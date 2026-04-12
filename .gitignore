@@ -32,6 +32,7 @@ site/
 pip-wheel-metadata/
 
 # Local runtime and environment files
+AGENTS.md
 env.toml
 runtime.sqlite
 runtime.db
