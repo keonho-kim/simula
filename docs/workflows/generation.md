@@ -42,6 +42,20 @@ flowchart LR
    actor registry.
 5. `persist_generated_actors` stores the final actor list.
 
+## Prompt-Facing Inputs
+
+`generate_actor_slot` does not render the full planning bundle directly into the prompt.
+Instead it builds compact generator views from planning outputs:
+
+- compact interpretation view
+- compact situation view
+- compact action catalog view
+- compact coordination-frame view
+- cast item JSON
+
+The compact action catalog is intentionally truncated to a fixed upper bound before prompt
+rendering.
+
 ## Important Current Behaviors
 
 - generation fails fast if planning did not produce a cast roster
@@ -49,3 +63,5 @@ flowchart LR
 - the finalized actor registry must match the expected cast order by `cast_id`
 - the generator must produce at least two actors
 - parse failure counts are accumulated back into shared state
+- generation uses compact prompt projections even though the shared workflow state still
+  carries the richer planning bundle

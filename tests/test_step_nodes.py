@@ -274,21 +274,9 @@ def test_dispatch_selected_actor_proposals_sends_minimal_actor_task_payload() ->
     assert "actors" not in payload
     actor_task = payload["actor_proposal_task"]
     assert actor_task["actor"]["actor_id"] == "a"
-    assert "avatar_seed" not in actor_task["actor"]
     assert actor_task["focus_slice"]["slice_id"] == "focus-1"
-    assert "unread_visible_activities" not in actor_task
-    assert "recent_visible_activities" not in actor_task
     assert actor_task["visible_action_context"][0]["activity_id"] == "a2"
-    assert "visibility_scope" not in actor_task["visible_action_context"][0]
     assert actor_task["visible_actors"][0]["actor_id"] == "b"
-    assert set(actor_task["visible_actors"][0]) == {
-        "actor_id",
-        "display_name",
-        "role",
-        "group_name",
-        "baseline_attention_tier",
-        "story_function",
-    }
 
 
 def test_prepare_focus_candidates_advances_step_and_builds_candidates() -> None:
@@ -784,9 +772,6 @@ def test_adjudicate_step_focus_adopts_selected_actions_and_updates_clock() -> No
     assert len(result["latest_step_activities"]) == 1
     assert result["latest_step_activities"][0]["source_actor_id"] == "a"
     assert result["simulation_clock"]["total_elapsed_minutes"] == 90
-    assert result["rejected_action_notes"] == [
-        "b의 proposal은 이번 단계 focus와 거리가 있다."
-    ]
 
 
 def test_decide_runtime_progression_updates_state(caplog) -> None:

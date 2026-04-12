@@ -51,6 +51,8 @@ Initializes the mailbox/feed state and clears runtime-only channels such as:
 - `actor_intent_states`
 - `world_state_summary`
 
+The current runtime reset does not include the older `observer_event_*` scratch channels.
+
 ### `coordinator`
 
 Delegates the step execution core:
@@ -72,6 +74,14 @@ Produces the observer report for the current step and updates:
 - `world_state_summary`
 - `stagnation_steps`
 
+The observer input is built from compact views, not from the full runtime state:
+
+- compact latest-step actions
+- compact latest background updates
+- relevant intent subset
+- `prior_state_digest`
+- current clock and current step time-advance snapshot
+
 ### `persist_step_artifacts`
 
 Persists the latest adopted activities together with the observer report.
@@ -86,6 +96,8 @@ Decides whether the runtime loop ends or returns to the coordinator.
 - sets `momentum` and `atmosphere`
 - refreshes `world_state_summary`
 - contributes to stop logic through `momentum`
+- reads compact prompt projections tailored to the latest step instead of the full activity
+  history
 
 ## What the Observer Does Not Own Today
 
@@ -105,6 +117,7 @@ The runtime stops when either condition is met:
 
 ## Important Current Behaviors
 
+- runtime uses prompt projections to keep role inputs smaller than the full stored state
 - the compiled runtime path is smaller than the full set of prompt modules present in the
   tree
 - prompts such as step-time estimation or alternative event decomposition exist in the

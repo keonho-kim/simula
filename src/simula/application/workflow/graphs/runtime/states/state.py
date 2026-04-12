@@ -48,10 +48,7 @@ class RuntimeStateFragment(TypedDict, total=False):
     background_updates: list[dict[str, Any]]
     actor_proposal_task: ActorProposalTask
     pending_actor_proposals: list[ActorProposalResult]
-    pending_adopted_actions: list[dict[str, Any]]
-    rejected_action_notes: list[str]
     actor_intent_states: list[dict[str, Any]]
-    pending_intent_updates: list[dict[str, Any]]
     intent_history: list[dict[str, Any]]
     pending_step_time_advance: dict[str, Any] | None
     simulation_clock: dict[str, Any]

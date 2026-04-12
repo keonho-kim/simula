@@ -25,9 +25,12 @@ flowchart LR
     Commands --> Executor["application.services.executor"]
     Executor --> Workflow["SIMULATION_WORKFLOW / recompiled graph"]
     Executor --> Store["app store"]
-    Executor --> Router["LLM router"]
-    Workflow --> Store
+    Workflow --> State["shared workflow state"]
+    State --> PromptViews["prompt projections"]
+    PromptViews --> RolePrompts["role prompts"]
+    RolePrompts --> Router["LLM router"]
     Workflow --> FinalState["final state"]
+    FinalState --> ReportProjection["report_projection_json"]
     FinalState --> Presentation["application.services.presentation"]
 ```
 
@@ -71,10 +74,33 @@ The workflow produces structured state fields such as:
 Actual files in `output/<run_id>/` are written later by the presentation layer, not by the
 graph itself.
 
+### Rich State vs. Prompt Projections
+
+The workflow stores richer state than any single role sees. Runtime and generation nodes
+derive compact prompt projections before invoking LLMs so that prompt payloads stay small
+and role-specific.
+
+Examples:
+
+- actor prompts receive compact actor views, visible action context, unread backlog digests,
+  visible actors, and compact runtime guidance
+- coordinator prompts receive compact focus candidates, compact pending proposals, compact
+  background updates, and relevant intent subsets
+- observer prompts receive compact latest-step actions, compact background updates, and a
+  prior-state digest
+
+These prompt projections are ephemeral node inputs, not persisted workflow channels.
+
 ### Graph Persistence vs. Human-Facing Reports
 
 Runtime and finalization nodes persist structured artifacts to the app store. Human-readable
 report files are derived from the final state after the run completes.
+
+### Prompt Projections vs. Report Projection
+
+`report_projection_json` belongs only to finalization. It is a report-writing artifact built
+after runtime completes, and it should not be confused with the prompt projection helpers
+used during generation, coordinator, actor, or observer calls.
 
 ### Runtime Summary vs. Runtime Adjudication
 

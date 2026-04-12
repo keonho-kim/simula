@@ -10,7 +10,7 @@ The current compiled workflow uses five distinct role slots:
 | `generator` | actor-card generation from the cast roster | generation |
 | `coordinator` | focus planning, background update digestion, step adjudication | runtime coordinator |
 | `actor` | one-step action proposals for selected actors | runtime coordinator |
-| `observer` | per-step summary, momentum, atmosphere, world digest | runtime observation |
+| `observer` | per-step summary, momentum, atmosphere, world digest | runtime observation and finalization writing |
 
 ## Routing Model
 
@@ -50,6 +50,22 @@ The runtime graph is intentionally split:
 This means time advancement and adjudication belong to the coordinator path in the current
 compiled graph, not to the observer path.
 
+## Compact Prompt Inputs
+
+LLM-facing nodes do not consume the full workflow state directly. The current code derives
+compact prompt projections first and then renders prompts from those reduced views.
+
+| Role | Prompt-facing inputs |
+| --- | --- |
+| `generator` | compact interpretation view, compact situation view, compact action catalog, compact coordination-frame view, cast item |
+| `coordinator` | compact focus candidates, compact coordination-frame fragments, compact situation fragments, compact pending actor proposals, compact background updates, relevant intent subset, compact progression plan |
+| `actor` | compact actor card, `visible_action_context`, `visible_actors`, `unread_backlog_digest`, compact runtime guidance, focus slice |
+| `observer` | compact latest-step actions, compact background updates, relevant intent subset, `prior_state_digest`, current time snapshot |
+
+This is intentional design, not an incidental implementation detail. Prompt input limits are
+used to preserve role separation and keep each role focused on the smallest useful slice of
+state.
+
 ## Failure Behavior by Role
 
 | Role or stage | Current behavior |
@@ -77,6 +93,10 @@ Prompt groups are currently split by workflow area:
 Some prompt modules exist for decompositions that are not wired into the current compiled
 runtime path. The workflow docs describe the compiled path first and should be treated as
 the source of truth for execution shape.
+
+In the current compiled runtime, the projection helpers in
+`simula.application.workflow.utils.prompt_projections` are the main boundary between rich
+workflow state and prompt-facing inputs.
 
 ## Finalization Role Reuse
 

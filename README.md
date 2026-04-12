@@ -41,6 +41,11 @@ The project is opinionated about state:
   and simulation time as explicit state channels
 - finalization rebuilds a report projection instead of dumping raw logs directly
 
+The LLM-facing nodes do not read the full workflow state directly. Generation,
+coordinator, actor, and observer prompts now receive compact prompt projections derived
+from rich workflow state, while finalization uses a separate report projection for
+report-writing tasks.
+
 ## Why It Exists
 
 Most LLM simulations collapse planning, action generation, pacing, and summarization into
@@ -66,23 +71,34 @@ flowchart LR
     Init --> Workflow["LangGraph simulation workflow"]
     Workflow --> Store["App store"]
     Workflow --> State["Shared workflow state"]
+    State --> PromptViews["prompt projections"]
+    PromptViews --> RolePrompts["role prompts"]
+    RolePrompts --> Models["LLM router<br/>planner / generator / coordinator / actor / observer"]
     Workflow --> FinalState["Final workflow state"]
+    FinalState --> ReportProjection["report_projection_json"]
     FinalState --> Presentation["Presentation / file writer"]
     Presentation --> Outputs["output/<run_id>/simulation.log.jsonl<br/>output/<run_id>/final_report.md"]
-    Executor --> Models["LLM router<br/>planner / generator / coordinator / actor / observer"]
-    Models --> Workflow
 ```
 
 ### Workflow Blueprint
 
 ```mermaid
-flowchart LR
-      RuntimeInit["initialize_runtime_state"] --> Coordinator["coordinator"]
-      Coordinator --> Observe["observe_step"]
-      Observe --> Persist["persist_step_artifacts"]
-      Persist --> Stop["stop_step"]
-      Stop -- continue --> Coordinator
-      Stop -- complete --> RuntimeDone["runtime end"]
+flowchart TD
+    Simulation["simulation"] --> Planning["planning"]
+    Planning --> Generation["generation"]
+    Generation --> Runtime["runtime"]
+    Runtime --> Finalization["finalization"]
+
+    subgraph RuntimeLoop["runtime internals"]
+        RuntimeInit["initialize_runtime_state"] --> Coordinator["coordinator"]
+        Coordinator --> Observe["observe_step"]
+        Observe --> Persist["persist_step_artifacts"]
+        Persist --> Stop["stop_step"]
+        Stop -- continue --> Coordinator
+        Stop -- complete --> RuntimeDone["runtime end"]
+    end
+
+    Runtime -. enters .-> RuntimeInit
 ```
 
 ### Stage Map
@@ -90,8 +106,8 @@ flowchart LR
 | Stage | Primary owner | What it produces |
 | --- | --- | --- |
 | Planning | `planner` | interpretation, situation bundle, runtime progression plan, action catalog, coordination frame, cast roster, persisted `plan` |
-| Generation | `generator` | actor registry |
-| Runtime | `coordinator`, `actor`, `observer` | activities, focus history, background updates, intent history, simulation clock, stop signals |
+| Generation | `generator` | actor registry from compact interpretation, situation, action-catalog, and coordination-frame views |
+| Runtime | `coordinator`, `actor`, `observer` | compressed candidate/focus decisions, compact actor prompt inputs, compact observer inputs, adopted activities, intent history, simulation clock, stop signals |
 | Finalization | `observer` + finalization assembly nodes | final report JSON, report projection JSON, markdown report state |
 
 ### Core Runtime Terms
@@ -101,9 +117,12 @@ flowchart LR
 | `action catalog` | scenario-wide list of allowed action types that actors choose from |
 | `coordination frame` | planner-produced rules that guide runtime focus and background motion |
 | `focus slice` | the actor cluster that the coordinator decides to follow directly in one step |
+| `prompt projection` | compact prompt-facing view derived from rich workflow state for one role or node |
+| `visible action context` | compact action digest set shown to one actor instead of the full visible history |
+| `unread backlog digest` | summary of unread actions omitted from the compact actor context window |
 | `background update` | structured digest for deferred actors that were not called directly |
 | `observer report` | per-step summary with `momentum`, `atmosphere`, and `world_state_summary` |
-| `report projection` | finalization-only structure derived from runtime state for report writing |
+| `report projection` | finalization-only report-writing structure, separate from prompt projections |
 
 ## Run It
 
@@ -179,7 +198,7 @@ judgment, settlement, collapse, or final choice.
 | [`docs/architecture.md`](./docs/architecture.md) | Understand layers, execution path, and system boundaries |
 | [`docs/workflows/README.md`](./docs/workflows/README.md) | See how the graph is split into subgraphs |
 | [`docs/workflows/runtime.md`](./docs/workflows/runtime.md) | Debug the runtime loop and stop conditions |
-| [`docs/workflows/coordinator.md`](./docs/workflows/coordinator.md) | Inspect focus planning and adjudication responsibilities |
+| [`docs/workflows/coordinator.md`](./docs/workflows/coordinator.md) | Inspect focus planning, actor task payloads, and adjudication responsibilities |
 | [`docs/contracts.md`](./docs/contracts.md) | Check state channels, config fields, and output contracts |
-| [`docs/llm.md`](./docs/llm.md) | Review role responsibilities, model routing, and failure behavior |
+| [`docs/llm.md`](./docs/llm.md) | Review role responsibilities, model routing, and compact prompt inputs |
 | [`docs/operations.md`](./docs/operations.md) | Run the project locally and validate the environment |

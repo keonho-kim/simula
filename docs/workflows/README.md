@@ -30,13 +30,20 @@ flowchart LR
 | Runtime | `plan`, `actors`, runtime settings, RNG seed | `activities`, `observer_reports`, `simulation_clock`, `intent_history`, stop flags |
 | Finalization | accumulated runtime state | `final_report`, `simulation_log_jsonl`, `report_projection_json`, `final_report_markdown` |
 
+## Projection Layers
+
+- prompt projections
+  - compact role-specific views used in generation and runtime prompts
+- report projection
+  - finalization-stage report artifact stored in `report_projection_json`
+
 ## Documents in This Folder
 
 | Document | Focus |
 | --- | --- |
-| [`simulation.md`](./simulation.md) | root workflow assembly and executor handoff |
+| [`simulation.md`](./simulation.md) | root workflow assembly, executor handoff, and prompt-projection boundary |
 | [`planning.md`](./planning.md) | scenario interpretation and plan persistence |
-| [`generation.md`](./generation.md) | actor slot fan-out/fan-in and actor persistence |
-| [`runtime.md`](./runtime.md) | runtime loop, stop logic, observer responsibilities |
-| [`coordinator.md`](./coordinator.md) | focus planning, actor proposal fan-out, adjudication |
-| [`finalization.md`](./finalization.md) | report payload, projection, markdown assembly |
+| [`generation.md`](./generation.md) | actor slot fan-out, compact generator inputs, and actor persistence |
+| [`runtime.md`](./runtime.md) | runtime loop, stop logic, observer responsibilities, compact observer inputs |
+| [`coordinator.md`](./coordinator.md) | focus planning, actor proposal fan-out, actor task payloads, and adjudication |
+| [`finalization.md`](./finalization.md) | report payload, report projection, and markdown assembly |

@@ -124,4 +124,6 @@ uv run ruff format src tests -v
   steps
 - deterministic branching can be influenced through `SIM_RNG_SEED` or `[env].rng_seed`
 - the removed fixed-time settings `time_unit` and `time_step_size` are rejected on purpose
+- prompt projections are transient in-memory prompt inputs; `report_projection_json` is the
+  finalization-specific persisted report-writing artifact
 - file outputs are produced after the workflow returns, not from inside the graph itself

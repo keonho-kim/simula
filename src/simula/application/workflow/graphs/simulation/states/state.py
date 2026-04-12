@@ -35,8 +35,6 @@ class SimulationWorkflowState(PlanningStateFragment, TypedDict, total=False):
     run_id: str
     scenario: str
     plan: dict[str, Any]
-    action_catalog: dict[str, Any] | None
-    coordination_frame: dict[str, Any] | None
     actors: list[dict[str, Any]]
     activity_feeds: dict[str, dict[str, Any]]
     activities: list[dict[str, Any]]
@@ -49,10 +47,7 @@ class SimulationWorkflowState(PlanningStateFragment, TypedDict, total=False):
     deferred_actor_ids: list[str]
     latest_background_updates: list[dict[str, Any]]
     background_updates: list[dict[str, Any]]
-    pending_adopted_actions: list[dict[str, Any]]
-    rejected_action_notes: list[str]
     actor_intent_states: list[dict[str, Any]]
-    pending_intent_updates: list[dict[str, Any]]
     intent_history: list[dict[str, Any]]
     pending_step_time_advance: dict[str, Any] | None
     simulation_clock: dict[str, Any]

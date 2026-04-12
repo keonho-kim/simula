@@ -161,12 +161,8 @@ async def adjudicate_step_focus(
         "activity_feeds": applied["activity_feeds"],
         "activities": applied["activities"],
         "latest_step_activities": latest_step_actions,
-        "pending_adopted_actions": latest_step_actions,
         "pending_actor_proposals": Overwrite(value=[]),
         "actor_intent_states": [
-            item.model_dump(mode="json") for item in adjudication.updated_intent_states
-        ],
-        "pending_intent_updates": [
             item.model_dump(mode="json") for item in adjudication.updated_intent_states
         ],
         "intent_history": list(state.get("intent_history", []))
@@ -183,7 +179,6 @@ async def adjudicate_step_focus(
         "simulation_clock": clock["simulation_clock"],
         "step_time_history": list(state.get("step_time_history", []))
         + [clock["step_time_advance"]],
-        "rejected_action_notes": list(adjudication.rejected_action_notes),
         "world_state_summary": adjudication.world_state_summary_hint,
         "parse_failures": int(state.get("parse_failures", 0))
         + applied["parse_failure_count"]

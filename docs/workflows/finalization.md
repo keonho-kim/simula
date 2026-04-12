@@ -66,6 +66,19 @@ flowchart TD
 The finalization prompts currently reuse the `observer` role for timeline-anchor inference
 and report section writing.
 
+## Report Projection vs. Prompt Projection
+
+Finalization uses `report_projection_json`, which is not the same thing as the compact
+prompt projections used in generation or runtime.
+
+- prompt projections
+  - ephemeral prompt-facing views derived right before one LLM call
+- report projection
+  - a finalization-stage artifact built from completed runtime state for report writing
+
+Finalization is therefore not another consumer of the runtime prompt-projection helpers. It
+builds its own report-writing projection and then feeds that into section-writing prompts.
+
 ## Report Projection Focus
 
 The projection stage is where finalization becomes different from a raw log dump. It

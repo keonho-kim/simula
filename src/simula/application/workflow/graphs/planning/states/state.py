@@ -26,9 +26,7 @@ class PlanningStateFragment(TypedDict, total=False):
     pending_interpretation: dict[str, Any] | None
     pending_situation: dict[str, Any] | None
     pending_action_catalog: dict[str, Any] | None
-    action_catalog: dict[str, Any] | None
     pending_coordination_frame: dict[str, Any] | None
-    coordination_frame: dict[str, Any] | None
     progression_plan: dict[str, Any] | None
     pending_cast_roster: list[dict[str, Any]]
     pending_plan: dict[str, Any] | None

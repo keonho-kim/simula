@@ -74,6 +74,22 @@ current runtime supports only `max_steps` as a direct time-related setting.
 | `stagnation_steps` | low-momentum accumulation counter |
 | `stop_requested` / `stop_reason` | runtime stop flags |
 
+The current runtime state no longer carries the older observer-event scratch channels.
+
+### Actor Proposal Task Payload
+
+`ActorProposalTask` is the prompt-facing runtime payload used for one selected actor call.
+
+| Field | Meaning |
+| --- | --- |
+| `actor` | compact actor view for the selected actor |
+| `unread_activity_ids` | unread activity identifiers that will be consumed on adoption |
+| `visible_action_context` | compact recent and unread activity digest shown to the actor |
+| `unread_backlog_digest` | summary of unread items omitted from the compact context window |
+| `visible_actors` | compact actor references relevant to the current step |
+| `focus_slice` | the selected focus slice that contains the actor |
+| `runtime_guidance` | compact simulation objective, world digest, previous observer signal, constraints, intent snapshot, and available actions |
+
 ### Finalization
 
 | Channel | Meaning |
@@ -84,6 +100,15 @@ current runtime supports only `max_steps` as a direct time-related setting.
 | `report_projection_json` | report-specific projection over runtime state |
 | `report_*_section` | generated markdown section bodies |
 | `final_report_markdown` | final markdown report assembled in-state |
+
+### Projection Vocabulary
+
+- `prompt projection`
+  - compact in-memory prompt input derived from workflow state for generation, coordinator,
+    actor, or observer nodes
+- `report_projection_json`
+  - persisted finalization state channel used for report-writing, not a runtime prompt
+    projection
 
 ## Structured Output Surface
 
@@ -108,6 +133,13 @@ current runtime supports only `max_steps` as a direct time-related setting.
 - `ObserverReport`
 - `SimulationClockSnapshot`
 - `StepTimeAdvanceRecord`
+
+### Optional Output Fields
+
+- `ActorActionProposal.expected_outcome`
+  - optional predicted result of the proposed action
+- `CanonicalAction.expected_outcome`
+  - optional carried-through expected result on stored actions
 
 ### Finalization Outputs
 
@@ -141,7 +173,8 @@ The repository does not treat all roles the same.
 - coordinator nodes can fall back to default payloads for focus planning, background
   updates, and step adjudication
 - actor proposals can fall back to a forced idle/default action path
-- observer summaries are expected to succeed without the same default-fallback path
+- observer summaries are expected to return a structured report without the same
+  default-fallback path
 - config validation and storage shape mismatches fail explicitly
 
 For role-by-role details, see [`llm.md`](./llm.md).

@@ -62,6 +62,20 @@ flowchart TD
 - file outputs are not written inside this workflow; they are written later from the final
   state by the presentation layer
 
+## Prompt Projection Boundary
+
+The root workflow moves rich shared state between subgraphs, but generation, coordinator,
+actor, and observer LLM calls do not receive that state wholesale. Downstream nodes derive
+compact prompt projections before each role invocation.
+
+- generation uses compact planning views
+- coordinator uses compact focus, proposal, background, and intent views
+- actor uses a compact per-actor task payload
+- observer uses compact latest-step and prior-state digests
+
+Finalization is different: it derives `report_projection_json`, which is a report-writing
+artifact rather than a prompt projection helper payload.
+
 ## Related Docs
 
 - planning internals: [`planning.md`](./planning.md)

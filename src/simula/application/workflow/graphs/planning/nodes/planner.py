@@ -264,7 +264,6 @@ async def build_action_catalog(
     )
     return {
         "pending_action_catalog": action_catalog.model_dump(mode="json"),
-        "action_catalog": action_catalog.model_dump(mode="json"),
         "planning_latency_seconds": float(state.get("planning_latency_seconds", 0.0))
         + meta.duration_seconds,
     }
@@ -304,7 +303,6 @@ async def build_coordination_frame(
     dumped = coordination_frame.model_dump(mode="json")
     return {
         "pending_coordination_frame": dumped,
-        "coordination_frame": dumped,
         "planning_latency_seconds": float(state.get("planning_latency_seconds", 0.0))
         + meta.duration_seconds,
     }
@@ -376,8 +374,6 @@ async def build_cast_roster(
     )
     return {
         "plan": plan_payload,
-        "action_catalog": dict(action_catalog),
-        "coordination_frame": dict(coordination_frame),
         "pending_plan": plan_payload,
         "pending_cast_roster": cast_roster,
         "planning_latency_seconds": float(state.get("planning_latency_seconds", 0.0))
