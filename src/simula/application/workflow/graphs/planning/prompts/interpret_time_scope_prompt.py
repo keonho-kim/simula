@@ -25,8 +25,8 @@ _PROMPT = (
     Your task is to express the scenario's effective time scope in structured form.
 
     # Input
-    - Scenario:
-    {scenario_text}
+    - Scenario brief JSON:
+    {scenario_brief_json}
     - Current maximum steps: {max_steps}
 
     # Output Format

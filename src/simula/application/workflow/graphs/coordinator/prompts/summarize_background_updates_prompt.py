@@ -46,6 +46,7 @@ _PROMPT = textwrap.dedent(
     - Write all natural-language values in Korean.
     - Keep identifiers, field names, and enum values in the required schema format.
     - Only include deferred actors whose background motion is worth carrying into the next step.
+    - Every `background_updates[]` item must include the current `step_index`.
     - pressure_level must be exactly one of `low`, `medium`, `high`.
     - Do not fabricate detailed off-screen actions; summarize pressure, delay, preparation, or brewing response.
     """

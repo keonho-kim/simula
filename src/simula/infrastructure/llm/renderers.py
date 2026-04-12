@@ -24,10 +24,12 @@ from simula.domain.contracts import (
     ActorCard,
     ActorIntentStateBatch,
     BackgroundUpdateBatch,
+    CastRoster,
     CoordinationFrame,
     ObserverEventProposal,
     ObserverReport,
     RuntimeProgressionPlan,
+    ScenarioBrief,
     ScenarioInterpretation,
     ScenarioTimeScope,
     SimulationClockSnapshot,
@@ -61,6 +63,13 @@ def render_structured_response(
             f"시간 범위: {parsed.time_scope.start} -> {parsed.time_scope.end}\n"
             f"공개 맥락 {len(parsed.public_context)}개 / 비공개 맥락 {len(parsed.private_context)}개\n"
             f"중요 변수: {pressures}"
+        )
+
+    if isinstance(parsed, ScenarioBrief):
+        return (
+            "시나리오 요약 분석을 만들었습니다.\n"
+            f"핵심 주체: {_list_preview(parsed.key_entities, limit=3)}\n"
+            f"요약: {_truncate(parsed.summary, 220)}"
         )
 
     if isinstance(parsed, ScenarioTimeScope):
@@ -111,6 +120,13 @@ def render_structured_response(
             "시나리오 공통 action catalog를 만들었습니다.\n"
             f"action 수: {len(parsed.actions)}\n"
             f"대표 action_type: {action_types}"
+        )
+
+    if isinstance(parsed, CastRoster):
+        names = ", ".join(item.display_name for item in parsed.items[:6]) or "-"
+        return (
+            f"등장 주체 {len(parsed.items)}명을 확정했습니다.\n"
+            f"인물: {names}"
         )
 
     if isinstance(parsed, ActorCard):
@@ -215,7 +231,12 @@ def render_structured_response(
             f"관찰 포인트: {observations}"
         )
 
-    return f"{role} 응답을 해석했습니다: {_truncate(parsed.model_dump_json(), 220)}"
+    if isinstance(parsed, BaseModel):
+        dumped = parsed.model_dump(mode="json")
+        if isinstance(dumped, dict):
+            keys = ", ".join(str(key) for key in list(dumped.keys())[:6]) or "-"
+            return f"{role} 응답을 해석했습니다.\n필드: {keys}"
+    return f"{role} 응답을 해석했습니다."
 
 
 def render_text_response(

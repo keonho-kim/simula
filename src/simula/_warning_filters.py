@@ -26,3 +26,9 @@ def configure_warning_filters() -> None:
         category=DeprecationWarning,
         module=r"google\.genai\.types",
     )
+    warnings.filterwarnings(
+        "ignore",
+        message=r"Pydantic serializer warnings:",
+        category=UserWarning,
+        module=r"pydantic\.main",
+    )

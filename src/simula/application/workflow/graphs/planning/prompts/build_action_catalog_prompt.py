@@ -13,23 +13,31 @@ from __future__ import annotations
 import textwrap
 
 from langchain_core.prompts import PromptTemplate
-from simula.prompts.shared.user_facing_language import build_user_facing_style_block
 
-_USER_FACING_STYLE = build_user_facing_style_block()
-
-_PROMPT = (
-    textwrap.dedent(
-        """
+_PROMPT = textwrap.dedent(
+    """
     # Role
     You are a simulation planner at our company.
-    Your task is to derive a scenario-wide action catalog that later actors can choose from.
+    Derive the scenario-wide action catalog that later actors may choose from.
+
+    # Hard Constraints
+    - Write natural-language values in Korean.
+    - Keep field names and enum values exactly as required by the schema.
+    - Return at most 5 broad actions.
+    - Produce scenario-wide actions, not actor-specific copies.
+    - Each `action_type` must be a broad capability bucket, not a topic, event name, or actor-specific micro action.
+    - Prefer broad buckets such as public signaling, private coordination, multilateral coordination, posture or preparation adjustment, and one scenario-specific residual bucket.
+    - `supported_visibility` may use only `public`, `private`, `group`.
+    - `supports_utterance` is true only when speech-like output is natural for that action.
+    - Keep each `description` to 1-2 short sentences.
+    - Keep `role_hints` and `group_hints` to at most 2 items each.
+    - Keep `examples_or_usage_notes` to at most 1 short item, or leave it empty.
+    - Keep `selection_guidance` to at most 2 short lines.
 
     # Input
-    - Scenario:
-    {scenario_text}
-    - Scenario interpretation JSON:
+    - Interpretation summary JSON:
     {interpretation_json}
-    - Situation bundle JSON:
+    - Situation summary JSON:
     {situation_json}
 
     # Output Format
@@ -38,22 +46,7 @@ _PROMPT = (
 
     # Example
     {output_example}
-
-    # Instructions
-    - Write all natural-language values in Korean.
-    - Keep identifiers, field names, and enum values in the required schema format.
-    - Produce scenario-wide actions, not actor-specific copies.
-    - Each action_type must describe a meaningful action, not a topic or mood.
-    - `speech` must be treated as one possible action, not the default center of the simulation.
-    - Include both conversational and non-conversational actions when the scenario supports them.
-    - role_hints and group_hints should help later filtering, but they do not need to be exhaustive.
-    - supported_visibility must only use `public`, `private`, `group`.
-    - requires_target should reflect whether the action normally needs a direct target.
-    - supports_utterance should be true only when speech or a speech-like output can naturally appear.
     """
-    ).strip()
-    + "\n"
-    + _USER_FACING_STYLE
-)
+).strip()
 
 PROMPT = PromptTemplate.from_template(_PROMPT)

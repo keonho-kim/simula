@@ -53,6 +53,7 @@ class StructuredLLM(Protocol):
         allow_default_on_failure: bool = False,
         default_payload: dict[str, object] | None = None,
         log_context: dict[str, object] | None = None,
+        enforce_native_structured_output: bool = False,
     ) -> tuple[SchemaT, StructuredCallMeta]:
         """LLM 구조화 응답과 메타데이터를 함께 반환한다."""
 
@@ -70,6 +71,7 @@ class StructuredLLM(Protocol):
         allow_default_on_failure: bool = False,
         default_payload: dict[str, object] | None = None,
         log_context: dict[str, object] | None = None,
+        enforce_native_structured_output: bool = False,
     ) -> tuple[SchemaT, StructuredCallMeta]:
         """비동기 LLM 구조화 응답과 메타데이터를 함께 반환한다."""
 

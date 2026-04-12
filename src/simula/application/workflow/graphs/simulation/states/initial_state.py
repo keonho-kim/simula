@@ -56,6 +56,7 @@ def build_initial_workflow_state(
                 "last_advanced_step_index": 0,
             },
             "step_time_history": [],
+            "pending_scenario_brief": None,
             "pending_interpretation_core": None,
             "pending_progression_plan": None,
             "pending_time_scope": None,

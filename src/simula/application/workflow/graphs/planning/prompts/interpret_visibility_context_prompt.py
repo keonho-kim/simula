@@ -25,8 +25,8 @@ _PROMPT = (
     Your task is to separate what is publicly observable from what remains private or hidden in the scenario.
 
     # Input
-    - Scenario:
-    {scenario_text}
+    - Scenario brief JSON:
+    {scenario_brief_json}
 
     # Output Format
     - Return format: {output_format_name}

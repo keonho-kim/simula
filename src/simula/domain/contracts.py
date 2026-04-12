@@ -33,6 +33,25 @@ class ScenarioTimeScope(BaseModel):
     end: str
 
 
+class ScenarioBrief(BaseModel):
+    """후속 planner 단계가 재사용할 시나리오 요약 분석이다."""
+
+    summary: str
+    key_entities: list[str] = Field(default_factory=list)
+    explicit_time_signals: list[str] = Field(default_factory=list)
+    public_facts: list[str] = Field(default_factory=list)
+    private_dynamics: list[str] = Field(default_factory=list)
+    terminal_conditions: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_scenario_brief(self) -> "ScenarioBrief":
+        """요약 분석 필수 필드를 검증한다."""
+
+        if not self.summary.strip():
+            raise ValueError("summary는 비어 있을 수 없습니다.")
+        return self
+
+
 class RuntimeProgressionPlan(BaseModel):
     """Planner가 제안하는 실행 시간 진행 계획이다."""
 
@@ -175,6 +194,8 @@ class ActionCatalog(BaseModel):
         action_types = [item.action_type for item in self.actions]
         if not action_types:
             raise ValueError("actions는 최소 1개 이상 필요합니다.")
+        if len(action_types) > 5:
+            raise ValueError("action catalog는 최대 5개 action만 허용합니다.")
         if len(action_types) != len(set(action_types)):
             raise ValueError("action catalog에 중복 action_type을 허용하지 않습니다.")
         return self
@@ -188,6 +209,27 @@ class CastRosterItem(BaseModel):
     role_hint: str
     group_name: str | None = None
     core_tension: str
+
+
+class CastRoster(BaseModel):
+    """구조화 출력용 cast roster 묶음이다."""
+
+    items: list[CastRosterItem] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_cast_roster(self) -> "CastRoster":
+        """cast roster의 필수 항목과 유일성을 검증한다."""
+
+        if not self.items:
+            raise ValueError("items는 최소 1개 이상 필요합니다.")
+
+        cast_ids = [item.cast_id for item in self.items]
+        display_names = [item.display_name for item in self.items]
+        if len(cast_ids) != len(set(cast_ids)):
+            raise ValueError("cast roster에 중복 cast_id를 허용하지 않습니다.")
+        if len(display_names) != len(set(display_names)):
+            raise ValueError("cast roster에 중복 display_name을 허용하지 않습니다.")
+        return self
 
 
 class ActorCard(BaseModel):

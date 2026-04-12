@@ -16,6 +16,9 @@ from typing import cast
 from langgraph.runtime import Runtime
 
 from simula.application.workflow.context import WorkflowRuntimeContext
+from simula.application.workflow.graphs.runtime.output_schema.bundles import (
+    build_observer_report_prompt_bundle,
+)
 from simula.application.workflow.graphs.runtime.prompts.observe_step_prompt import (
     PROMPT as OBSERVE_STEP_PROMPT,
 )
@@ -31,7 +34,6 @@ from simula.application.workflow.utils.prompt_projections import (
 from simula.domain.reporting import evaluate_stop
 from simula.domain.runtime_policy import next_stagnation_steps
 from simula.domain.contracts import ObserverReport
-from simula.prompts.shared.output_examples import build_output_prompt_bundle
 
 
 async def observe_step(
@@ -126,7 +128,7 @@ async def observe_step(
                 ensure_ascii=False,
                 separators=(",", ":"),
             ),
-            **build_output_prompt_bundle(ObserverReport),
+            **build_observer_report_prompt_bundle(),
         )
         report, meta = await runtime.context.llms.ainvoke_structured_with_meta(
             "observer",

@@ -16,6 +16,7 @@ from typing import Any, TypedDict
 class PlanningStateFragment(TypedDict, total=False):
     """planning 서브그래프 상태 조각이다."""
 
+    pending_scenario_brief: dict[str, Any] | None
     pending_interpretation_core: str | None
     pending_progression_plan: dict[str, Any] | None
     pending_time_scope: dict[str, Any] | None

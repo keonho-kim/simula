@@ -159,7 +159,7 @@ def test_build_actor_available_actions_view_caps_and_uses_usage_hint() -> None:
         fallback_actions=fallback,
     )
 
-    assert len(compact) == 6
+    assert len(compact) == 5
     assert set(compact[0]) == {
         "action_type",
         "supported_visibility",

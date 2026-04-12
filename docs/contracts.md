@@ -114,11 +114,13 @@ The current runtime state no longer carries the older observer-event scratch cha
 
 ### Planning Outputs
 
+- `ScenarioBrief`
 - `ScenarioInterpretation`
 - `RuntimeProgressionPlan`
 - `SituationBundle`
 - `ActionCatalog`
 - `CoordinationFrame`
+- `CastRoster`
 - `CastRosterItem`
 
 ### Generation and Runtime Outputs

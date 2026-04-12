@@ -14,7 +14,10 @@ import asyncio
 import logging
 from types import SimpleNamespace
 
+import pytest
+
 from simula.application.workflow.graphs.coordinator.nodes.adjudicate_step_focus import (
+    _normalize_step_time_advance_payload,
     adjudicate_step_focus,
 )
 from simula.application.workflow.graphs.coordinator.nodes.build_step_focus_plan import (
@@ -35,10 +38,12 @@ from simula.application.workflow.graphs.runtime.nodes.observation import (
 )
 from simula.domain.activity_feeds import initialize_activity_feeds
 from simula.domain.contracts import (
+    ActionCatalog,
     ActorActionProposal,
     BackgroundUpdateBatch,
     ObserverReport,
     RuntimeProgressionPlan,
+    ScenarioBrief,
     StepAdjudication,
     StepFocusPlan,
 )
@@ -76,6 +81,18 @@ class FakePlannerLLM:
         **kwargs,  # noqa: ANN003
     ):
         del role, prompt, kwargs
+        if schema is ScenarioBrief:
+            return (
+                ScenarioBrief(
+                    summary="공개 신호와 비공개 계산이 함께 움직이는 다자 위기다. 제한된 시간 안에 누가 먼저 강한 신호를 보내고 누가 그 신호를 따라갈지가 종결 경로를 가른다.",
+                    key_entities=["핵심 의사결정자", "직접 압박 상대"],
+                    explicit_time_signals=["초기 충돌 직후", "종결 직전"],
+                    public_facts=["공개 신호가 중요하다."],
+                    private_dynamics=["비공개 계산이 실제 선택을 바꾼다."],
+                    terminal_conditions=["최종 결심까지 본다."],
+                ),
+                SimpleNamespace(duration_seconds=0.4, parse_failure_count=0),
+            )
         assert schema is RuntimeProgressionPlan
         return (
             RuntimeProgressionPlan(
@@ -601,6 +618,55 @@ def test_summarize_background_updates_collects_updates() -> None:
     assert result["background_updates"][0]["pressure_level"] == "medium"
 
 
+def test_summarize_background_updates_overrides_step_index_with_current_step() -> None:
+    class FakeCoordinatorRouter:
+        async def ainvoke_structured_with_meta(
+            self,
+            role,
+            prompt,
+            schema,
+            **kwargs,  # noqa: ANN003
+        ):
+            del role, prompt, kwargs
+            assert schema is BackgroundUpdateBatch
+            return (
+                BackgroundUpdateBatch(
+                    background_updates=[
+                        {
+                            "step_index": 1,
+                            "actor_id": "c",
+                            "summary": "배경 준비가 이어진다.",
+                            "pressure_level": "low",
+                            "future_hook": "다음 단계 선택을 늦출 수 있다.",
+                        }
+                    ]
+                ),
+                SimpleNamespace(duration_seconds=0.1, parse_failure_count=0),
+            )
+
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(
+            llms=FakeCoordinatorRouter(),
+            logger=logging.getLogger("simula.test.step"),
+        )
+    )
+    state = {
+        "step_index": 3,
+        "actors": [{"actor_id": "c", "display_name": "C"}],
+        "deferred_actor_ids": ["c"],
+        "selected_actor_ids": [],
+        "activities": [],
+        "actor_intent_states": [],
+        "world_state_summary": "기존 상태",
+        "plan": {"coordination_frame": {"background_motion_rules": ["규칙"]}},
+        "background_updates": [],
+    }
+
+    result = asyncio.run(summarize_background_updates(state, runtime))
+
+    assert result["latest_background_updates"][0]["step_index"] == 3
+
+
 def test_adjudicate_step_focus_adopts_selected_actions_and_updates_clock() -> None:
     class FakeCoordinatorRouter:
         async def ainvoke_structured_with_meta(
@@ -787,6 +853,14 @@ def test_decide_runtime_progression_updates_state(caplog) -> None:
     )
     state = {
         "scenario": "테스트 시나리오",
+        "pending_scenario_brief": {
+            "summary": "공개 신호와 비공개 계산이 함께 움직이는 다자 위기다.",
+            "key_entities": ["핵심 의사결정자"],
+            "explicit_time_signals": ["초기 충돌 직후"],
+            "public_facts": ["공개 신호가 중요하다."],
+            "private_dynamics": ["비공개 계산이 실제 선택을 바꾼다."],
+            "terminal_conditions": ["최종 결심까지 본다."],
+        },
         "pending_interpretation_core": "공개 신호와 비공개 계산이 엇갈린다.",
         "max_steps": 4,
         "planning_latency_seconds": 0.0,
@@ -799,3 +873,38 @@ def test_decide_runtime_progression_updates_state(caplog) -> None:
     assert result["progression_plan"]["allowed_units"] == ["minute", "hour", "day"]
     assert result["progression_plan"]["max_steps"] == 4
     assert "시간 진행 계획 결정 완료" in caplog.text
+
+
+def test_action_catalog_rejects_more_than_five_actions() -> None:
+    with pytest.raises(ValueError, match="최대 5개 action만 허용"):
+        ActionCatalog(
+            actions=[
+                {
+                    "action_type": f"action-{index}",
+                    "label": f"액션 {index}",
+                    "description": "설명",
+                    "role_hints": [],
+                    "group_hints": [],
+                    "supported_visibility": ["public"],
+                    "requires_target": False,
+                    "supports_utterance": False,
+                    "examples_or_usage_notes": [],
+                }
+                for index in range(6)
+            ],
+            selection_guidance=[],
+        )
+
+
+def test_normalize_step_time_advance_accepts_unit_and_amount_aliases() -> None:
+    normalized = _normalize_step_time_advance_payload(
+        {
+            "unit": "hour",
+            "amount": 1,
+            "selection_reason": "짧은 대응 이후 바로 한 시간 안에서 정리된다.",
+            "signals": [],
+        }
+    )
+
+    assert normalized["elapsed_unit"] == "hour"
+    assert normalized["elapsed_amount"] == 1

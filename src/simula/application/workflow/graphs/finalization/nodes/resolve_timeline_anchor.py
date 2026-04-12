@@ -17,6 +17,9 @@ from typing import cast
 from langgraph.runtime import Runtime
 
 from simula.application.workflow.context import WorkflowRuntimeContext
+from simula.application.workflow.graphs.finalization.output_schema.bundles import (
+    build_timeline_anchor_decision_prompt_bundle,
+)
 from simula.application.workflow.graphs.finalization.prompts.timeline_anchor_prompt import (
     PROMPT,
 )
@@ -24,7 +27,6 @@ from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
 from simula.domain.contracts import TimelineAnchorDecision
-from simula.prompts.shared.output_examples import build_output_prompt_bundle
 
 _DATE_PATTERNS = [
     re.compile(r"(?P<year>\d{4})년\s*(?P<month>\d{1,2})월\s*(?P<day>\d{1,2})일"),
@@ -65,7 +67,7 @@ async def resolve_timeline_anchor(
             )
         ),
         max_steps=state["max_steps"],
-        **build_output_prompt_bundle(TimelineAnchorDecision),
+        **build_timeline_anchor_decision_prompt_bundle(),
     )
     anchor, _ = await runtime.context.llms.ainvoke_structured_with_meta(
         "observer",

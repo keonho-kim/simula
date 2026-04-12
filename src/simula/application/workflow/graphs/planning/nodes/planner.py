@@ -29,6 +29,9 @@ from simula.application.workflow.graphs.planning.prompts.build_coordination_fram
 from simula.application.workflow.graphs.planning.prompts.build_cast_roster_prompt import (
     PROMPT as BUILD_CAST_ROSTER_PROMPT,
 )
+from simula.application.workflow.graphs.planning.prompts.summarize_scenario_brief_prompt import (
+    PROMPT as SUMMARIZE_SCENARIO_BRIEF_PROMPT,
+)
 from simula.application.workflow.graphs.planning.prompts.finalize_situation_prompt import (
     PROMPT as FINALIZE_SITUATION_PROMPT,
 )
@@ -44,32 +47,48 @@ from simula.application.workflow.graphs.planning.prompts.interpret_time_scope_pr
 from simula.application.workflow.graphs.planning.prompts.interpret_visibility_context_prompt import (
     PROMPT as INTERPRET_VISIBILITY_CONTEXT_PROMPT,
 )
+from simula.application.workflow.graphs.planning.output_schema.bundles import (
+    build_action_catalog_prompt_bundle,
+    build_cast_roster_prompt_bundle,
+    build_coordination_frame_prompt_bundle,
+    build_pressure_point_prompt_bundle,
+    build_runtime_progression_plan_prompt_bundle,
+    build_scenario_brief_prompt_bundle,
+    build_scenario_time_scope_prompt_bundle,
+    build_situation_bundle_prompt_bundle,
+    build_visibility_context_prompt_bundle,
+)
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
+from simula.application.workflow.utils.prompt_projections import (
+    build_compact_action_catalog_view,
+    build_planning_interpretation_view,
+    build_planning_situation_view,
+)
 from simula.domain.contracts import (
     ActionCatalog,
-    CastRosterItem,
+    CastRoster,
     CoordinationFrame,
     RuntimeProgressionPlan,
+    ScenarioBrief,
     ScenarioInterpretation,
     ScenarioTimeScope,
     SituationBundle,
 )
-from simula.prompts.shared.output_examples import (
-    build_ndjson_prompt_bundle,
-    build_output_prompt_bundle,
-)
-
-
 async def interpret_core(
     state: SimulationWorkflowState,
     runtime: Runtime[WorkflowRuntimeContext],
 ) -> dict[str, object]:
     """시나리오의 핵심 전제를 해석한다."""
 
+    scenario_brief = cast(dict[str, object], state.get("pending_scenario_brief", {}))
     prompt = INTERPRET_CORE_PROMPT.format(
-        scenario_text=state["scenario"],
+        scenario_brief_json=json.dumps(
+            scenario_brief,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
         max_steps=state["max_steps"],
     )
     premise, meta = await runtime.context.llms.ainvoke_text_with_meta(
@@ -79,7 +98,32 @@ async def interpret_core(
     )
     return {
         "pending_interpretation_core": premise.strip(),
-        "planning_latency_seconds": meta.duration_seconds,
+        "planning_latency_seconds": float(state.get("planning_latency_seconds", 0.0))
+        + meta.duration_seconds,
+    }
+
+
+async def summarize_scenario_brief(
+    state: SimulationWorkflowState,
+    runtime: Runtime[WorkflowRuntimeContext],
+) -> dict[str, object]:
+    """원문 시나리오를 후속 planner 재사용용 brief로 압축한다."""
+
+    prompt = SUMMARIZE_SCENARIO_BRIEF_PROMPT.format(
+        scenario_text=state["scenario"],
+        max_steps=state["max_steps"],
+        **build_scenario_brief_prompt_bundle(),
+    )
+    scenario_brief, meta = await runtime.context.llms.ainvoke_structured_with_meta(
+        "planner",
+        prompt,
+        ScenarioBrief,
+        log_context={"scope": "scenario-brief"},
+    )
+    return {
+        "pending_scenario_brief": scenario_brief.model_dump(mode="json"),
+        "planning_latency_seconds": float(state.get("planning_latency_seconds", 0.0))
+        + meta.duration_seconds,
     }
 
 
@@ -89,17 +133,22 @@ async def decide_runtime_progression(
 ) -> dict[str, object]:
     """실행 시간 진행 계획을 결정한다."""
 
+    scenario_brief = cast(dict[str, object], state.get("pending_scenario_brief", {}))
     prompt = DECIDE_RUNTIME_PROGRESSION_PROMPT.format(
-        scenario_text=state["scenario"],
+        scenario_brief_json=json.dumps(
+            scenario_brief,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
         core_premise=str(state.get("pending_interpretation_core", "")),
         max_steps=state["max_steps"],
-        **build_output_prompt_bundle(RuntimeProgressionPlan),
+        **build_runtime_progression_plan_prompt_bundle(),
     )
     progression_plan, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "planner",
         prompt,
         RuntimeProgressionPlan,
-        log_context={"scope": "runtime-progression"},
+        log_context={"scope": "runtime-window"},
     )
     runtime.context.logger.info(
         "시간 진행 계획 결정 완료 | 허용 단위 %s | 기본 단위 %s | 이유: %s",
@@ -121,10 +170,15 @@ async def interpret_time_scope(
 ) -> dict[str, object]:
     """시나리오의 시간 범위를 해석한다."""
 
+    scenario_brief = cast(dict[str, object], state.get("pending_scenario_brief", {}))
     prompt = INTERPRET_TIME_SCOPE_PROMPT.format(
-        scenario_text=state["scenario"],
+        scenario_brief_json=json.dumps(
+            scenario_brief,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
         max_steps=state["max_steps"],
-        **build_output_prompt_bundle(ScenarioTimeScope),
+        **build_scenario_time_scope_prompt_bundle(),
     )
     time_scope, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "planner",
@@ -145,9 +199,14 @@ async def interpret_visibility_context(
 ) -> dict[str, object]:
     """공개/비공개 맥락을 해석한다."""
 
+    scenario_brief = cast(dict[str, object], state.get("pending_scenario_brief", {}))
     prompt = INTERPRET_VISIBILITY_CONTEXT_PROMPT.format(
-        scenario_text=state["scenario"],
-        **build_output_prompt_bundle(VisibilityContextBundle),
+        scenario_brief_json=json.dumps(
+            scenario_brief,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        **build_visibility_context_prompt_bundle(),
     )
     context_bundle, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "planner",
@@ -169,9 +228,14 @@ async def interpret_pressure_points(
 ) -> dict[str, object]:
     """핵심 압박과 관찰 포인트를 해석한다."""
 
+    scenario_brief = cast(dict[str, object], state.get("pending_scenario_brief", {}))
     prompt = INTERPRET_PRESSURE_POINTS_PROMPT.format(
-        scenario_text=state["scenario"],
-        **build_output_prompt_bundle(PressurePointBundle),
+        scenario_brief_json=json.dumps(
+            scenario_brief,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        **build_pressure_point_prompt_bundle(),
     )
     pressure_bundle, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "planner",
@@ -214,14 +278,15 @@ async def finalize_situation(
     """시나리오 해석을 실행용 상황 번들로 확정한다."""
 
     prompt = FINALIZE_SITUATION_PROMPT.format(
-        scenario_text=state["scenario"],
         interpretation_json=json.dumps(
-            state["pending_interpretation"],
+            build_planning_interpretation_view(
+                cast(dict[str, object], state["pending_interpretation"])
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         max_steps=state["max_steps"],
-        **build_output_prompt_bundle(SituationBundle),
+        **build_situation_bundle_prompt_bundle(),
     )
     situation, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "planner",
@@ -243,18 +308,21 @@ async def build_action_catalog(
     """시나리오 공통 action catalog를 구성한다."""
 
     prompt = BUILD_ACTION_CATALOG_PROMPT.format(
-        scenario_text=state["scenario"],
         interpretation_json=json.dumps(
-            state["pending_interpretation"],
+            build_planning_interpretation_view(
+                cast(dict[str, object], state["pending_interpretation"])
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         situation_json=json.dumps(
-            state["pending_situation"],
+            build_planning_situation_view(
+                cast(dict[str, object], state["pending_situation"])
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
-        **build_output_prompt_bundle(ActionCatalog),
+        **build_action_catalog_prompt_bundle(),
     )
     action_catalog, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "planner",
@@ -276,23 +344,29 @@ async def build_coordination_frame(
     """runtime 조율 기준 프레임을 구성한다."""
 
     prompt = BUILD_COORDINATION_FRAME_PROMPT.format(
-        scenario_text=state["scenario"],
         interpretation_json=json.dumps(
-            state["pending_interpretation"],
+            build_planning_interpretation_view(
+                cast(dict[str, object], state["pending_interpretation"])
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         situation_json=json.dumps(
-            state["pending_situation"],
+            build_planning_situation_view(
+                cast(dict[str, object], state["pending_situation"])
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         action_catalog_json=json.dumps(
-            state["pending_action_catalog"],
+            build_compact_action_catalog_view(
+                cast(dict[str, object], state["pending_action_catalog"]),
+                limit=6,
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
-        **build_output_prompt_bundle(CoordinationFrame),
+        **build_coordination_frame_prompt_bundle(),
     )
     coordination_frame, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "planner",
@@ -312,34 +386,44 @@ async def build_cast_roster(
     state: SimulationWorkflowState,
     runtime: Runtime[WorkflowRuntimeContext],
 ) -> dict[str, object]:
-    """상황 번들에서 unique cast roster를 NDJSON으로 생성한다."""
+    """상황 번들에서 unique cast roster를 구조화 출력으로 생성한다."""
 
-    prompt_bundle = build_ndjson_prompt_bundle(CastRosterItem)
+    prompt_bundle = build_cast_roster_prompt_bundle()
     prompt = BUILD_CAST_ROSTER_PROMPT.format(
-        scenario_text=state["scenario"],
         interpretation_json=json.dumps(
-            state["pending_interpretation"],
+            build_planning_interpretation_view(
+                cast(dict[str, object], state["pending_interpretation"])
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         situation_json=json.dumps(
-            state["pending_situation"],
+            build_planning_situation_view(
+                cast(dict[str, object], state["pending_situation"])
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         action_catalog_json=json.dumps(
-            state["pending_action_catalog"],
+            build_compact_action_catalog_view(
+                cast(dict[str, object], state["pending_action_catalog"]),
+                limit=6,
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         **prompt_bundle,
     )
-    raw_text, meta = await runtime.context.llms.ainvoke_text_with_meta(
+    cast_roster_payload, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "planner",
         prompt,
+        CastRoster,
         log_context={"scope": "cast_roster"},
+        enforce_native_structured_output=True,
     )
-    cast_roster = _parse_cast_roster_ndjson(raw_text)
+    cast_roster = [
+        item.model_dump(mode="json") for item in cast_roster_payload.items
+    ]
     _validate_unique_cast_roster(cast_roster)
     interpretation = state.get("pending_interpretation")
     situation = state.get("pending_situation")
@@ -358,6 +442,7 @@ async def build_cast_roster(
             "planner 중간 상태가 비어 있어 coordination frame을 확정할 수 없습니다."
         )
     plan_payload = {
+        "scenario_brief": cast(dict[str, object], state.get("pending_scenario_brief", {})),
         "interpretation": dict(interpretation),
         "situation": dict(situation),
         "progression_plan": _build_progression_plan_payload(state),
@@ -379,18 +464,6 @@ async def build_cast_roster(
         "planning_latency_seconds": float(state.get("planning_latency_seconds", 0.0))
         + meta.duration_seconds,
     }
-
-
-def _parse_cast_roster_ndjson(raw_text: str) -> list[dict[str, object]]:
-    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
-    if not lines:
-        raise ValueError("cast roster NDJSON 응답이 비어 있습니다.")
-
-    cast_roster: list[dict[str, object]] = []
-    for line in lines:
-        item = CastRosterItem.model_validate(json.loads(line))
-        cast_roster.append(item.model_dump(mode="json"))
-    return cast_roster
 
 
 def _validate_unique_cast_roster(cast_roster: list[dict[str, object]]) -> None:

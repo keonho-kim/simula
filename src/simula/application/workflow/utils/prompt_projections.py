@@ -21,8 +21,8 @@ from typing import Any, Iterable, cast
 
 ACTOR_VISIBLE_ACTOR_LIMIT = 6
 ACTOR_ACTION_CONTEXT_LIMIT = 6
-ACTOR_AVAILABLE_ACTION_LIMIT = 6
-GENERATION_ACTION_LIMIT = 8
+ACTOR_AVAILABLE_ACTION_LIMIT = 5
+GENERATION_ACTION_LIMIT = 5
 DEFERRED_ACTOR_LIMIT = 8
 INTENT_STATE_LIMIT = 10
 WORLD_STATE_SUMMARY_LIMIT = 220
@@ -244,6 +244,45 @@ def build_generation_interpretation_view(
     }
 
 
+def build_planning_interpretation_view(
+    interpretation: dict[str, object],
+) -> dict[str, object]:
+    """planning 후반 prompt용 interpretation 축약본을 만든다."""
+
+    time_scope = cast(dict[str, object], interpretation.get("time_scope", {}))
+    compact_time_scope: dict[str, object] = {}
+    if time_scope:
+        compact_time_scope = {
+            "start": truncate_text(time_scope.get("start", ""), 80),
+            "end": truncate_text(time_scope.get("end", ""), 80),
+        }
+
+    return {
+        "premise": truncate_text(interpretation.get("premise", ""), 180),
+        "time_scope": compact_time_scope,
+        "key_pressures": _truncate_string_list(
+            interpretation.get("key_pressures", []),
+            limit=4,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
+        "public_context": _truncate_string_list(
+            interpretation.get("public_context", []),
+            limit=3,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
+        "private_context": _truncate_string_list(
+            interpretation.get("private_context", []),
+            limit=3,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
+        "observation_points": _truncate_string_list(
+            interpretation.get("observation_points", []),
+            limit=3,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
+    }
+
+
 def build_generation_situation_view(
     situation: dict[str, object],
 ) -> dict[str, object]:
@@ -258,6 +297,33 @@ def build_generation_situation_view(
         "initial_tensions": _truncate_string_list(
             situation.get("initial_tensions", []),
             limit=3,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
+    }
+
+
+def build_planning_situation_view(
+    situation: dict[str, object],
+) -> dict[str, object]:
+    """planning 후반 prompt용 situation 축약본을 만든다."""
+
+    return {
+        "simulation_objective": truncate_text(
+            situation.get("simulation_objective", ""),
+            180,
+        ),
+        "world_summary": truncate_text(situation.get("world_summary", ""), 220),
+        "initial_tensions": _truncate_string_list(
+            situation.get("initial_tensions", []),
+            limit=4,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
+        "channel_guidance": _compact_channel_guidance(
+            situation.get("channel_guidance", {})
+        ),
+        "current_constraints": _truncate_string_list(
+            situation.get("current_constraints", []),
+            limit=4,
             text_limit=SHORT_DESCRIPTION_LIMIT,
         ),
     }
@@ -284,12 +350,22 @@ def build_compact_action_catalog_view(
     }
 
 
-def build_generation_coordination_frame_view(
+def build_planning_coordination_frame_view(
     coordination_frame: dict[str, object],
 ) -> dict[str, object]:
-    """generation prompt용 coordination frame 축약본을 만든다."""
+    """planning/generation 공용 coordination frame 축약본을 만든다."""
 
     return {
+        "focus_selection_rules": _truncate_string_list(
+            coordination_frame.get("focus_selection_rules", []),
+            limit=2,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
+        "background_motion_rules": _truncate_string_list(
+            coordination_frame.get("background_motion_rules", []),
+            limit=2,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
         "focus_archetypes": _truncate_string_list(
             coordination_frame.get("focus_archetypes", []),
             limit=3,
@@ -300,6 +376,24 @@ def build_generation_coordination_frame_view(
             limit=2,
             text_limit=SHORT_DESCRIPTION_LIMIT,
         ),
+        "budget_guidance": _truncate_string_list(
+            coordination_frame.get("budget_guidance", []),
+            limit=2,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
+    }
+
+
+def build_generation_coordination_frame_view(
+    coordination_frame: dict[str, object],
+) -> dict[str, object]:
+    """generation prompt용 coordination frame 축약본을 만든다."""
+
+    compact = build_planning_coordination_frame_view(coordination_frame)
+    return {
+        "focus_archetypes": compact["focus_archetypes"],
+        "attention_shift_rules": compact["attention_shift_rules"],
+        "budget_guidance": compact["budget_guidance"],
     }
 
 

@@ -78,11 +78,24 @@ class StructuredLLMRouter:
         allow_default_on_failure: bool = False,
         default_payload: dict[str, object] | None = None,
         log_context: dict[str, object] | None = None,
+        enforce_native_structured_output: bool = False,
     ) -> tuple[SchemaT, StructuredCallMeta]:
         """LLM 구조화 응답과 메타데이터를 함께 반환한다."""
 
         started_at = time.perf_counter()
         self._log_structured_call_start(role=role, log_context=log_context)
+        if enforce_native_structured_output:
+            native_result = self._invoke_native_structured_with_meta(
+                role=role,
+                prompt=prompt,
+                schema=schema,
+                allow_default_on_failure=allow_default_on_failure,
+                default_payload=default_payload,
+                log_context=log_context,
+                started_at=started_at,
+            )
+            if native_result is not None:
+                return native_result
         return self._execute_structured_attempts(
             role=role,
             schema=schema,
@@ -111,11 +124,24 @@ class StructuredLLMRouter:
         allow_default_on_failure: bool = False,
         default_payload: dict[str, object] | None = None,
         log_context: dict[str, object] | None = None,
+        enforce_native_structured_output: bool = False,
     ) -> tuple[SchemaT, StructuredCallMeta]:
         """비동기 LLM 구조화 응답과 메타데이터를 함께 반환한다."""
 
         started_at = time.perf_counter()
         self._log_structured_call_start(role=role, log_context=log_context)
+        if enforce_native_structured_output:
+            native_result = await self._ainvoke_native_structured_with_meta(
+                role=role,
+                prompt=prompt,
+                schema=schema,
+                allow_default_on_failure=allow_default_on_failure,
+                default_payload=default_payload,
+                log_context=log_context,
+                started_at=started_at,
+            )
+            if native_result is not None:
+                return native_result
         return await self._aexecute_structured_attempts(
             role=role,
             schema=schema,
@@ -313,6 +339,162 @@ class StructuredLLMRouter:
         raise ValueError(
             f"{role} 구조화 응답 파싱에 실패했습니다. error={last_error}"
         ) from last_error
+
+    def _invoke_native_structured_with_meta(
+        self,
+        *,
+        role: str,
+        prompt: str,
+        schema: type[SchemaT],
+        allow_default_on_failure: bool,
+        default_payload: dict[str, object] | None,
+        log_context: dict[str, object] | None,
+        started_at: float,
+    ) -> tuple[SchemaT, StructuredCallMeta] | None:
+        """provider native structured output이 가능하면 우선 사용한다."""
+
+        native_runnable = _build_native_structured_runnable(
+            self.for_role(role),
+            schema,
+            include_raw=False,
+        )
+        if native_runnable is None:
+            return None
+
+        result = native_runnable.invoke(prompt)
+        return self._finalize_native_structured_result(
+            role=role,
+            schema=schema,
+            result=result,
+            allow_default_on_failure=allow_default_on_failure,
+            default_payload=default_payload,
+            log_context=log_context,
+            started_at=started_at,
+        )
+
+    async def _ainvoke_native_structured_with_meta(
+        self,
+        *,
+        role: str,
+        prompt: str,
+        schema: type[SchemaT],
+        allow_default_on_failure: bool,
+        default_payload: dict[str, object] | None,
+        log_context: dict[str, object] | None,
+        started_at: float,
+    ) -> tuple[SchemaT, StructuredCallMeta] | None:
+        """비동기 provider native structured output이 가능하면 우선 사용한다."""
+
+        native_runnable = _build_native_structured_runnable(
+            self.for_role(role),
+            schema,
+            include_raw=False,
+        )
+        if native_runnable is None:
+            return None
+
+        result = await native_runnable.ainvoke(prompt)
+        return self._finalize_native_structured_result(
+            role=role,
+            schema=schema,
+            result=result,
+            allow_default_on_failure=allow_default_on_failure,
+            default_payload=default_payload,
+            log_context=log_context,
+            started_at=started_at,
+        )
+
+    def _finalize_native_structured_result(
+        self,
+        *,
+        role: str,
+        schema: type[SchemaT],
+        result: object,
+        allow_default_on_failure: bool,
+        default_payload: dict[str, object] | None,
+        log_context: dict[str, object] | None,
+        started_at: float,
+    ) -> tuple[SchemaT, StructuredCallMeta]:
+        """native structured output 결과를 공통 메타 계약으로 정리한다."""
+
+        content = ""
+        input_tokens: int | None = None
+        output_tokens: int | None = None
+        total_tokens: int | None = None
+        parsed = result
+        parsing_error: Exception | None = None
+
+        duration_seconds = time.perf_counter() - started_at
+        if isinstance(parsed, schema):
+            self._log_structured_response(
+                role=role,
+                content=content,
+                parsed=parsed,
+                duration_seconds=duration_seconds,
+                ttft_seconds=None,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
+                log_context=log_context,
+            )
+            return parsed, StructuredCallMeta(
+                parse_failure_count=0,
+                forced_default=False,
+                duration_seconds=duration_seconds,
+                last_content=content,
+                ttft_seconds=None,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
+            )
+
+        parse_error = ValueError("provider native structured output이 비어 있습니다.")
+        if allow_default_on_failure and default_payload is not None:
+            self._log_structured_response(
+                role=role,
+                content=content,
+                parsed=None,
+                duration_seconds=duration_seconds,
+                ttft_seconds=None,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
+                log_context=log_context,
+                parse_error=parse_error,
+            )
+            self.logger.warning("%s 응답을 파싱하지 못해 기본값으로 강등합니다.", role)
+            try:
+                default_parsed = schema.model_validate(default_payload)
+            except (ValidationError, ValueError, TypeError) as exc:
+                raise ValueError(
+                    f"{role} 기본 강등 payload가 스키마를 만족하지 않습니다. error={exc}"
+                ) from exc
+            return default_parsed, StructuredCallMeta(
+                parse_failure_count=1,
+                forced_default=True,
+                duration_seconds=duration_seconds,
+                last_content=content,
+                ttft_seconds=None,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
+            )
+
+        self._log_structured_response(
+            role=role,
+            content=content,
+            parsed=None,
+            duration_seconds=duration_seconds,
+            ttft_seconds=None,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+            log_context=log_context,
+            parse_error=parse_error,
+        )
+        raise ValueError(
+            f"{role} 구조화 응답 파싱에 실패했습니다. error={parse_error}"
+        ) from parse_error
 
     async def _aexecute_structured_attempts(
         self,
@@ -717,8 +899,10 @@ def _format_response_title(
 
 def _planner_scope_label(scope: str, *, suffix: str = "") -> str:
     labels = {
+        "scenario-brief": "planner · 시나리오 요약 분석",
         "interpretation-core": "planner · 핵심 전제 정리",
         "runtime-window": "planner · 실행 시간축 결정",
+        "runtime-progression": "planner · 실행 시간축 결정",
         "interpretation-time": "planner · 시간 범위 정리",
         "interpretation-visibility": "planner · 공개/비공개 맥락 정리",
         "interpretation-pressure": "planner · 압박 요인·관찰 포인트 정리",
@@ -807,12 +991,35 @@ def _build_structured_runnable(
 ):
     """prompt -> model -> JSON 파싱 RunnableSequence를 생성한다."""
 
+    native_runnable = _build_native_structured_runnable(model, schema, include_raw=False)
+    if native_runnable is not None:
+        return native_runnable
+
     parser = build_output_parser(schema)
     return (
         _coerce_model_runnable(model)
         | RunnableLambda(_extract_response_content)
         | RunnableLambda(parser.parse)
     )
+
+
+def _build_native_structured_runnable(
+    model: Any,
+    schema: type[SchemaT],
+    *,
+    include_raw: bool,
+):
+    """provider native structured output runnable을 구성한다."""
+
+    if not isinstance(model, BaseChatModel):
+        return None
+    with_structured_output = getattr(model, "with_structured_output", None)
+    if not callable(with_structured_output):
+        return None
+    try:
+        return with_structured_output(schema, include_raw=include_raw)
+    except TypeError:
+        return None
 
 
 def _extract_response_content(response: Any) -> str:

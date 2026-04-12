@@ -29,12 +29,14 @@ from simula.application.workflow.utils.prompt_projections import (
 from simula.application.workflow.graphs.coordinator.prompts.build_step_focus_plan_prompt import (
     PROMPT as BUILD_STEP_FOCUS_PLAN_PROMPT,
 )
+from simula.application.workflow.graphs.coordinator.output_schema.bundles import (
+    build_step_focus_plan_prompt_bundle,
+)
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
 from simula.domain.contracts import StepFocusPlan
 from simula.domain.reporting import latest_observer_summary
-from simula.prompts.shared.output_examples import build_output_prompt_bundle
 
 
 async def build_step_focus_plan(
@@ -75,7 +77,7 @@ async def build_step_focus_plan(
         ),
         max_focus_slices_per_step=max_focus_slices,
         max_actor_calls_per_step=max_actor_calls,
-        **build_output_prompt_bundle(StepFocusPlan),
+        **build_step_focus_plan_prompt_bundle(),
     )
     default_payload = _build_default_step_focus_plan_payload(
         state=state,

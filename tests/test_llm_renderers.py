@@ -18,6 +18,7 @@ from simula.domain.contracts import (
     ActorActionProposal,
     ActorCard,
     ActorIntentStateBatch,
+    CastRoster,
     ObserverEventProposal,
     ObserverReport,
     RuntimeProgressionPlan,
@@ -195,6 +196,35 @@ def test_render_action_catalog_is_human_readable() -> None:
 
     assert "시나리오 공통 action catalog를 만들었습니다." in text
     assert "대표 action_type: speech" in text
+
+
+def test_render_cast_roster_is_human_readable() -> None:
+    text = render_structured_response(
+        role="planner",
+        parsed=CastRoster(
+            items=[
+                {
+                    "cast_id": "ops",
+                    "display_name": "운영 총괄",
+                    "role_hint": "조정자",
+                    "group_name": "운영팀",
+                    "core_tension": "속도를 높이고 싶다.",
+                },
+                {
+                    "cast_id": "finance",
+                    "display_name": "재무 총괄",
+                    "role_hint": "검토자",
+                    "group_name": "재무팀",
+                    "core_tension": "리스크를 줄이고 싶다.",
+                },
+            ]
+        ),
+        content="",
+        log_context=None,
+    )
+
+    assert "등장 주체 2명을 확정했습니다." in text
+    assert "운영 총괄" in text
 
 
 def test_render_intent_batch_is_human_readable() -> None:

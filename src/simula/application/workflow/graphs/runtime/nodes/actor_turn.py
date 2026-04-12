@@ -18,6 +18,9 @@ from langgraph.runtime import Runtime
 from langgraph.types import Overwrite, Send
 
 from simula.application.workflow.context import WorkflowRuntimeContext
+from simula.application.workflow.graphs.runtime.output_schema.bundles import (
+    build_actor_action_proposal_prompt_bundle,
+)
 from simula.application.workflow.graphs.runtime.prompts.actor_turn_prompt import (
     PROMPT as ACTOR_PROPOSAL_PROMPT,
 )
@@ -40,7 +43,6 @@ from simula.domain.activity_feeds import (
 from simula.domain.contracts import ActionCatalog, ActorActionProposal
 from simula.domain.reporting import latest_observer_summary
 from simula.domain.runtime_steps import ActorProposalPayload, apply_actor_proposals
-from simula.prompts.shared.output_examples import build_output_prompt_bundle
 
 
 def dispatch_selected_actor_proposals(
@@ -279,7 +281,7 @@ def _build_actor_proposal_prompt(
             separators=(",", ":"),
         ),
         max_recipients_per_message=max_recipients_per_message,
-        **build_output_prompt_bundle(ActorActionProposal),
+        **build_actor_action_proposal_prompt_bundle(),
     )
 
 

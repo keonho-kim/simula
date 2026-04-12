@@ -30,6 +30,9 @@ from simula.application.workflow.utils.prompt_projections import (
 from simula.application.workflow.graphs.coordinator.prompts.adjudicate_step_focus_prompt import (
     PROMPT as ADJUDICATE_STEP_FOCUS_PROMPT,
 )
+from simula.application.workflow.graphs.coordinator.output_schema.bundles import (
+    build_step_adjudication_prompt_bundle,
+)
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
@@ -43,7 +46,6 @@ from simula.domain.runtime_steps import (
     ActorProposalPayload,
     apply_adopted_actor_proposals,
 )
-from simula.prompts.shared.output_examples import build_output_prompt_bundle
 
 
 async def adjudicate_step_focus(
@@ -105,7 +107,7 @@ async def adjudicate_step_focus(
             state.get("world_state_summary", ""),
             WORLD_STATE_SUMMARY_LIMIT,
         ),
-        **build_output_prompt_bundle(StepAdjudication),
+        **build_step_adjudication_prompt_bundle(),
     )
     default_payload = _build_default_step_adjudication_payload(state)
     adjudication, meta = await runtime.context.llms.ainvoke_structured_with_meta(
@@ -149,7 +151,9 @@ async def adjudicate_step_focus(
 
     clock = _build_updated_clock(
         state=state,
-        step_time_advance=adjudication.step_time_advance.model_dump(mode="json"),
+        step_time_advance=_normalize_step_time_advance_payload(
+            adjudication.step_time_advance.model_dump(mode="json")
+        ),
     )
     runtime.context.logger.info(
         "step %s 채택 완료 | adopted action %s건 | background update %s건",
@@ -285,6 +289,19 @@ def _default_step_time_advance(state: SimulationWorkflowState) -> dict[str, obje
         "selection_reason": "이번 단계에는 큰 시간 점프보다 기본 진행 단위를 따른다.",
         "signals": ["기본 pacing 적용"],
     }
+
+
+def _normalize_step_time_advance_payload(
+    step_time_advance: dict[str, object],
+) -> dict[str, object]:
+    """허용 가능한 alias만 canonical 시간 경과 payload로 정규화한다."""
+
+    normalized = dict(step_time_advance)
+    if "elapsed_unit" not in normalized and "unit" in normalized:
+        normalized["elapsed_unit"] = normalized["unit"]
+    if "elapsed_amount" not in normalized and "amount" in normalized:
+        normalized["elapsed_amount"] = normalized["amount"]
+    return normalized
 
 
 def _build_updated_clock(

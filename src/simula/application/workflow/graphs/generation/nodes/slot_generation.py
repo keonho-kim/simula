@@ -18,6 +18,9 @@ from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.generation.prompts.generate_actor_prompt import (
     PROMPT as GENERATE_ACTOR_PROMPT,
 )
+from simula.application.workflow.graphs.generation.output_schema.bundles import (
+    build_actor_card_prompt_bundle,
+)
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
@@ -29,7 +32,6 @@ from simula.application.workflow.utils.prompt_projections import (
     build_generation_situation_view,
 )
 from simula.domain.contracts import ActorCard
-from simula.prompts.shared.output_examples import build_output_prompt_bundle
 
 
 async def generate_actor_slot(
@@ -41,7 +43,6 @@ async def generate_actor_slot(
     slot = state["cast_slot"]
     cast_item = slot["cast_item"]
     prompt = GENERATE_ACTOR_PROMPT.format(
-        scenario_text=state["scenario"],
         interpretation_json=json.dumps(
             build_generation_interpretation_view(state["plan"]["interpretation"]),
             ensure_ascii=False,
@@ -70,7 +71,7 @@ async def generate_actor_slot(
         actor_slot_index=slot["slot_index"],
         target_actor_count=len(list(state["plan"].get("cast_roster", []))),
         cast_item_json=json.dumps(cast_item, ensure_ascii=False, separators=(",", ":")),
-        **build_output_prompt_bundle(ActorCard),
+        **build_actor_card_prompt_bundle(),
     )
     actor, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "generator",

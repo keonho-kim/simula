@@ -21,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 Provider = Literal["openai", "anthropic", "google", "ollama", "vllm", "bedrock"]
 DatabaseProvider = Literal["sqlite", "postgresql"]
-ReasoningEffort = Literal["none", "low", "medium", "high", "xhigh"]
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
 Verbosity = Literal["low", "medium", "high"]
 OllamaReasoning = bool | Literal["low", "medium", "high"]
 AnthropicEffort = Literal["low", "medium", "high", "max"]

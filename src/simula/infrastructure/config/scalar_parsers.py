@@ -104,7 +104,7 @@ def env_reasoning_effort(
         env_enum(
             key=key,
             raw=raw,
-            allowed={"none", "low", "medium", "high", "xhigh"},
+            allowed={"none", "minimal", "low", "medium", "high", "xhigh"},
             label="reasoning_effort",
         ),
     )

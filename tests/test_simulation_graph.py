@@ -37,9 +37,11 @@ from simula.domain.contracts import (
     ActorActionProposal,
     ActorCard,
     BackgroundUpdateBatch,
+    CastRoster,
     CoordinationFrame,
     ObserverReport,
     RuntimeProgressionPlan,
+    ScenarioBrief,
     ScenarioTimeScope,
     StepAdjudication,
     StepFocusPlan,
@@ -77,6 +79,18 @@ class FakeRouter:
 
     def invoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
         del role, kwargs
+        if schema is ScenarioBrief:
+            return (
+                ScenarioBrief(
+                    summary="공개와 비공개 계산이 동시에 움직이는 위기다. 핵심 주체의 초기 선택이 전체 흐름을 좌우하고, 짧은 반응과 긴 조율이 번갈아 나온다. 말과 실제 계산이 달라 후반 종결 지점까지 추적해야 한다.",
+                    key_entities=["Alpha", "Beta", "Gamma"],
+                    explicit_time_signals=["초기 대면 직후", "종결 직전"],
+                    public_facts=["공개 신호가 판세를 흔든다."],
+                    private_dynamics=["비공개 계산이 실제 선택을 움직인다."],
+                    terminal_conditions=["핵심 갈등이 실제로 정리되는 시점까지 본다."],
+                ),
+                FakeMeta(),
+            )
         if schema is ScenarioTimeScope:
             return (
                 ScenarioTimeScope(
@@ -182,6 +196,36 @@ class FakeRouter:
                         "조용했던 actor도 압력이 높아지면 끌어올린다."
                     ],
                     budget_guidance=["한 step에서는 소수 actor만 직접 추적한다."],
+                ),
+                FakeMeta(),
+            )
+
+        if schema is CastRoster:
+            return (
+                CastRoster(
+                    items=[
+                        {
+                            "cast_id": "cast-alpha",
+                            "display_name": "Alpha",
+                            "role_hint": "선도자",
+                            "group_name": "A",
+                            "core_tension": "속도를 높이고 싶다.",
+                        },
+                        {
+                            "cast_id": "cast-beta",
+                            "display_name": "Beta",
+                            "role_hint": "조정자",
+                            "group_name": "B",
+                            "core_tension": "리스크를 줄이고 싶다.",
+                        },
+                        {
+                            "cast_id": "cast-gamma",
+                            "display_name": "Gamma",
+                            "role_hint": "관찰자",
+                            "group_name": "C",
+                            "core_tension": "판단을 미루고 싶다.",
+                        },
+                    ]
                 ),
                 FakeMeta(),
             )
@@ -882,6 +926,33 @@ def test_initial_state_starts_with_empty_simulation_clock(tmp_path) -> None:
 
     assert state["simulation_clock"]["total_elapsed_minutes"] == 0
     assert state["step_time_history"] == []
+
+
+def test_run_from_cli_keeps_original_error_when_log_level_resolution_fails(
+    monkeypatch, capsys, caplog
+) -> None:
+    monkeypatch.setattr(
+        bootstrap_module,
+        "resolve_single_run_log_level",
+        lambda **kwargs: (_ for _ in ()).throw(ValueError("boom")),
+    )
+
+    args = SimpleNamespace(
+        env=None,
+        scenario_file="x",
+        scenario_text=None,
+        max_steps=None,
+        trials=1,
+        parallel=False,
+    )
+
+    with caplog.at_level(logging.ERROR, logger="simula.bootstrap"):
+        result = bootstrap_module.run_from_cli(args)
+
+    captured = capsys.readouterr()
+    assert result == 1
+    assert "실행 실패: boom" in captured.err
+    assert "실행 실패" in caplog.text
 
 
 def _unwrap_chunk_value(value):  # noqa: ANN001

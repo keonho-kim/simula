@@ -18,16 +18,23 @@ _PROMPT = textwrap.dedent(
     """
     # Role
     You are a simulation casting planner at our company.
-    Your task is to produce the unique cast roster that the actor generator will later expand.
+    Produce the unique cast roster that the actor generator will later expand.
+
+    # Hard Constraints
+    - Write natural-language values in Korean.
+    - Keep field names exactly as required by the schema.
+    - Return one JSON object with an `items` array.
+    - Every `items[]` entry must include `cast_id`, `display_name`, `role_hint`, `group_name`, `core_tension`.
+    - `cast_id` and `display_name` must be globally unique within this roster.
+    - Do not invent duplicate people with slightly different wording.
+    - The roster must be able to plausibly perform the listed actions, not only comment on them.
 
     # Input
-    - Scenario:
-    {scenario_text}
-    - Scenario interpretation JSON:
+    - Interpretation summary JSON:
     {interpretation_json}
-    - Situation bundle JSON:
+    - Situation summary JSON:
     {situation_json}
-    - Action catalog JSON:
+    - Action catalog summary JSON:
     {action_catalog_json}
 
     # Output Format
@@ -36,15 +43,6 @@ _PROMPT = textwrap.dedent(
 
     # Example
     {output_example}
-
-    # Instructions
-    - Write all natural-language values in Korean.
-    - Output NDJSON only.
-    - Every line must be one valid JSON object.
-    - display_name and cast_id must be globally unique within this roster.
-    - Do not invent duplicate people with slightly different wording.
-    - Produce exactly the cast roster needed to express the situation bundle.
-    - Make sure the roster can plausibly perform the action catalog, not only talk about it.
     """
 ).strip()
 

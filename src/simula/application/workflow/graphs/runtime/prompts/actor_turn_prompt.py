@@ -8,7 +8,7 @@
 - PromptTemplate singleton 패턴
 
 연관된 다른 모듈/구조:
-- simula.prompts.shared.output_examples
+- simula.application.workflow.graphs.runtime.output_schema
 - simula.application.workflow.graphs.runtime
 """
 
@@ -23,6 +23,16 @@ _PROMPT = textwrap.dedent(
     # Role
     You are one participant inside our simulation.
     Read the compact state for this step and propose one plausible action.
+
+    # Hard Constraints
+    - Write natural-language values in Korean.
+    - Keep field names and enum values exactly as required by the schema.
+    - Propose exactly one action for this step.
+    - Choose `action_type` from `runtime_guidance.available_actions`.
+    - `public` visibility may leave `target_actor_ids` empty.
+    - `private` and `group` visibility must include real `actor_id` values in `target_actor_ids`.
+    - If there is no spoken line, set `utterance` to null.
+    - If the action is not directed at a concrete actor or subset, use `public` visibility.
 
     # Input
     - step_index: {step_index}
@@ -51,19 +61,9 @@ _PROMPT = textwrap.dedent(
     # Example
     {output_example}
 
-    # Instructions
-    - Write all natural-language values in Korean.
-    - Keep identifiers, field names, and enum values in the required schema format.
-    - Propose exactly one action for this step.
-    - Choose action_type from the available actions provided in runtime guidance.
-    - The action may be conversational, observational, strategic, operational, or passive.
-    - `발화`는 optional 결과다. 말하지 않는 action이면 utterance는 빈 문자열이 아니라 null로 둬라.
-    - public visibility may leave target_actor_ids empty.
-    - private and group visibility must include real actor_id values in target_actor_ids.
-    - If the action is not directed at a concrete actor or actor subset, do not choose private/group. Use public visibility instead.
+    # Priority
     - Use focus slice, visible action context, visible actors, and runtime guidance together.
-    - previous_observer_momentum is a rough speed signal, and previous_observer_atmosphere is a tone signal.
-    - action_summary와 action_detail은 액션 자체를 먼저 설명하고, 발화가 있다면 utterance에 따로 적어라.
+    - `action_summary` and `action_detail` should describe the action itself first.
     """
 ).strip()
 

@@ -46,6 +46,15 @@ coordinator, actor, and observer prompts now receive compact prompt projections 
 from rich workflow state, while finalization uses a separate report projection for
 report-writing tasks.
 
+Planning now follows the same direction after the initial scenario-reading steps: late
+planner stages reuse a structured scenario brief plus compact interpretation/situation
+summaries, and the cast-roster step uses schema-enforced structured output instead of raw
+NDJSON text parsing.
+
+Structured output examples are no longer kept in one shared monolith. Each graph now owns
+its own `output_schema` assets so prompt examples stay local to the node family that uses
+them.
+
 ## Why It Exists
 
 Most LLM simulations collapse planning, action generation, pacing, and summarization into
@@ -105,7 +114,7 @@ flowchart TD
 
 | Stage | Primary owner | What it produces |
 | --- | --- | --- |
-| Planning | `planner` | interpretation, situation bundle, runtime progression plan, action catalog, coordination frame, cast roster, persisted `plan` |
+| Planning | `planner` | scenario brief, interpretation, situation bundle, runtime progression plan, action catalog, coordination frame, cast roster, persisted `plan` |
 | Generation | `generator` | actor registry from compact interpretation, situation, action-catalog, and coordination-frame views |
 | Runtime | `coordinator`, `actor`, `observer` | compressed candidate/focus decisions, compact actor prompt inputs, compact observer inputs, adopted activities, intent history, simulation clock, stop signals |
 | Finalization | `observer` + finalization assembly nodes | final report JSON, report projection JSON, markdown report state |

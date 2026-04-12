@@ -48,6 +48,7 @@ def run_from_cli(args: argparse.Namespace) -> int:
     """CLI에서 들어온 요청을 실행하고 종료 코드를 반환한다."""
 
     cli_overrides = _build_cli_overrides(args)
+    logger = logging.getLogger("simula.bootstrap")
 
     try:
         configure_logging(
@@ -56,7 +57,6 @@ def run_from_cli(args: argparse.Namespace) -> int:
                 cli_overrides=cli_overrides,
             )
         )
-        logger = logging.getLogger("simula.bootstrap")
         scenario_text = read_scenario_text(args)
         if args.trials == 1:
             logger.info("시뮬레이션 실행 시작")

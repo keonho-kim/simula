@@ -13,24 +13,24 @@ from __future__ import annotations
 import textwrap
 
 from langchain_core.prompts import PromptTemplate
-from simula.prompts.shared.user_facing_language import build_user_facing_style_block
 
-_USER_FACING_STYLE = build_user_facing_style_block()
-
-_PROMPT = (
-    textwrap.dedent(
-        """
+_PROMPT = textwrap.dedent(
+    """
     # Role
     You are a simulation planner at our company.
-    Your task is to turn the scenario interpretation into a runnable situation bundle
-    for an autonomous, activity-driven simulation.
+    Turn the interpretation into one runnable situation bundle.
+
+    # Hard Constraints
+    - Write natural-language values in Korean.
+    - Keep field names and enum values exactly as required by the schema.
+    - Return one compact, decision-complete situation bundle.
+    - `current_constraints` must describe concrete limits, pressures, or asymmetries.
 
     # Input
-    - Scenario:
-    {scenario_text}
-    - Scenario interpretation JSON:
+    - Interpretation summary JSON:
     {interpretation_json}
-    - Maximum steps: {max_steps}
+    - Runtime max steps:
+    {max_steps}
 
     # Output Format
     - Return format: {output_format_name}
@@ -38,16 +38,7 @@ _PROMPT = (
 
     # Example
     {output_example}
-
-    # Instructions
-    - Write all natural-language values in Korean.
-    - Keep identifiers, field names, and enum values in the required schema format.
-    - Produce a concise but decision-complete situation bundle for later actor generation.
-    - current_constraints should describe concrete limits, pressures, or asymmetries present in the scenario.
     """
-    ).strip()
-    + "\n"
-    + _USER_FACING_STYLE
-)
+).strip()
 
 PROMPT = PromptTemplate.from_template(_PROMPT)

@@ -57,6 +57,7 @@ compact prompt projections first and then renders prompts from those reduced vie
 
 | Role | Prompt-facing inputs |
 | --- | --- |
+| `planner` (late stages) | structured scenario brief, compact interpretation view, compact situation view, compact action catalog, runtime max-step ceiling |
 | `generator` | compact interpretation view, compact situation view, compact action catalog, compact coordination-frame view, cast item |
 | `coordinator` | compact focus candidates, compact coordination-frame fragments, compact situation fragments, compact pending actor proposals, compact background updates, relevant intent subset, compact progression plan |
 | `actor` | compact actor card, `visible_action_context`, `visible_actors`, `unread_backlog_digest`, compact runtime guidance, focus slice |
@@ -70,7 +71,7 @@ state.
 
 | Role or stage | Current behavior |
 | --- | --- |
-| planner | structured parsing failures are treated as hard failures |
+| planner | structured parsing failures are treated as hard failures; cast roster uses native structured output where the provider supports it |
 | generator | actor generation is expected to produce valid actor cards or fail |
 | coordinator: focus plan | allows default payload fallback |
 | coordinator: background updates | allows default empty-batch fallback |
@@ -85,10 +86,15 @@ The repository keeps prompt assets as Python modules rather than external text f
 Prompt groups are currently split by workflow area:
 
 - `graphs/planning/prompts`
+- `graphs/planning/output_schema`
 - `graphs/generation/prompts`
+- `graphs/generation/output_schema`
 - `graphs/coordinator/prompts`
+- `graphs/coordinator/output_schema`
 - `graphs/runtime/prompts`
+- `graphs/runtime/output_schema`
 - `graphs/finalization/prompts`
+- `graphs/finalization/output_schema`
 
 Some prompt modules exist for decompositions that are not wired into the current compiled
 runtime path. The workflow docs describe the compiled path first and should be treated as
@@ -124,3 +130,6 @@ The repository currently models these providers:
 
 The sample config demonstrates mixed-role routing, including a local `ollama` actor setup
 and OpenAI-backed planner, coordinator, and observer roles.
+
+For OpenAI GPT-5-family roles, `reasoning_effort` now accepts `minimal`, `low`,
+`medium`, `high`, and `xhigh` in addition to `none`.

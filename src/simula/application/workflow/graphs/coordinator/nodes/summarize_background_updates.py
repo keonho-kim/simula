@@ -18,6 +18,9 @@ from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.coordinator.prompts.summarize_background_updates_prompt import (
     PROMPT as SUMMARIZE_BACKGROUND_UPDATES_PROMPT,
 )
+from simula.application.workflow.graphs.coordinator.output_schema.bundles import (
+    build_background_update_batch_prompt_bundle,
+)
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
@@ -30,7 +33,6 @@ from simula.application.workflow.utils.prompt_projections import (
     truncate_text,
 )
 from simula.domain.contracts import BackgroundUpdateBatch
-from simula.prompts.shared.output_examples import build_output_prompt_bundle
 
 
 async def summarize_background_updates(
@@ -95,7 +97,7 @@ async def summarize_background_updates(
             ensure_ascii=False,
             separators=(",", ":"),
         ),
-        **build_output_prompt_bundle(BackgroundUpdateBatch),
+        **build_background_update_batch_prompt_bundle(),
     )
     batch, _ = await runtime.context.llms.ainvoke_structured_with_meta(
         "coordinator",
@@ -108,7 +110,11 @@ async def summarize_background_updates(
             "step_index": int(state["step_index"]),
         },
     )
-    updates = [item.model_dump(mode="json") for item in batch.background_updates]
+    current_step_index = int(state["step_index"])
+    updates = [
+        item.model_copy(update={"step_index": current_step_index}).model_dump(mode="json")
+        for item in batch.background_updates
+    ]
     return {
         "latest_background_updates": updates,
         "background_updates": list(state.get("background_updates", [])) + updates,

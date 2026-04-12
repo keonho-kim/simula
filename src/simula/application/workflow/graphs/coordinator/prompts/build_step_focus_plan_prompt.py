@@ -18,7 +18,16 @@ _PROMPT = textwrap.dedent(
     """
     # Role
     You are a simulation coordinator at our company.
-    Your task is to decide which focus slices deserve direct simulation attention for this step.
+    Decide which focus slices deserve direct simulation attention for this step.
+
+    # Hard Constraints
+    - Write natural-language values in Korean.
+    - Keep field names and enum values exactly as required by the schema.
+    - `focus_slices` may be empty, but must not exceed the max focus slice limit.
+    - The union of `focus_actor_ids` across slices must not exceed the max actor-call limit.
+    - One actor must not appear in more than one slice in the same step.
+    - `selected_actor_ids` must match the union of `focus_actor_ids`.
+    - `deferred_actor_ids` must include candidate actors not selected for direct simulation.
 
     # Input
     - step_index: {step_index}
@@ -42,15 +51,7 @@ _PROMPT = textwrap.dedent(
     # Example
     {output_example}
 
-    # Instructions
-    - Write all natural-language values in Korean.
-    - Keep identifiers, field names, and enum values in the required schema format.
-    - focus_slices may be empty, but must not exceed the max focus slices limit.
-    - The union of focus_actor_ids across all slices must not exceed the max actor calls limit.
-    - One actor must not appear in more than one slice in the same step.
-    - selected_actor_ids should match the union of focus_actor_ids.
-    - deferred_actor_ids should include candidate actors who are not selected for direct simulation this step.
-    - focus_summary should describe the step's main focus without using TV-show wording.
+    # Priority
     - Prioritize continuity, direct pressure, unresolved tension, and meaningful state change.
     """
 ).strip()

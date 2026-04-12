@@ -25,8 +25,8 @@ _PROMPT = (
     Your task is to extract the core premise that best explains what kind of situation this scenario is.
 
     # Input
-    - Scenario:
-    {scenario_text}
+    - Scenario brief JSON:
+    {scenario_brief_json}
     - Maximum steps: {max_steps}
 
     # Instructions

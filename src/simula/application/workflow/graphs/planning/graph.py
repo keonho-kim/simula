@@ -27,6 +27,7 @@ from simula.application.workflow.graphs.planning.nodes.planner import (
     interpret_pressure_points,
     interpret_time_scope,
     interpret_visibility_context,
+    summarize_scenario_brief,
 )
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
@@ -36,6 +37,7 @@ _graph = StateGraph(
     state_schema=cast(Any, SimulationWorkflowState),
     context_schema=WorkflowRuntimeContext,
 )
+_graph.add_node("summarize_scenario_brief", summarize_scenario_brief)
 _graph.add_node("interpret_core", interpret_core)
 _graph.add_node("decide_runtime_progression", decide_runtime_progression)
 _graph.add_node("interpret_time_scope", interpret_time_scope)
@@ -47,7 +49,8 @@ _graph.add_node("build_action_catalog", build_action_catalog)
 _graph.add_node("build_coordination_frame", build_coordination_frame)
 _graph.add_node("build_cast_roster", build_cast_roster)
 _graph.add_node("persist_plan", persist_plan)
-_graph.add_edge(START, "interpret_core")
+_graph.add_edge(START, "summarize_scenario_brief")
+_graph.add_edge("summarize_scenario_brief", "interpret_core")
 _graph.add_edge("interpret_core", "decide_runtime_progression")
 _graph.add_edge("decide_runtime_progression", "interpret_time_scope")
 _graph.add_edge("interpret_time_scope", "interpret_visibility_context")

@@ -25,8 +25,8 @@ _PROMPT = (
     Your task is to identify the main pressures and observation points that will matter during execution.
 
     # Input
-    - Scenario:
-    {scenario_text}
+    - Scenario brief JSON:
+    {scenario_brief_json}
 
     # Output Format
     - Return format: {output_format_name}

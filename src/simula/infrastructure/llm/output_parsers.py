@@ -9,7 +9,7 @@
 
 연관된 다른 모듈/구조:
 - simula.llm.factory
-- simula.prompts.shared.output_examples
+- simula.prompts.shared.output_schema_utils
 """
 
 from __future__ import annotations

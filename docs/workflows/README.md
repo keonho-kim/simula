@@ -25,7 +25,7 @@ flowchart LR
 
 | Stage | Main inputs | Main outputs |
 | --- | --- | --- |
-| Planning | `scenario`, `max_steps` | `plan`, `progression_plan`, `action_catalog`, `coordination_frame`, cast roster |
+| Planning | `scenario`, `max_steps` | `plan`, `scenario_brief`, `progression_plan`, `action_catalog`, `coordination_frame`, cast roster |
 | Generation | `plan.cast_roster`, planning bundle | `actors` |
 | Runtime | `plan`, `actors`, runtime settings, RNG seed | `activities`, `observer_reports`, `simulation_clock`, `intent_history`, stop flags |
 | Finalization | accumulated runtime state | `final_report`, `simulation_log_jsonl`, `report_projection_json`, `final_report_markdown` |

@@ -50,6 +50,9 @@ _PROMPT = textwrap.dedent(
     - adopted_actor_ids should only include actors present in pending_actor_proposals.
     - Do not adopt every proposal by default; keep only the actions that best express this step's focus.
     - updated_intent_states should return one snapshot per actor.
+    - `step_time_advance` must include `elapsed_unit`, `elapsed_amount`, `selection_reason`, and `signals`.
+    - `elapsed_unit` must be one of `minute`, `hour`, `day`, `week`.
+    - `elapsed_amount` must be an integer >= 1.
     - step_time_advance must respect the dynamic time rules and remain at least 30 minutes.
     - event_action is optional and should remain null unless a public situation change is clearly justified.
     - world_state_summary_hint should compress the resulting state into a reusable summary for the next step.

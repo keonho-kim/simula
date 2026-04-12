@@ -184,6 +184,94 @@ def test_role_table_reads_openai_reasoning_effort_and_verbosity(
     assert settings.models.planner.verbosity == "low"
 
 
+def test_role_table_accepts_openai_minimal_reasoning_effort(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_known_env(monkeypatch)
+    env_file = tmp_path / "env.toml"
+    env_file.write_text(
+        textwrap.dedent(
+            """
+            [db]
+            provider = "sqlite"
+
+            [db.sqlite]
+            path = "./runtime.sqlite"
+
+            [llm.openai]
+            API_KEY = "openai-key"
+
+            [llm.planner]
+            provider = "openai"
+            model = "gpt-5.4-mini"
+
+            [llm.generator]
+            provider = "openai"
+            model = "gpt-5.4-mini"
+
+            [llm.actor]
+            provider = "openai"
+            model = "gpt-5.4-mini"
+            reasoning_effort = "minimal"
+
+            [llm.observer]
+            provider = "openai"
+            model = "gpt-5.4-mini"
+            """
+        ).strip(),
+        encoding="utf-8",
+    )
+
+    settings = load_settings(env_file)
+
+    assert settings.models.actor.reasoning_effort == "minimal"
+
+
+def test_non_openai_role_rejects_reasoning_effort(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_known_env(monkeypatch)
+    env_file = tmp_path / "env.toml"
+    env_file.write_text(
+        textwrap.dedent(
+            """
+            [db]
+            provider = "sqlite"
+
+            [db.sqlite]
+            path = "./runtime.sqlite"
+
+            [llm.ollama]
+            base_url = "http://127.0.0.1:11434"
+
+            [llm.planner]
+            provider = "ollama"
+            model = "qwen3:8b"
+            reasoning_effort = "minimal"
+
+            [llm.generator]
+            provider = "ollama"
+            model = "qwen3:8b"
+
+            [llm.actor]
+            provider = "ollama"
+            model = "qwen3:8b"
+
+            [llm.observer]
+            provider = "ollama"
+            model = "qwen3:8b"
+            """
+        ).strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=r"planner provider `ollama` 는 reasoning_effort를 지원하지 않습니다.",
+    ):
+        load_settings(env_file)
+
+
 def test_nested_role_provider_table_is_rejected_for_openai(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
