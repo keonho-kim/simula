@@ -1,0 +1,299 @@
+"""목적:
+- finalization 단계가 공통으로 쓰는 섹션 유틸을 제공한다.
+
+설명:
+- 최종 보고서 프롬프트 입력 조립, 섹션 형식 검증, 재생성 제어를 담당한다.
+
+사용한 설계 패턴:
+- shared utility 패턴
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from collections.abc import Callable
+
+from langchain_core.prompts import PromptTemplate
+from langgraph.runtime import Runtime
+
+from simula.application.workflow.context import WorkflowRuntimeContext
+from simula.application.workflow.graphs.simulation.states.state import (
+    SimulationWorkflowState,
+)
+from simula.prompts.shared.user_facing_language import (
+    find_forbidden_user_facing_term,
+)
+
+
+def build_report_prompt_inputs(
+    state: SimulationWorkflowState,
+    *,
+    include_body_sections: bool,
+    include_actor_final_results: bool = False,
+) -> dict[str, str]:
+    """최종 보고서 프롬프트 공통 입력을 만든다."""
+
+    inputs = {
+        "scenario_text": str(state["scenario"]),
+        "final_report_json": json.dumps(
+            state["final_report"],
+            ensure_ascii=False,
+            indent=2,
+        ),
+        "report_projection_json": str(state.get("report_projection_json", "{}")),
+    }
+    if include_body_sections:
+        inputs["body_sections_markdown"] = str(
+            state.get("report_body_sections_markdown", "")
+        )
+    if include_actor_final_results:
+        inputs["actor_final_results_markdown"] = str(
+            state.get("report_actor_final_results_section", "")
+        )
+    return inputs
+
+
+async def write_report_section(
+    *,
+    runtime: Runtime[WorkflowRuntimeContext],
+    prompt: PromptTemplate,
+    prompt_inputs: dict[str, str],
+    section_title: str,
+    validator: Callable[[str], str | None] | None = None,
+) -> str:
+    """observer를 호출해 보고서 섹션 본문을 작성한다."""
+
+    feedback: str | None = None
+    for attempt in range(2):
+        rendered_prompt = prompt.format(**prompt_inputs)
+        if feedback:
+            rendered_prompt += (
+                "\n\n# Retry Notice\n"
+                f"- 이전 출력은 형식 검증에 실패했다: {feedback}\n"
+                "- 전체 내용을 처음부터 다시 쓰고, 형식 요구사항을 정확히 지켜라.\n"
+            )
+        section_body, _ = await runtime.context.llms.ainvoke_text_with_meta(
+            "observer",
+            rendered_prompt,
+            log_context={
+                "scope": "final-report",
+                "section": section_title,
+                "attempt": attempt + 1,
+            },
+        )
+        normalized_body = section_body.strip()
+        if validator is None:
+            feedback = None
+        else:
+            feedback = validator(normalized_body)
+        if feedback is None:
+            feedback = validate_forbidden_report_terms(
+                normalized_body,
+                scenario_text=prompt_inputs.get("scenario_text", ""),
+            )
+        if feedback is None:
+            return normalized_body
+
+    raise ValueError(f"{section_title} 섹션 형식 검증에 두 번 실패했습니다: {feedback}")
+
+
+def assemble_body_sections_markdown(report_body_sections: list[dict[str, str]]) -> str:
+    """본론 섹션 리스트를 markdown 문자열로 조립한다."""
+
+    return "\n\n".join(
+        f"## {section['title']}\n\n{section['body']}".strip()
+        for section in report_body_sections
+    )
+
+
+def validate_bullet_section(
+    section_body: str,
+    *,
+    min_items: int,
+    max_items: int | None = None,
+) -> str | None:
+    """bullet 전용 섹션 형식을 검증한다."""
+
+    lines = [line.strip() for line in section_body.splitlines() if line.strip()]
+    if len(lines) < min_items:
+        return f"bullet 수는 최소 {min_items}개여야 합니다."
+    if max_items is not None and len(lines) > max_items:
+        return f"bullet 수는 최대 {max_items}개여야 합니다."
+    if any(not line.startswith("- ") for line in lines):
+        return "모든 줄은 '- '로 시작하는 bullet이어야 합니다."
+    return None
+
+
+def validate_conclusion_section(section_body: str) -> str | None:
+    """결론 섹션의 소제목과 bullet 구조를 검증한다."""
+
+    return validate_subheaded_bullet_section(
+        section_body,
+        headings=["### 최종 상태", "### 핵심 이유"],
+        min_items=2,
+    )
+
+
+def validate_timeline_section(section_body: str) -> str | None:
+    """타임라인 bullet 형식을 검증한다."""
+
+    error = validate_bullet_section(section_body, min_items=1)
+    if error is not None:
+        return error
+
+    pattern = re.compile(r"^- \d{4}-\d{2}-\d{2} \d{2}:\d{2} \| .+ \| .+ \| .+$")
+    for line in [line.strip() for line in section_body.splitlines() if line.strip()]:
+        if not pattern.match(line):
+            return (
+                "타임라인 각 줄은 '- YYYY-MM-DD HH:mm | 국면 | 핵심 이벤트 | 결과/파급' "
+                "형식을 따라야 합니다."
+            )
+    return None
+
+
+def validate_actor_dynamics_section(section_body: str) -> str | None:
+    """행위자 역학 관계 섹션의 소제목 구조를 검증한다."""
+
+    return validate_subheaded_text_section(
+        section_body,
+        headings=["### 현재 구도", "### 관계 변화"],
+    )
+
+
+def validate_forbidden_report_terms(
+    section_body: str,
+    *,
+    scenario_text: str,
+) -> str | None:
+    """최종 보고서에서 피해야 하는 추상 표현을 검사한다."""
+
+    violation = find_forbidden_user_facing_term(
+        text=section_body,
+        scenario_text=scenario_text,
+    )
+    if violation is None:
+        return None
+    return f"사용자 노출 출력에서 피해야 하는 표현 {violation} 이 포함되어 있습니다."
+
+
+def validate_markdown_table_rows(
+    section_body: str,
+    *,
+    min_rows: int,
+    max_rows: int,
+) -> str | None:
+    """헤더 없는 markdown 표 본문 행 형식을 검증한다."""
+
+    lines = [line.strip() for line in section_body.splitlines() if line.strip()]
+    if len(lines) < min_rows or len(lines) > max_rows:
+        return f"표 본문 행 수는 {min_rows}~{max_rows}개여야 합니다."
+    if any(not line.startswith("|") or not line.endswith("|") for line in lines):
+        return "표 본문은 각 줄이 '|'로 시작하고 끝나야 합니다."
+    for line in lines:
+        cells = [cell.strip() for cell in line.split("|")[1:-1]]
+        if len(cells) != 5:
+            return "표 본문 각 행은 정확히 5개 셀을 가져야 합니다."
+        if any(not cell for cell in cells):
+            return "표 본문 셀은 비어 있으면 안 됩니다."
+    return None
+
+
+def render_markdown_table(
+    *,
+    headers: list[str],
+    section_body: str,
+) -> str:
+    """표 헤더와 본문 행을 합쳐 markdown 표로 만든다."""
+
+    header_row = "| " + " | ".join(headers) + " |"
+    separator_row = "| " + " | ".join("---" for _ in headers) + " |"
+    body_rows = "\n".join(
+        line.strip() for line in section_body.splitlines() if line.strip()
+    )
+    return f"{header_row}\n{separator_row}\n{body_rows}".strip()
+
+
+def prepend_subheading(*, subheading: str, body: str) -> str:
+    """고정 소제목과 본문을 결합한다."""
+
+    return f"### {subheading}\n\n{body.strip()}".strip()
+
+
+def validate_subheaded_bullet_section(
+    section_body: str,
+    *,
+    headings: list[str],
+    min_items: int,
+    max_items: int | None = None,
+) -> str | None:
+    """소제목 아래 bullet만 허용되는 섹션 형식을 검증한다."""
+
+    parsed = _parse_subheaded_sections(section_body, headings)
+    if isinstance(parsed, str):
+        return parsed
+
+    bullet_count = 0
+    for heading, lines in parsed.items():
+        if not lines:
+            return f"{heading} 아래에는 bullet이 최소 1개 필요합니다."
+        for line in lines:
+            if not line.startswith("- "):
+                return f"{heading} 아래 모든 줄은 '- '로 시작해야 합니다."
+            bullet_count += 1
+
+    if bullet_count < min_items:
+        return f"전체 bullet 수는 최소 {min_items}개여야 합니다."
+    if max_items is not None and bullet_count > max_items:
+        return f"전체 bullet 수는 최대 {max_items}개여야 합니다."
+    return None
+
+
+def validate_subheaded_text_section(
+    section_body: str,
+    *,
+    headings: list[str],
+) -> str | None:
+    """소제목 아래 자유 서술이 들어가는 섹션 형식을 검증한다."""
+
+    parsed = _parse_subheaded_sections(section_body, headings)
+    if isinstance(parsed, str):
+        return parsed
+
+    for heading, lines in parsed.items():
+        if not lines:
+            return f"{heading} 아래에는 본문이 필요합니다."
+        if any(line.startswith("- ") for line in lines):
+            return f"{heading} 아래에는 bullet이 아니라 짧은 문단을 써야 합니다."
+    return None
+
+
+def _parse_subheaded_sections(
+    section_body: str,
+    headings: list[str],
+) -> dict[str, list[str]] | str:
+    lines = [line.strip() for line in section_body.splitlines() if line.strip()]
+    if not lines:
+        return "본문이 비어 있습니다."
+
+    expected_index = 0
+    current_heading: str | None = None
+    sections = {heading: [] for heading in headings}
+
+    for line in lines:
+        if line.startswith("### "):
+            if expected_index >= len(headings):
+                return "허용되지 않은 소제목이 포함되어 있습니다."
+            expected_heading = headings[expected_index]
+            if line != expected_heading:
+                return f"소제목 순서는 {' -> '.join(headings)} 이어야 합니다."
+            current_heading = line
+            expected_index += 1
+            continue
+        if current_heading is None:
+            return "소제목 없이 시작할 수 없습니다."
+        sections[current_heading].append(line)
+
+    if expected_index != len(headings):
+        return f"소제목은 {' -> '.join(headings)} 모두 포함해야 합니다."
+    return sections

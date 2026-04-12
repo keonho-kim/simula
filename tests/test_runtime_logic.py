@@ -1,0 +1,380 @@
+"""목적:
+- activity feed 처리와 종료 판단 같은 순수 로직을 검증한다.
+
+설명:
+- LLM 호출 없이 상태 전이의 핵심 계약만 테스트한다.
+
+사용한 설계 패턴:
+- 순수 함수 단위 테스트 패턴
+
+연관된 다른 모듈/구조:
+- simula.domain.activity_feeds
+- simula.domain.activities
+- simula.domain.reporting
+- simula.domain.runtime_steps
+"""
+
+from __future__ import annotations
+
+from simula.domain.activities import create_canonical_action, recent_actions
+from simula.domain.activity_feeds import (
+    build_visibility_scope,
+    initialize_activity_feeds,
+    list_recent_visible_activities,
+    list_unseen_activities,
+    route_activity,
+    sanitize_targets,
+)
+from simula.domain.reporting import (
+    build_final_report,
+    evaluate_stop,
+    latest_observer_summary,
+    latest_world_state_summary,
+)
+from simula.domain.runtime_policy import (
+    compute_observer_event_probability,
+    derive_rng_seed,
+    select_active_actor_ids,
+)
+from simula.domain.runtime_steps import apply_actor_proposals
+
+
+def test_public_activity_targets_no_specific_actor() -> None:
+    actors = [
+        {"actor_id": "a"},
+        {"actor_id": "b"},
+        {"actor_id": "c"},
+    ]
+
+    targets = sanitize_targets(
+        [],
+        source_actor_id="a",
+        actors=actors,
+        visibility="public",
+        max_targets=2,
+    )
+
+    assert targets == []
+    assert build_visibility_scope("a", targets, "public") == ["all"]
+
+
+def test_route_activity_updates_visible_feeds() -> None:
+    actors = [
+        {"actor_id": "a"},
+        {"actor_id": "b"},
+        {"actor_id": "c"},
+    ]
+    feeds = initialize_activity_feeds(actors)
+    activity = create_canonical_action(
+        run_id="run-1",
+        step_index=1,
+        source_actor_id="a",
+        visibility="private",
+        target_actor_ids=["b"],
+        action_type="coordination",
+        intent="b와 비공개 정렬을 맞춘다.",
+        intent_target_actor_ids=["b"],
+        action_summary="비공개 정렬 action",
+        action_detail="비공개로 우선순위를 맞춘다.",
+        visibility_scope=["a", "b"],
+    ).model_dump(mode="json")
+
+    updated = route_activity(feeds, activity)
+
+    assert updated["b"]["unseen_activity_ids"] == [activity["activity_id"]]
+    assert updated["c"]["unseen_activity_ids"] == []
+
+
+def test_list_unseen_activities_does_not_consume_feed() -> None:
+    actors = [
+        {"actor_id": "a"},
+        {"actor_id": "b"},
+    ]
+    feeds = initialize_activity_feeds(actors)
+    activity = create_canonical_action(
+        run_id="run-1",
+        step_index=1,
+        source_actor_id="b",
+        visibility="private",
+        target_actor_ids=["a"],
+        action_type="speech",
+        intent="a의 입장을 바로 확인한다.",
+        intent_target_actor_ids=["a"],
+        action_summary="확인 요청 action",
+        action_detail="지금 의견을 바로 확인해야 한다.",
+        utterance="지금 의견이 필요합니다.",
+        visibility_scope=["a", "b"],
+    ).model_dump(mode="json")
+    updated = route_activity(feeds, activity)
+
+    unseen = list_unseen_activities(updated, "a", [activity])
+
+    assert [item["activity_id"] for item in unseen] == [activity["activity_id"]]
+    assert updated["a"]["unseen_activity_ids"] == [activity["activity_id"]]
+
+
+def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> None:
+    actors = [
+        {"actor_id": "a", "display_name": "A"},
+        {"actor_id": "b", "display_name": "B"},
+    ]
+    feeds = initialize_activity_feeds(actors)
+    inbound_activity = create_canonical_action(
+        run_id="run-1",
+        step_index=1,
+        source_actor_id="b",
+        visibility="private",
+        target_actor_ids=["a"],
+        action_type="speech",
+        intent="a의 답을 바로 듣는다.",
+        intent_target_actor_ids=["a"],
+        action_summary="질문 action",
+        action_detail="답변이 바로 필요하다.",
+        utterance="답변이 필요합니다.",
+        visibility_scope=["a", "b"],
+    ).model_dump(mode="json")
+    routed_feeds = route_activity(feeds, inbound_activity)
+
+    routed = apply_actor_proposals(
+        run_id="run-1",
+        step_index=2,
+        actors=actors,
+        activity_feeds=routed_feeds,
+        activities=[inbound_activity],
+        action_catalog={
+            "actions": [
+                {
+                    "action_type": "speech",
+                    "label": "직접 발화",
+                    "description": "직접 말로 의도를 전달한다.",
+                    "role_hints": [],
+                    "group_hints": [],
+                    "supported_visibility": ["public", "private", "group"],
+                    "requires_target": True,
+                    "supports_utterance": True,
+                    "examples_or_usage_notes": [],
+                }
+            ],
+            "selection_guidance": [],
+        },
+        pending_actor_proposals=[
+            {
+                "actor_id": "a",
+                "unread_activity_ids": [inbound_activity["activity_id"]],
+                "proposal": {
+                    "action_type": "speech",
+                    "intent": "b에게 답을 돌려준다.",
+                    "intent_target_actor_ids": ["b"],
+                    "action_summary": "A가 응답 action을 한다.",
+                    "action_detail": "질문에 바로 반응해 답을 준다.",
+                    "utterance": "확인했습니다.",
+                    "visibility": "private",
+                    "target_actor_ids": ["b"],
+                    "thread_id": None,
+                },
+                "forced_idle": False,
+                "parse_failure_count": 0,
+                "latency_seconds": 0.01,
+            }
+        ],
+        max_targets_per_activity=2,
+    )
+
+    assert routed["activity_feeds"]["a"]["unseen_activity_ids"] == []
+    assert (
+        inbound_activity["activity_id"]
+        in routed["activity_feeds"]["a"]["seen_activity_ids"]
+    )
+    assert len(routed["latest_step_activities"]) == 1
+    assert routed["activity_feeds"]["b"]["unseen_activity_ids"] == [
+        routed["latest_step_activities"][0]["activity_id"]
+    ]
+    assert routed["activities"][0]["activity_id"] == inbound_activity["activity_id"]
+
+
+def test_evaluate_stop_prefers_max_steps() -> None:
+    should_stop, reason = evaluate_stop(
+        step_index=4,
+        max_steps=4,
+    )
+
+    assert should_stop is True
+    assert reason == "max_steps 도달"
+
+
+def test_evaluate_stop_allows_early_stop_on_stagnation() -> None:
+    should_stop, reason = evaluate_stop(
+        step_index=2,
+        max_steps=6,
+        stagnation_steps=3,
+        last_momentum="low",
+    )
+
+    assert should_stop is True
+    assert reason == "정체 단계 누적"
+
+
+def test_select_active_actor_ids_prioritizes_unread_and_reduces_on_low_momentum() -> (
+    None
+):
+    actors = [
+        {"actor_id": "a"},
+        {"actor_id": "b"},
+        {"actor_id": "c"},
+    ]
+    active_actor_ids = select_active_actor_ids(
+        actors=actors,
+        activity_feeds={
+            "a": {"unseen_activity_ids": [], "seen_activity_ids": []},
+            "b": {"unseen_activity_ids": ["act-1"], "seen_activity_ids": []},
+            "c": {"unseen_activity_ids": [], "seen_activity_ids": []},
+        },
+        activities=[],
+        observer_reports=[
+            {
+                "step_index": 1,
+                "summary": "정체",
+                "notable_events": ["반응 지연"],
+                "atmosphere": "정체",
+                "momentum": "low",
+                "world_state_summary": "큰 변화가 없다.",
+            }
+        ],
+        next_step_index=2,
+        rng_seed=17,
+    )
+
+    assert "b" in active_actor_ids
+    assert len(active_actor_ids) == 2
+
+
+def test_compute_observer_event_probability_increases_on_stagnation() -> None:
+    low_probability = compute_observer_event_probability(
+        latest_activities=[{"activity_id": "act-1"}],
+        observer_reports=[
+            {
+                "step_index": 1,
+                "summary": "탐색",
+                "notable_events": ["공개 발언"],
+                "atmosphere": "완화",
+                "momentum": "medium",
+                "world_state_summary": "아직 안정적이다.",
+            }
+        ],
+        stagnation_steps=0,
+    )
+    high_probability = compute_observer_event_probability(
+        latest_activities=[],
+        observer_reports=[
+            {
+                "step_index": 2,
+                "summary": "정체",
+                "notable_events": ["반응 없음"],
+                "atmosphere": "정체",
+                "momentum": "low",
+                "world_state_summary": "흐름이 멈췄다.",
+            }
+        ],
+        stagnation_steps=3,
+    )
+
+    assert high_probability > low_probability
+
+
+def test_derive_rng_seed_prefers_configured_seed() -> None:
+    assert derive_rng_seed(run_id="run-1", configured_seed=1234) == 1234
+
+
+def test_build_final_report_counts_visibility() -> None:
+    state = {
+        "run_id": "run-1",
+        "scenario": "테스트 시나리오",
+        "plan": {
+            "situation": {
+                "simulation_objective": "갈등 추적",
+                "world_summary": "공청회 직전",
+            }
+        },
+        "actors": [
+            {"actor_id": "a"},
+            {"actor_id": "b"},
+        ],
+        "activities": [
+            {
+                "activity_id": "a1",
+                "visibility": "public",
+            },
+            {
+                "activity_id": "a2",
+                "visibility": "private",
+            },
+        ],
+        "observer_reports": [
+            {
+                "step_index": 1,
+                "summary": "긴장 상승",
+                "notable_events": ["공개 행동", "비공개 정렬"],
+                "atmosphere": "불안",
+                "momentum": "medium",
+                "world_state_summary": "실무 정렬이 시작됐다.",
+            }
+        ],
+        "simulation_clock": {
+            "total_elapsed_minutes": 30,
+            "total_elapsed_label": "30분",
+            "last_elapsed_minutes": 30,
+            "last_elapsed_label": "30분",
+            "last_advanced_step_index": 1,
+        },
+        "step_index": 1,
+        "errors": [],
+    }
+
+    report = build_final_report(state)
+
+    assert report["actor_count"] == 2
+    assert report["total_activities"] == 2
+    assert report["visibility_activity_counts"] == {"public": 1, "private": 1}
+    assert report["last_observer_summary"] == "긴장 상승"
+    assert report["world_state_summary"] == "실무 정렬이 시작됐다."
+    assert report["elapsed_simulation_minutes"] == 30
+
+
+def test_recent_actions_and_latest_summaries_use_latest_values() -> None:
+    activities = [
+        {"activity_id": "a1"},
+        {"activity_id": "a2"},
+        {"activity_id": "a3"},
+        {"activity_id": "a4"},
+        {"activity_id": "a5"},
+        {"activity_id": "a6"},
+    ]
+    feeds = {
+        "a": {
+            "seen_activity_ids": ["a1", "a2"],
+            "unseen_activity_ids": ["a5", "a6"],
+        }
+    }
+    observer_reports = [
+        {"summary": "첫 요약", "world_state_summary": "초기"},
+        {"summary": "최신 요약", "world_state_summary": "최신 상태"},
+    ]
+
+    recent = recent_actions(activities)
+    visible = list_recent_visible_activities(feeds, "a", activities)
+
+    assert [activity["activity_id"] for activity in recent] == [
+        "a2",
+        "a3",
+        "a4",
+        "a5",
+        "a6",
+    ]
+    assert [activity["activity_id"] for activity in visible] == [
+        "a1",
+        "a2",
+        "a5",
+        "a6",
+    ]
+    assert latest_observer_summary(observer_reports) == "최신 요약"
+    assert latest_world_state_summary(observer_reports) == "최신 상태"
