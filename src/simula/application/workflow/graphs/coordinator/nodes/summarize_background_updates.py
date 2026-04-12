@@ -21,6 +21,14 @@ from simula.application.workflow.graphs.coordinator.prompts.summarize_background
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
+from simula.application.workflow.utils.prompt_projections import (
+    WORLD_STATE_SUMMARY_LIMIT,
+    build_background_coordination_frame_view,
+    build_deferred_actor_views,
+    build_relevant_intent_states,
+    build_visible_action_context,
+    truncate_text,
+)
 from simula.domain.contracts import BackgroundUpdateBatch
 from simula.prompts.shared.output_examples import build_output_prompt_bundle
 
@@ -39,10 +47,21 @@ async def summarize_background_updates(
     if not deferred_actors:
         return {"latest_background_updates": []}
 
+    recent_actions, _ = build_visible_action_context(
+        unread_visible_activities=[],
+        recent_visible_activities=list(state.get("activities", []))[-8:],
+        limit=6,
+    )
+    deferred_actor_ids = [
+        str(actor.get("actor_id", ""))
+        for actor in deferred_actors
+        if str(actor.get("actor_id", "")).strip()
+    ]
+
     prompt = SUMMARIZE_BACKGROUND_UPDATES_PROMPT.format(
         step_index=state["step_index"],
         deferred_actors_json=json.dumps(
-            deferred_actors,
+            build_deferred_actor_views(deferred_actors),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
@@ -51,19 +70,28 @@ async def summarize_background_updates(
             ensure_ascii=False,
             separators=(",", ":"),
         ),
-        recent_activities_json=json.dumps(
-            list(state.get("activities", []))[-8:],
+        latest_actions_json=json.dumps(
+            recent_actions,
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         actor_intent_states_json=json.dumps(
-            list(state.get("actor_intent_states", [])),
+            build_relevant_intent_states(
+                list(state.get("actor_intent_states", [])),
+                relevant_actor_ids=deferred_actor_ids,
+                limit=8,
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
-        world_state_summary=str(state.get("world_state_summary", "")),
+        world_state_summary=truncate_text(
+            state.get("world_state_summary", ""),
+            WORLD_STATE_SUMMARY_LIMIT,
+        ),
         coordination_frame_json=json.dumps(
-            state["plan"]["coordination_frame"],
+            build_background_coordination_frame_view(
+                state["plan"]["coordination_frame"]
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),

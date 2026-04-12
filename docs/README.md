@@ -1,48 +1,56 @@
-# 시스템 개요
+# Documentation
 
-`simula`는 시나리오 입력을 planning, generation, runtime, finalization 단계로 분해해 다중 행위자 시뮬레이션을 수행하는 시스템이다.
+This documentation set follows the current compiled graph and runtime path in the
+repository. It is meant to answer two questions quickly:
 
-## 구성 요소
+- what is wired today
+- where a specific behavior actually lives
 
-- 입력
-  - 시나리오 텍스트
-  - 선택적 `max_steps` override
-  - 선택적 반복 실행 옵션
-- 내부 실행
-  - Planning
-  - Generation
-  - Runtime
-  - Finalization
-- 출력
-  - simulation log
-  - 최종 보고서
+## Recommended Reading Paths
 
-```mermaid
-flowchart TD
-    A["Scenario"] --> B["Planning"]
-    B --> C["Generation"]
-    C --> D["Runtime"]
-    D --> E["Finalization"]
-    E --> F["Report"]
-```
+| Goal | Read this first | Then read |
+| --- | --- | --- |
+| Understand the whole project | [`../README.md`](../README.md) | [`architecture.md`](./architecture.md), [`workflows/README.md`](./workflows/README.md) |
+| Understand graph composition | [`workflows/simulation.md`](./workflows/simulation.md) | [`workflows/planning.md`](./workflows/planning.md), [`workflows/runtime.md`](./workflows/runtime.md) |
+| Debug one runtime step | [`workflows/runtime.md`](./workflows/runtime.md) | [`workflows/coordinator.md`](./workflows/coordinator.md), [`contracts.md`](./contracts.md) |
+| Change model routing or prompt ownership | [`llm.md`](./llm.md) | relevant workflow document for the stage you are editing |
+| Run locally or verify config | [`operations.md`](./operations.md) | [`contracts.md`](./contracts.md) |
 
-## 설계 방향
+## Documentation Map
 
-- 역할 분리
-- 상태 중심 실행
-- 구조화 출력 우선
-- 보고서 중심 최종 산출
-- 문서는 `현재 구현`과 `강화 후보`를 구분해 기록
+### System Docs
 
-## 문서 구성
+- [`architecture.md`](./architecture.md)
+  - layer boundaries, execution path, shared runtime context, and output ownership
+- [`contracts.md`](./contracts.md)
+  - config merge rules, state channels, structured outputs, and persistence surface
+- [`llm.md`](./llm.md)
+  - role responsibilities, provider wiring, fallback behavior, and prompt ownership
+- [`operations.md`](./operations.md)
+  - local run commands, config workflow, multi-run behavior, and maintenance commands
 
-- architecture
-  - 레이어와 그래프 흐름, 현재 runtime 정책
-- contracts
-  - 상태, 출력, 저장 계약과 observer 신호 의미
-- llm
-  - 역할별 LLM 규칙과 현재 실패 처리 정책
-- operations
-  - 실행, seed, 디버깅 포인트
-- timeline
-  - 동적 시간 진행, 사건 분기, 조기 종료
+### Workflow Docs
+
+- [`workflows/README.md`](./workflows/README.md)
+  - workflow hub and handoff summary
+- [`workflows/simulation.md`](./workflows/simulation.md)
+  - root graph assembly and executor handoff
+- [`workflows/planning.md`](./workflows/planning.md)
+  - scenario interpretation and plan construction
+- [`workflows/generation.md`](./workflows/generation.md)
+  - actor-slot fan-out and actor registry finalization
+- [`workflows/runtime.md`](./workflows/runtime.md)
+  - step loop, observer role, persistence, and stop branching
+- [`workflows/coordinator.md`](./workflows/coordinator.md)
+  - focus selection, deferred actor digestion, actor proposal fan-out, adjudication
+- [`workflows/finalization.md`](./workflows/finalization.md)
+  - report payloads, timeline anchoring, projection building, markdown assembly
+
+## Documentation Conventions
+
+- “current compiled graph” means the path wired by `*_SUBGRAPH` and `SIMULATION_WORKFLOW`
+  today, not every prompt or helper module present in the tree
+- workflow docs describe inputs and outputs at the state-channel level instead of repeating
+  every implementation detail from the code
+- file outputs such as `final_report.md` are documented separately from state outputs because
+  they are written after the workflow returns

@@ -70,34 +70,22 @@ from simula.application.workflow.graphs.planning.prompts.interpret_visibility_co
 from simula.application.workflow.graphs.runtime.prompts.actor_turn_prompt import (
     PROMPT as ACTOR_PROPOSAL_PROMPT,
 )
-from simula.application.workflow.graphs.runtime.prompts.estimate_step_time_advance_prompt import (
-    PROMPT as ESTIMATE_STEP_TIME_ADVANCE_PROMPT,
-)
 from simula.application.workflow.graphs.runtime.prompts.observe_step_prompt import (
     PROMPT as OBSERVE_STEP_PROMPT,
-)
-from simula.application.workflow.graphs.runtime.prompts.propose_observer_event_prompt import (
-    PROMPT as PROPOSE_OBSERVER_EVENT_PROMPT,
-)
-from simula.application.workflow.graphs.runtime.prompts.track_intent_shifts_prompt import (
-    PROMPT as TRACK_INTENT_SHIFTS_PROMPT,
 )
 from simula.domain.contracts import (
     ActionCatalog,
     ActorActionProposal,
     ActorCard,
-    ActorIntentStateBatch,
     BackgroundUpdateBatch,
     CastRosterItem,
     CoordinationFrame,
-    ObserverEventProposal,
     ObserverReport,
     RuntimeProgressionPlan,
     ScenarioTimeScope,
     StepAdjudication,
     StepFocusPlan,
     SituationBundle,
-    StepTimeAdvanceProposal,
     TimelineAnchorDecision,
 )
 from simula.prompts.shared.output_examples import (
@@ -110,8 +98,9 @@ def test_output_examples_are_generic_and_english_rules() -> None:
     bundle = build_output_prompt_bundle(ScenarioTimeScope)
 
     assert "Return one JSON object only." in bundle["format_rules"]
-    assert '"start": "초기 대면 직후"' in bundle["output_example"]
+    assert '"start":"초기 대면 직후"' in bundle["output_example"]
     assert "미국" not in bundle["output_example"]
+    assert "\n" not in bundle["output_example"]
 
 
 def test_timeline_anchor_prompt_requests_absolute_timestamp() -> None:
@@ -278,17 +267,17 @@ def test_actor_proposal_prompt_is_english_with_korean_response_rule() -> None:
         simulation_clock_json="{}",
         actor_json="{}",
         focus_slice_json="{}",
-        recent_visible_activities_json="[]",
+        visible_action_context_json="[]",
         visible_actors_json="[]",
-        unread_visible_activities_json="[]",
+        unread_backlog_digest_json="null",
         runtime_guidance_json='{"available_actions":[]}',
         max_recipients_per_message=2,
         **build_output_prompt_bundle(ActorActionProposal),
     )
 
-    assert "propose one plausible action for this step" in prompt
+    assert "propose one plausible action" in prompt
     assert "Write all natural-language values in Korean." in prompt
-    assert "recent visible activities JSON:" in prompt
+    assert "visible action context JSON:" in prompt
     assert "runtime guidance JSON:" in prompt
     assert "focus slice JSON:" in prompt
     assert "Choose action_type from the available actions" in prompt
@@ -301,12 +290,9 @@ def test_observer_prompt_is_english_with_korean_response_rule() -> None:
         simulation_clock_json="{}",
         step_time_advance_json="{}",
         latest_activities_json="[]",
-        recent_activities_json="[]",
         current_intent_states_json="[]",
-        recent_intent_history_json="[]",
         latest_background_updates_json="[]",
-        previous_summary="none",
-        world_state_summary="초기 상태",
+        prior_state_digest_json="{}",
         **build_output_prompt_bundle(ObserverReport),
     )
 
@@ -316,25 +302,7 @@ def test_observer_prompt_is_english_with_korean_response_rule() -> None:
     assert "Do not translate momentum into Korean words" in prompt
     assert "current intent states JSON:" in prompt
     assert "latest background updates JSON:" in prompt
-    assert "Use short, direct Korean sentences" in prompt
-
-
-def test_observer_event_prompt_requests_public_event() -> None:
-    prompt = PROPOSE_OBSERVER_EVENT_PROMPT.format(
-        step_index=1,
-        simulation_clock_json="{}",
-        step_time_advance_json="{}",
-        latest_activities_json="[]",
-        recent_activities_json="[]",
-        current_intent_states_json="[]",
-        previous_summary="none",
-        world_state_summary="초기 상태",
-        **build_output_prompt_bundle(ObserverEventProposal),
-    )
-
-    assert "propose one public situation change" in prompt
-    assert "Propose exactly one public action or event." in prompt
-    assert "Write all natural-language values in Korean." in prompt
+    assert "prior state digest JSON:" in prompt
     assert "Use short, direct Korean sentences" in prompt
 
 
@@ -344,7 +312,6 @@ def test_build_step_focus_plan_prompt_requests_budgeted_focus() -> None:
         focus_candidates_json="[]",
         coordination_frame_json="{}",
         situation_json="{}",
-        action_catalog_json="{}",
         simulation_clock_json="{}",
         previous_observer_summary="none",
         max_focus_slices_per_step=3,
@@ -362,7 +329,7 @@ def test_background_update_prompt_requests_offscreen_digest_only() -> None:
         step_index=1,
         deferred_actors_json="[]",
         selected_actor_ids_json="[]",
-        recent_activities_json="[]",
+        latest_actions_json="[]",
         actor_intent_states_json="[]",
         world_state_summary="초기 상태",
         coordination_frame_json="{}",
@@ -389,37 +356,6 @@ def test_step_adjudication_prompt_requests_adopted_subset() -> None:
     assert "adjudicate the selected actor proposals" in prompt
     assert "Do not adopt every proposal by default" in prompt
     assert "event_action is optional" in prompt
-
-
-def test_step_time_advance_prompt_requests_dynamic_elapsed_time() -> None:
-    prompt = ESTIMATE_STEP_TIME_ADVANCE_PROMPT.format(
-        step_index=1,
-        latest_actions_json="[]",
-        current_intent_states_json="[]",
-        progression_plan_json="{}",
-        simulation_clock_json="{}",
-        interpretation_json="{}",
-        situation_json="{}",
-        **build_output_prompt_bundle(StepTimeAdvanceProposal),
-    )
-
-    assert "estimates how much simulation time actually passed" in prompt
-    assert "The normalized elapsed time must be at least 30 minutes." in prompt
-    assert "elapsed_unit must be one of the units allowed" in prompt
-
-
-def test_track_intent_prompt_requests_one_snapshot_per_actor() -> None:
-    prompt = TRACK_INTENT_SHIFTS_PROMPT.format(
-        step_index=1,
-        actors_json="[]",
-        latest_actions_json="[]",
-        previous_intent_states_json="[]",
-        action_catalog_json="{}",
-        **build_output_prompt_bundle(ActorIntentStateBatch),
-    )
-
-    assert "tracks how each actor's intent evolves" in prompt
-    assert "Return one current intent snapshot per actor." in prompt
 
 
 def test_simulation_conclusion_prompt_requests_bullet_only() -> None:
@@ -485,9 +421,9 @@ def test_user_facing_style_rules_are_not_added_to_actor_roleplay_prompts() -> No
         simulation_clock_json="{}",
         actor_json="{}",
         focus_slice_json="{}",
-        recent_visible_activities_json="[]",
+        visible_action_context_json="[]",
         visible_actors_json="[]",
-        unread_visible_activities_json="[]",
+        unread_backlog_digest_json="null",
         runtime_guidance_json="{}",
         max_recipients_per_message=2,
         **build_output_prompt_bundle(ActorActionProposal),

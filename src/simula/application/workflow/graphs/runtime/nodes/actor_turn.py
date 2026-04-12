@@ -24,6 +24,14 @@ from simula.application.workflow.graphs.runtime.prompts.actor_turn_prompt import
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
+from simula.application.workflow.utils.prompt_projections import (
+    build_actor_available_actions_view,
+    build_actor_prompt_actor_view,
+    build_actor_runtime_guidance_view,
+    build_actor_visible_actors_view,
+    build_progression_plan_prompt_view,
+    build_visible_action_context,
+)
 from simula.domain.activities import recent_actions
 from simula.domain.activity_feeds import (
     list_recent_visible_activities,
@@ -45,49 +53,63 @@ def dispatch_selected_actor_proposals(
 
     actors_by_id = {str(actor["actor_id"]): actor for actor in state["actors"]}
     action_catalog = ActionCatalog.model_validate(state["plan"]["action_catalog"])
-    visible_actors_by_id = {
-        actor_id: [
-            candidate
-            for candidate in state["actors"]
-            if str(candidate["actor_id"]) != actor_id
-        ]
-        for actor_id in state["selected_actor_ids"]
-    }
     all_recent_actions = recent_actions(list(state.get("activities", [])), limit=12)
-    return [
-        Send(
-            "generate_actor_proposal",
-            {
-                "step_index": state["step_index"],
-                "progression_plan": state["plan"]["progression_plan"],
-                "simulation_clock": state.get("simulation_clock", {}),
-                "actor_proposal_task": {
-                    "actor": actors_by_id[actor_id],
-                    "unread_visible_activities": list_unseen_activities(
-                        state["activity_feeds"],
-                        actor_id,
-                        state["activities"],
-                    ),
-                    "recent_visible_activities": list_recent_visible_activities(
-                        state["activity_feeds"],
-                        actor_id,
-                        all_recent_actions,
-                    ),
-                    "visible_actors": visible_actors_by_id[actor_id],
-                    "focus_slice": _focus_slice_for_actor(state, actor_id),
-                    "runtime_guidance": _build_runtime_guidance(
-                        state=state,
-                        actor_id=actor_id,
-                        action_catalog=action_catalog,
-                    ),
-                },
-            },
+    sends: list[Send] = []
+    for actor_id in state["selected_actor_ids"]:
+        actor = actors_by_id[actor_id]
+        unread_visible_activities = list_unseen_activities(
+            state["activity_feeds"],
+            actor_id,
+            state["activities"],
         )
-        for actor_id in state["selected_actor_ids"]
-    ]
-
-
-dispatch_actor_proposals = dispatch_selected_actor_proposals
+        recent_visible_activities = list_recent_visible_activities(
+            state["activity_feeds"],
+            actor_id,
+            all_recent_actions,
+        )
+        focus_slice = _focus_slice_for_actor(state, actor_id)
+        current_intent_snapshot = _current_intent_snapshot(state, actor_id)
+        visible_action_context, unread_backlog_digest = build_visible_action_context(
+            unread_visible_activities=unread_visible_activities,
+            recent_visible_activities=recent_visible_activities,
+        )
+        visible_actors = build_actor_visible_actors_view(
+            actors=list(state["actors"]),
+            actor_id=actor_id,
+            focus_slice=focus_slice,
+            current_intent_snapshot=current_intent_snapshot,
+            visible_action_context=visible_action_context,
+            selected_actor_ids=list(state.get("selected_actor_ids", [])),
+        )
+        runtime_guidance = _build_runtime_guidance(
+            state=state,
+            actor_id=actor_id,
+            action_catalog=action_catalog,
+            current_intent_snapshot=current_intent_snapshot,
+        )
+        sends.append(
+            Send(
+                "generate_actor_proposal",
+                {
+                    "step_index": state["step_index"],
+                    "progression_plan": state["plan"]["progression_plan"],
+                    "simulation_clock": state.get("simulation_clock", {}),
+                    "actor_proposal_task": {
+                        "actor": build_actor_prompt_actor_view(actor),
+                        "unread_activity_ids": [
+                            str(activity["activity_id"])
+                            for activity in unread_visible_activities
+                        ],
+                        "visible_action_context": visible_action_context,
+                        "unread_backlog_digest": unread_backlog_digest,
+                        "visible_actors": visible_actors,
+                        "focus_slice": focus_slice,
+                        "runtime_guidance": runtime_guidance,
+                    },
+                },
+            )
+        )
+    return sends
 
 
 async def generate_actor_proposal(
@@ -99,14 +121,14 @@ async def generate_actor_proposal(
     actor_task = state["actor_proposal_task"]
     actor = actor_task["actor"]
     actor_id = str(actor["actor_id"])
-    unread_visible_activities = list(actor_task.get("unread_visible_activities", []))
     runtime_guidance = dict(actor_task.get("runtime_guidance", {}))
 
     prompt = _build_actor_proposal_prompt(
         state=state,
         actor=actor,
-        unread_visible_activities=unread_visible_activities,
-        recent_visible_activities=list(actor_task.get("recent_visible_activities", [])),
+        focus_slice=dict(actor_task.get("focus_slice", {})),
+        visible_action_context=list(actor_task.get("visible_action_context", [])),
+        unread_backlog_digest=actor_task.get("unread_backlog_digest"),
         visible_actors=list(actor_task.get("visible_actors", [])),
         runtime_guidance=runtime_guidance,
         max_recipients_per_message=runtime.context.settings.runtime.max_recipients_per_message,
@@ -140,10 +162,7 @@ async def generate_actor_proposal(
         "pending_actor_proposals": [
             {
                 "actor_id": actor_id,
-                "unread_activity_ids": [
-                    str(activity["activity_id"])
-                    for activity in unread_visible_activities
-                ],
+                "unread_activity_ids": list(actor_task.get("unread_activity_ids", [])),
                 "proposal": proposal_payload,
                 "forced_idle": meta.forced_default,
                 "parse_failure_count": meta.parse_failure_count,
@@ -212,8 +231,9 @@ def _build_actor_proposal_prompt(
     *,
     state: SimulationWorkflowState,
     actor: dict[str, Any],
-    unread_visible_activities: list[dict[str, object]],
-    recent_visible_activities: list[dict[str, object]],
+    focus_slice: dict[str, object],
+    visible_action_context: list[dict[str, object]],
+    unread_backlog_digest: object,
     visible_actors: list[dict[str, object]],
     runtime_guidance: dict[str, object],
     max_recipients_per_message: int,
@@ -221,7 +241,9 @@ def _build_actor_proposal_prompt(
     return ACTOR_PROPOSAL_PROMPT.format(
         step_index=state["step_index"],
         progression_plan_json=json.dumps(
-            state.get("progression_plan", {}),
+            build_progression_plan_prompt_view(
+                cast(dict[str, object], state.get("progression_plan", {}))
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
@@ -232,14 +254,12 @@ def _build_actor_proposal_prompt(
         ),
         actor_json=json.dumps(actor, ensure_ascii=False, separators=(",", ":")),
         focus_slice_json=json.dumps(
-            actor_task_focus_slice(
-                actor_task_focus=runtime_guidance.get("focus_slice")
-            ),
+            focus_slice if isinstance(focus_slice, dict) else {},
             ensure_ascii=False,
             separators=(",", ":"),
         ),
-        recent_visible_activities_json=json.dumps(
-            recent_visible_activities,
+        visible_action_context_json=json.dumps(
+            visible_action_context,
             ensure_ascii=False,
             separators=(",", ":"),
         ),
@@ -248,8 +268,8 @@ def _build_actor_proposal_prompt(
             ensure_ascii=False,
             separators=(",", ":"),
         ),
-        unread_visible_activities_json=json.dumps(
-            unread_visible_activities,
+        unread_backlog_digest_json=json.dumps(
+            unread_backlog_digest,
             ensure_ascii=False,
             separators=(",", ":"),
         ),
@@ -285,6 +305,7 @@ def _build_runtime_guidance(
     state: SimulationWorkflowState,
     actor_id: str,
     action_catalog: ActionCatalog,
+    current_intent_snapshot: dict[str, object],
 ) -> dict[str, object]:
     """actor prompt에 넘길 compact 실행 맥락을 만든다."""
 
@@ -300,23 +321,20 @@ def _build_runtime_guidance(
         actor=cast(dict[str, object], actor),
         action_catalog=action_catalog,
     )
-    return {
-        "simulation_objective": str(situation.get("simulation_objective", "")),
-        "world_state_summary": str(state.get("world_state_summary", "")),
-        "previous_observer_summary": latest_observer_summary(
+    return build_actor_runtime_guidance_view(
+        simulation_objective=situation.get("simulation_objective", ""),
+        world_state_summary=state.get("world_state_summary", ""),
+        previous_observer_summary=latest_observer_summary(
             list(state.get("observer_reports", []))
         ),
-        "previous_observer_momentum": str(previous_report.get("momentum", "")),
-        "previous_observer_atmosphere": str(previous_report.get("atmosphere", "")),
-        "channel_guidance": cast(
-            dict[str, object], situation.get("channel_guidance", {})
-        ),
-        "current_constraints": _object_list(situation.get("current_constraints", [])),
-        "focus_slice": _focus_slice_for_actor(state, actor_id),
-        "current_intent_snapshot": _current_intent_snapshot(state, actor_id),
-        "available_actions": available_actions,
-        "action_selection_guidance": action_catalog.selection_guidance,
-    }
+        previous_observer_momentum=previous_report.get("momentum", ""),
+        previous_observer_atmosphere=previous_report.get("atmosphere", ""),
+        channel_guidance=cast(dict[str, object], situation.get("channel_guidance", {})),
+        current_constraints=_object_list(situation.get("current_constraints", [])),
+        current_intent_snapshot=current_intent_snapshot,
+        available_actions=available_actions,
+        action_selection_guidance=action_catalog.selection_guidance,
+    )
 
 
 def _filter_action_catalog_for_actor(
@@ -351,9 +369,10 @@ def _filter_action_catalog_for_actor(
             matched.append(dumped)
             continue
 
-    if matched:
-        return matched
-    return fallback
+    return build_actor_available_actions_view(
+        matched_actions=matched,
+        fallback_actions=fallback,
+    )
 
 
 def _current_intent_snapshot(
@@ -377,14 +396,6 @@ def _focus_slice_for_actor(
         focus_slice = cast(dict[str, object], raw_focus_slice)
         if actor_id in _string_list(focus_slice.get("focus_actor_ids", [])):
             return focus_slice
-    return {}
-
-
-def actor_task_focus_slice(*, actor_task_focus: object) -> dict[str, object]:
-    """actor prompt에 직접 넣을 focus slice를 정리한다."""
-
-    if isinstance(actor_task_focus, dict):
-        return cast(dict[str, object], actor_task_focus)
     return {}
 
 
@@ -447,9 +458,9 @@ def _select_default_action(
 ) -> dict[str, object]:
     if not has_targets:
         for action in available_actions:
-            if "public" in _string_list(action.get("supported_visibility")) and not bool(
-                action.get("supports_utterance")
-            ):
+            if "public" in _string_list(
+                action.get("supported_visibility")
+            ) and not bool(action.get("supports_utterance")):
                 return action
         for action in available_actions:
             if "public" in _string_list(action.get("supported_visibility")):

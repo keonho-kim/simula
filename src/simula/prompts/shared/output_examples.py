@@ -33,7 +33,11 @@ def build_output_prompt_bundle(schema: type[BaseModel]) -> dict[str, str]:
                 "- Keep every string key explicitly wrapped in double quotes.",
             ]
         ),
-        "output_example": json.dumps(example, ensure_ascii=False, indent=2),
+        "output_example": json.dumps(
+            example,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
     }
 
 
@@ -51,9 +55,7 @@ def build_ndjson_prompt_bundle(schema: type[BaseModel]) -> dict[str, str]:
                 "- Keep every string key explicitly wrapped in double quotes.",
             ]
         ),
-        "output_example": "\n".join(
-            [example, example.replace("cast-operations", "cast-finance")]
-        ),
+        "output_example": example,
     }
 
 
@@ -238,18 +240,18 @@ def _example_payload(schema: type[BaseModel]) -> dict[str, Any]:
         },
         "StepFocusPlan": {
             "step_index": 2,
-            "focus_summary": "이번 단계는 비공개 압박과 공개 입장 정렬이 직접 맞물리는 축을 추적한다.",
-            "selection_reason": "직접 target 압력과 직전 intent 변화가 동시에 높아 focus 가치가 가장 크다.",
+            "focus_summary": "이번 단계 핵심 압박 축을 직접 따라간다.",
+            "selection_reason": "직접 target 압력이 가장 높다.",
             "selected_actor_ids": ["operations-lead", "finance-director"],
             "deferred_actor_ids": ["field-lead"],
             "focus_slices": [
                 {
                     "slice_id": "step-2-focus-1",
-                    "title": "비공개 압박 축",
+                    "title": "비공개 압박",
                     "focus_actor_ids": ["operations-lead", "finance-director"],
                     "visibility": "private",
-                    "stakes": "일정 재조정 여부가 다음 단계의 공개 입장을 바꿀 수 있다.",
-                    "selection_reason": "직접 target 압력과 action 연쇄가 가장 강하다.",
+                    "stakes": "즉시 반응이 필요하다.",
+                    "selection_reason": "action 압력이 가장 강하다.",
                 }
             ],
         },
@@ -258,21 +260,19 @@ def _example_payload(schema: type[BaseModel]) -> dict[str, Any]:
                 {
                     "step_index": 2,
                     "actor_id": "field-lead",
-                    "summary": "현장 쪽은 직접 개입하지 않았지만 내부적으로 대응 부담이 커지고 있다.",
+                    "summary": "현장 압력이 조금씩 커진다.",
                     "pressure_level": "medium",
-                    "future_hook": "다음 단계에서 자원 재배치 요구가 전면으로 올라올 수 있다.",
+                    "future_hook": "다음 단계에서 직접 개입할 수 있다.",
                 }
             ]
         },
         "StepAdjudication": {
             "adopted_actor_ids": ["operations-lead"],
-            "rejected_action_notes": [
-                "finance-director의 제안은 이번 단계 핵심 압력보다 후순위였다."
-            ],
+            "rejected_action_notes": ["finance-director는 이번 단계 후순위였다."],
             "updated_intent_states": [
                 {
                     "actor_id": "operations-lead",
-                    "current_intent": "핵심 범위를 다시 정리하도록 방향을 틀게 만든다.",
+                    "current_intent": "핵심 범위를 다시 정리하게 만든다.",
                     "target_actor_ids": ["finance-director"],
                     "supporting_action_type": "speech",
                     "confidence": 0.82,
@@ -289,37 +289,37 @@ def _example_payload(schema: type[BaseModel]) -> dict[str, Any]:
                 {
                     "step_index": 2,
                     "actor_id": "field-lead",
-                    "summary": "현장 쪽은 직접 개입하지 않았지만 대응 부담이 커지고 있다.",
+                    "summary": "현장 압력이 커진다.",
                     "pressure_level": "medium",
-                    "future_hook": "다음 단계에서 자원 재배치 요구가 올라올 수 있다.",
+                    "future_hook": "다음 단계에서 직접 개입할 수 있다.",
                 }
             ],
             "event_action": None,
-            "world_state_summary_hint": "핵심 압박은 비공개 조율 축에 집중됐고, 배경에서는 대응 부담이 천천히 커지고 있다.",
+            "world_state_summary_hint": "핵심 압박은 비공개 조율에 몰렸고 배경 압력은 조금씩 커지고 있다.",
         },
         "ActorActionProposal": {
             "action_type": "speech",
-            "intent": "핵심 범위를 다시 정리하도록 방향을 틀게 만든다.",
-            "intent_target_actor_ids": ["finance-director", "field-lead"],
-            "action_summary": "운영 총괄이 일정 재조정 방향을 꺼낸다.",
-            "action_detail": "현재 인력과 우선순위 기준으로는 기존 일정이 무리라는 점을 분명히 하고, 먼저 핵심 범위를 다시 정리해야 한다는 방향으로 분위기를 민다.",
-            "utterance": "지금 기준으로는 기존 일정이 무리입니다. 먼저 핵심 범위를 다시 정리해야 합니다.",
+            "intent": "핵심 범위를 다시 보게 만든다.",
+            "intent_target_actor_ids": ["finance-director"],
+            "action_summary": "운영 총괄이 일정 재검토를 제안한다.",
+            "action_detail": "현재 조건으로는 무리라는 점을 짧게 짚고 우선순위 재검토를 요구한다.",
+            "utterance": "지금 조건으로는 무리합니다. 먼저 범위를 다시 보겠습니다.",
             "visibility": "group",
-            "target_actor_ids": ["finance-director", "field-lead"],
-            "thread_id": "schedule-alignment",
-            "expected_outcome": "일정 재조정 논의가 공식 안건으로 올라간다.",
+            "target_actor_ids": ["finance-director"],
+            "thread_id": "schedule-check",
+            "expected_outcome": "재검토 논의가 즉시 시작된다.",
         },
         "ActorActionProposalPassive": {
             "action_type": "reposition",
-            "intent": "현재 우선순위를 조용히 다시 정렬한다.",
+            "intent": "우선순위를 조용히 다시 본다.",
             "intent_target_actor_ids": [],
-            "action_summary": "운영 총괄이 내부 우선순위를 다시 정리한다.",
-            "action_detail": "즉시 공개 발화를 하지는 않고, 다음 단계 판단을 위해 내부 기준과 우선순위를 재정렬한다.",
+            "action_summary": "운영 총괄이 내부 우선순위를 다시 본다.",
+            "action_detail": "즉시 말하지 않고 다음 판단을 위해 내부 기준만 다시 정리한다.",
             "utterance": None,
             "visibility": "public",
             "target_actor_ids": [],
             "thread_id": None,
-            "expected_outcome": "다음 단계에서 더 일관된 action 선택이 가능해진다.",
+            "expected_outcome": "다음 단계 판단이 더 일관된다.",
         },
         "ActorIntentStateBatch": {
             "actor_intent_states": [
@@ -335,14 +335,14 @@ def _example_payload(schema: type[BaseModel]) -> dict[str, Any]:
         },
         "ObserverReport": {
             "step_index": 1,
-            "summary": "발화보다 일정 재정렬과 입장 조정 action이 먼저 국면을 움직이기 시작했다.",
+            "summary": "직접 action이 먼저 쌓이며 다음 선택 압력이 커졌다.",
             "notable_events": [
-                "운영 총괄이 일정 재정렬 방향을 꺼냈다.",
-                "핵심 실무자들이 같은 조정 action에 반응하기 시작했다.",
+                "운영 총괄이 재검토를 제안했다.",
+                "핵심 실무자들이 같은 방향으로 움직였다.",
             ],
             "atmosphere": "경계",
             "momentum": "medium",
-            "world_state_summary": "발화보다 실제 조정 action이 먼저 누적되면서 선택 방향이 조금씩 갈리고 있다.",
+            "world_state_summary": "직접 조정 action이 먼저 누적되며 다음 선택 방향이 갈리기 시작했다.",
         },
         "ObserverEventProposal": {
             "action_type": "public_event",

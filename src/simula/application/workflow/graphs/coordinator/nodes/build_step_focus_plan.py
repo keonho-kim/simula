@@ -19,6 +19,13 @@ from simula.application.workflow.utils.coercion import (
     as_dict_list,
     as_string_list,
 )
+from simula.application.workflow.utils.prompt_projections import (
+    PREVIOUS_SUMMARY_LIMIT,
+    build_focus_candidates_prompt_view,
+    build_focus_plan_coordination_frame_view,
+    build_focus_plan_situation_view,
+    truncate_text,
+)
 from simula.application.workflow.graphs.coordinator.prompts.build_step_focus_plan_prompt import (
     PROMPT as BUILD_STEP_FOCUS_PLAN_PROMPT,
 )
@@ -41,22 +48,19 @@ async def build_step_focus_plan(
     prompt = BUILD_STEP_FOCUS_PLAN_PROMPT.format(
         step_index=state["step_index"],
         focus_candidates_json=json.dumps(
-            list(state.get("focus_candidates", [])),
+            build_focus_candidates_prompt_view(list(state.get("focus_candidates", []))),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         coordination_frame_json=json.dumps(
-            state["plan"]["coordination_frame"],
+            build_focus_plan_coordination_frame_view(
+                state["plan"]["coordination_frame"]
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         situation_json=json.dumps(
-            state["plan"]["situation"],
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        action_catalog_json=json.dumps(
-            state["plan"]["action_catalog"],
+            build_focus_plan_situation_view(state["plan"]["situation"]),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
@@ -65,8 +69,9 @@ async def build_step_focus_plan(
             ensure_ascii=False,
             separators=(",", ":"),
         ),
-        previous_observer_summary=latest_observer_summary(
-            list(state.get("observer_reports", []))
+        previous_observer_summary=truncate_text(
+            latest_observer_summary(list(state.get("observer_reports", []))),
+            PREVIOUS_SUMMARY_LIMIT,
         ),
         max_focus_slices_per_step=max_focus_slices,
         max_actor_calls_per_step=max_actor_calls,

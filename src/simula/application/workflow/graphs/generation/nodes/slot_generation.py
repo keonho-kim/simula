@@ -21,6 +21,13 @@ from simula.application.workflow.graphs.generation.prompts.generate_actor_prompt
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
+from simula.application.workflow.utils.prompt_projections import (
+    GENERATION_ACTION_LIMIT,
+    build_compact_action_catalog_view,
+    build_generation_coordination_frame_view,
+    build_generation_interpretation_view,
+    build_generation_situation_view,
+)
 from simula.domain.contracts import ActorCard
 from simula.prompts.shared.output_examples import build_output_prompt_bundle
 
@@ -36,22 +43,27 @@ async def generate_actor_slot(
     prompt = GENERATE_ACTOR_PROMPT.format(
         scenario_text=state["scenario"],
         interpretation_json=json.dumps(
-            state["plan"]["interpretation"],
+            build_generation_interpretation_view(state["plan"]["interpretation"]),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         situation_json=json.dumps(
-            state["plan"]["situation"],
+            build_generation_situation_view(state["plan"]["situation"]),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         action_catalog_json=json.dumps(
-            state["plan"]["action_catalog"],
+            build_compact_action_catalog_view(
+                state["plan"]["action_catalog"],
+                limit=GENERATION_ACTION_LIMIT,
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         coordination_frame_json=json.dumps(
-            state["plan"]["coordination_frame"],
+            build_generation_coordination_frame_view(
+                state["plan"]["coordination_frame"]
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),

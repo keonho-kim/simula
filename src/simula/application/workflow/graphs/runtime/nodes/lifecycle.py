@@ -54,7 +54,6 @@ def initialize_runtime_state(state: SimulationWorkflowState) -> dict[str, object
         "parse_failures": 0,
         "forced_idles": 0,
         "stagnation_steps": 0,
-        "observer_event_probability": None,
         "world_state_summary": str(
             state.get("plan", {}).get("situation", {}).get("world_summary", "")
         ),

@@ -1,140 +1,147 @@
-# 계약
+# Contracts
 
-## 설정 계약
+## Configuration Merge Contract
 
-### 우선순위
+Settings are built from four layers in this order:
 
-- CLI
-- 환경 변수
-- `env.toml`
-- 기본값
+1. defaults
+2. `env.toml`
+3. environment variables
+4. CLI overrides
 
-### 핵심 runtime 필드
+At load time the repository flattens structured TOML into internal env-style keys, merges
+real environment variables, then applies CLI overrides.
 
-| 필드 | 의미 |
+## Key Runtime Settings
+
+| Field | Meaning |
 | --- | --- |
-| `max_steps` | 최대 step 수 |
-| `max_recipients_per_message` | actor proposal 수신자 상한 |
-| `enable_checkpointing` | checkpoint 사용 여부 |
-| `rng_seed` | 재현 가능한 runtime 분기용 선택 seed |
+| `runtime.max_steps` | hard cap for runtime steps |
+| `runtime.max_actor_calls_per_step` | upper bound for directly called actors in one step |
+| `runtime.max_focus_slices_per_step` | upper bound for coordinator focus slices |
+| `runtime.max_recipients_per_message` | limit for routed activity targets |
+| `runtime.enable_checkpointing` | enables checkpointer-backed graph compilation |
+| `runtime.rng_seed` | optional deterministic seed override |
+| `storage.provider` | `sqlite` or `postgresql` |
+| `storage.output_dir` | directory used by the presentation layer for file outputs |
 
-## 상태 계약
+### Removed Time Inputs
 
-### 핵심 채널
+The fixed-time settings `time_unit` and `time_step_size` are intentionally rejected. The
+current runtime supports only `max_steps` as a direct time-related setting.
 
-| 채널 | 역할 |
+## State Channel Groups
+
+### Planning and Shared Inputs
+
+| Channel | Meaning |
 | --- | --- |
-| `scenario` | 원본 시나리오 |
-| `plan` | planning 결과 |
-| `action_catalog` | planner가 도출한 scenario 전역 action catalog |
-| `actors` | actor registry |
-| `activities` | 전체 canonical action JSON |
-| `latest_step_activities` | 현재 step action |
-| `focus_candidates` | coordinator 후보 actor pool |
-| `step_focus_plan` | 이번 step focus 선택 결과 |
-| `step_focus_history` | step별 focus 기록 |
-| `selected_actor_ids` | 직접 호출된 actor 목록 |
-| `deferred_actor_ids` | background digest로만 반영된 actor 목록 |
-| `background_updates` | off-screen actor 배경 변화 digest |
-| `observer_reports` | step별 observer 요약 |
-| `actor_intent_states` | actor별 현재 intent snapshot |
-| `intent_history` | step별 intent 변화 이력 |
-| `progression_plan` | planner가 정한 동적 시간 진행 계획 |
-| `simulation_clock` | 현재 누적 경과 시간 snapshot |
-| `step_time_history` | step별 실제 경과 시간 기록 |
-| `world_state_summary` | 누적 세계 상태 |
-| `step_index` | 현재 step |
-| `stagnation_steps` | 저활동/저속 단계 누적 수 |
-| `rng_seed` | run별 deterministic seed |
-| `stop_requested` | 종료 플래그 |
-| `final_report` | 최종 요약 JSON |
-| `report_timeline_anchor_json` | 보고서용 절대시각 anchor |
-| `report_projection_json` | 보고서용 projection |
+| `scenario` | raw scenario text |
+| `plan` | persisted planning result bundle |
+| `progression_plan` | planner-selected dynamic time policy |
+| `action_catalog` | scenario-wide action menu |
+| `coordination_frame` | planner-produced runtime guidance |
 
-### 상태 원칙
+### Generation
 
-- raw action과 observer 해석을 분리한다.
-- finalization은 추가 projection을 만들어 보고서 입력을 정제한다.
-- report projection은 `timeline_packets`, `endgame_packets`, `actor_digests`, `final_actor_snapshots`, `final_outcome_clues`를 포함할 수 있다.
-- 현재 runtime은 `world_state_summary`, 직전 `momentum`, 직전 `atmosphere`, `channel_guidance`, `current_constraints`, filtered action options, 현재 intent snapshot, 현재 `simulation_clock`, 자기 focus slice를 actor prompt에 다시 공급한다.
+| Channel | Meaning |
+| --- | --- |
+| `pending_cast_slots` | fan-out work items for actor generation |
+| `generated_actor_results` | slot-level generator results |
+| `actors` | finalized actor registry |
 
-### Observer 신호 의미
+### Runtime
 
-- `atmosphere`
-  - 현재 step의 정서적/사회적 분위기 라벨
-  - 현재 구현에서는 보고와 prompt tone 입력에 사용한다
-- `momentum`
-  - 현재 phase의 거친 진행 속도 신호
-  - 현재 구현에서는 활성 actor 선택, 사건 확률, 조기 종료 판단에 사용한다
+| Channel | Meaning |
+| --- | --- |
+| `activity_feeds` | mailbox-like visibility feeds per actor |
+| `activities` | canonical activity log |
+| `latest_step_activities` | activities adopted in the current step |
+| `focus_candidates` | compressed coordinator candidate pool |
+| `step_focus_plan` | selected focus slices for the current step |
+| `step_focus_history` | historical focus plans |
+| `selected_actor_ids` | actors called directly in the current step |
+| `deferred_actor_ids` | actors summarized through background updates only |
+| `latest_background_updates` | deferred-actor digest for the current step |
+| `background_updates` | accumulated deferred-actor digest history |
+| `actor_intent_states` | latest intent snapshots |
+| `intent_history` | step-level intent history |
+| `pending_step_time_advance` | normalized time-advance record for the current step |
+| `simulation_clock` | cumulative time snapshot |
+| `step_time_history` | historical time-advance records |
+| `observer_reports` | per-step observer summaries |
+| `world_state_summary` | current world digest used across steps |
+| `stagnation_steps` | low-momentum accumulation counter |
+| `stop_requested` / `stop_reason` | runtime stop flags |
 
-## 구조화 출력 계약
+### Finalization
 
-### planning
+| Channel | Meaning |
+| --- | --- |
+| `final_report` | structured final report JSON |
+| `simulation_log_jsonl` | rendered log string in JSONL form |
+| `report_timeline_anchor_json` | absolute anchor for report timestamps |
+| `report_projection_json` | report-specific projection over runtime state |
+| `report_*_section` | generated markdown section bodies |
+| `final_report_markdown` | final markdown report assembled in-state |
+
+## Structured Output Surface
+
+### Planning Outputs
 
 - `ScenarioInterpretation`
 - `RuntimeProgressionPlan`
 - `SituationBundle`
 - `ActionCatalog`
+- `CoordinationFrame`
 - `CastRosterItem`
 
-### generation / runtime
+### Generation and Runtime Outputs
 
 - `ActorCard`
-- `ActorActionProposal`
-- `CanonicalAction`
-- `CoordinationFrame`
 - `StepFocusPlan`
 - `BackgroundUpdateBatch`
+- `ActorActionProposal`
+- `CanonicalAction`
 - `StepAdjudication`
-- `StepTimeAdvanceProposal`
-- `StepTimeAdvanceRecord`
-- `SimulationClockSnapshot`
+- `ActorIntentSnapshot`
 - `ObserverReport`
+- `SimulationClockSnapshot`
+- `StepTimeAdvanceRecord`
 
-### finalization
+### Finalization Outputs
 
 - `FinalReport`
 - `TimelineAnchorDecision`
 
-### 규칙
+## Persistence Contract
 
-- planner roster만 NDJSON
-- 나머지는 JSON 단일 객체
-- `RuntimeProgressionPlan`은 허용 시간 단위와 기본 pacing 단위를 담는다
-- visibility는 `public`, `private`, `group`만 허용한다
-- 현재 `ActorCard`는 `baseline_attention_tier`, `story_function`, `preferred_action_types`, `action_bias_notes`를 포함한다
+Structured artifacts are persisted through the app store:
 
-### 강화 후보 타입
-
-- runtime state 후보
-  - `relationship_edges`
-  - `open_threads`
-  - `incident_state`
-- actor card 후보
-  - `risk_tolerance`
-  - `initiative_bias`
-  - `disclosure_bias`
-  - `loyalty_bias`
-
-## 저장 계약
-
-| 저장 대상 | 의미 |
+| Stored artifact | Meaning |
 | --- | --- |
-| `runs` | 실행 메타 정보 |
-| `actors` | actor registry |
-| `activities` | canonical activity |
-| `observer_reports` | step별 observer report |
-| `final_reports` | 최종 요약 JSON |
+| `runs` | run metadata and status |
+| `plan` | persisted planning bundle |
+| `actors` | finalized actor registry |
+| `activities` | canonical activities |
+| `observer_reports` | per-step observer summaries |
+| `final_reports` | structured final report JSON |
 
-## 실패 처리 계약
+Human-facing files are written separately after the workflow completes:
 
-- 설정 검증 실패는 즉시 예외 처리
-- 구조화 파싱 실패는 명시적 실패
-- 저장 스키마 불일치는 즉시 실패
-- 실행 실패 시 run 상태에 실패 이유 기록
-- checkpoint는 명시적으로 켤 때만 요구
+- `output/<run_id>/simulation.log.jsonl`
+- `output/<run_id>/final_report.md`
 
-### 현재 구현 메모
+## Failure Contract
 
-- actor proposal parsing 실패는 기본 대기 행동으로 대체될 수 있다
-- observer summary 자체는 기본 요약으로 대체하지 않고 그대로 실패한다
+The repository does not treat all roles the same.
+
+- planning structured generation is expected to succeed without silent degradation
+- generation is expected to return a valid actor registry or fail
+- coordinator nodes can fall back to default payloads for focus planning, background
+  updates, and step adjudication
+- actor proposals can fall back to a forced idle/default action path
+- observer summaries are expected to succeed without the same default-fallback path
+- config validation and storage shape mismatches fail explicitly
+
+For role-by-role details, see [`llm.md`](./llm.md).

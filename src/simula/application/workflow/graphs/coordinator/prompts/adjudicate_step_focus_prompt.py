@@ -13,13 +13,9 @@ from __future__ import annotations
 import textwrap
 
 from langchain_core.prompts import PromptTemplate
-from simula.prompts.shared.user_facing_language import build_user_facing_style_block
 
-_USER_FACING_STYLE = build_user_facing_style_block()
-
-_PROMPT = (
-    textwrap.dedent(
-        """
+_PROMPT = textwrap.dedent(
+    """
     # Role
     You are a simulation coordinator at our company.
     Your task is to adjudicate the selected actor proposals for this step and decide what becomes part of the canonical simulation state.
@@ -58,9 +54,6 @@ _PROMPT = (
     - event_action is optional and should remain null unless a public situation change is clearly justified.
     - world_state_summary_hint should compress the resulting state into a reusable summary for the next step.
     """
-    ).strip()
-    + "\n"
-    + _USER_FACING_STYLE
-)
+).strip()
 
 PROMPT = PromptTemplate.from_template(_PROMPT)

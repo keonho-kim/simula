@@ -36,12 +36,24 @@ FORBIDDEN_USER_FACING_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 
-def build_user_facing_style_block(*, include_result_first: bool = True) -> str:
+def build_user_facing_style_block(
+    *,
+    include_result_first: bool = True,
+    compact: bool = False,
+) -> str:
     """사용자 노출 자연어 스타일 지침 블록을 만든다."""
 
-    lines = list(_BASE_STYLE_LINES)
-    if include_result_first:
-        lines.insert(1, _RESULT_FIRST_LINE)
+    if compact:
+        lines = [
+            _BASE_STYLE_LINES[0],
+            _RESULT_FIRST_LINE,
+        ]
+        if not include_result_first:
+            lines = [_BASE_STYLE_LINES[0]]
+    else:
+        lines = list(_BASE_STYLE_LINES)
+        if include_result_first:
+            lines.insert(1, _RESULT_FIRST_LINE)
     return "\n".join(f"- {line}" for line in lines)
 
 

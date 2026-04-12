@@ -22,7 +22,13 @@ from simula.application.workflow.graphs.runtime.prompts.observe_step_prompt impo
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
-from simula.domain.reporting import evaluate_stop, latest_observer_summary
+from simula.application.workflow.utils.prompt_projections import (
+    build_compact_background_updates,
+    build_prior_state_digest,
+    build_relevant_intent_states,
+    build_visible_action_context,
+)
+from simula.domain.reporting import evaluate_stop
 from simula.domain.runtime_policy import next_stagnation_steps
 from simula.domain.contracts import ObserverReport
 from simula.prompts.shared.output_examples import build_output_prompt_bundle
@@ -48,6 +54,35 @@ async def observe_step(
             ),
         )
     else:
+        latest_action_views, _ = build_visible_action_context(
+            unread_visible_activities=[],
+            recent_visible_activities=latest_actions,
+            limit=6,
+        )
+        latest_background_update_views = build_compact_background_updates(
+            latest_background_updates
+        )
+        relevant_actor_ids = [
+            str(item.get("source_actor_id", ""))
+            for item in latest_actions
+            if str(item.get("source_actor_id", "")).strip()
+        ]
+        for item in latest_actions:
+            relevant_actor_ids.extend(
+                str(actor_id)
+                for actor_id in item.get("target_actor_ids", [])
+                if str(actor_id).strip()
+            )
+            relevant_actor_ids.extend(
+                str(actor_id)
+                for actor_id in item.get("intent_target_actor_ids", [])
+                if str(actor_id).strip()
+            )
+        relevant_actor_ids.extend(
+            str(item.get("actor_id", ""))
+            for item in latest_background_updates
+            if str(item.get("actor_id", "")).strip()
+        )
         prompt = OBSERVE_STEP_PROMPT.format(
             step_index=state["step_index"],
             simulation_clock_json=json.dumps(
@@ -61,35 +96,35 @@ async def observe_step(
                 separators=(",", ":"),
             ),
             latest_activities_json=json.dumps(
-                latest_actions,
-                ensure_ascii=False,
-                separators=(",", ":"),
-            ),
-            recent_activities_json=json.dumps(
-                list(state.get("activities", []))[-12:],
+                latest_action_views,
                 ensure_ascii=False,
                 separators=(",", ":"),
             ),
             current_intent_states_json=json.dumps(
-                list(state.get("actor_intent_states", [])),
-                ensure_ascii=False,
-                separators=(",", ":"),
-            ),
-            recent_intent_history_json=json.dumps(
-                list(state.get("intent_history", []))[-3:],
+                build_relevant_intent_states(
+                    list(state.get("actor_intent_states", [])),
+                    relevant_actor_ids=relevant_actor_ids,
+                ),
                 ensure_ascii=False,
                 separators=(",", ":"),
             ),
             latest_background_updates_json=json.dumps(
-                latest_background_updates,
+                latest_background_update_views,
                 ensure_ascii=False,
                 separators=(",", ":"),
             ),
-            previous_summary=latest_observer_summary(
-                list(state.get("observer_reports", []))
-            ),
-            world_state_summary=str(
-                state.get("world_state_summary", "초기 세계 상태 요약 없음")
+            prior_state_digest_json=json.dumps(
+                build_prior_state_digest(
+                    observer_reports=list(state.get("observer_reports", [])),
+                    world_state_summary=state.get("world_state_summary", ""),
+                    step_focus_history=list(state.get("step_focus_history", [])),
+                    simulation_clock=cast(
+                        dict[str, object],
+                        state.get("simulation_clock", {}),
+                    ),
+                ),
+                ensure_ascii=False,
+                separators=(",", ":"),
             ),
             **build_output_prompt_bundle(ObserverReport),
         )

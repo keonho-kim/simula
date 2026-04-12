@@ -13,13 +13,9 @@ from __future__ import annotations
 import textwrap
 
 from langchain_core.prompts import PromptTemplate
-from simula.prompts.shared.user_facing_language import build_user_facing_style_block
 
-_USER_FACING_STYLE = build_user_facing_style_block()
-
-_PROMPT = (
-    textwrap.dedent(
-        """
+_PROMPT = textwrap.dedent(
+    """
     # Role
     You are a simulation coordinator at our company.
     Your task is to decide which focus slices deserve direct simulation attention for this step.
@@ -32,8 +28,6 @@ _PROMPT = (
     {coordination_frame_json}
     - situation bundle JSON:
     {situation_json}
-    - action catalog JSON:
-    {action_catalog_json}
     - simulation clock JSON:
     {simulation_clock_json}
     - previous observer summary:
@@ -59,9 +53,6 @@ _PROMPT = (
     - focus_summary should describe the step's main focus without using TV-show wording.
     - Prioritize continuity, direct pressure, unresolved tension, and meaningful state change.
     """
-    ).strip()
-    + "\n"
-    + _USER_FACING_STYLE
-)
+).strip()
 
 PROMPT = PromptTemplate.from_template(_PROMPT)

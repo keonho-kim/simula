@@ -247,7 +247,7 @@ def test_dispatch_selected_actor_proposals_sends_minimal_actor_task_payload() ->
             {
                 "actor_id": "a",
                 "current_intent": "긴장을 관리한다.",
-                "target_actor_ids": [],
+                "target_actor_ids": ["b"],
                 "supporting_action_type": "initial_state",
                 "confidence": 0.5,
                 "changed_from_previous": False,
@@ -274,7 +274,21 @@ def test_dispatch_selected_actor_proposals_sends_minimal_actor_task_payload() ->
     assert "actors" not in payload
     actor_task = payload["actor_proposal_task"]
     assert actor_task["actor"]["actor_id"] == "a"
+    assert "avatar_seed" not in actor_task["actor"]
     assert actor_task["focus_slice"]["slice_id"] == "focus-1"
+    assert "unread_visible_activities" not in actor_task
+    assert "recent_visible_activities" not in actor_task
+    assert actor_task["visible_action_context"][0]["activity_id"] == "a2"
+    assert "visibility_scope" not in actor_task["visible_action_context"][0]
+    assert actor_task["visible_actors"][0]["actor_id"] == "b"
+    assert set(actor_task["visible_actors"][0]) == {
+        "actor_id",
+        "display_name",
+        "role",
+        "group_name",
+        "baseline_attention_tier",
+        "story_function",
+    }
 
 
 def test_prepare_focus_candidates_advances_step_and_builds_candidates() -> None:
@@ -361,11 +375,11 @@ def test_generate_actor_proposal_logs_completion_event(caplog) -> None:
         "actor_proposal_task": {
             "actor": {"actor_id": "yeongho", "display_name": "영호"},
             "focus_slice": {"slice_id": "focus-1"},
-            "unread_visible_activities": [],
-            "recent_visible_activities": [],
+            "unread_activity_ids": [],
+            "visible_action_context": [],
+            "unread_backlog_digest": None,
             "visible_actors": [],
             "runtime_guidance": {
-                "focus_slice": {"slice_id": "focus-1"},
                 "available_actions": [
                     {
                         "action_type": "speech",
@@ -440,11 +454,11 @@ def test_generate_actor_proposal_fallback_payload_stays_contract_safe() -> None:
         "actor_proposal_task": {
             "actor": {"actor_id": "a", "display_name": "A"},
             "focus_slice": {"slice_id": "focus-1", "focus_actor_ids": ["a", "b"]},
-            "unread_visible_activities": [],
-            "recent_visible_activities": [],
+            "unread_activity_ids": [],
+            "visible_action_context": [],
+            "unread_backlog_digest": None,
             "visible_actors": [{"actor_id": "b", "display_name": "B"}],
             "runtime_guidance": {
-                "focus_slice": {"slice_id": "focus-1", "focus_actor_ids": ["a", "b"]},
                 "available_actions": [
                     {
                         "action_type": "conduct_air_defense",

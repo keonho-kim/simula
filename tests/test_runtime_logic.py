@@ -31,11 +31,7 @@ from simula.domain.reporting import (
     latest_observer_summary,
     latest_world_state_summary,
 )
-from simula.domain.runtime_policy import (
-    compute_observer_event_probability,
-    derive_rng_seed,
-    select_active_actor_ids,
-)
+from simula.domain.runtime_policy import derive_rng_seed
 from simula.domain.runtime_steps import apply_actor_proposals
 
 
@@ -212,73 +208,6 @@ def test_evaluate_stop_allows_early_stop_on_stagnation() -> None:
 
     assert should_stop is True
     assert reason == "정체 단계 누적"
-
-
-def test_select_active_actor_ids_prioritizes_unread_and_reduces_on_low_momentum() -> (
-    None
-):
-    actors = [
-        {"actor_id": "a"},
-        {"actor_id": "b"},
-        {"actor_id": "c"},
-    ]
-    active_actor_ids = select_active_actor_ids(
-        actors=actors,
-        activity_feeds={
-            "a": {"unseen_activity_ids": [], "seen_activity_ids": []},
-            "b": {"unseen_activity_ids": ["act-1"], "seen_activity_ids": []},
-            "c": {"unseen_activity_ids": [], "seen_activity_ids": []},
-        },
-        activities=[],
-        observer_reports=[
-            {
-                "step_index": 1,
-                "summary": "정체",
-                "notable_events": ["반응 지연"],
-                "atmosphere": "정체",
-                "momentum": "low",
-                "world_state_summary": "큰 변화가 없다.",
-            }
-        ],
-        next_step_index=2,
-        rng_seed=17,
-    )
-
-    assert "b" in active_actor_ids
-    assert len(active_actor_ids) == 2
-
-
-def test_compute_observer_event_probability_increases_on_stagnation() -> None:
-    low_probability = compute_observer_event_probability(
-        latest_activities=[{"activity_id": "act-1"}],
-        observer_reports=[
-            {
-                "step_index": 1,
-                "summary": "탐색",
-                "notable_events": ["공개 발언"],
-                "atmosphere": "완화",
-                "momentum": "medium",
-                "world_state_summary": "아직 안정적이다.",
-            }
-        ],
-        stagnation_steps=0,
-    )
-    high_probability = compute_observer_event_probability(
-        latest_activities=[],
-        observer_reports=[
-            {
-                "step_index": 2,
-                "summary": "정체",
-                "notable_events": ["반응 없음"],
-                "atmosphere": "정체",
-                "momentum": "low",
-                "world_state_summary": "흐름이 멈췄다.",
-            }
-        ],
-        stagnation_steps=3,
-    )
-
-    assert high_probability > low_probability
 
 
 def test_derive_rng_seed_prefers_configured_seed() -> None:

@@ -17,8 +17,9 @@ class ActorProposalTask(TypedDict, total=False):
     """actor proposal 실행 태스크 조각이다."""
 
     actor: dict[str, Any]
-    unread_visible_activities: list[dict[str, object]]
-    recent_visible_activities: list[dict[str, object]]
+    unread_activity_ids: list[str]
+    visible_action_context: list[dict[str, object]]
+    unread_backlog_digest: dict[str, object] | None
     visible_actors: list[dict[str, object]]
     focus_slice: dict[str, Any]
     runtime_guidance: dict[str, object]
@@ -61,9 +62,6 @@ class RuntimeStateFragment(TypedDict, total=False):
     step_index: int
     forced_idles: int
     stagnation_steps: int
-    observer_event_roll: float | None
-    observer_event_probability: float | None
-    observer_event_triggered: bool
     stop_requested: bool
     stop_reason: str | None
     world_state_summary: str

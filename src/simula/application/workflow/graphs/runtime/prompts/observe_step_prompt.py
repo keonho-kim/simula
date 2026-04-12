@@ -15,7 +15,7 @@ import textwrap
 from langchain_core.prompts import PromptTemplate
 from simula.prompts.shared.user_facing_language import build_user_facing_style_block
 
-_USER_FACING_STYLE = build_user_facing_style_block()
+_USER_FACING_STYLE = build_user_facing_style_block(compact=True)
 
 _PROMPT = (
     textwrap.dedent(
@@ -33,18 +33,12 @@ _PROMPT = (
     {step_time_advance_json}
     - latest step actions JSON:
     {latest_activities_json}
-    - recent actions JSON:
-    {recent_activities_json}
     - current intent states JSON:
     {current_intent_states_json}
-    - recent intent history JSON:
-    {recent_intent_history_json}
     - latest background updates JSON:
     {latest_background_updates_json}
-    - previous summary:
-    {previous_summary}
-    - current world state summary:
-    {world_state_summary}
+    - prior state digest JSON:
+    {prior_state_digest_json}
 
     # Output Format
     - Return format: {output_format_name}

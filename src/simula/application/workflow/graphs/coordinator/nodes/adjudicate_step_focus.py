@@ -19,6 +19,14 @@ from langgraph.types import Overwrite
 
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.utils.coercion import as_string_list
+from simula.application.workflow.utils.prompt_projections import (
+    WORLD_STATE_SUMMARY_LIMIT,
+    build_compact_background_updates,
+    build_compact_pending_actor_proposals,
+    build_progression_plan_prompt_view,
+    build_relevant_intent_states,
+    truncate_text,
+)
 from simula.application.workflow.graphs.coordinator.prompts.adjudicate_step_focus_prompt import (
     PROMPT as ADJUDICATE_STEP_FOCUS_PROMPT,
 )
@@ -44,6 +52,20 @@ async def adjudicate_step_focus(
 ) -> dict[str, object]:
     """actor proposal 채택과 intent/time/world 상태 정리를 확정한다."""
 
+    pending_actor_proposals = cast(
+        list[dict[str, object]],
+        list(state.get("pending_actor_proposals", [])),
+    )
+    latest_background_updates = list(state.get("latest_background_updates", []))
+    relevant_actor_ids = [
+        *list(state.get("selected_actor_ids", [])),
+        *_proposal_related_actor_ids(pending_actor_proposals),
+        *[
+            str(item.get("actor_id", ""))
+            for item in latest_background_updates
+            if str(item.get("actor_id", "")).strip()
+        ],
+    ]
     prompt = ADJUDICATE_STEP_FOCUS_PROMPT.format(
         step_index=state["step_index"],
         step_focus_plan_json=json.dumps(
@@ -52,17 +74,20 @@ async def adjudicate_step_focus(
             separators=(",", ":"),
         ),
         pending_actor_proposals_json=json.dumps(
-            list(state.get("pending_actor_proposals", [])),
+            build_compact_pending_actor_proposals(pending_actor_proposals),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         actor_intent_states_json=json.dumps(
-            list(state.get("actor_intent_states", [])),
+            build_relevant_intent_states(
+                list(state.get("actor_intent_states", [])),
+                relevant_actor_ids=relevant_actor_ids,
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         latest_background_updates_json=json.dumps(
-            list(state.get("latest_background_updates", [])),
+            build_compact_background_updates(latest_background_updates),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
@@ -72,11 +97,14 @@ async def adjudicate_step_focus(
             separators=(",", ":"),
         ),
         progression_plan_json=json.dumps(
-            state["plan"]["progression_plan"],
+            build_progression_plan_prompt_view(state["plan"]["progression_plan"]),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
-        world_state_summary=str(state.get("world_state_summary", "")),
+        world_state_summary=truncate_text(
+            state.get("world_state_summary", ""),
+            WORLD_STATE_SUMMARY_LIMIT,
+        ),
         **build_output_prompt_bundle(StepAdjudication),
     )
     default_payload = _build_default_step_adjudication_payload(state)
@@ -234,6 +262,22 @@ def _build_default_step_adjudication_payload(
             state.get("world_state_summary", "현재 시뮬레이션 압력은 유지되고 있다.")
         ),
     }
+
+
+def _proposal_related_actor_ids(
+    pending_actor_proposals: list[dict[str, object]],
+) -> list[str]:
+    related: list[str] = []
+    for item in pending_actor_proposals:
+        proposal = cast(dict[str, object], item.get("proposal", {}))
+        if not isinstance(proposal, dict):
+            continue
+        for actor_id in as_string_list(
+            proposal.get("target_actor_ids", [])
+        ) + as_string_list(proposal.get("intent_target_actor_ids", [])):
+            if actor_id not in related:
+                related.append(actor_id)
+    return related
 
 
 def _default_step_time_advance(state: SimulationWorkflowState) -> dict[str, object]:

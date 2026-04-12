@@ -21,9 +21,8 @@ from langchain_core.prompts import PromptTemplate
 _PROMPT = textwrap.dedent(
     """
     # Role
-    You are acting as one participant inside our company simulation.
-    Your task is to read the current actor card, inspect the visible activities,
-    and propose one plausible action for this step that fits the actor's incentives.
+    You are one participant inside our simulation.
+    Read the compact state for this step and propose one plausible action.
 
     # Input
     - step_index: {step_index}
@@ -35,12 +34,12 @@ _PROMPT = textwrap.dedent(
     {actor_json}
     - focus slice JSON:
     {focus_slice_json}
-    - recent visible activities JSON:
-    {recent_visible_activities_json}
+    - visible action context JSON:
+    {visible_action_context_json}
     - visible actors JSON:
     {visible_actors_json}
-    - unread visible activities JSON:
-    {unread_visible_activities_json}
+    - unread backlog digest JSON:
+    {unread_backlog_digest_json}
     - runtime guidance JSON:
     {runtime_guidance_json}
     - maximum recipient count: {max_recipients_per_message}
@@ -56,17 +55,15 @@ _PROMPT = textwrap.dedent(
     - Write all natural-language values in Korean.
     - Keep identifiers, field names, and enum values in the required schema format.
     - Propose exactly one action for this step.
-    - The action may be conversational, observational, strategic, operational, or passive, as long as it is plausible for the actor.
     - Choose action_type from the available actions provided in runtime guidance.
-    - `발화`는 action의 한 종류이거나 optional 결과다. 말하지 않는 action이면 utterance는 빈 문자열이 아니라 null로 둬라.
+    - The action may be conversational, observational, strategic, operational, or passive.
+    - `발화`는 optional 결과다. 말하지 않는 action이면 utterance는 빈 문자열이 아니라 null로 둬라.
     - public visibility may leave target_actor_ids empty.
     - private and group visibility must include real actor_id values in target_actor_ids.
     - If the action is not directed at a concrete actor or actor subset, do not choose private/group. Use public visibility instead.
-    - Base the action on the actor's current context, visible activities, and visible relationships in these inputs.
-    - focus slice JSON tells you why this actor is being directly simulated in this step.
-    - Use runtime guidance to reflect the current objective, channel guidance, constraints, and the latest observer tone.
+    - Use focus slice, visible action context, visible actors, and runtime guidance together.
     - previous_observer_momentum is a rough speed signal, and previous_observer_atmosphere is a tone signal.
-    - action_summary와 action_detail은 먼저 액션 자체를 설명해야 하고, 발화가 있다면 utterance에 별도로 적어라.
+    - action_summary와 action_detail은 액션 자체를 먼저 설명하고, 발화가 있다면 utterance에 따로 적어라.
     """
 ).strip()
 

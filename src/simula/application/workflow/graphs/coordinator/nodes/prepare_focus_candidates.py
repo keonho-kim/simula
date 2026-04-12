@@ -60,9 +60,6 @@ def prepare_focus_candidates(
         "pending_step_time_advance": None,
         "latest_step_activities": [],
         "pending_observer_report": None,
-        "observer_event_roll": None,
-        "observer_event_probability": None,
-        "observer_event_triggered": False,
         "actor_proposal_task": {},
         "current_step_started_at": time.perf_counter(),
     }

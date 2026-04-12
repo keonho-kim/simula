@@ -1,123 +1,113 @@
-# simula
-
 <div align="center">
-  <h3>상태 중심 다중 행위자 시뮬레이션 엔진</h3>
-  <p>시나리오 해석, action catalog 생성, actor 생성, step 실행, intent 추적, observer 요약, 최종 보고서를 하나의 그래프 런타임에서 처리합니다.</p>
+  <h1>simula</h1>
+  <p><strong>State-driven multi-agent simulation built on LangGraph.</strong></p>
+  <p>
+    simula turns one scenario into a planning pass, an actor registry, a runtime
+    adjudication loop, observer summaries, and a final markdown report.
+  </p>
+  <p>
+    <a href="./docs/README.md">Documentation</a>
+    ·
+    <a href="./docs/workflows/README.md">Workflow Docs</a>
+    ·
+    <a href="./senario.samples/README.md">Sample Scenarios</a>
+  </p>
+  <p>
+    <img alt="Python 3.14" src="https://img.shields.io/badge/python-3.14-blue" />
+    <img alt="Package manager uv" src="https://img.shields.io/badge/package_manager-uv-4B8BBE" />
+    <img alt="Runtime LangGraph" src="https://img.shields.io/badge/runtime-LangGraph-1f6feb" />
+    <img alt="Architecture mailbox-first" src="https://img.shields.io/badge/architecture-mailbox--first-0f766e" />
+  </p>
 </div>
 
-## 핵심 기능
+## What This Is
 
-- 역할 분리형 시뮬레이션
-  - Planner
-  - Generator
-  - Coordinator
-  - Actor
-  - Observer
-- 동적 시간축 실행
-  - step별 시간 경과 추론
-  - 혼합 단위(`minute`, `hour`, `day`, `week`)
-  - 누적 simulation clock
-- 상태 중심 런타임
-  - action feed
-  - actor intent state
-  - observer report
-  - world state
-- 상부 보고용 출력
-  - 행위자 별 최종 결과
-  - 절대시각 타임라인
-  - 주요 사건 요약
+`simula` is a scenario-to-report simulation engine for multi-actor situations such as
+boardroom conflicts, public crises, political rumor cascades, or relationship-heavy
+social games.
 
-## 시스템 흐름
+The current compiled workflow is organized around five distinct LLM-facing roles:
+
+- `planner`
+- `generator`
+- `coordinator`
+- `actor`
+- `observer`
+
+The project is opinionated about state:
+
+- planning produces structured execution inputs instead of loose prose
+- runtime keeps visible activities, background updates, focus history, intent snapshots,
+  and simulation time as explicit state channels
+- finalization rebuilds a report projection instead of dumping raw logs directly
+
+## Why It Exists
+
+Most LLM simulations collapse planning, action generation, pacing, and summarization into
+one undifferentiated loop. `simula` deliberately splits them apart so each phase has a
+clear contract:
+
+- planning interprets the scenario and defines the execution frame
+- generation turns the cast roster into runnable actor cards
+- runtime chooses who matters now, adjudicates actions, advances time, and tracks momentum
+- finalization assembles a report that is readable by humans and stable enough for tooling
+
+## How It Works
+
+### System Blueprint
 
 ```mermaid
 flowchart LR
-    A["Scenario Input"] --> B["Planning"]
-    B --> C["Generation"]
-    C --> D["Runtime Loop"]
-    D --> E["Observer"]
-    E --> F{"Stop?"}
-    F -- "No" --> D
-    F -- "Yes" --> G["Finalization"]
-    G --> H["Simulation Report"]
+    Scenario["Scenario input"] --> CLI["CLI / bootstrap"]
+    Env["env.toml + env vars + CLI overrides"] --> CLI
+    CLI --> Commands["Application commands"]
+    Commands --> Executor["SimulationExecutor"]
+    Executor --> Init["Initial state + runtime context"]
+    Init --> Workflow["LangGraph simulation workflow"]
+    Workflow --> Store["App store"]
+    Workflow --> State["Shared workflow state"]
+    Workflow --> FinalState["Final workflow state"]
+    FinalState --> Presentation["Presentation / file writer"]
+    Presentation --> Outputs["output/<run_id>/simulation.log.jsonl<br/>output/<run_id>/final_report.md"]
+    Executor --> Models["LLM router<br/>planner / generator / coordinator / actor / observer"]
+    Models --> Workflow
 ```
 
-## 현재 구현 핵심
+### Workflow Blueprint
 
-<table>
-  <thead>
-    <tr>
-      <th>단계</th>
-      <th>설명</th>
-      <th>주요 산출물</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Planning</td>
-      <td>시나리오 해석, progression plan 결정, visibility/pressure 정리, action catalog 생성, cast roster 생성</td>
-      <td>interpretation, situation bundle, progression plan, action catalog, cast roster</td>
-    </tr>
-    <tr>
-      <td>Generation</td>
-      <td>interpretation + situation + action catalog + cast를 actor 카드로 구체화</td>
-      <td>actor registry</td>
-    </tr>
-    <tr>
-      <td>Runtime</td>
-      <td>coordinator가 focus slice를 고르고, 선택된 actor만 호출한 뒤 action 채택, background digest, step 시간 경과, observer 요약, 조기 종료 판단을 이어간다</td>
-      <td>actions, focus history, background updates, intent history, step time history, observer reports, stagnation counter</td>
-    </tr>
-    <tr>
-      <td>Finalization</td>
-      <td>projection 정리, 절대시각 보정, 보고서 조립</td>
-      <td>simulation.log.jsonl, final_report.md</td>
-    </tr>
-  </tbody>
-</table>
+```mermaid
+flowchart LR
+      RuntimeInit["initialize_runtime_state"] --> Coordinator["coordinator"]
+      Coordinator --> Observe["observe_step"]
+      Observe --> Persist["persist_step_artifacts"]
+      Persist --> Stop["stop_step"]
+      Stop -- continue --> Coordinator
+      Stop -- complete --> RuntimeDone["runtime end"]
+```
 
-## Runtime 동작 메모
+### Stage Map
 
-- runtime은 매 step마다 전체 actor를 전부 호출하지 않는다.
-- coordinator가 focus candidate pool을 압축하고, 그 안에서 직접 추적할 focus slice를 최대 3개까지 고른다.
-- 직접 호출되는 actor 수는 step당 최대 6명으로 제한된다.
-- 후보 압축은 baseline attention tier, unseen inbox, 최근 intent 변화, background pressure, quiet bonus, 최근 focus penalty, run seed를 함께 사용한다.
-- actor는 자유 발화를 제안하는 것이 아니라, planner가 만든 `action catalog` 안에서 action 하나를 고른다.
-- `발화`는 action의 한 종류이거나 optional 결과이며, 모든 action이 발화를 요구하지는 않는다.
-- 직접 호출되지 않은 actor는 background update digest로만 반영된다.
-- runtime은 actor별 현재 intent snapshot과 step별 intent history를 함께 유지한다.
-- runtime은 고정 step 간격을 쓰지 않고, coordinator가 step마다 실제 경과 시간을 함께 정리한다.
-- 한 step은 반드시 최소 `30분` 이상 진행된다.
-- 경과 시간은 분 단위 canonical 값으로 저장하고, 표시 시에는 `minute/hour/day/week` 라벨로 복원한다.
-- 시나리오는 가능하면 `시작 시점`부터 `최종 판정 이벤트`까지를 짧고 선명하게 적고, 세부 스크립트보다 전환점과 종료 조건을 우선해서 입력하는 편이 좋다.
-- `momentum`과 `atmosphere`는 현재 observer 요약 메타데이터이면서, coordinator selection과 actor prompt 톤을 조정하는 입력으로도 쓰인다.
-- 종료 조건은 `max_steps` 도달 또는 `low momentum` 정체 단계 3회 누적이다.
-- actor proposal 파싱 실패는 기본 대기 행동으로 대체될 수 있다.
-- finalization의 관계 분석은 별도 관계 그래프 상태가 아니라 activity 로그 projection에서 사후 추론한다.
+| Stage | Primary owner | What it produces |
+| --- | --- | --- |
+| Planning | `planner` | interpretation, situation bundle, runtime progression plan, action catalog, coordination frame, cast roster, persisted `plan` |
+| Generation | `generator` | actor registry |
+| Runtime | `coordinator`, `actor`, `observer` | activities, focus history, background updates, intent history, simulation clock, stop signals |
+| Finalization | `observer` + finalization assembly nodes | final report JSON, report projection JSON, markdown report state |
 
-## 최종 보고서 파이프라인
+### Core Runtime Terms
 
-- 요약 JSON 집계
-- simulation log 조립
-- timeline anchor 결정
-- report projection 생성
-- 본문 섹션 fan-out
-  - 시뮬레이션 타임라인
-  - 행위자 역학 관계
-  - 주요 사건과 결과
-- 후행 섹션 생성
-  - 행위자 별 최종 결과
-  - 시뮬레이션 결론
+| Term | Meaning |
+| --- | --- |
+| `action catalog` | scenario-wide list of allowed action types that actors choose from |
+| `coordination frame` | planner-produced rules that guide runtime focus and background motion |
+| `focus slice` | the actor cluster that the coordinator decides to follow directly in one step |
+| `background update` | structured digest for deferred actors that were not called directly |
+| `observer report` | per-step summary with `momentum`, `atmosphere`, and `world_state_summary` |
+| `report projection` | finalization-only structure derived from runtime state for report writing |
 
-## 강화 후보
+## Run It
 
-- `relationship_edges`, `open_threads`, `incident_state` 같은 구조화 상태를 runtime에 추가
-- `risk_tolerance`, `initiative_bias`, `disclosure_bias`, `loyalty_bias` 같은 actor 내부 성향 확장
-- thread 우선순위, 기억 감쇠, 관계 드리프트 기반 actor 선택
-- scenario/pressure point와 연결된 incident family 풀
-- intent effect를 더 정교하게 world state에 반영
-- `rng_seed` CLI override와 trial 간 seed 전략 확장
-
-## 빠른 시작
+### Quick Start
 
 ```bash
 uv sync
@@ -125,57 +115,71 @@ cp env.sample.toml env.toml
 uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md
 ```
 
-### 최대 step 수 지정
+### Common CLI Patterns
 
 ```bash
+# Override max steps
 uv run simula \
   --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
   --max-steps 16
-```
 
-### 반복 실행
-
-```bash
+# Run the same scenario three times
 uv run simula \
   --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
   --trials 3
-```
 
-### 병렬 반복 실행
-
-```bash
+# Run trials in parallel
 uv run simula \
   --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
   --trials 3 \
   --parallel
 ```
 
-## 운영/설정 핵심
+### Configuration Notes
 
-- 동적 시간축
-  - planner가 scenario별 progression plan을 만든다
-  - runtime이 step마다 실제 경과 시간을 따로 추론한다
-  - 설정에서는 `max_steps`만 직접 지정한다
-- 재현 가능한 runtime seed
-  - `SIM_RNG_SEED`
-  - 또는 `env.toml`의 `[env].rng_seed`
-- 지원 provider
-  - `openai`
-  - `anthropic`
-  - `google`
-  - `bedrock`
-  - `ollama`
-  - `vllm`
-- runtime은 `max_steps` 또는 저속 정체 누적 시 종료됩니다.
-- 출력 산출물은 run별 디렉터리에 저장됩니다.
+- `env.toml` is optional. If it exists, it is loaded automatically.
+- effective precedence is: CLI overrides -> environment variables -> `env.toml` -> defaults
+- the fixed-time settings `time_unit` and `time_step_size` are intentionally not supported
+- the coordinator is a first-class role in config and can have its own model settings
 
-<details>
-  <summary>잘 맞는 문제 유형</summary>
+## Output Artifacts
 
-- 연애 및 관계 재편
-- 외교와 워게임
-- 재난 대응과 운영 의사결정
-- 조직 정치와 이사회 갈등
-- 선거, 루머, 파벌 경쟁
+The workflow itself produces structured state. After the graph returns, the presentation
+layer writes the file artifacts for a run.
 
-</details>
+```text
+output/
+  <run_id>/
+    final_report.md
+    simulation.log.jsonl
+```
+
+When SQLite-backed multi-run execution is used, each trial also gets its own database file
+under `data/db/trial-runs/`.
+
+## Sample Scenarios
+
+The repository ships with scenario seeds in [`senario.samples/`](./senario.samples/README.md):
+
+- `01_i-am-solo_31_2026-04-10.md`
+- `02_wargame_iran_us.md`
+- `03_startup_boardroom_crisis.md`
+- `04_city_hall_disaster_response.md`
+- `05_campus_election_scandal.md`
+- `06_fantasy_court_intrigue.md`
+
+These samples are designed to start near a meaningful decision point and end near a clear
+judgment, settlement, collapse, or final choice.
+
+## Read More
+
+| Document | When to read it |
+| --- | --- |
+| [`docs/README.md`](./docs/README.md) | Start here for the full documentation map |
+| [`docs/architecture.md`](./docs/architecture.md) | Understand layers, execution path, and system boundaries |
+| [`docs/workflows/README.md`](./docs/workflows/README.md) | See how the graph is split into subgraphs |
+| [`docs/workflows/runtime.md`](./docs/workflows/runtime.md) | Debug the runtime loop and stop conditions |
+| [`docs/workflows/coordinator.md`](./docs/workflows/coordinator.md) | Inspect focus planning and adjudication responsibilities |
+| [`docs/contracts.md`](./docs/contracts.md) | Check state channels, config fields, and output contracts |
+| [`docs/llm.md`](./docs/llm.md) | Review role responsibilities, model routing, and failure behavior |
+| [`docs/operations.md`](./docs/operations.md) | Run the project locally and validate the environment |

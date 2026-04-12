@@ -13,13 +13,9 @@ from __future__ import annotations
 import textwrap
 
 from langchain_core.prompts import PromptTemplate
-from simula.prompts.shared.user_facing_language import build_user_facing_style_block
 
-_USER_FACING_STYLE = build_user_facing_style_block()
-
-_PROMPT = (
-    textwrap.dedent(
-        """
+_PROMPT = textwrap.dedent(
+    """
     # Role
     You are a simulation coordinator at our company.
     Your task is to summarize plausible background state movement for actors who are not directly simulated in this step.
@@ -30,8 +26,8 @@ _PROMPT = (
     {deferred_actors_json}
     - selected actor ids JSON:
     {selected_actor_ids_json}
-    - recent activities JSON:
-    {recent_activities_json}
+    - latest adopted actions JSON:
+    {latest_actions_json}
     - latest intent states JSON:
     {actor_intent_states_json}
     - current world state summary:
@@ -53,9 +49,6 @@ _PROMPT = (
     - pressure_level must be exactly one of `low`, `medium`, `high`.
     - Do not fabricate detailed off-screen actions; summarize pressure, delay, preparation, or brewing response.
     """
-    ).strip()
-    + "\n"
-    + _USER_FACING_STYLE
-)
+).strip()
 
 PROMPT = PromptTemplate.from_template(_PROMPT)

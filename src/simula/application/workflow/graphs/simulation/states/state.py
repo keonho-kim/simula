@@ -67,9 +67,6 @@ class SimulationWorkflowState(PlanningStateFragment, TypedDict, total=False):
     parse_failures: int
     forced_idles: int
     stagnation_steps: int
-    observer_event_roll: float | None
-    observer_event_probability: float | None
-    observer_event_triggered: bool
     planning_latency_seconds: float
     generation_started_at: float
     generation_latency_seconds: float
