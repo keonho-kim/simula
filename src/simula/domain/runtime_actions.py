@@ -43,7 +43,7 @@ class RoutedRoundState(TypedDict):
 class ActorProposalPayload(TypedDict):
     """actor action proposal 결과 payload다."""
 
-    actor_id: str
+    cast_id: str
     unread_activity_ids: list[str]
     proposal: dict[str, object]
     forced_idle: bool
@@ -73,12 +73,12 @@ def apply_actor_proposals(
     action_catalog_by_type = {item.action_type: item for item in catalog.actions}
 
     for proposal_result in pending_actor_proposals:
-        actor_id = str(proposal_result["actor_id"])
+        cast_id = str(proposal_result["cast_id"])
         forced_idle_count += int(bool(proposal_result["forced_idle"]))
         parse_failure_count += proposal_result["parse_failure_count"]
         mark_seen_activities(
             updated_feeds,
-            actor_id,
+            cast_id,
             proposal_result["unread_activity_ids"],
         )
 
@@ -89,21 +89,21 @@ def apply_actor_proposals(
 
         if proposal.action_type not in action_catalog_by_type:
             raise ValueError(
-                f"actor `{actor_id}` 가 action catalog 밖의 action_type "
+                f"cast `{cast_id}` 가 action catalog 밖의 action_type "
                 f"`{proposal.action_type}` 를 제안했습니다."
             )
         action_spec = action_catalog_by_type[proposal.action_type]
 
-        target_actor_ids = sanitize_targets(
-            proposal.target_actor_ids,
-            source_actor_id=actor_id,
+        target_cast_ids = sanitize_targets(
+            proposal.target_cast_ids,
+            source_cast_id=cast_id,
             actors=actors,
             visibility=proposal.visibility,
             max_targets=max_targets_per_activity,
         )
-        intent_target_actor_ids = sanitize_targets(
-            proposal.intent_target_actor_ids,
-            source_actor_id=actor_id,
+        intent_target_cast_ids = sanitize_targets(
+            proposal.intent_target_cast_ids,
+            source_cast_id=cast_id,
             actors=actors,
             visibility=proposal.visibility,
             max_targets=max_targets_per_activity,
@@ -114,9 +114,9 @@ def apply_actor_proposals(
                 f"action_type `{proposal.action_type}` 는 visibility "
                 f"`{proposal.visibility}` 를 지원하지 않습니다."
             )
-        if action_spec.requires_target and not target_actor_ids:
+        if action_spec.requires_target and not target_cast_ids:
             raise ValueError(
-                f"action_type `{proposal.action_type}` 는 target_actor_ids가 필요합니다."
+                f"action_type `{proposal.action_type}` 는 target_cast_ids가 필요합니다."
             )
         if proposal.utterance.strip() and not action_spec.supports_utterance:
             raise ValueError(
@@ -126,17 +126,17 @@ def apply_actor_proposals(
         action = create_canonical_action(
             run_id=run_id,
             round_index=round_index,
-            source_actor_id=actor_id,
+            source_cast_id=cast_id,
             visibility=proposal.visibility,
-            target_actor_ids=target_actor_ids,
+            target_cast_ids=target_cast_ids,
             visibility_scope=build_visibility_scope(
-                actor_id,
-                target_actor_ids,
+                cast_id,
+                target_cast_ids,
                 proposal.visibility,
             ),
             action_type=proposal.action_type.strip(),
             intent=proposal.intent.strip(),
-            intent_target_actor_ids=intent_target_actor_ids,
+            intent_target_cast_ids=intent_target_cast_ids,
             action_summary=proposal.action_summary.strip(),
             action_detail=proposal.action_detail.strip(),
             utterance=proposal.utterance.strip(),
@@ -165,16 +165,16 @@ def apply_adopted_actor_proposals(
     activities: list[dict[str, object]],
     action_catalog: dict[str, object],
     pending_actor_proposals: list[ActorProposalPayload],
-    adopted_actor_ids: list[str],
+    adopted_cast_ids: list[str],
     max_targets_per_activity: int,
 ) -> RoutedRoundState:
     """채택된 actor proposal만 canonical action으로 반영한다."""
 
-    adopted_set = {str(actor_id) for actor_id in adopted_actor_ids}
+    adopted_set = {str(cast_id) for cast_id in adopted_cast_ids}
     selected_proposals = [
         proposal
         for proposal in pending_actor_proposals
-        if str(proposal["actor_id"]) in adopted_set
+        if str(proposal["cast_id"]) in adopted_set
     ]
     return apply_actor_proposals(
         run_id=run_id,

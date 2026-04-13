@@ -64,12 +64,12 @@ async def resolve_round(
         recent_visible_activities=list(state["latest_round_activities"]),
         limit=6,
     )
-    relevant_actor_ids = [
-        *list(state["selected_actor_ids"]),
+    relevant_cast_ids = [
+        *list(state["selected_cast_ids"]),
         *[
-            str(item.get("actor_id", ""))
+            str(item.get("cast_id", ""))
             for item in latest_background_updates
-            if str(item.get("actor_id", "")).strip()
+            if str(item.get("cast_id", "")).strip()
         ],
     ]
     prompt = STEP_RESOLUTION_PROMPT.format(
@@ -97,7 +97,7 @@ async def resolve_round(
         actor_intent_states_json=json.dumps(
             build_relevant_intent_states(
                 list(state["actor_intent_states"]),
-                relevant_actor_ids=relevant_actor_ids,
+                relevant_cast_ids=relevant_cast_ids,
             ),
             ensure_ascii=False,
             separators=(",", ":"),
@@ -135,8 +135,8 @@ async def resolve_round(
             "round_index": int(state["round_index"]),
         },
     )
-    valid_adopted_actor_ids, invalid_adoption_errors = _filter_invalid_adopted_actor_ids(
-        adopted_actor_ids=list(resolution.adopted_actor_ids),
+    valid_adopted_cast_ids, invalid_adoption_errors = _filter_invalid_adopted_cast_ids(
+        adopted_cast_ids=list(resolution.adopted_cast_ids),
         pending_actor_proposals=cast(
             list[ActorProposalPayload],
             list(state["pending_actor_proposals"]),
@@ -156,7 +156,7 @@ async def resolve_round(
             list[ActorProposalPayload],
             list(state["pending_actor_proposals"]),
         ),
-        adopted_actor_ids=valid_adopted_actor_ids,
+        adopted_cast_ids=valid_adopted_cast_ids,
         max_targets_per_activity=runtime.context.settings.runtime.max_recipients_per_message,
     )
     clock = _build_updated_clock(
@@ -182,7 +182,7 @@ async def resolve_round(
     runtime.context.logger.info(
         "round %s 해소 완료 | adopted=%s background=%s stop=%s | world=%s | pressures=%s | talking_points=%s",
         state["round_index"],
-        len(list(resolution.adopted_actor_ids)),
+        len(list(resolution.adopted_cast_ids)),
         len(latest_background_updates),
         stop_reason or "-",
         truncate_text(resolution.world_state_summary, 90),
@@ -237,9 +237,9 @@ async def resolve_round(
     }
 
 
-def _filter_invalid_adopted_actor_ids(
+def _filter_invalid_adopted_cast_ids(
     *,
-    adopted_actor_ids: list[str],
+    adopted_cast_ids: list[str],
     pending_actor_proposals: list[ActorProposalPayload],
     actors: list[dict[str, object]],
     action_catalog: dict[str, object],
@@ -247,56 +247,56 @@ def _filter_invalid_adopted_actor_ids(
 ) -> tuple[list[str], list[str]]:
     catalog = ActionCatalog.model_validate(action_catalog)
     available_actions = [item.model_dump(mode="json") for item in catalog.actions]
-    valid_actor_ids = [
-        str(actor.get("actor_id", ""))
+    valid_cast_ids = [
+        str(actor.get("cast_id", ""))
         for actor in actors
-        if str(actor.get("actor_id", "")).strip()
+        if str(actor.get("cast_id", "")).strip()
     ]
-    proposal_by_actor_id = {
-        str(item["actor_id"]): item for item in pending_actor_proposals
+    proposal_by_cast_id = {
+        str(item["cast_id"]): item for item in pending_actor_proposals
     }
-    valid_adopted_actor_ids: list[str] = []
+    valid_adopted_cast_ids: list[str] = []
     errors: list[str] = []
 
-    for actor_id in adopted_actor_ids:
-        proposal_result = proposal_by_actor_id.get(str(actor_id))
+    for cast_id in adopted_cast_ids:
+        proposal_result = proposal_by_cast_id.get(str(cast_id))
         if proposal_result is None or bool(proposal_result.get("forced_idle")):
             errors.append(
-                f"round adopted proposal dropped: actor `{actor_id}` has no usable proposal"
+                f"round adopted proposal dropped: cast `{cast_id}` has no usable proposal"
             )
             continue
         try:
             proposal = ActorActionProposal.model_validate(proposal_result["proposal"])
         except (ValidationError, ValueError, TypeError) as exc:
             errors.append(
-                f"round adopted proposal dropped: actor `{actor_id}` parse failed: {exc}"
+                f"round adopted proposal dropped: cast `{cast_id}` parse failed: {exc}"
             )
             continue
 
         issues = validate_actor_action_proposal_semantics(
             proposal=proposal,
-            actor_id=str(actor_id),
+            cast_id=str(cast_id),
             available_actions=available_actions,
-            valid_target_actor_ids=valid_actor_ids,
+            valid_target_cast_ids=valid_cast_ids,
             max_target_count=max_targets_per_activity,
         )
         if issues:
             errors.append(
-                f"round adopted proposal dropped: actor `{actor_id}` invalid: {'; '.join(issues)}"
+                f"round adopted proposal dropped: cast `{cast_id}` invalid: {'; '.join(issues)}"
             )
             continue
-        valid_adopted_actor_ids.append(str(actor_id))
+        valid_adopted_cast_ids.append(str(cast_id))
 
-    return valid_adopted_actor_ids, errors
+    return valid_adopted_cast_ids, errors
 
 
 def _build_default_round_resolution_payload(
     state: SimulationWorkflowState,
 ) -> dict[str, object]:
-    adopted_actor_ids = [
-        str(item.get("actor_id", ""))
+    adopted_cast_ids = [
+        str(item.get("cast_id", ""))
         for item in list(state["pending_actor_proposals"])
-        if str(item.get("actor_id", "")) in set(state["selected_actor_ids"])
+        if str(item.get("cast_id", "")) in set(state["selected_cast_ids"])
         and not bool(item.get("forced_idle"))
         and isinstance(item.get("proposal", {}), dict)
         and item.get("proposal", {})
@@ -305,11 +305,11 @@ def _build_default_round_resolution_payload(
     if not current_intent_states:
         current_intent_states = [
             {
-                "actor_id": str(actor.get("actor_id", "")),
+                "cast_id": str(actor.get("cast_id", "")),
                 "current_intent": str(actor.get("private_goal", "")).strip()
                 or "현재 상황을 더 관찰한다.",
-                "thought": f"{str(actor.get('display_name', actor.get('actor_id', 'actor')))}는 아직 상대 반응을 더 확인해야 한다고 본다.",
-                "target_actor_ids": [],
+                "thought": f"{str(actor.get('display_name', actor.get('cast_id', 'actor')))}는 아직 상대 반응을 더 확인해야 한다고 본다.",
+                "target_cast_ids": [],
                 "supporting_action_type": "initial_state",
                 "confidence": 0.5,
                 "changed_from_previous": False,
@@ -319,14 +319,14 @@ def _build_default_round_resolution_payload(
     latest_activities = [
         cast(dict[str, object], item.get("proposal", {}))
         for item in list(state["pending_actor_proposals"])
-        if str(item.get("actor_id", "")) in set(adopted_actor_ids)
+        if str(item.get("cast_id", "")) in set(adopted_cast_ids)
         and isinstance(item.get("proposal", {}), dict)
     ]
     world_state_summary = str(
         state["world_state_summary"] or "현재 압력은 유지되고 있다."
     )
     return {
-        "adopted_actor_ids": adopted_actor_ids[:2],
+        "adopted_cast_ids": adopted_cast_ids[:2],
         "updated_intent_states": current_intent_states,
         "round_time_advance": _default_round_time_advance(state),
         "observer_report": {

@@ -43,8 +43,8 @@ def test_orm_store_persists_runtime_artifacts(tmp_path) -> None:
         store.save_actors(
             "run-1",
             [
-                {"actor_id": "a", "display_name": "A"},
-                {"actor_id": "b", "display_name": "B"},
+                {"cast_id": "a", "display_name": "A"},
+                {"cast_id": "b", "display_name": "B"},
             ],
         )
         store.save_round_artifacts(
@@ -53,7 +53,7 @@ def test_orm_store_persists_runtime_artifacts(tmp_path) -> None:
                 {
                     "activity_id": "a1",
                     "round_index": 1,
-                    "source_actor_id": "a",
+                    "source_cast_id": "a",
                     "visibility": "public",
                     "thread_id": None,
                     "created_at": "2026-04-10T00:00:00+00:00",

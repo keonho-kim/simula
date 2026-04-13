@@ -22,12 +22,12 @@ def test_json_repair_parser_recovers_broken_actor_proposal_json() -> None:
     {
       action_type: "speech",
       intent: "우선순위를 다시 정리하게 만든다.",
-      intent_target_actor_ids: ["ally-1"],
+      intent_target_cast_ids: ["ally-1"],
       action_summary: "운영 총괄이 조율 action을 제안한다.",
       action_detail: "우선순위를 다시 정리해야 한다.",
       utterance: "",
       visibility: "group",
-      target_actor_ids: ["ally-1"],
+      target_cast_ids: ["ally-1"],
       thread_id: "",
     }
     """
@@ -35,15 +35,15 @@ def test_json_repair_parser_recovers_broken_actor_proposal_json() -> None:
     parsed = parser.parse(broken)
 
     assert parsed.visibility == "group"
-    assert parsed.target_actor_ids == ["ally-1"]
+    assert parsed.target_cast_ids == ["ally-1"]
     assert parsed.utterance == ""
 
 
 def test_json_repair_parser_rejects_schema_mismatch() -> None:
     parser = JsonRepairOutputParser(target_schema=ActorActionProposal)
     bad_json = (
-        '{"action_type":"","intent":"","intent_target_actor_ids":[],"action_summary":"",'
-        '"action_detail":"","utterance":"","visibility":"private","target_actor_ids":[],"thread_id":""}'
+        '{"action_type":"","intent":"","intent_target_cast_ids":[],"action_summary":"",'
+        '"action_detail":"","utterance":"","visibility":"private","target_cast_ids":[],"thread_id":""}'
     )
 
     with pytest.raises(OutputParserException):
@@ -55,7 +55,6 @@ def test_json_repair_parser_normalizes_single_item_string_list_fields() -> None:
     payload = """
     {
       "cast_id": "jeongsuk_female",
-      "actor_id": "jeongsuk",
       "display_name": "정숙",
       "role": "여성 참가자다.",
       "group_name": "여성",

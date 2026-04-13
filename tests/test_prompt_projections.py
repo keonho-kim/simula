@@ -25,8 +25,8 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
         {
             "activity_id": "a1",
             "round_index": 1,
-            "source_actor_id": "b",
-            "target_actor_ids": ["a"],
+            "source_cast_id": "b",
+            "target_cast_ids": ["a"],
             "visibility": "private",
             "action_type": "speech",
             "action_summary": "첫 번째 요약",
@@ -40,8 +40,8 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
         {
             "activity_id": "a1",
             "round_index": 1,
-            "source_actor_id": "b",
-            "target_actor_ids": ["a"],
+            "source_cast_id": "b",
+            "target_cast_ids": ["a"],
             "visibility": "private",
             "action_type": "speech",
             "action_summary": "중복 요약",
@@ -51,8 +51,8 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
         {
             "activity_id": "a2",
             "round_index": 1,
-            "source_actor_id": "c",
-            "target_actor_ids": ["a"],
+            "source_cast_id": "c",
+            "target_cast_ids": ["a"],
             "visibility": "public",
             "action_type": "signal",
             "action_summary": "두 번째 요약",
@@ -74,8 +74,8 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
         {
             "activity_id": f"a-extra-{index}",
             "round_index": 1,
-            "source_actor_id": "d",
-            "target_actor_ids": ["a"],
+            "source_cast_id": "d",
+            "target_cast_ids": ["a"],
             "visibility": "private",
             "action_type": "signal",
             "action_summary": "추가 요약",
@@ -98,7 +98,7 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
 def test_build_actor_visible_actors_view_caps_and_prefers_related_actors() -> None:
     actors = [
         {
-            "actor_id": actor_id,
+            "cast_id": actor_id,
             "display_name": actor_id.upper(),
             "role": f"{actor_id} role",
             "group_name": "g",
@@ -119,20 +119,20 @@ def test_build_actor_visible_actors_view_caps_and_prefers_related_actors() -> No
 
     visible = build_actor_visible_actors_view(
         actors=actors,
-        actor_id="self",
-        focus_slice={"focus_actor_ids": ["self", "peer-1", "peer-2"]},
-        current_intent_snapshot={"target_actor_ids": ["t-1"]},
+        cast_id="self",
+        focus_slice={"focus_cast_ids": ["self", "peer-1", "peer-2"]},
+        current_intent_snapshot={"target_cast_ids": ["t-1"]},
         visible_action_context=[
             {
-                "source_actor_id": "src-1",
-                "target_actor_ids": ["self"],
+                "source_cast_id": "src-1",
+                "target_cast_ids": ["self"],
             }
         ],
-        selected_actor_ids=["self", "peer-1", "peer-2", "sel-1", "sel-2", "sel-3"],
+        selected_cast_ids=["self", "peer-1", "peer-2", "sel-1", "sel-2", "sel-3"],
     )
 
     assert len(visible) == 6
-    assert [item["actor_id"] for item in visible[:4]] == [
+    assert [item["cast_id"] for item in visible[:4]] == [
         "peer-1",
         "peer-2",
         "t-1",
@@ -173,7 +173,7 @@ def test_build_compact_pending_actor_proposals_strips_metadata() -> None:
     compact = build_compact_pending_actor_proposals(
         [
             {
-                "actor_id": "a",
+                "cast_id": "a",
                 "unread_activity_ids": ["x"],
                 "forced_idle": False,
                 "parse_failure_count": 1,
@@ -181,19 +181,19 @@ def test_build_compact_pending_actor_proposals_strips_metadata() -> None:
                 "proposal": {
                     "action_type": "speech",
                     "intent": "짧은 intent",
-                    "intent_target_actor_ids": ["b"],
+                    "intent_target_cast_ids": ["b"],
                     "action_summary": "짧은 요약",
                     "action_detail": "긴 설명",
                     "utterance": "발화",
                     "visibility": "private",
-                    "target_actor_ids": ["b"],
+                    "target_cast_ids": ["b"],
                     "thread_id": "t-1",
                 },
             }
         ]
     )
 
-    assert list(compact[0]) == ["actor_id", "forced_idle", "proposal"]
+    assert list(compact[0]) == ["cast_id", "forced_idle", "proposal"]
     assert "latency_seconds" not in compact[0]
     assert "parse_failure_count" not in compact[0]
     assert "unread_activity_ids" not in compact[0]
@@ -202,10 +202,10 @@ def test_build_compact_pending_actor_proposals_strips_metadata() -> None:
 def test_build_relevant_intent_states_filters_subset() -> None:
     states = [
         {
-            "actor_id": actor_id,
+            "cast_id": actor_id,
             "current_intent": f"{actor_id} intent",
             "thought": f"{actor_id} thought",
-            "target_actor_ids": [],
+            "target_cast_ids": [],
             "supporting_action_type": "speech",
             "confidence": 0.5,
             "changed_from_previous": False,
@@ -215,8 +215,8 @@ def test_build_relevant_intent_states_filters_subset() -> None:
 
     selected = build_relevant_intent_states(
         states,
-        relevant_actor_ids=["b", "c"],
+        relevant_cast_ids=["b", "c"],
     )
 
-    assert [item["actor_id"] for item in selected] == ["b", "c"]
+    assert [item["cast_id"] for item in selected] == ["b", "c"]
     assert selected[0]["thought"] == "b thought"

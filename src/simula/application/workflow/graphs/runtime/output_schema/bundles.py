@@ -41,12 +41,12 @@ def build_observer_report_prompt_bundle(
 _ACTOR_ACTION_PROPOSAL_EXAMPLE: dict[str, Any] = {
     "action_type": "<choose one action_type from runtime_guidance.available_actions>",
     "intent": "<one Korean sentence describing the intended change>",
-    "intent_target_actor_ids": ["<actor_id string or an empty list>"],
+    "intent_target_cast_ids": ["<cast_id string or an empty list>"],
     "action_summary": "<one Korean sentence summarizing the action>",
     "action_detail": "<one Korean sentence describing the concrete action in more detail>",
     "utterance": "<one Korean spoken line or an empty string>",
     "visibility": "<choose exactly one of public, private, group>",
-    "target_actor_ids": ["<real actor_id string when visibility is private or group>"],
+    "target_cast_ids": ["<real cast_id string when visibility is private or group>"],
     "thread_id": "<stable thread identifier or an empty string>",
 }
 

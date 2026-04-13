@@ -22,8 +22,8 @@ def initialize_activity_feeds(
     """actor 목록으로 빈 activity feed를 만든다."""
 
     return {
-        str(actor["actor_id"]): {
-            "actor_id": str(actor["actor_id"]),
+        str(actor["cast_id"]): {
+            "cast_id": str(actor["cast_id"]),
             "unseen_activity_ids": [],
             "seen_activity_ids": [],
         }
@@ -33,12 +33,12 @@ def initialize_activity_feeds(
 
 def list_unseen_activities(
     activity_feeds: dict[str, dict[str, object]],
-    actor_id: str,
+    cast_id: str,
     activities: list[dict[str, object]],
 ) -> list[dict[str, object]]:
     """actor가 현재 unseen feed에서 읽을 activity 목록을 조회한다."""
 
-    feed = activity_feeds.get(actor_id)
+    feed = activity_feeds.get(cast_id)
     if feed is None:
         return []
     unseen_ids = _string_list(feed.get("unseen_activity_ids", []))
@@ -52,14 +52,14 @@ def list_unseen_activities(
 
 def list_recent_visible_activities(
     activity_feeds: dict[str, dict[str, object]],
-    actor_id: str,
+    cast_id: str,
     activities: list[dict[str, object]],
     *,
     limit: int = 5,
 ) -> list[dict[str, object]]:
     """actor가 최근에 볼 수 있는 activity 최대 limit개를 반환한다."""
 
-    feed = activity_feeds.get(actor_id)
+    feed = activity_feeds.get(cast_id)
     if feed is None:
         return []
 
@@ -78,30 +78,30 @@ def list_recent_visible_activities(
 def sanitize_targets(
     requested_target_ids: list[str],
     *,
-    source_actor_id: str,
+    source_cast_id: str,
     actors: list[dict[str, object]],
     visibility: str,
     max_targets: int,
 ) -> list[str]:
     """유효한 target 목록만 남긴다."""
 
-    all_actor_ids = [
-        str(actor["actor_id"])
+    all_cast_ids = [
+        str(actor["cast_id"])
         for actor in actors
-        if str(actor["actor_id"]) != source_actor_id
+        if str(actor["cast_id"]) != source_cast_id
     ]
-    valid_actor_ids = set(all_actor_ids)
+    valid_cast_ids = set(all_cast_ids)
     ordered_unique: list[str] = []
-    for actor_id in requested_target_ids:
-        if actor_id in valid_actor_ids and actor_id not in ordered_unique:
-            ordered_unique.append(actor_id)
+    for cast_id in requested_target_ids:
+        if cast_id in valid_cast_ids and cast_id not in ordered_unique:
+            ordered_unique.append(cast_id)
 
     return ordered_unique[:max_targets]
 
 
 def build_visibility_scope(
-    source_actor_id: str,
-    target_actor_ids: list[str],
+    source_cast_id: str,
+    target_cast_ids: list[str],
     visibility: str,
 ) -> list[str]:
     """visibility별 scope를 만든다."""
@@ -109,10 +109,10 @@ def build_visibility_scope(
     if visibility == "public":
         return ["all"]
 
-    scope = [source_actor_id]
-    for actor_id in target_actor_ids:
-        if actor_id not in scope:
-            scope.append(actor_id)
+    scope = [source_cast_id]
+    for cast_id in target_cast_ids:
+        if cast_id not in scope:
+            scope.append(cast_id)
     return scope
 
 
@@ -124,20 +124,20 @@ def route_activity(
 
     updated_feeds = deepcopy(activity_feeds)
     activity_id = str(activity["activity_id"])
-    source_actor_id = str(activity.get("source_actor_id", ""))
+    source_cast_id = str(activity.get("source_cast_id", ""))
 
     visibility_scope = _string_list(activity.get("visibility_scope", []))
     if "all" in visibility_scope:
-        target_actor_ids = list(updated_feeds)
+        target_cast_ids = list(updated_feeds)
     else:
-        target_actor_ids = visibility_scope
+        target_cast_ids = visibility_scope
 
-    for actor_id in target_actor_ids:
-        feed = updated_feeds.get(actor_id)
+    for cast_id in target_cast_ids:
+        feed = updated_feeds.get(cast_id)
         if feed is None:
             continue
 
-        if actor_id == source_actor_id:
+        if cast_id == source_cast_id:
             seen_ids = _string_list(feed.get("seen_activity_ids", []))
             if activity_id not in seen_ids:
                 seen_ids.append(activity_id)
@@ -154,15 +154,15 @@ def route_activity(
 
 def mark_seen_activities(
     activity_feeds: dict[str, dict[str, object]],
-    actor_id: str,
+    cast_id: str,
     unseen_activity_ids: list[str],
 ) -> None:
     """actor가 읽은 unseen activity를 seen으로 옮긴다."""
 
-    if actor_id not in activity_feeds:
+    if cast_id not in activity_feeds:
         return
 
-    feed = dict(activity_feeds[actor_id])
+    feed = dict(activity_feeds[cast_id])
     remaining_unseen = _string_list(feed.get("unseen_activity_ids", []))
     seen_ids = _string_list(feed.get("seen_activity_ids", []))
     for activity_id in unseen_activity_ids:
@@ -172,7 +172,7 @@ def mark_seen_activities(
             seen_ids.append(activity_id)
     feed["unseen_activity_ids"] = remaining_unseen
     feed["seen_activity_ids"] = seen_ids
-    activity_feeds[actor_id] = feed
+    activity_feeds[cast_id] = feed
 
 
 def _string_list(value: object) -> list[str]:

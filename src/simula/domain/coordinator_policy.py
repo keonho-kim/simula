@@ -56,9 +56,9 @@ def build_focus_candidates(
 
     momentum, _ = latest_observer_signal(observer_reports)
     unread_counts = {
-        str(actor["actor_id"]): len(
+        str(actor["cast_id"]): len(
             _string_list(
-                activity_feeds.get(str(actor["actor_id"]), {}).get(
+                activity_feeds.get(str(actor["cast_id"]), {}).get(
                     "unseen_activity_ids", []
                 )
             )
@@ -74,7 +74,7 @@ def build_focus_candidates(
         current_round_index=current_round_index,
     )
     intent_shift_flags = {
-        str(snapshot.get("actor_id", "")): bool(snapshot.get("changed_from_previous"))
+        str(snapshot.get("cast_id", "")): bool(snapshot.get("changed_from_previous"))
         for snapshot in actor_intent_states
     }
     background_pressure = _background_pressure_by_actor(
@@ -92,64 +92,64 @@ def build_focus_candidates(
 
     candidates = []
     for actor in actors:
-        actor_id = str(actor["actor_id"])
+        cast_id = str(actor["cast_id"])
         tier = str(actor.get("baseline_attention_tier", "background"))
         score = _TIER_BASE.get(tier, 0.8)
         reasons: list[str] = [f"기본 attention tier={tier}"]
 
-        unread_count = unread_counts.get(actor_id, 0)
+        unread_count = unread_counts.get(cast_id, 0)
         if unread_count > 0:
             score += min(unread_count, 3) * 1.2
             reasons.append(f"unseen inbox {unread_count}건")
 
-        targeted_count = targeted_counts.get(actor_id, 0)
+        targeted_count = targeted_counts.get(cast_id, 0)
         if targeted_count > 0:
             score += min(targeted_count, 2) * 1.0
             reasons.append(f"직접 target {targeted_count}회")
 
-        if intent_shift_flags.get(actor_id, False):
+        if intent_shift_flags.get(cast_id, False):
             score += 1.2
             reasons.append("직전 intent 변화")
 
-        thread_count = thread_counts.get(actor_id, 0)
+        thread_count = thread_counts.get(cast_id, 0)
         if thread_count > 0:
             score += min(thread_count, 2) * 0.8
             reasons.append(f"thread 관여 {thread_count}건")
 
-        pressure_level = background_pressure.get(actor_id)
+        pressure_level = background_pressure.get(cast_id)
         if pressure_level is not None:
             score += _BACKGROUND_PRESSURE[pressure_level]
             reasons.append(f"background pressure {pressure_level}")
 
-        focus_count_last_two = sum(recent_focus_counts.get(actor_id, [])[:2])
+        focus_count_last_two = sum(recent_focus_counts.get(cast_id, [])[:2])
         if focus_count_last_two == 0:
             score += 0.9
             reasons.append("최근 focus 비노출")
 
-        if recent_activity_counts.get(actor_id, 0) == 0:
+        if recent_activity_counts.get(cast_id, 0) == 0:
             score += 0.4
             reasons.append("최근 action 관여 희박")
 
-        if recent_focus_counts.get(actor_id, [0])[0] > 0:
+        if recent_focus_counts.get(cast_id, [0])[0] > 0:
             score -= 1.2
             reasons.append("직전 focus 패널티")
 
-        if sum(recent_focus_counts.get(actor_id, [])[:3]) >= 2:
+        if sum(recent_focus_counts.get(cast_id, [])[:3]) >= 2:
             score -= 0.6
             reasons.append("최근 연속 focus 패널티")
 
         score = _apply_momentum_bias(
             score=score,
             momentum=momentum,
-            actor_id=actor_id,
+            cast_id=cast_id,
             quiet_bonus=(focus_count_last_two == 0),
             targeted_count=targeted_count,
             thread_count=thread_count,
         )
         candidates.append(
             {
-                "actor_id": actor_id,
-                "display_name": str(actor.get("display_name", actor_id)),
+                "cast_id": cast_id,
+                "display_name": str(actor.get("display_name", cast_id)),
                 "baseline_attention_tier": tier,
                 "story_function": str(actor.get("story_function", "")),
                 "candidate_score": max(0.2, round(score, 3)),
@@ -158,81 +158,81 @@ def build_focus_candidates(
                 "unseen_count": unread_count,
                 "targeted_count": targeted_count,
                 "thread_count": thread_count,
-                "intent_shift": intent_shift_flags.get(actor_id, False),
+                "intent_shift": intent_shift_flags.get(cast_id, False),
                 "background_pressure": pressure_level,
             }
         )
 
-    by_actor_id = {str(item["actor_id"]): item for item in candidates}
+    by_cast_id = {str(item["cast_id"]): item for item in candidates}
     ordered_candidates = sorted(
         candidates,
         key=lambda item: (
             float(item["candidate_score"]),
-            str(item["actor_id"]),
+            str(item["cast_id"]),
         ),
         reverse=True,
     )
 
     hard_include_ids: list[str] = []
     lead_driver_ids = [
-        str(item["actor_id"])
+        str(item["cast_id"])
         for item in ordered_candidates
         if str(item["baseline_attention_tier"]) in {"lead", "driver"}
     ]
     hard_include_ids.extend(lead_driver_ids[:2])
     direct_target_ids = [
-        str(item["actor_id"])
+        str(item["cast_id"])
         for item in ordered_candidates
         if int(item["targeted_count"]) > 0
-        and str(item["actor_id"]) not in hard_include_ids
+        and str(item["cast_id"]) not in hard_include_ids
     ]
     hard_include_ids.extend(direct_target_ids[:1])
     if len(hard_include_ids) < _MAX_HARD_INCLUDE:
         shifted_ids = [
-            str(item["actor_id"])
+            str(item["cast_id"])
             for item in ordered_candidates
             if bool(item["intent_shift"])
-            and str(item["actor_id"]) not in hard_include_ids
+            and str(item["cast_id"]) not in hard_include_ids
         ]
         hard_include_ids.extend(
             shifted_ids[: _MAX_HARD_INCLUDE - len(hard_include_ids)]
         )
     hard_include_ids = hard_include_ids[:_MAX_HARD_INCLUDE]
 
-    for actor_id in hard_include_ids:
-        by_actor_id[actor_id]["selection_bucket"] = "hard_include"
+    for cast_id in hard_include_ids:
+        by_cast_id[cast_id]["selection_bucket"] = "hard_include"
 
     remaining_ids = [
-        str(item["actor_id"])
+        str(item["cast_id"])
         for item in ordered_candidates
-        if str(item["actor_id"]) not in hard_include_ids
+        if str(item["cast_id"]) not in hard_include_ids
     ]
     wildcard_source_ids = [
-        actor_id
-        for actor_id in remaining_ids
-        if str(by_actor_id[actor_id]["baseline_attention_tier"])
+        cast_id
+        for cast_id in remaining_ids
+        if str(by_cast_id[cast_id]["baseline_attention_tier"])
         in {"support", "background"}
     ]
     wildcard_count = min(_MAX_WILDCARD, len(wildcard_source_ids))
     wildcard_ids = _weighted_sample_without_replacement(
         actor_ids=wildcard_source_ids,
         weights={
-            actor_id: max(
+            cast_id: max(
                 0.2,
-                float(by_actor_id[actor_id]["candidate_score"]) * 0.5
-                + (0.7 if bool(by_actor_id[actor_id]["intent_shift"]) else 0.0)
-                + (0.4 if int(by_actor_id[actor_id]["unseen_count"]) == 0 else 0.0),
+                float(by_cast_id[cast_id]["candidate_score"]) * 0.5
+                + (0.7 if bool(by_cast_id[cast_id]["intent_shift"]) else 0.0)
+                + (0.4 if int(by_cast_id[cast_id]["unseen_count"]) == 0 else 0.0),
             )
-            for actor_id in wildcard_source_ids
+            for cast_id in wildcard_source_ids
         },
         target_count=wildcard_count,
         rng=random.Random(f"{rng_seed}:coordinator:wildcard:{current_round_index}"),
     )
-    for actor_id in wildcard_ids:
-        by_actor_id[actor_id]["selection_bucket"] = "wildcard"
+    for cast_id in wildcard_ids:
+        by_cast_id[cast_id]["selection_bucket"] = "wildcard"
 
     weighted_source_ids = [
-        actor_id for actor_id in remaining_ids if actor_id not in wildcard_ids
+        cast_id for cast_id in remaining_ids if cast_id not in wildcard_ids
     ]
     weighted_target_count = min(
         _MAX_WEIGHTED,
@@ -245,8 +245,8 @@ def build_focus_candidates(
     weighted_ids = _weighted_sample_without_replacement(
         actor_ids=weighted_source_ids,
         weights={
-            actor_id: float(by_actor_id[actor_id]["candidate_score"])
-            for actor_id in weighted_source_ids
+            cast_id: float(by_cast_id[cast_id]["candidate_score"])
+            for cast_id in weighted_source_ids
         },
         target_count=weighted_target_count,
         rng=random.Random(f"{rng_seed}:coordinator:weighted:{current_round_index}"),
@@ -255,16 +255,16 @@ def build_focus_candidates(
     final_ids = hard_include_ids + weighted_ids + wildcard_ids
     unique_ids = []
     seen: set[str] = set()
-    for actor_id in final_ids:
-        if actor_id in seen:
+    for cast_id in final_ids:
+        if cast_id in seen:
             continue
-        seen.add(actor_id)
-        unique_ids.append(actor_id)
+        seen.add(cast_id)
+        unique_ids.append(cast_id)
 
     return [
-        by_actor_id[actor_id]
-        for actor_id in [item["actor_id"] for item in ordered_candidates]
-        if actor_id in seen
+        by_cast_id[cast_id]
+        for cast_id in [item["cast_id"] for item in ordered_candidates]
+        if cast_id in seen
     ]
 
 
@@ -279,10 +279,10 @@ def _recent_target_counts(
         round_index = int(str(activity.get("round_index", 0)))
         if round_index < recent_start:
             continue
-        for actor_id in _string_list(activity.get("target_actor_ids", [])):
-            counts[actor_id] += 1
-        for actor_id in _string_list(activity.get("intent_target_actor_ids", [])):
-            counts[actor_id] += 1
+        for cast_id in _string_list(activity.get("target_cast_ids", [])):
+            counts[cast_id] += 1
+        for cast_id in _string_list(activity.get("intent_target_cast_ids", [])):
+            counts[cast_id] += 1
     return counts
 
 
@@ -299,11 +299,11 @@ def _recent_thread_counts(
             continue
         if not str(activity.get("thread_id", "")).strip():
             continue
-        source_actor_id = str(activity.get("source_actor_id", ""))
-        if source_actor_id:
-            counts[source_actor_id] += 1
-        for actor_id in _string_list(activity.get("target_actor_ids", [])):
-            counts[actor_id] += 1
+        source_cast_id = str(activity.get("source_cast_id", ""))
+        if source_cast_id:
+            counts[source_cast_id] += 1
+        for cast_id in _string_list(activity.get("target_cast_ids", [])):
+            counts[cast_id] += 1
     return counts
 
 
@@ -318,10 +318,10 @@ def _background_pressure_by_actor(
         round_index = int(str(item.get("round_index", 0)))
         if round_index < recent_start:
             continue
-        actor_id = str(item.get("actor_id", ""))
+        cast_id = str(item.get("cast_id", ""))
         pressure_level = str(item.get("pressure_level", ""))
-        if actor_id and pressure_level in _BACKGROUND_PRESSURE:
-            pressure_by_actor[actor_id] = cast(PressureLevel, pressure_level)
+        if cast_id and pressure_level in _BACKGROUND_PRESSURE:
+            pressure_by_actor[cast_id] = cast(PressureLevel, pressure_level)
     return pressure_by_actor
 
 
@@ -343,8 +343,8 @@ def _recent_focus_counts(
         if round_index < 1:
             continue
         focus_plan = history_by_step.get(round_index, {})
-        for actor_id in _string_list(focus_plan.get("selected_actor_ids", [])):
-            counts.setdefault(actor_id, [0, 0, 0])[offset_index] += 1
+        for cast_id in _string_list(focus_plan.get("selected_cast_ids", [])):
+            counts.setdefault(cast_id, [0, 0, 0])[offset_index] += 1
     return counts
 
 
@@ -359,11 +359,11 @@ def _recent_activity_counts(
         round_index = int(str(activity.get("round_index", 0)))
         if round_index < recent_start:
             continue
-        source_actor_id = str(activity.get("source_actor_id", ""))
-        if source_actor_id:
-            counts[source_actor_id] += 1
-        for actor_id in _string_list(activity.get("target_actor_ids", [])):
-            counts[actor_id] += 1
+        source_cast_id = str(activity.get("source_cast_id", ""))
+        if source_cast_id:
+            counts[source_cast_id] += 1
+        for cast_id in _string_list(activity.get("target_cast_ids", [])):
+            counts[cast_id] += 1
     return counts
 
 
@@ -371,12 +371,12 @@ def _apply_momentum_bias(
     *,
     score: float,
     momentum: str | None,
-    actor_id: str,
+    cast_id: str,
     quiet_bonus: bool,
     targeted_count: int,
     thread_count: int,
 ) -> float:
-    del actor_id
+    del cast_id
     adjusted = score
     if momentum == "low":
         if quiet_bonus:

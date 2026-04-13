@@ -79,15 +79,15 @@ def test_cluster_round_activities_prioritizes_thread_grouping() -> None:
         round_activities=[
             {
                 "thread_id": "same-thread",
-                "source_actor_id": "alpha",
-                "target_actor_ids": ["beta"],
+                "source_cast_id": "alpha",
+                "target_cast_ids": ["beta"],
                 "action_summary": "첫 action",
                 "visibility": "private",
             },
             {
                 "thread_id": "same-thread",
-                "source_actor_id": "alpha",
-                "target_actor_ids": ["beta"],
+                "source_cast_id": "alpha",
+                "target_cast_ids": ["beta"],
                 "action_summary": "둘째 action",
                 "visibility": "private",
             },

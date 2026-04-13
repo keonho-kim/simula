@@ -116,7 +116,7 @@ def test_round_prompts_smoke() -> None:
         **build_round_resolution_prompt_bundle(),
     )
 
-    assert "selected_actor_ids" in directive_prompt
+    assert "selected_cast_ids" in directive_prompt
     assert '"confidence":"<float between 0.0 and 1.0>"' in resolution_prompt
     assert '"thought":"<one Korean sentence explaining why this actor chose the direction now>"' in resolution_prompt
 

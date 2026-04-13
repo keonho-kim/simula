@@ -33,13 +33,13 @@ _STEP_DIRECTIVE_EXAMPLE: dict[str, Any] = {
     "round_index": "<copy the current round index as an integer>",
     "focus_summary": "<one Korean sentence summarizing the direct focus for this round>",
     "selection_reason": "<one Korean sentence explaining why these actors were selected>",
-    "selected_actor_ids": ["<actor_id selected for direct focus>"],
-    "deferred_actor_ids": ["<actor_id deferred to background motion>"],
+    "selected_cast_ids": ["<cast_id selected for direct focus>"],
+    "deferred_cast_ids": ["<cast_id deferred to background motion>"],
     "focus_slices": [
         {
             "slice_id": "<stable slice identifier>",
             "title": "<short Korean slice title>",
-            "focus_actor_ids": ["<actor_id included in this slice>"],
+            "focus_cast_ids": ["<cast_id included in this slice>"],
             "visibility": "<choose exactly one of public, private, group>",
             "stakes": "<one Korean sentence describing what is at stake>",
             "selection_reason": "<one Korean sentence explaining why this slice matters now>",
@@ -48,7 +48,7 @@ _STEP_DIRECTIVE_EXAMPLE: dict[str, Any] = {
     "background_updates": [
         {
             "round_index": "<copy the current round index as an integer>",
-            "actor_id": "<deferred actor_id>",
+            "cast_id": "<deferred cast_id>",
             "summary": "<one Korean sentence describing deferred motion>",
             "pressure_level": "<choose exactly one of low, medium, high>",
             "future_hook": "<one Korean sentence describing a plausible next hook>",
@@ -57,13 +57,13 @@ _STEP_DIRECTIVE_EXAMPLE: dict[str, Any] = {
 }
 
 _STEP_RESOLUTION_EXAMPLE: dict[str, Any] = {
-    "adopted_actor_ids": ["<actor_id whose proposal was adopted>"],
+    "adopted_cast_ids": ["<cast_id whose proposal was adopted>"],
     "updated_intent_states": [
         {
-            "actor_id": "<actor_id>",
+            "cast_id": "<cast_id>",
             "current_intent": "<one Korean sentence describing the current intent>",
             "thought": "<one Korean sentence explaining why this actor chose the direction now>",
-            "target_actor_ids": ["<actor_id string or an empty list>"],
+            "target_cast_ids": ["<cast_id string or an empty list>"],
             "supporting_action_type": "<action_type string>",
             "confidence": "<float between 0.0 and 1.0>",
             "changed_from_previous": "<true or false>",

@@ -34,10 +34,9 @@ _PROMPT = textwrap.dedent(
     - If a field is a string, return a JSON string and never wrap it in an array.
     - If a field is an array, return a JSON array even when it has only one item.
     - Create exactly one actor card.
-    - Preserve the given `cast_id` and `display_name` exactly.
     - `baseline_attention_tier` must be one of `lead`, `driver`, `support`, `background`.
     - `public_profile` and `private_goal` must not say the same thing.
-    - Write `actor_id` as a short slug.
+    - Identity fields are fixed by the system. Do not invent new ids, names, or groups.
     - Make the cast item's `role_hint` and `core_tension` clearly visible in the card.
 
     # Input

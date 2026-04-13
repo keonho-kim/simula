@@ -22,7 +22,7 @@ class ActorProposalTask(TypedDict):
 class ActorProposalResult(TypedDict):
     """Fan-out actor proposal result."""
 
-    actor_id: str
+    cast_id: str
     unread_activity_ids: list[str]
     proposal: dict[str, Any]
     forced_idle: bool

@@ -28,13 +28,13 @@ def test_prepare_focus_candidates_advances_round_and_builds_candidates() -> None
     state = {
         "actors": [
             {
-                "actor_id": "a",
+                "cast_id": "a",
                 "display_name": "A",
                 "baseline_attention_tier": "lead",
                 "story_function": "주요 압박 축",
             },
             {
-                "actor_id": "b",
+                "cast_id": "b",
                 "display_name": "B",
                 "baseline_attention_tier": "support",
                 "story_function": "보조 반응 축",
@@ -59,7 +59,7 @@ def test_prepare_focus_candidates_advances_round_and_builds_candidates() -> None
     assert result["focus_candidates"]
 
 
-def test_build_round_directive_sets_selected_actor_ids() -> None:
+def test_build_round_directive_sets_selected_cast_ids() -> None:
     class FakeRouter:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
@@ -69,13 +69,13 @@ def test_build_round_directive_sets_selected_actor_ids() -> None:
                         round_index=2,
                         focus_summary="직접 압박 축을 우선 추적한다.",
                         selection_reason="직접 반응 압력이 가장 높다.",
-                        selected_actor_ids=["a", "b"],
-                        deferred_actor_ids=["c"],
+                        selected_cast_ids=["a", "b"],
+                        deferred_cast_ids=["c"],
                         focus_slices=[
                             {
                                 "slice_id": "focus-1",
                                 "title": "압박 축",
-                                "focus_actor_ids": ["a", "b"],
+                                "focus_cast_ids": ["a", "b"],
                                 "visibility": "private",
                                 "stakes": "즉시 반응이 필요하다.",
                                 "selection_reason": "핵심 압박이 몰렸다.",
@@ -84,7 +84,7 @@ def test_build_round_directive_sets_selected_actor_ids() -> None:
                         background_updates=[
                             {
                                 "round_index": 2,
-                                "actor_id": "c",
+                                "cast_id": "c",
                                 "summary": "배경 압력이 유지된다.",
                                 "pressure_level": "medium",
                                 "future_hook": "다음 round에서 직접 개입할 수 있다.",
@@ -109,8 +109,8 @@ def test_build_round_directive_sets_selected_actor_ids() -> None:
     )
     state = {
         "round_index": 2,
-        "actors": [{"actor_id": "c", "display_name": "C"}],
-        "focus_candidates": [{"actor_id": "a"}, {"actor_id": "b"}, {"actor_id": "c"}],
+        "actors": [{"cast_id": "c", "display_name": "C"}],
+        "focus_candidates": [{"cast_id": "a"}, {"cast_id": "b"}, {"cast_id": "c"}],
         "plan": {
             "coordination_frame": {"focus_selection_rules": ["규칙"]},
             "situation": {"simulation_objective": "긴장 추적"},
@@ -124,8 +124,8 @@ def test_build_round_directive_sets_selected_actor_ids() -> None:
 
     result = asyncio.run(build_round_directive(state, runtime))
 
-    assert result["selected_actor_ids"] == ["a", "b"]
-    assert result["latest_background_updates"][0]["actor_id"] == "c"
+    assert result["selected_cast_ids"] == ["a", "b"]
+    assert result["latest_background_updates"][0]["cast_id"] == "c"
 
 
 def test_resolve_round_persists_round_artifacts() -> None:
@@ -134,22 +134,22 @@ def test_resolve_round_persists_round_artifacts() -> None:
             del role, prompt, kwargs
             return (
                 RoundResolution(
-                    adopted_actor_ids=["a"],
+                    adopted_cast_ids=["a"],
                     updated_intent_states=[
                         {
-                            "actor_id": "a",
+                            "cast_id": "a",
                             "current_intent": "b를 압박한다.",
                             "thought": "지금 압박해야 다음 선택 주도권을 잡을 수 있다고 본다.",
-                            "target_actor_ids": ["b"],
+                            "target_cast_ids": ["b"],
                             "supporting_action_type": "speech",
                             "confidence": 0.8,
                             "changed_from_previous": True,
                         },
                         {
-                            "actor_id": "b",
+                            "cast_id": "b",
                             "current_intent": "상황을 더 본다.",
                             "thought": "바로 답하면 밀릴 수 있어 한 번 더 상황을 읽으려 한다.",
-                            "target_actor_ids": [],
+                            "target_cast_ids": [],
                             "supporting_action_type": "initial_state",
                             "confidence": 0.5,
                             "changed_from_previous": False,
@@ -206,15 +206,15 @@ def test_resolve_round_persists_round_artifacts() -> None:
         "round_index": 2,
         "max_rounds": 4,
         "actors": [
-            {"actor_id": "a", "private_goal": "압박한다."},
-            {"actor_id": "b", "private_goal": "관망한다."},
+            {"cast_id": "a", "private_goal": "압박한다."},
+            {"cast_id": "b", "private_goal": "관망한다."},
         ],
-        "activity_feeds": initialize_activity_feeds([{"actor_id": "a"}, {"actor_id": "b"}]),
+        "activity_feeds": initialize_activity_feeds([{"cast_id": "a"}, {"cast_id": "b"}]),
         "activities": [],
         "latest_round_activities": [],
-        "round_focus_plan": {"selected_actor_ids": ["a"]},
+        "round_focus_plan": {"selected_cast_ids": ["a"]},
         "latest_background_updates": [],
-        "selected_actor_ids": ["a"],
+        "selected_cast_ids": ["a"],
         "actor_intent_states": [],
         "actor_facing_scenario_digest": {},
         "world_state_summary": "기존 상태",
@@ -242,17 +242,17 @@ def test_resolve_round_persists_round_artifacts() -> None:
         },
         "pending_actor_proposals": [
             {
-                "actor_id": "a",
+                "cast_id": "a",
                 "unread_activity_ids": [],
                 "proposal": {
                     "action_type": "speech",
                     "intent": "b를 압박해 즉시 반응을 끌어낸다.",
-                    "intent_target_actor_ids": ["b"],
+                    "intent_target_cast_ids": ["b"],
                     "action_summary": "a가 압박 action을 보낸다.",
                     "action_detail": "즉시 반응을 요구한다.",
                     "utterance": "지금 답해야 한다.",
                     "visibility": "private",
-                    "target_actor_ids": ["b"],
+                    "target_cast_ids": ["b"],
                     "thread_id": "warning",
                 },
                 "forced_idle": False,
@@ -291,13 +291,13 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
             del role, prompt, kwargs
             return (
                 RoundResolution(
-                    adopted_actor_ids=["a"],
+                    adopted_cast_ids=["a"],
                     updated_intent_states=[
                         {
-                            "actor_id": "a",
+                            "cast_id": "a",
                             "current_intent": "b에게 비공개 고백을 시도한다.",
                             "thought": "지금 감정을 밀어야 반응을 확인할 수 있다고 본다.",
-                            "target_actor_ids": ["b"],
+                            "target_cast_ids": ["b"],
                             "supporting_action_type": "private_confide",
                             "confidence": 0.8,
                             "changed_from_previous": True,
@@ -347,15 +347,15 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
         "round_index": 2,
         "max_rounds": 4,
         "actors": [
-            {"actor_id": "a", "private_goal": "고백한다."},
-            {"actor_id": "b", "private_goal": "관망한다."},
+            {"cast_id": "a", "private_goal": "고백한다."},
+            {"cast_id": "b", "private_goal": "관망한다."},
         ],
-        "activity_feeds": initialize_activity_feeds([{"actor_id": "a"}, {"actor_id": "b"}]),
+        "activity_feeds": initialize_activity_feeds([{"cast_id": "a"}, {"cast_id": "b"}]),
         "activities": [],
         "latest_round_activities": [],
-        "round_focus_plan": {"selected_actor_ids": ["a"]},
+        "round_focus_plan": {"selected_cast_ids": ["a"]},
         "latest_background_updates": [],
-        "selected_actor_ids": ["a"],
+        "selected_cast_ids": ["a"],
         "actor_intent_states": [],
         "actor_facing_scenario_digest": {},
         "world_state_summary": "기존 상태",
@@ -383,17 +383,17 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
         },
         "pending_actor_proposals": [
             {
-                "actor_id": "a",
+                "cast_id": "a",
                 "unread_activity_ids": [],
                 "proposal": {
                     "action_type": "private_confide",
                     "intent": "b에게 감정을 털어놓는다.",
-                    "intent_target_actor_ids": ["b"],
+                    "intent_target_cast_ids": ["b"],
                     "action_summary": "a가 비공개 고백을 시도한다.",
                     "action_detail": "하지만 대상 actor를 비워 둔 잘못된 제안이다.",
                     "utterance": "사실 마음이 갑니다.",
                     "visibility": "private",
-                    "target_actor_ids": [],
+                    "target_cast_ids": [],
                     "thread_id": "",
                 },
                 "forced_idle": False,

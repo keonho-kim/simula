@@ -66,12 +66,12 @@ def build_store_models(storage: StorageConfig) -> StoreModels:
     class ActorRecord(Base):
         __tablename__ = tables.actors
         __table_args__ = (
-            PrimaryKeyConstraint("run_id", "actor_id"),
+            PrimaryKeyConstraint("run_id", "cast_id"),
             {"schema": schema} if schema else {},
         )
 
         run_id: Mapped[str] = mapped_column(String, nullable=False)
-        actor_id: Mapped[str] = mapped_column(String, nullable=False)
+        cast_id: Mapped[str] = mapped_column(String, nullable=False)
         actor_json: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
         created_at: Mapped[datetime] = mapped_column(
             DateTime(timezone=True), nullable=False
@@ -84,7 +84,7 @@ def build_store_models(storage: StorageConfig) -> StoreModels:
         activity_id: Mapped[str] = mapped_column(String, primary_key=True)
         run_id: Mapped[str] = mapped_column(String, nullable=False)
         round_index: Mapped[int] = mapped_column(Integer, nullable=False)
-        source_actor_id: Mapped[str] = mapped_column(String, nullable=False)
+        source_cast_id: Mapped[str] = mapped_column(String, nullable=False)
         visibility: Mapped[str] = mapped_column(String, nullable=False)
         thread_id: Mapped[str | None] = mapped_column(String)
         activity_json: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)

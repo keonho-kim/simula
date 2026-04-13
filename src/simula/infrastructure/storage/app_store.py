@@ -148,7 +148,7 @@ class SqlAlchemyAppStore(AppStore):
                 session.merge(
                     self.models.actor_record(
                         run_id=run_id,
-                        actor_id=str(actor["actor_id"]),
+                        cast_id=str(actor["cast_id"]),
                         actor_json=actor,
                         created_at=timestamp,
                     )
@@ -171,7 +171,7 @@ class SqlAlchemyAppStore(AppStore):
                         run_id=run_id,
                         activity_id=str(activity["activity_id"]),
                         round_index=int(str(activity["round_index"])),
-                        source_actor_id=str(activity["source_actor_id"]),
+                        source_cast_id=str(activity["source_cast_id"]),
                         visibility=str(activity["visibility"]),
                         thread_id=cast(str | None, activity.get("thread_id")),
                         activity_json=activity,

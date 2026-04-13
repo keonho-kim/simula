@@ -253,7 +253,7 @@ class StructuredLLMRouter:
         else:
             self.logger.warning("%s | %s", title, summary)
         if pretty_text.strip():
-            self.logger.debug("\n%s\n%s\n", title, pretty_text)
+            self.logger.debug("\n%s\n", pretty_text)
 
     def _log_structured_call_start(
         self,
@@ -298,7 +298,7 @@ class StructuredLLMRouter:
         title = _format_response_title(role=role, log_context=log_context)
         self.logger.info("%s | %s", title, meta_line)
         if pretty_text.strip():
-            self.logger.debug("\n%s\n%s\n", title, pretty_text)
+            self.logger.debug("\n%s\n", pretty_text)
 
 
 def build_raw_model_router(
@@ -382,13 +382,13 @@ def _format_log_context_suffix(log_context: dict[str, object] | None) -> str:
         parts.append(f"round_index={round_index}")
 
     actor_display_name = log_context.get("actor_display_name")
-    actor_id = log_context.get("actor_id")
-    if actor_display_name is not None and actor_id is not None:
-        parts.append(f"actor={actor_display_name}({actor_id})")
+    cast_id = log_context.get("cast_id")
+    if actor_display_name is not None and cast_id is not None:
+        parts.append(f"actor={actor_display_name}({cast_id})")
     elif actor_display_name is not None:
         parts.append(f"actor={actor_display_name}")
-    elif actor_id is not None:
-        parts.append(f"actor_id={actor_id}")
+    elif cast_id is not None:
+        parts.append(f"cast_id={cast_id}")
 
     slot_index = log_context.get("slot_index")
     if slot_index is not None:

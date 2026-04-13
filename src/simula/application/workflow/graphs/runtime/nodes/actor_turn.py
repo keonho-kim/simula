@@ -54,42 +54,42 @@ def dispatch_selected_actor_proposals(
 ) -> list[Send] | str:
     """선택된 actor action proposal 생성을 fan-out 한다."""
 
-    if not state.get("selected_actor_ids"):
+    if not state.get("selected_cast_ids"):
         return "resolve_round"
 
-    actors_by_id = {str(actor["actor_id"]): actor for actor in state["actors"]}
+    actors_by_id = {str(actor["cast_id"]): actor for actor in state["actors"]}
     action_catalog = ActionCatalog.model_validate(state["plan"]["action_catalog"])
     all_recent_actions = recent_actions(list(state.get("activities", [])), limit=12)
     sends: list[Send] = []
-    for actor_id in state["selected_actor_ids"]:
-        actor = actors_by_id[actor_id]
+    for cast_id in state["selected_cast_ids"]:
+        actor = actors_by_id[cast_id]
         unread_visible_activities = list_unseen_activities(
             state["activity_feeds"],
-            actor_id,
+            cast_id,
             state["activities"],
         )
         recent_visible_activities = list_recent_visible_activities(
             state["activity_feeds"],
-            actor_id,
+            cast_id,
             all_recent_actions,
         )
-        focus_slice = _focus_slice_for_actor(state, actor_id)
-        current_intent_snapshot = _current_intent_snapshot(state, actor_id)
+        focus_slice = _focus_slice_for_actor(state, cast_id)
+        current_intent_snapshot = _current_intent_snapshot(state, cast_id)
         visible_action_context, unread_backlog_digest = build_visible_action_context(
             unread_visible_activities=unread_visible_activities,
             recent_visible_activities=recent_visible_activities,
         )
         visible_actors = build_actor_visible_actors_view(
             actors=list(state["actors"]),
-            actor_id=actor_id,
+            cast_id=cast_id,
             focus_slice=focus_slice,
             current_intent_snapshot=current_intent_snapshot,
             visible_action_context=visible_action_context,
-            selected_actor_ids=list(state.get("selected_actor_ids", [])),
+            selected_cast_ids=list(state.get("selected_cast_ids", [])),
         )
         runtime_guidance = _build_runtime_guidance(
             state=state,
-            actor_id=actor_id,
+            cast_id=cast_id,
             action_catalog=action_catalog,
             current_intent_snapshot=current_intent_snapshot,
         )
@@ -127,7 +127,7 @@ async def generate_actor_proposal(
 
     actor_task = state["actor_proposal_task"]
     actor = actor_task["actor"]
-    actor_id = str(actor["actor_id"])
+    cast_id = str(actor["cast_id"])
     runtime_guidance = dict(actor_task.get("runtime_guidance", {}))
 
     prompt = _build_actor_proposal_prompt(
@@ -157,16 +157,16 @@ async def generate_actor_proposal(
             max_recipients_per_message=runtime.context.settings.runtime.max_recipients_per_message,
         ),
         repair_context=build_actor_proposal_repair_context(
-            actor_id=actor_id,
+            cast_id=cast_id,
             available_actions=[
                 cast(dict[str, object], item)
                 for item in _object_list(runtime_guidance.get("available_actions", []))
                 if isinstance(item, dict)
             ],
-            valid_target_actor_ids=[
-                str(item.get("actor_id", ""))
+            valid_target_cast_ids=[
+                str(item.get("cast_id", ""))
                 for item in list(actor_task.get("visible_actors", []))
-                if str(item.get("actor_id", "")).strip()
+                if str(item.get("cast_id", "")).strip()
             ],
             max_target_count=runtime.context.settings.runtime.max_recipients_per_message,
         ),
@@ -188,7 +188,7 @@ async def generate_actor_proposal(
     return {
         "pending_actor_proposals": [
             {
-                "actor_id": actor_id,
+                "cast_id": cast_id,
                 "unread_activity_ids": list(actor_task.get("unread_activity_ids", [])),
                 "proposal": proposal_payload,
                 "forced_idle": meta.forced_default,
@@ -203,12 +203,12 @@ def reduce_actor_proposals(state: SimulationWorkflowState) -> dict[str, object]:
     """actor order 기준으로 proposal 결과를 정렬한다."""
 
     active_order = {
-        actor_id: index
-        for index, actor_id in enumerate(state.get("selected_actor_ids", []))
+        cast_id: index
+        for index, cast_id in enumerate(state.get("selected_cast_ids", []))
     }
     ordered_results = sorted(
         state.get("pending_actor_proposals", []),
-        key=lambda item: active_order.get(str(item["actor_id"]), 10_000),
+        key=lambda item: active_order.get(str(item["cast_id"]), 10_000),
     )
     return {
         "pending_actor_proposals": Overwrite(value=ordered_results),
@@ -327,7 +327,7 @@ def _actor_log_context(
                 "0분",
             )
         ),
-        "actor_id": str(actor["actor_id"]),
+        "cast_id": str(actor["cast_id"]),
         "actor_display_name": actor.get("display_name"),
         "actor_thought": cast(
             dict[str, object],
@@ -341,7 +341,7 @@ def _actor_log_context(
 def _build_runtime_guidance(
     *,
     state: SimulationWorkflowState,
-    actor_id: str,
+    cast_id: str,
     action_catalog: ActionCatalog,
     current_intent_snapshot: dict[str, object],
 ) -> dict[str, object]:
@@ -358,7 +358,7 @@ def _build_runtime_guidance(
         if state.get("observer_reports")
         else {},
     )
-    actor = next(item for item in state["actors"] if str(item["actor_id"]) == actor_id)
+    actor = next(item for item in state["actors"] if str(item["cast_id"]) == cast_id)
     available_actions = _filter_action_catalog_for_actor(
         actor=cast(dict[str, object], actor),
         action_catalog=action_catalog,
@@ -418,24 +418,24 @@ def _filter_action_catalog_for_actor(
 
 def _current_intent_snapshot(
     state: SimulationWorkflowState,
-    actor_id: str,
+    cast_id: str,
 ) -> dict[str, object]:
     for snapshot in list(state.get("actor_intent_states", [])):
-        if str(snapshot.get("actor_id", "")) == actor_id:
+        if str(snapshot.get("cast_id", "")) == cast_id:
             return cast(dict[str, object], snapshot)
     return {}
 
 
 def _focus_slice_for_actor(
     state: SimulationWorkflowState,
-    actor_id: str,
+    cast_id: str,
 ) -> dict[str, object]:
     focus_plan = cast(dict[str, object], state.get("round_focus_plan", {}) or {})
     for raw_focus_slice in _object_list(focus_plan.get("focus_slices", [])):
         if not isinstance(raw_focus_slice, dict):
             continue
         focus_slice = cast(dict[str, object], raw_focus_slice)
-        if actor_id in _string_list(focus_slice.get("focus_actor_ids", [])):
+        if cast_id in _string_list(focus_slice.get("focus_cast_ids", [])):
             return focus_slice
     return {}
 
@@ -451,20 +451,20 @@ def _build_default_action_proposal(
         for item in _object_list(runtime_guidance.get("available_actions", []))
         if isinstance(item, dict)
     ]
-    actor_id = str(actor.get("actor_id", ""))
-    target_actor_ids = _default_target_actor_ids(
-        actor_id=actor_id,
+    cast_id = str(actor.get("cast_id", ""))
+    target_cast_ids = _default_target_cast_ids(
+        cast_id=cast_id,
         visible_actors=visible_actors,
         runtime_guidance=runtime_guidance,
     )
     selected_action = _select_default_action(
         available_actions,
-        has_targets=bool(target_actor_ids),
+        has_targets=bool(target_cast_ids),
     )
     supported_visibility = _string_list(selected_action.get("supported_visibility"))
     visibility = _select_default_visibility(
         supported_visibility=supported_visibility,
-        has_targets=bool(target_actor_ids),
+        has_targets=bool(target_cast_ids),
     )
     intent_snapshot = cast(
         dict[str, object],
@@ -479,11 +479,11 @@ def _build_default_action_proposal(
             "아직은 관계 신호와 상대 반응을 더 읽어야 한다고 본다.",
         )
     )
-    intent_target_actor_ids = _string_list(intent_snapshot.get("target_actor_ids", []))
+    intent_target_cast_ids = _string_list(intent_snapshot.get("target_cast_ids", []))
     if visibility == "public":
-        target_actor_ids = []
-    if not intent_target_actor_ids:
-        intent_target_actor_ids = list(target_actor_ids)
+        target_cast_ids = []
+    if not intent_target_cast_ids:
+        intent_target_cast_ids = list(target_cast_ids)
     digest = cast(
         dict[str, object],
         runtime_guidance.get("actor_facing_scenario_digest", {}),
@@ -501,12 +501,12 @@ def _build_default_action_proposal(
     return {
         "action_type": str(selected_action.get("action_type", "observe")),
         "intent": current_intent,
-        "intent_target_actor_ids": intent_target_actor_ids,
+        "intent_target_cast_ids": intent_target_cast_ids,
         "action_summary": action_summary,
         "action_detail": f"{action_detail} 판단 판단 근거는 {current_thought}",
         "utterance": "",
         "visibility": visibility,
-        "target_actor_ids": target_actor_ids,
+        "target_cast_ids": target_cast_ids,
         "thread_id": "",
     }
 
@@ -518,24 +518,24 @@ def _build_actor_proposal_semantic_validator(
     runtime_guidance: dict[str, object],
     max_recipients_per_message: int,
 ):
-    actor_id = str(actor.get("actor_id", ""))
+    cast_id = str(actor.get("cast_id", ""))
     available_actions = [
         cast(dict[str, object], item)
         for item in _object_list(runtime_guidance.get("available_actions", []))
         if isinstance(item, dict)
     ]
-    valid_target_actor_ids = [
-        str(item.get("actor_id", ""))
+    valid_target_cast_ids = [
+        str(item.get("cast_id", ""))
         for item in visible_actors
-        if str(item.get("actor_id", "")).strip()
+        if str(item.get("cast_id", "")).strip()
     ]
 
     def validator(proposal: ActorActionProposal) -> list[str]:
         return validate_actor_action_proposal_semantics(
             proposal=proposal,
-            actor_id=actor_id,
+            cast_id=cast_id,
             available_actions=available_actions,
-            valid_target_actor_ids=valid_target_actor_ids,
+            valid_target_cast_ids=valid_target_cast_ids,
             max_target_count=max_recipients_per_message,
         )
 
@@ -591,9 +591,9 @@ def _select_default_visibility(
     return "public"
 
 
-def _default_target_actor_ids(
+def _default_target_cast_ids(
     *,
-    actor_id: str,
+    cast_id: str,
     visible_actors: list[dict[str, object]],
     runtime_guidance: dict[str, object],
 ) -> list[str]:
@@ -603,8 +603,8 @@ def _default_target_actor_ids(
     )
     intent_targets = [
         candidate
-        for candidate in _string_list(intent_snapshot.get("target_actor_ids", []))
-        if candidate and candidate != actor_id
+        for candidate in _string_list(intent_snapshot.get("target_cast_ids", []))
+        if candidate and candidate != cast_id
     ]
     if intent_targets:
         return intent_targets[:1]
@@ -612,17 +612,17 @@ def _default_target_actor_ids(
     focus_slice = cast(dict[str, object], runtime_guidance.get("focus_slice", {}))
     focus_targets = [
         candidate
-        for candidate in _string_list(focus_slice.get("focus_actor_ids", []))
-        if candidate and candidate != actor_id
+        for candidate in _string_list(focus_slice.get("focus_cast_ids", []))
+        if candidate and candidate != cast_id
     ]
     if focus_targets:
         return focus_targets[:1]
 
     visible_target_ids = [
-        str(candidate.get("actor_id", ""))
+        str(candidate.get("cast_id", ""))
         for candidate in visible_actors
-        if str(candidate.get("actor_id", "")).strip()
-        and str(candidate.get("actor_id", "")) != actor_id
+        if str(candidate.get("cast_id", "")).strip()
+        and str(candidate.get("cast_id", "")) != cast_id
     ]
     if visible_target_ids:
         return visible_target_ids[:1]
@@ -650,7 +650,7 @@ def _log_actor_proposal_completed(
     forced_default: bool,
     duration_seconds: float,
 ) -> None:
-    actor_name = str(actor.get("display_name") or actor.get("actor_id") or "actor")
+    actor_name = str(actor.get("display_name") or actor.get("cast_id") or "actor")
     if forced_default:
         logger.info(
             "%s action 정리 완료 | round %s | 기본 대기 적용 | 소요 %.2fs",
@@ -666,19 +666,19 @@ def _log_actor_proposal_completed(
         round_index,
         proposal.action_type,
         _visibility_label(proposal.visibility),
-        _target_preview(proposal.target_actor_ids),
+        _target_preview(proposal.target_cast_ids),
         _truncate_text(proposal.action_summary, 72),
         duration_seconds,
     )
 
 
-def _target_preview(target_actor_ids: list[str]) -> str:
-    if not target_actor_ids:
+def _target_preview(target_cast_ids: list[str]) -> str:
+    if not target_cast_ids:
         return "직접 대상 없음"
-    if len(target_actor_ids) <= 3:
-        return ", ".join(target_actor_ids)
-    head = ", ".join(target_actor_ids[:3])
-    return f"{head} 외 {len(target_actor_ids) - 3}명"
+    if len(target_cast_ids) <= 3:
+        return ", ".join(target_cast_ids)
+    head = ", ".join(target_cast_ids[:3])
+    return f"{head} 외 {len(target_cast_ids) - 3}명"
 
 
 def _visibility_label(visibility: str) -> str:

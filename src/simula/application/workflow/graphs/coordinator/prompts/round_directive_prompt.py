@@ -12,8 +12,8 @@ Choose the direct focus for this round and summarize deferred motion in the same
 
 # Rules
 - Keep the number of selected actors within the provided budget.
-- `selected_actor_ids` must match the union of every `focus_actor_ids`.
-- Only actors from `focus_candidates_json` may appear in `selected_actor_ids`.
+- `selected_cast_ids` must match the union of every `focus_cast_ids`.
+- Only actors from `focus_candidates_json` may appear in `selected_cast_ids`.
 - `background_updates` should only describe deferred actors.
 - Every field is required.
 - Return only the JSON object that matches the required output schema.

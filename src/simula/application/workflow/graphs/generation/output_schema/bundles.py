@@ -29,11 +29,7 @@ def build_actor_card_prompt_bundle(
 
 
 _ACTOR_CARD_EXAMPLE: dict[str, Any] = {
-    "cast_id": "<preserve the provided cast_id exactly>",
-    "actor_id": "<short slug identifier for this actor>",
-    "display_name": "<preserve the provided display_name exactly>",
     "role": "<one Korean sentence describing this actor's role>",
-    "group_name": "<copy or refine the cast item's group name>",
     "public_profile": "<one Korean sentence describing the public-facing profile>",
     "private_goal": "<one Korean sentence describing the private goal>",
     "speaking_style": "<one Korean sentence describing how this actor speaks>",

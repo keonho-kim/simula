@@ -252,7 +252,6 @@ class ActorCard(BaseModel):
     """Runtime actor card."""
 
     cast_id: str
-    actor_id: str
     display_name: str
     role: str
     group_name: str
@@ -269,8 +268,35 @@ class ActorCard(BaseModel):
     def validate_actor_card(self) -> "ActorCard":
         for field_name in (
             "cast_id",
-            "actor_id",
             "display_name",
+            "role",
+            "public_profile",
+            "private_goal",
+            "speaking_style",
+            "avatar_seed",
+            "story_function",
+        ):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        return self
+
+
+class GeneratedActorCardDraft(BaseModel):
+    """LLM draft for one actor card without identity fields."""
+
+    role: str
+    public_profile: str
+    private_goal: str
+    speaking_style: str
+    avatar_seed: str
+    baseline_attention_tier: AttentionTier
+    story_function: str
+    preferred_action_types: list[str]
+    action_bias_notes: list[str]
+
+    @model_validator(mode="after")
+    def validate_generated_actor_card_draft(self) -> "GeneratedActorCardDraft":
+        for field_name in (
             "role",
             "public_profile",
             "private_goal",
@@ -288,12 +314,12 @@ class ActorActionProposal(BaseModel):
 
     action_type: str
     intent: str
-    intent_target_actor_ids: list[str]
+    intent_target_cast_ids: list[str]
     action_summary: str
     action_detail: str
     utterance: str
     visibility: VisibilityType
-    target_actor_ids: list[str]
+    target_cast_ids: list[str]
     thread_id: str
 
     @model_validator(mode="after")
@@ -301,8 +327,8 @@ class ActorActionProposal(BaseModel):
         for field_name in ("action_type", "intent", "action_summary", "action_detail"):
             if not getattr(self, field_name).strip():
                 raise ValueError(f"{field_name} must not be empty.")
-        if self.visibility in {"private", "group"} and not self.target_actor_ids:
-            raise ValueError("private/group proposals require target_actor_ids.")
+        if self.visibility in {"private", "group"} and not self.target_cast_ids:
+            raise ValueError("private/group proposals require target_cast_ids.")
         return self
 
 
@@ -312,13 +338,13 @@ class CanonicalAction(BaseModel):
     activity_id: str
     run_id: str
     round_index: int
-    source_actor_id: str
+    source_cast_id: str
     visibility: VisibilityType
-    target_actor_ids: list[str]
+    target_cast_ids: list[str]
     visibility_scope: list[str]
     action_type: str
     intent: str
-    intent_target_actor_ids: list[str]
+    intent_target_cast_ids: list[str]
     action_summary: str
     action_detail: str
     utterance: str
@@ -329,10 +355,10 @@ class CanonicalAction(BaseModel):
 class ActorIntentSnapshot(BaseModel):
     """Actor intent snapshot."""
 
-    actor_id: str
+    cast_id: str
     current_intent: str
     thought: str
-    target_actor_ids: list[str]
+    target_cast_ids: list[str]
     supporting_action_type: str
     confidence: float = Field(ge=0.0, le=1.0)
     changed_from_previous: bool
@@ -340,7 +366,7 @@ class ActorIntentSnapshot(BaseModel):
     @model_validator(mode="after")
     def validate_intent_snapshot(self) -> "ActorIntentSnapshot":
         for field_name in (
-            "actor_id",
+            "cast_id",
             "current_intent",
             "thought",
             "supporting_action_type",
@@ -357,9 +383,9 @@ class ActorIntentStateBatch(BaseModel):
 
     @model_validator(mode="after")
     def validate_intent_batch(self) -> "ActorIntentStateBatch":
-        actor_ids = [item.actor_id for item in self.actor_intent_states]
-        if len(actor_ids) != len(set(actor_ids)):
-            raise ValueError("actor_intent_states must use unique actor_id values.")
+        cast_ids = [item.cast_id for item in self.actor_intent_states]
+        if len(cast_ids) != len(set(cast_ids)):
+            raise ValueError("actor_intent_states must use unique cast_id values.")
         return self
 
 
@@ -368,7 +394,7 @@ class FocusSlice(BaseModel):
 
     slice_id: str
     title: str
-    focus_actor_ids: list[str]
+    focus_cast_ids: list[str]
     visibility: VisibilityType
     stakes: str
     selection_reason: str
@@ -379,8 +405,8 @@ class FocusSlice(BaseModel):
             raise ValueError("slice_id must not be empty.")
         if not self.title.strip():
             raise ValueError("title must not be empty.")
-        if not self.focus_actor_ids:
-            raise ValueError("focus_actor_ids must not be empty.")
+        if not self.focus_cast_ids:
+            raise ValueError("focus_cast_ids must not be empty.")
         if not self.stakes.strip():
             raise ValueError("stakes must not be empty.")
         if not self.selection_reason.strip():
@@ -392,14 +418,14 @@ class BackgroundUpdate(BaseModel):
     """Compressed off-screen update."""
 
     round_index: int = Field(ge=1)
-    actor_id: str
+    cast_id: str
     summary: str
     pressure_level: PressureLevel
     future_hook: str
 
     @model_validator(mode="after")
     def validate_background_update(self) -> "BackgroundUpdate":
-        for field_name in ("actor_id", "summary", "future_hook"):
+        for field_name in ("cast_id", "summary", "future_hook"):
             if not getattr(self, field_name).strip():
                 raise ValueError(f"{field_name} must not be empty.")
         return self
@@ -449,8 +475,8 @@ class RoundDirective(BaseModel):
     round_index: int = Field(ge=1)
     focus_summary: str
     selection_reason: str
-    selected_actor_ids: list[str]
-    deferred_actor_ids: list[str]
+    selected_cast_ids: list[str]
+    deferred_cast_ids: list[str]
     focus_slices: list[FocusSlice]
     background_updates: list[BackgroundUpdate]
 
@@ -460,14 +486,14 @@ class RoundDirective(BaseModel):
             raise ValueError("focus_summary must not be empty.")
         if not self.selection_reason.strip():
             raise ValueError("selection_reason must not be empty.")
-        if len(self.selected_actor_ids) != len(set(self.selected_actor_ids)):
-            raise ValueError("selected_actor_ids must be unique.")
-        if len(self.deferred_actor_ids) != len(set(self.deferred_actor_ids)):
-            raise ValueError("deferred_actor_ids must be unique.")
-        selected_set = set(self.selected_actor_ids)
+        if len(self.selected_cast_ids) != len(set(self.selected_cast_ids)):
+            raise ValueError("selected_cast_ids must be unique.")
+        if len(self.deferred_cast_ids) != len(set(self.deferred_cast_ids)):
+            raise ValueError("deferred_cast_ids must be unique.")
+        selected_set = set(self.selected_cast_ids)
         for focus_slice in self.focus_slices:
-            if not set(focus_slice.focus_actor_ids).issubset(selected_set):
-                raise ValueError("focus_actor_ids must be contained in selected_actor_ids.")
+            if not set(focus_slice.focus_cast_ids).issubset(selected_set):
+                raise ValueError("focus_cast_ids must be contained in selected_cast_ids.")
         return self
 
 
@@ -492,7 +518,7 @@ class ObserverReport(BaseModel):
 class RoundResolution(BaseModel):
     """Single required runtime resolution bundle."""
 
-    adopted_actor_ids: list[str]
+    adopted_cast_ids: list[str]
     updated_intent_states: list[ActorIntentSnapshot]
     round_time_advance: RoundTimeAdvanceProposal
     observer_report: ObserverReport
@@ -502,8 +528,8 @@ class RoundResolution(BaseModel):
 
     @model_validator(mode="after")
     def validate_round_resolution(self) -> "RoundResolution":
-        if len(self.adopted_actor_ids) != len(set(self.adopted_actor_ids)):
-            raise ValueError("adopted_actor_ids must be unique.")
+        if len(self.adopted_cast_ids) != len(set(self.adopted_cast_ids)):
+            raise ValueError("adopted_cast_ids must be unique.")
         if not self.world_state_summary.strip():
             raise ValueError("world_state_summary must not be empty.")
         if (

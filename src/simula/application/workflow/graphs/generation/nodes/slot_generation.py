@@ -31,7 +31,7 @@ from simula.application.workflow.utils.prompt_projections import (
     build_generation_interpretation_view,
     build_generation_situation_view,
 )
-from simula.domain.contracts import ActorCard
+from simula.domain.contracts import ActorCard, GeneratedActorCardDraft
 
 
 async def generate_actor_slot(
@@ -80,15 +80,30 @@ async def generate_actor_slot(
     actor, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "generator",
         prompt,
-        ActorCard,
+        GeneratedActorCardDraft,
         log_context={"slot_index": int(slot["slot_index"])},
+    )
+    actor_card = ActorCard(
+        cast_id=str(slot["cast_id"]),
+        display_name=str(slot["display_name"]),
+        group_name=str(slot["group_name"]),
+        role=actor.role,
+        public_profile=actor.public_profile,
+        private_goal=actor.private_goal,
+        speaking_style=actor.speaking_style,
+        avatar_seed=actor.avatar_seed,
+        baseline_attention_tier=actor.baseline_attention_tier,
+        story_function=actor.story_function,
+        preferred_action_types=actor.preferred_action_types,
+        action_bias_notes=actor.action_bias_notes,
     )
     return {
         "generated_actor_results": [
             {
                 "slot_index": slot["slot_index"],
-                "cast_id": str(cast_item["cast_id"]),
-                "actor": actor.model_dump(mode="json"),
+                "cast_id": str(slot["cast_id"]),
+                "display_name": str(slot["display_name"]),
+                "actor": actor_card.model_dump(mode="json"),
                 "latency_seconds": meta.duration_seconds,
                 "parse_failure_count": meta.parse_failure_count,
             }

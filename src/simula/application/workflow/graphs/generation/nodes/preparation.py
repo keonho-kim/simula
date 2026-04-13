@@ -32,7 +32,13 @@ def prepare_actor_slots(
     if not cast_roster:
         raise ValueError("cast roster 없이 actor generation을 수행할 수 없습니다.")
     slot_specs: list[CastSlotSpec] = [
-        {"slot_index": index, "cast_item": cast_item}
+        {
+            "slot_index": index,
+            "cast_item": cast_item,
+            "cast_id": str(cast_item["cast_id"]),
+            "display_name": str(cast_item["display_name"]),
+            "group_name": str(cast_item.get("group_name", "")),
+        }
         for index, cast_item in enumerate(cast_roster, start=1)
     ]
 

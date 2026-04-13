@@ -38,14 +38,14 @@ from simula.domain.runtime_actions import apply_actor_proposals
 
 def test_public_activity_targets_no_specific_actor() -> None:
     actors = [
-        {"actor_id": "a"},
-        {"actor_id": "b"},
-        {"actor_id": "c"},
+        {"cast_id": "a"},
+        {"cast_id": "b"},
+        {"cast_id": "c"},
     ]
 
     targets = sanitize_targets(
         [],
-        source_actor_id="a",
+        source_cast_id="a",
         actors=actors,
         visibility="public",
         max_targets=2,
@@ -57,20 +57,20 @@ def test_public_activity_targets_no_specific_actor() -> None:
 
 def test_route_activity_updates_visible_feeds() -> None:
     actors = [
-        {"actor_id": "a"},
-        {"actor_id": "b"},
-        {"actor_id": "c"},
+        {"cast_id": "a"},
+        {"cast_id": "b"},
+        {"cast_id": "c"},
     ]
     feeds = initialize_activity_feeds(actors)
     activity = create_canonical_action(
         run_id="run-1",
         round_index=1,
-        source_actor_id="a",
+        source_cast_id="a",
         visibility="private",
-        target_actor_ids=["b"],
+        target_cast_ids=["b"],
         action_type="coordination",
         intent="b와 비공개 정렬을 맞춘다.",
-        intent_target_actor_ids=["b"],
+        intent_target_cast_ids=["b"],
         action_summary="비공개 정렬 action",
         action_detail="비공개로 우선순위를 맞춘다.",
         visibility_scope=["a", "b"],
@@ -84,19 +84,19 @@ def test_route_activity_updates_visible_feeds() -> None:
 
 def test_list_unseen_activities_does_not_consume_feed() -> None:
     actors = [
-        {"actor_id": "a"},
-        {"actor_id": "b"},
+        {"cast_id": "a"},
+        {"cast_id": "b"},
     ]
     feeds = initialize_activity_feeds(actors)
     activity = create_canonical_action(
         run_id="run-1",
         round_index=1,
-        source_actor_id="b",
+        source_cast_id="b",
         visibility="private",
-        target_actor_ids=["a"],
+        target_cast_ids=["a"],
         action_type="speech",
         intent="a의 입장을 바로 확인한다.",
-        intent_target_actor_ids=["a"],
+        intent_target_cast_ids=["a"],
         action_summary="확인 요청 action",
         action_detail="지금 의견을 바로 확인해야 한다.",
         utterance="지금 의견이 필요합니다.",
@@ -112,19 +112,19 @@ def test_list_unseen_activities_does_not_consume_feed() -> None:
 
 def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> None:
     actors = [
-        {"actor_id": "a", "display_name": "A"},
-        {"actor_id": "b", "display_name": "B"},
+        {"cast_id": "a", "display_name": "A"},
+        {"cast_id": "b", "display_name": "B"},
     ]
     feeds = initialize_activity_feeds(actors)
     inbound_activity = create_canonical_action(
         run_id="run-1",
         round_index=1,
-        source_actor_id="b",
+        source_cast_id="b",
         visibility="private",
-        target_actor_ids=["a"],
+        target_cast_ids=["a"],
         action_type="speech",
         intent="a의 답을 바로 듣는다.",
-        intent_target_actor_ids=["a"],
+        intent_target_cast_ids=["a"],
         action_summary="질문 action",
         action_detail="답변이 바로 필요하다.",
         utterance="답변이 필요합니다.",
@@ -156,17 +156,17 @@ def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> Non
         },
         pending_actor_proposals=[
             {
-                "actor_id": "a",
+                "cast_id": "a",
                 "unread_activity_ids": [inbound_activity["activity_id"]],
                 "proposal": {
                     "action_type": "speech",
                     "intent": "b에게 답을 돌려준다.",
-                    "intent_target_actor_ids": ["b"],
+                    "intent_target_cast_ids": ["b"],
                     "action_summary": "A가 응답 action을 한다.",
                     "action_detail": "질문에 바로 반응해 답을 준다.",
                     "utterance": "확인했습니다.",
                     "visibility": "private",
-                    "target_actor_ids": ["b"],
+                    "target_cast_ids": ["b"],
                     "thread_id": "",
                 },
                 "forced_idle": False,
@@ -226,8 +226,8 @@ def test_build_final_report_counts_visibility() -> None:
             }
         },
         "actors": [
-            {"actor_id": "a"},
-            {"actor_id": "b"},
+            {"cast_id": "a"},
+            {"cast_id": "b"},
         ],
         "activities": [
             {

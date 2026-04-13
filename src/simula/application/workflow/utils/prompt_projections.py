@@ -49,7 +49,7 @@ def build_actor_prompt_actor_view(actor: dict[str, object]) -> dict[str, object]
     """actor prompt에 넣을 actor 카드 축약본을 만든다."""
 
     return {
-        "actor_id": str(actor.get("actor_id", "")),
+        "cast_id": str(actor.get("cast_id", "")),
         "display_name": str(actor.get("display_name", "")),
         "role": str(actor.get("role", "")),
         "group_name": actor.get("group_name"),
@@ -70,39 +70,37 @@ def build_actor_prompt_actor_view(actor: dict[str, object]) -> dict[str, object]
 def build_actor_visible_actors_view(
     *,
     actors: list[dict[str, object]],
-    actor_id: str,
+    cast_id: str,
     focus_slice: dict[str, object],
     current_intent_snapshot: dict[str, object],
     visible_action_context: list[dict[str, object]],
-    selected_actor_ids: list[str],
+    selected_cast_ids: list[str],
     limit: int = ACTOR_VISIBLE_ACTOR_LIMIT,
 ) -> list[dict[str, object]]:
     """actor prompt에 넣을 상대 actor 목록을 우선순위 기준으로 줄인다."""
 
     actors_by_id = {
-        str(actor.get("actor_id", "")): actor
+        str(actor.get("cast_id", "")): actor
         for actor in actors
-        if str(actor.get("actor_id", "")).strip()
+        if str(actor.get("cast_id", "")).strip()
     }
     ordered_ids: list[str] = []
     candidate_sets = [
         [
             candidate
-            for candidate in _string_list(focus_slice.get("focus_actor_ids", []))
-            if candidate != actor_id
+            for candidate in _string_list(focus_slice.get("focus_cast_ids", []))
+            if candidate != cast_id
         ],
         [
             candidate
-            for candidate in _string_list(
-                current_intent_snapshot.get("target_actor_ids", [])
-            )
-            if candidate != actor_id
+            for candidate in _string_list(current_intent_snapshot.get("target_cast_ids", []))
+            if candidate != cast_id
         ],
         _action_related_actor_ids(
             visible_action_context=visible_action_context,
-            actor_id=actor_id,
+            cast_id=cast_id,
         ),
-        [candidate for candidate in selected_actor_ids if candidate != actor_id],
+        [candidate for candidate in selected_cast_ids if candidate != cast_id],
     ]
     for candidates in candidate_sets:
         for candidate in candidates:
@@ -411,7 +409,7 @@ def build_focus_candidates_prompt_view(
 
     return [
         {
-            "actor_id": str(item.get("actor_id", "")),
+            "cast_id": str(item.get("cast_id", "")),
             "display_name": str(item.get("display_name", "")),
             "baseline_attention_tier": str(item.get("baseline_attention_tier", "")),
             "story_function": truncate_text(item.get("story_function", ""), 120),
@@ -495,23 +493,23 @@ def build_background_coordination_frame_view(
 def build_relevant_intent_states(
     actor_intent_states: list[dict[str, object]],
     *,
-    relevant_actor_ids: Iterable[str],
+    relevant_cast_ids: Iterable[str],
     limit: int = INTENT_STATE_LIMIT,
 ) -> list[dict[str, object]]:
     """prompt용 관련 actor intent subset을 만든다."""
 
-    target_ids = [item for item in relevant_actor_ids if item]
+    target_ids = [item for item in relevant_cast_ids if item]
     if not target_ids:
         return []
     selected: list[dict[str, object]] = []
     selected_ids: set[str] = set()
     target_set = set(target_ids)
     for snapshot in actor_intent_states:
-        actor_id = str(snapshot.get("actor_id", ""))
-        if actor_id not in target_set or actor_id in selected_ids:
+        cast_id = str(snapshot.get("cast_id", ""))
+        if cast_id not in target_set or cast_id in selected_ids:
             continue
         selected.append(_compact_intent_snapshot(snapshot))
-        selected_ids.add(actor_id)
+        selected_ids.add(cast_id)
         if len(selected) >= limit:
             break
     return selected
@@ -527,7 +525,7 @@ def build_compact_pending_actor_proposals(
         proposal = item.get("proposal", {})
         compact.append(
             {
-                "actor_id": str(item.get("actor_id", "")),
+                "cast_id": str(item.get("cast_id", "")),
                 "forced_idle": bool(item.get("forced_idle", False)),
                 "proposal": _compact_action_proposal_for_prompt(proposal),
             }
@@ -555,7 +553,7 @@ def build_compact_background_updates(
     return [
         {
             "round_index": _int_value(item.get("round_index", 0)),
-            "actor_id": str(item.get("actor_id", "")),
+            "cast_id": str(item.get("cast_id", "")),
             "summary": truncate_text(item.get("summary", ""), 140),
             "pressure_level": str(item.get("pressure_level", "")),
             "future_hook": truncate_text(item.get("future_hook", ""), 120),
@@ -600,7 +598,7 @@ def build_prior_state_digest(
 
 def _compact_actor_reference(actor: dict[str, object]) -> dict[str, object]:
     return {
-        "actor_id": str(actor.get("actor_id", "")),
+        "cast_id": str(actor.get("cast_id", "")),
         "display_name": str(actor.get("display_name", "")),
         "role": truncate_text(actor.get("role", ""), 100),
         "group_name": actor.get("group_name"),
@@ -613,8 +611,8 @@ def _compact_action_digest(activity: dict[str, object]) -> dict[str, object]:
     return {
         "activity_id": str(activity.get("activity_id", "")),
         "round_index": _int_value(activity.get("round_index", 0)),
-        "source_actor_id": str(activity.get("source_actor_id", "")),
-        "target_actor_ids": _string_list(activity.get("target_actor_ids", [])),
+        "source_cast_id": str(activity.get("source_cast_id", "")),
+        "target_cast_ids": _string_list(activity.get("target_cast_ids", [])),
         "visibility": str(activity.get("visibility", "")),
         "action_type": str(activity.get("action_type", "")),
         "action_summary": truncate_text(
@@ -642,9 +640,9 @@ def _build_unread_backlog_digest(
         "omitted_count": omitted_count,
         "top_sources": _top_counter_values(
             Counter(
-                str(item.get("source_actor_id", ""))
+                str(item.get("source_cast_id", ""))
                 for item in omitted_unread
-                if str(item.get("source_actor_id", "")).strip()
+                if str(item.get("source_cast_id", "")).strip()
             )
         ),
         "top_threads": _top_counter_values(
@@ -678,10 +676,10 @@ def _compact_intent_snapshot(snapshot: object) -> dict[str, object]:
         return {}
     dumped = cast(dict[str, object], snapshot)
     return {
-        "actor_id": str(dumped.get("actor_id", "")),
+        "cast_id": str(dumped.get("cast_id", "")),
         "current_intent": truncate_text(dumped.get("current_intent", ""), 140),
         "thought": truncate_text(dumped.get("thought", ""), 140),
-        "target_actor_ids": _string_list(dumped.get("target_actor_ids", [])),
+        "target_cast_ids": _string_list(dumped.get("target_cast_ids", [])),
         "supporting_action_type": str(dumped.get("supporting_action_type", "")),
         "confidence": dumped.get("confidence"),
         "changed_from_previous": bool(dumped.get("changed_from_previous", False)),
@@ -755,8 +753,8 @@ def _compact_action_proposal_for_prompt(proposal: object) -> dict[str, object]:
     return {
         "action_type": str(dumped.get("action_type", "")),
         "intent": truncate_text(dumped.get("intent", ""), 140),
-        "intent_target_actor_ids": _string_list(
-            dumped.get("intent_target_actor_ids", [])
+        "intent_target_cast_ids": _string_list(
+            dumped.get("intent_target_cast_ids", [])
         ),
         "action_summary": truncate_text(
             dumped.get("action_summary", ""),
@@ -768,7 +766,7 @@ def _compact_action_proposal_for_prompt(proposal: object) -> dict[str, object]:
         ),
         "utterance": _optional_truncated_text(dumped.get("utterance"), UTTERANCE_LIMIT),
         "visibility": str(dumped.get("visibility", "")),
-        "target_actor_ids": _string_list(dumped.get("target_actor_ids", [])),
+        "target_cast_ids": _string_list(dumped.get("target_cast_ids", [])),
         "thread_id": _optional_string(dumped.get("thread_id")),
     }
 
@@ -776,21 +774,21 @@ def _compact_action_proposal_for_prompt(proposal: object) -> dict[str, object]:
 def _action_related_actor_ids(
     *,
     visible_action_context: list[dict[str, object]],
-    actor_id: str,
+    cast_id: str,
 ) -> list[str]:
     ordered_ids: list[str] = []
     for action in visible_action_context:
-        source_actor_id = str(action.get("source_actor_id", ""))
+        source_cast_id = str(action.get("source_cast_id", ""))
         if (
-            source_actor_id
-            and source_actor_id != actor_id
-            and source_actor_id not in ordered_ids
+            source_cast_id
+            and source_cast_id != cast_id
+            and source_cast_id not in ordered_ids
         ):
-            ordered_ids.append(source_actor_id)
-        for target_actor_id in _string_list(action.get("target_actor_ids", [])):
-            if target_actor_id == actor_id or target_actor_id in ordered_ids:
+            ordered_ids.append(source_cast_id)
+        for target_cast_id in _string_list(action.get("target_cast_ids", [])):
+            if target_cast_id == cast_id or target_cast_id in ordered_ids:
                 continue
-            ordered_ids.append(target_actor_id)
+            ordered_ids.append(target_cast_id)
     return ordered_ids
 
 
@@ -815,7 +813,7 @@ def _activity_key(activity: dict[str, object]) -> str:
     return "|".join(
         [
             str(activity.get("round_index", "")),
-            str(activity.get("source_actor_id", "")),
+            str(activity.get("source_cast_id", "")),
             str(activity.get("action_type", "")),
             str(activity.get("thread_id", "")),
         ]

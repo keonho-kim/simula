@@ -49,8 +49,8 @@ def prepare_focus_candidates(
     return {
         "round_index": next_round_index,
         "focus_candidates": candidates,
-        "selected_actor_ids": [],
-        "deferred_actor_ids": [],
+        "selected_cast_ids": [],
+        "deferred_cast_ids": [],
         "round_focus_plan": {},
         "latest_background_updates": [],
         "pending_actor_proposals": Overwrite(value=[]),

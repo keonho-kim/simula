@@ -38,7 +38,7 @@ def build_report_projection(
         for report in _dict_list(state.get("observer_reports", []))
     }
     actors = _dict_list(state.get("actors", []))
-    actors_by_id = {str(actor["actor_id"]): actor for actor in actors}
+    actors_by_id = {str(actor["cast_id"]): actor for actor in actors}
     total_rounds = max(1, _int_value(state.get("round_index", 0)))
     round_time_history = {
         _int_value(item.get("round_index", 0)): item
@@ -87,8 +87,8 @@ def build_report_projection(
                     total_rounds=total_rounds,
                 ),
                 "focus_summary": str(focus_plan.get("focus_summary", "")),
-                "selected_actor_ids": _string_list(
-                    focus_plan.get("selected_actor_ids", [])
+                "selected_cast_ids": _string_list(
+                    focus_plan.get("selected_cast_ids", [])
                 ),
                 "observer_summary": str(report.get("summary", "")),
                 "notable_events": _string_list(report.get("notable_events")),
@@ -211,12 +211,12 @@ def cluster_round_activities(
     for activity in round_activities:
         cluster_key = (
             str(activity.get("thread_id") or ""),
-            str(activity.get("source_actor_id") or ""),
+            str(activity.get("source_cast_id") or ""),
         )
         if not cluster_key[0]:
             cluster_key = (
                 str(activity.get("action_summary", "")),
-                str(activity.get("source_actor_id") or ""),
+                str(activity.get("source_cast_id") or ""),
             )
         cluster = grouped.setdefault(
             cluster_key,
@@ -232,15 +232,15 @@ def cluster_round_activities(
         )
         cluster["activity_count"] = _int_value(cluster.get("activity_count", 0)) + 1
         source_name = display_name_of(
-            actor_id=str(activity.get("source_actor_id", "")),
+            cast_id=str(activity.get("source_cast_id", "")),
             actors_by_id=actors_by_id,
         )
         source_actors = cast(list[str], cluster["source_actors"])
         if source_name not in source_actors:
             source_actors.append(source_name)
-        for actor_id in _string_list(activity.get("target_actor_ids")):
+        for cast_id in _string_list(activity.get("target_cast_ids")):
             target_name = display_name_of(
-                actor_id=str(actor_id),
+                cast_id=str(cast_id),
                 actors_by_id=actors_by_id,
             )
             target_actors = cast(list[str], cluster["target_actors"])
@@ -267,15 +267,15 @@ def build_actor_digests(
     received_by_actor: dict[str, list[dict[str, object]]] = defaultdict(list)
     initiated_by_actor: dict[str, list[dict[str, object]]] = defaultdict(list)
     for activity in activities:
-        source_actor_id = str(activity.get("source_actor_id", ""))
-        initiated_by_actor[source_actor_id].append(activity)
-        for target_actor_id in _string_list(activity.get("target_actor_ids")):
-            received_by_actor[str(target_actor_id)].append(activity)
+        source_cast_id = str(activity.get("source_cast_id", ""))
+        initiated_by_actor[source_cast_id].append(activity)
+        for target_cast_id in _string_list(activity.get("target_cast_ids")):
+            received_by_actor[str(target_cast_id)].append(activity)
 
     digests = []
     endgame_start_round = max(1, total_rounds - 4)
     for actor in actors:
-        actor_id = str(actor["actor_id"])
+        actor_id = str(actor["cast_id"])
         display_name = str(actor["display_name"])
         initiated = initiated_by_actor.get(actor_id, [])
         received = received_by_actor.get(actor_id, [])
@@ -293,13 +293,13 @@ def build_actor_digests(
         for activity in initiated + received:
             names = [
                 display_name_of(
-                    actor_id=str(target_actor_id),
+                    cast_id=str(target_actor_id),
                     actors_by_id=actors_by_id,
                 )
-                for target_actor_id in _string_list(activity.get("target_actor_ids"))
+                for target_actor_id in _string_list(activity.get("target_cast_ids"))
             ]
             source_name = display_name_of(
-                actor_id=str(activity.get("source_actor_id", "")),
+                cast_id=str(activity.get("source_cast_id", "")),
                 actors_by_id=actors_by_id,
             )
             counterparties.extend(name for name in names if name != display_name)
@@ -312,7 +312,7 @@ def build_actor_digests(
 
         digests.append(
             {
-                "actor_id": actor_id,
+                "cast_id": actor_id,
                 "display_name": display_name,
                 "interaction_count": len(initiated) + len(received),
                 "initiated_count": len(initiated),
@@ -330,7 +330,7 @@ def build_actor_digests(
                 "late_focus_targets": unique_display_names(
                     activities=endgame_initiated,
                     actors_by_id=actors_by_id,
-                    field_name="target_actor_ids",
+                    field_name="target_cast_ids",
                 ),
                 "late_focus_from": unique_source_names(
                     activities=endgame_received,
@@ -368,13 +368,13 @@ def build_final_actor_snapshots(
     endgame_start_round = max(1, total_rounds - 4)
     snapshots = []
     for actor in actors:
-        actor_id = str(actor["actor_id"])
+        actor_id = str(actor["cast_id"])
         display_name = str(actor["display_name"])
         related_activities = [
             item
             for item in activities
-            if str(item.get("source_actor_id", "")) == actor_id
-            or actor_id in _string_list(item.get("target_actor_ids"))
+            if str(item.get("source_cast_id", "")) == actor_id
+            or actor_id in _string_list(item.get("target_cast_ids"))
         ]
         endgame_activities = [
             item
@@ -389,7 +389,7 @@ def build_final_actor_snapshots(
             last_seen_round = 0
         snapshots.append(
             {
-                "actor_id": actor_id,
+                "cast_id": actor_id,
                 "display_name": display_name,
                 "last_seen_round": last_seen_round,
                 "last_seen_time_label": round_to_time_label.get(last_seen_round, ""),
@@ -397,16 +397,16 @@ def build_final_actor_snapshots(
                     activities=[
                         item
                         for item in endgame_activities
-                        if str(item.get("source_actor_id", "")) == actor_id
+                        if str(item.get("source_cast_id", "")) == actor_id
                     ],
                     actors_by_id=actors_by_id,
-                    field_name="target_actor_ids",
+                    field_name="target_cast_ids",
                 ),
                 "endgame_received_from": unique_source_names(
                     activities=[
                         item
                         for item in endgame_activities
-                        if actor_id in _string_list(item.get("target_actor_ids"))
+                        if actor_id in _string_list(item.get("target_cast_ids"))
                     ],
                     actors_by_id=actors_by_id,
                     exclude_name=display_name,
@@ -472,15 +472,15 @@ def build_final_outcome_clues(
 
 def display_name_of(
     *,
-    actor_id: str,
+    cast_id: str,
     actors_by_id: dict[str, dict[str, object]],
 ) -> str:
     """actor id를 표시명으로 변환한다."""
 
-    actor = actors_by_id.get(actor_id)
+    actor = actors_by_id.get(cast_id)
     if actor is None:
-        return actor_id
-    return str(actor.get("display_name", actor_id))
+        return cast_id
+    return str(actor.get("display_name", cast_id))
 
 
 def unique_display_names(
@@ -495,7 +495,7 @@ def unique_display_names(
     for activity in activities:
         for actor_id in _string_list(activity.get(field_name)):
             display_name = display_name_of(
-                actor_id=str(actor_id),
+                cast_id=str(actor_id),
                 actors_by_id=actors_by_id,
             )
             if display_name and display_name not in names:
@@ -514,7 +514,7 @@ def unique_source_names(
     names: list[str] = []
     for activity in activities:
         source_name = display_name_of(
-            actor_id=str(activity.get("source_actor_id", "")),
+            cast_id=str(activity.get("source_cast_id", "")),
             actors_by_id=actors_by_id,
         )
         if source_name and source_name != exclude_name and source_name not in names:
@@ -533,14 +533,14 @@ def most_common_counterparty(
     counter = Counter[str]()
     for activity in activities:
         source_name = display_name_of(
-            actor_id=str(activity.get("source_actor_id", "")),
+            cast_id=str(activity.get("source_cast_id", "")),
             actors_by_id=actors_by_id,
         )
         if source_name and source_name != actor_name:
             counter[source_name] += 1
-        for target_actor_id in _string_list(activity.get("target_actor_ids")):
+        for target_actor_id in _string_list(activity.get("target_cast_ids")):
             target_name = display_name_of(
-                actor_id=str(target_actor_id),
+                cast_id=str(target_actor_id),
                 actors_by_id=actors_by_id,
             )
             if target_name and target_name != actor_name:
@@ -562,13 +562,13 @@ def latest_summary_for_actor(
         filtered = [
             item
             for item in activities
-            if str(item.get("source_actor_id", "")) == actor_id
+            if str(item.get("source_cast_id", "")) == actor_id
         ]
     else:
         filtered = [
             item
             for item in activities
-            if actor_id in _string_list(item.get("target_actor_ids"))
+            if actor_id in _string_list(item.get("target_cast_ids"))
         ]
     if not filtered:
         return ""
@@ -590,9 +590,9 @@ def build_intent_arc_packets(
                 "round_index": _int_value(entry.get("round_index", 0)),
                 "actor_intents": [
                     {
-                        "actor_id": str(snapshot.get("actor_id", "")),
+                        "cast_id": str(snapshot.get("cast_id", "")),
                         "display_name": display_name_of(
-                            actor_id=str(snapshot.get("actor_id", "")),
+                            cast_id=str(snapshot.get("cast_id", "")),
                             actors_by_id=actors_by_id,
                         ),
                         "current_intent": str(snapshot.get("current_intent", "")),

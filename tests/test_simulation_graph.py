@@ -136,7 +136,6 @@ class FakeRouter:
                 return (
                     ActorCard(
                         cast_id="cast-alpha",
-                        actor_id="alpha",
                         display_name="Alpha",
                         role="선도자",
                         group_name="A",
@@ -154,7 +153,6 @@ class FakeRouter:
             return (
                 ActorCard(
                     cast_id="cast-beta",
-                    actor_id="beta",
                     display_name="Beta",
                     role="조정자",
                     group_name="B",
@@ -175,13 +173,13 @@ class FakeRouter:
                     round_index=1,
                     focus_summary="Alpha의 직접 압박을 따라간다.",
                     selection_reason="현재 직접 반응 압력이 가장 높다.",
-                    selected_actor_ids=["alpha"],
-                    deferred_actor_ids=["beta"],
+                    selected_cast_ids=["alpha"],
+                    deferred_cast_ids=["beta"],
                     focus_slices=[
                         {
                             "slice_id": "focus-1",
                             "title": "직접 압박",
-                            "focus_actor_ids": ["alpha"],
+                            "focus_cast_ids": ["alpha"],
                             "visibility": "private",
                             "stakes": "즉시 반응이 필요하다.",
                             "selection_reason": "가장 빠른 상태 변화가 난다.",
@@ -190,7 +188,7 @@ class FakeRouter:
                     background_updates=[
                         {
                             "round_index": 1,
-                            "actor_id": "beta",
+                            "cast_id": "beta",
                             "summary": "Beta는 직접 호출되지는 않았지만 반응 압력이 올라간다.",
                             "pressure_level": "medium",
                             "future_hook": "다음 단계에서 직접 응답할 수 있다.",
@@ -204,12 +202,12 @@ class FakeRouter:
                 ActorActionProposal(
                     action_type="speech",
                     intent="Beta가 재검토를 피하지 못하게 만든다.",
-                    intent_target_actor_ids=["beta"],
+                    intent_target_cast_ids=["beta"],
                     action_summary="Alpha가 비공개로 재검토를 요구한다.",
                     action_detail="지금 바로 결론을 내지 말고 리스크를 다시 보자고 압박한다.",
                     utterance="지금 결론 내리지 말고 리스크를 다시 봅시다.",
                     visibility="private",
-                    target_actor_ids=["beta"],
+                    target_cast_ids=["beta"],
                     thread_id="review-thread",
                 ),
                 FakeMeta(),
@@ -217,22 +215,22 @@ class FakeRouter:
         if schema is RoundResolution:
             return (
                 RoundResolution(
-                    adopted_actor_ids=["alpha"],
+                    adopted_cast_ids=["alpha"],
                     updated_intent_states=[
                         {
-                            "actor_id": "alpha",
+                            "cast_id": "alpha",
                             "current_intent": "Beta의 결정을 늦춘다.",
                             "thought": "지금 압박해야 다음 선택을 자신에게 유리하게 돌릴 수 있다고 본다.",
-                            "target_actor_ids": ["beta"],
+                            "target_cast_ids": ["beta"],
                             "supporting_action_type": "speech",
                             "confidence": 0.8,
                             "changed_from_previous": True,
                         },
                         {
-                            "actor_id": "beta",
+                            "cast_id": "beta",
                             "current_intent": "상황을 더 본다.",
                             "thought": "즉시 답하면 밀릴 수 있어 시간을 더 벌고 싶다.",
-                            "target_actor_ids": [],
+                            "target_cast_ids": [],
                             "supporting_action_type": "initial_state",
                             "confidence": 0.5,
                             "changed_from_previous": False,

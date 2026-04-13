@@ -49,10 +49,10 @@ def build_initial_intent_snapshots(
             private_goal = "현재 상황을 보며 다음 행동 방향을 정리한다."
         snapshots.append(
             ActorIntentSnapshot(
-                actor_id=str(actor["actor_id"]),
+                cast_id=str(actor["cast_id"]),
                 current_intent=private_goal,
-                thought=f"{str(actor.get('display_name', actor['actor_id']))}는 아직 관계 판도를 더 읽어야 한다고 본다.",
-                target_actor_ids=[],
+                thought=f"{str(actor.get('display_name', actor['cast_id']))}는 아직 관계 판도를 더 읽어야 한다고 본다.",
+                target_cast_ids=[],
                 supporting_action_type="initial_state",
                 confidence=0.5,
                 changed_from_previous=False,
