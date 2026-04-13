@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 Provider = Literal["openai", "anthropic", "google", "ollama", "vllm", "bedrock"]
 DatabaseProvider = Literal["sqlite", "postgresql"]
@@ -154,7 +154,7 @@ class ModelConfig(BaseModel):
 class RuntimeConfig(BaseModel):
     """핵심 루프 실행 한계를 정의한다."""
 
-    max_steps: int = Field(default=16, ge=1)
+    max_rounds: int = Field(default=16, ge=1)
     max_actor_calls_per_step: int = Field(default=6, ge=1)
     max_focus_slices_per_step: int = Field(default=3, ge=1)
     max_recipients_per_message: int = 2
@@ -175,21 +175,13 @@ class PostgreSQLTableConfig(BaseModel):
 class PostgreSQLConfig(BaseModel):
     """PostgreSQL 연결 및 스키마 설정이다."""
 
-    model_config = ConfigDict(populate_by_name=True)
-
     host: str = "127.0.0.1"
     port: int = 5432
     user: str = "postgres"
     password: str = "1234"
     database: str = "simula"
-    schema_name: str = Field(default="simula", alias="schema")
+    db_schema: str = "simula"
     tables: PostgreSQLTableConfig = Field(default_factory=PostgreSQLTableConfig)
-
-    @property
-    def schema(self) -> str:
-        """호환용 schema 접근자다."""
-
-        return self.schema_name
 
 
 class StorageConfig(BaseModel):

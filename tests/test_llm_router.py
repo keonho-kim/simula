@@ -24,6 +24,7 @@ from simula.infrastructure.llm.fixer import _build_fix_json_prompt
 from simula.infrastructure.llm.output_parsers import build_output_parser
 from simula.infrastructure.llm.router import StructuredLLMRouter
 from simula.infrastructure.llm.service import AsyncStructuredLLMService
+from simula.infrastructure.llm.usage import LLMUsageTracker
 
 
 @pytest.fixture
@@ -99,6 +100,7 @@ def _build_router(
         actor=model,  # type: ignore[arg-type]
         observer=model,  # type: ignore[arg-type]
         fixer=fixer_model or model,  # type: ignore[arg-type]
+        usage_tracker=LLMUsageTracker(),
     )
 
 
@@ -153,6 +155,7 @@ async def test_service_uses_astream_for_structured_calls(caplog) -> None:
     assert model.ainvoke_called is False
     assert "planner 호출 시작" in caplog.text
     assert "planner 완료" in caplog.text
+    assert service.router.usage_tracker.snapshot()["structured_calls"] == 1
 
 
 @pytest.mark.anyio
@@ -167,13 +170,13 @@ async def test_service_logs_structured_call_start_once(caplog) -> None:
             ScenarioTimeScope,
             log_context={
                 "scope": "planning-analysis",
-                "step_index": 2,
+                "round_index": 2,
                 "slot_index": 1,
             },
         )
 
     assert caplog.text.count("planner · 계획 분석 정리 시작") == 1
-    assert "planner · 계획 분석 정리 시작 | step_index=2 slot_index=1" in caplog.text
+    assert "planner · 계획 분석 정리 시작 | round_index=2 slot_index=1" in caplog.text
     assert "planner · 계획 분석 정리 완료" in caplog.text
 
 
@@ -266,9 +269,9 @@ def test_fixer_prompt_includes_compact_schema_summary() -> None:
     )
 
     assert "Target schema: PlanningAnalysis" in prompt
-    assert "progression_plan.allowed_units: array[enum[minute, hour, day, week]]" in prompt
+    assert "progression_plan.allowed_elapsed_units: array[enum[minute, hour, day, week]]" in prompt
     assert "progression_plan.selection_reason: string (required)" in prompt
-    assert "allowed_units values must be unique." in prompt
+    assert "allowed_elapsed_units values must be unique." in prompt
 
 
 @pytest.mark.anyio

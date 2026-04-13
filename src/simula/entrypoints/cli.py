@@ -43,9 +43,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "--max-steps",
+        "--max-rounds",
         type=int,
-        help="최대 step 수 override",
+        help="최대 round 수 override",
     )
 
     parser.add_argument(

@@ -35,8 +35,8 @@ _PROMPT = (
     {context_hint}
     - total simulated elapsed label:
     {elapsed_simulation_label}
-    - max steps:
-    {max_steps}
+    - max rounds:
+    {max_rounds}
 
     # Output Format
     - Return format: {output_format_name}

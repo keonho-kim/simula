@@ -11,7 +11,7 @@
 - simula.domain.activity_feeds
 - simula.domain.activities
 - simula.domain.reporting
-- simula.domain.runtime_steps
+- simula.domain.runtime_actions
 """
 
 from __future__ import annotations
@@ -27,12 +27,13 @@ from simula.domain.activity_feeds import (
 )
 from simula.domain.reporting import (
     build_final_report,
+    build_simulation_log_entries,
     evaluate_stop,
     latest_observer_summary,
     latest_world_state_summary,
 )
 from simula.domain.runtime_policy import derive_rng_seed
-from simula.domain.runtime_steps import apply_actor_proposals
+from simula.domain.runtime_actions import apply_actor_proposals
 
 
 def test_public_activity_targets_no_specific_actor() -> None:
@@ -63,7 +64,7 @@ def test_route_activity_updates_visible_feeds() -> None:
     feeds = initialize_activity_feeds(actors)
     activity = create_canonical_action(
         run_id="run-1",
-        step_index=1,
+        round_index=1,
         source_actor_id="a",
         visibility="private",
         target_actor_ids=["b"],
@@ -89,7 +90,7 @@ def test_list_unseen_activities_does_not_consume_feed() -> None:
     feeds = initialize_activity_feeds(actors)
     activity = create_canonical_action(
         run_id="run-1",
-        step_index=1,
+        round_index=1,
         source_actor_id="b",
         visibility="private",
         target_actor_ids=["a"],
@@ -117,7 +118,7 @@ def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> Non
     feeds = initialize_activity_feeds(actors)
     inbound_activity = create_canonical_action(
         run_id="run-1",
-        step_index=1,
+        round_index=1,
         source_actor_id="b",
         visibility="private",
         target_actor_ids=["a"],
@@ -133,7 +134,7 @@ def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> Non
 
     routed = apply_actor_proposals(
         run_id="run-1",
-        step_index=2,
+        round_index=2,
         actors=actors,
         activity_feeds=routed_feeds,
         activities=[inbound_activity],
@@ -181,28 +182,28 @@ def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> Non
         inbound_activity["activity_id"]
         in routed["activity_feeds"]["a"]["seen_activity_ids"]
     )
-    assert len(routed["latest_step_activities"]) == 1
+    assert len(routed["latest_round_activities"]) == 1
     assert routed["activity_feeds"]["b"]["unseen_activity_ids"] == [
-        routed["latest_step_activities"][0]["activity_id"]
+        routed["latest_round_activities"][0]["activity_id"]
     ]
     assert routed["activities"][0]["activity_id"] == inbound_activity["activity_id"]
 
 
-def test_evaluate_stop_prefers_max_steps() -> None:
+def test_evaluate_stop_prefers_max_rounds() -> None:
     should_stop, reason = evaluate_stop(
-        step_index=4,
-        max_steps=4,
+        round_index=4,
+        max_rounds=4,
     )
 
     assert should_stop is True
-    assert reason == "max_steps 도달"
+    assert reason == "max_rounds 도달"
 
 
 def test_evaluate_stop_allows_early_stop_on_stagnation() -> None:
     should_stop, reason = evaluate_stop(
-        step_index=2,
-        max_steps=6,
-        stagnation_steps=3,
+        round_index=2,
+        max_rounds=6,
+        stagnation_rounds=3,
         last_momentum="low",
     )
 
@@ -240,7 +241,7 @@ def test_build_final_report_counts_visibility() -> None:
         ],
         "observer_reports": [
             {
-                "step_index": 1,
+                "round_index": 1,
                 "summary": "긴장 상승",
                 "notable_events": ["공개 행동", "비공개 정렬"],
                 "atmosphere": "불안",
@@ -253,13 +254,26 @@ def test_build_final_report_counts_visibility() -> None:
             "total_elapsed_label": "30분",
             "last_elapsed_minutes": 30,
             "last_elapsed_label": "30분",
-            "last_advanced_step_index": 1,
+            "last_advanced_round_index": 1,
         },
-        "step_index": 1,
+        "round_index": 1,
         "errors": [],
     }
 
-    report = build_final_report(state)
+    report = build_final_report(
+        state,
+        llm_usage_summary={
+            "total_calls": 0,
+            "calls_by_role": {},
+            "structured_calls": 0,
+            "text_calls": 0,
+            "parse_failures": 0,
+            "forced_defaults": 0,
+            "input_tokens": None,
+            "output_tokens": None,
+            "total_tokens": None,
+        },
+    )
 
     assert report["actor_count"] == 2
     assert report["total_activities"] == 2
@@ -267,6 +281,39 @@ def test_build_final_report_counts_visibility() -> None:
     assert report["last_observer_summary"] == "긴장 상승"
     assert report["world_state_summary"] == "실무 정렬이 시작됐다."
     assert report["elapsed_simulation_minutes"] == 30
+
+
+def test_build_simulation_log_entries_appends_llm_usage_summary() -> None:
+    entries = build_simulation_log_entries(
+        {
+            "run_id": "run-1",
+            "scenario": "테스트 시나리오",
+            "max_rounds": 2,
+            "rng_seed": 7,
+            "activities": [],
+            "observer_reports": [],
+            "actors": [],
+            "round_time_history": [],
+            "round_focus_history": [],
+            "background_updates": [],
+            "final_report": {"run_id": "run-1"},
+            "stop_reason": "max_rounds 도달",
+        },
+        llm_usage_summary={
+            "total_calls": 3,
+            "calls_by_role": {"planner": 1, "actor": 2},
+            "structured_calls": 2,
+            "text_calls": 1,
+            "parse_failures": 1,
+            "forced_defaults": 0,
+            "input_tokens": None,
+            "output_tokens": None,
+            "total_tokens": None,
+        },
+    )
+
+    assert entries[-1]["event"] == "llm_usage_summary"
+    assert entries[-1]["llm_usage_summary"]["calls_by_role"]["actor"] == 2
 
 
 def test_recent_actions_and_latest_summaries_use_latest_values() -> None:

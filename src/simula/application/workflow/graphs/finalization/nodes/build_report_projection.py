@@ -28,63 +28,63 @@ def build_report_projection(
     activities = sorted(
         _dict_list(state.get("activities", [])),
         key=lambda item: (
-            _int_value(item.get("step_index", 0)),
+            _int_value(item.get("round_index", 0)),
             str(item.get("created_at", "")),
             str(item.get("activity_id", "")),
         ),
     )
     observer_reports = {
-        _int_value(report.get("step_index", 0)): report
+        _int_value(report.get("round_index", 0)): report
         for report in _dict_list(state.get("observer_reports", []))
     }
     actors = _dict_list(state.get("actors", []))
     actors_by_id = {str(actor["actor_id"]): actor for actor in actors}
-    total_steps = max(1, _int_value(state.get("step_index", 0)))
-    step_time_history = {
-        _int_value(item.get("step_index", 0)): item
-        for item in _dict_list(state.get("step_time_history", []))
+    total_rounds = max(1, _int_value(state.get("round_index", 0)))
+    round_time_history = {
+        _int_value(item.get("round_index", 0)): item
+        for item in _dict_list(state.get("round_time_history", []))
     }
-    step_focus_history = {
-        _int_value(item.get("step_index", 0)): item
-        for item in _dict_list(state.get("step_focus_history", []))
+    round_focus_history = {
+        _int_value(item.get("round_index", 0)): item
+        for item in _dict_list(state.get("round_focus_history", []))
     }
-    background_updates_by_step: dict[int, list[dict[str, object]]] = defaultdict(list)
+    background_updates_by_round: dict[int, list[dict[str, object]]] = defaultdict(list)
     for item in _dict_list(state.get("background_updates", [])):
-        background_updates_by_step[_int_value(item.get("step_index", 0))].append(item)
+        background_updates_by_round[_int_value(item.get("round_index", 0))].append(item)
     anchor = datetime.fromisoformat(
         str(_dict_value(state.get("report_timeline_anchor_json")).get("anchor_iso"))
     )
 
     timeline_packets: list[dict[str, object]] = []
-    step_indexes = sorted(
-        {_int_value(activity.get("step_index", 0)) for activity in activities}
+    round_indexes = sorted(
+        {_int_value(activity.get("round_index", 0)) for activity in activities}
         | set(observer_reports.keys())
     )
-    for step_index in step_indexes:
-        step_activities = [
+    for round_index in round_indexes:
+        round_activities = [
             activity
             for activity in activities
-            if _int_value(activity.get("step_index", 0)) == step_index
+            if _int_value(activity.get("round_index", 0)) == round_index
         ]
-        report = observer_reports.get(step_index, {})
-        step_time = step_time_history.get(step_index, {})
-        focus_plan = step_focus_history.get(step_index, {})
+        report = observer_reports.get(round_index, {})
+        round_time = round_time_history.get(round_index, {})
+        focus_plan = round_focus_history.get(round_index, {})
         timeline_packets.append(
             {
-                "step_index": step_index,
+                "round_index": round_index,
                 "time_label": format_report_time_label(
                     anchor=anchor,
                     total_elapsed_minutes=_int_value(
-                        step_time.get("total_elapsed_minutes", 0)
+                        round_time.get("total_elapsed_minutes", 0)
                     ),
                 ),
-                "step_elapsed_label": str(step_time.get("elapsed_label", "0분")),
+                "round_elapsed_label": str(round_time.get("elapsed_label", "0분")),
                 "cumulative_elapsed_label": str(
-                    step_time.get("total_elapsed_label", "0분")
+                    round_time.get("total_elapsed_label", "0분")
                 ),
                 "phase_hint": phase_hint(
-                    step_index=step_index,
-                    total_steps=total_steps,
+                    round_index=round_index,
+                    total_rounds=total_rounds,
                 ),
                 "focus_summary": str(focus_plan.get("focus_summary", "")),
                 "selected_actor_ids": _string_list(
@@ -92,9 +92,9 @@ def build_report_projection(
                 ),
                 "observer_summary": str(report.get("summary", "")),
                 "notable_events": _string_list(report.get("notable_events")),
-                "background_updates": background_updates_by_step.get(step_index, []),
-                "action_clusters": cluster_step_activities(
-                    step_activities=step_activities,
+                "background_updates": background_updates_by_round.get(round_index, []),
+                "action_clusters": cluster_round_activities(
+                    round_activities=round_activities,
                     actors_by_id=actors_by_id,
                 ),
             }
@@ -104,7 +104,7 @@ def build_report_projection(
         actors=actors,
         activities=activities,
         actors_by_id=actors_by_id,
-        total_steps=total_steps,
+        total_rounds=total_rounds,
     )
     endgame_packets = timeline_packets[-min(5, len(timeline_packets)) :]
     final_actor_snapshots = build_final_actor_snapshots(
@@ -112,10 +112,10 @@ def build_report_projection(
         activities=activities,
         actors_by_id=actors_by_id,
         timeline_packets=timeline_packets,
-        total_steps=total_steps,
+        total_rounds=total_rounds,
     )
     final_state_digest = {
-        "steps_completed": total_steps,
+        "rounds_completed": total_rounds,
         "total_actions": len(activities),
         "visibility_action_counts": dict(
             Counter(str(activity.get("visibility", "")) for activity in activities)
@@ -177,35 +177,35 @@ def format_report_time_label(
     anchor: datetime,
     total_elapsed_minutes: int,
 ) -> str:
-    """step에 대응하는 절대시각 라벨을 만든다."""
+    """round에 대응하는 절대시각 라벨을 만든다."""
 
     delta = timedelta(minutes=total_elapsed_minutes)
     return (anchor + delta).strftime("%Y-%m-%d %H:%M")
 
 
-def phase_hint(*, step_index: int, total_steps: int) -> str:
-    """step 위치를 사람이 읽는 쉬운 단계명으로 변환한다."""
+def phase_hint(*, round_index: int, total_rounds: int) -> str:
+    """round 위치를 사람이 읽는 쉬운 단계명으로 변환한다."""
 
-    if total_steps <= 1:
+    if total_rounds <= 1:
         return "단일 단계"
-    if step_index == 1:
+    if round_index == 1:
         return "시작 단계"
-    if step_index == total_steps:
+    if round_index == total_rounds:
         return "마무리 단계"
-    if step_index >= total_steps - 1:
+    if round_index >= total_rounds - 1:
         return "관계 변화 단계"
     return "탐색 단계"
 
 
-def cluster_step_activities(
+def cluster_round_activities(
     *,
-    step_activities: list[dict[str, object]],
+    round_activities: list[dict[str, object]],
     actors_by_id: dict[str, dict[str, object]],
 ) -> list[dict[str, object]]:
-    """한 step의 activity를 대표 사건 cluster로 압축한다."""
+    """한 round의 activity를 대표 사건 cluster로 압축한다."""
 
     grouped: dict[tuple[str, str], dict[str, object]] = {}
-    for activity in step_activities:
+    for activity in round_activities:
         cluster_key = (
             str(activity.get("thread_id") or ""),
             str(activity.get("source_actor_id") or ""),
@@ -257,7 +257,7 @@ def build_actor_digests(
     actors: list[dict[str, object]],
     activities: list[dict[str, object]],
     actors_by_id: dict[str, dict[str, object]],
-    total_steps: int,
+    total_rounds: int,
 ) -> list[dict[str, object]]:
     """행위자별 핵심 상호작용 digest를 만든다."""
 
@@ -270,7 +270,7 @@ def build_actor_digests(
             received_by_actor[str(target_actor_id)].append(activity)
 
     digests = []
-    endgame_start_step = max(1, total_steps - 4)
+    endgame_start_round = max(1, total_rounds - 4)
     for actor in actors:
         actor_id = str(actor["actor_id"])
         display_name = str(actor["display_name"])
@@ -279,12 +279,12 @@ def build_actor_digests(
         endgame_initiated = [
             item
             for item in initiated
-            if _int_value(item.get("step_index", 0)) >= endgame_start_step
+            if _int_value(item.get("round_index", 0)) >= endgame_start_round
         ]
         endgame_received = [
             item
             for item in received
-            if _int_value(item.get("step_index", 0)) >= endgame_start_step
+            if _int_value(item.get("round_index", 0)) >= endgame_start_round
         ]
         counterparties: list[str] = []
         for activity in initiated + received:
@@ -354,15 +354,15 @@ def build_final_actor_snapshots(
     activities: list[dict[str, object]],
     actors_by_id: dict[str, dict[str, object]],
     timeline_packets: list[dict[str, object]],
-    total_steps: int,
+    total_rounds: int,
 ) -> list[dict[str, object]]:
     """최종 국면 해석에 집중한 행위자 snapshot을 만든다."""
 
-    step_to_time_label = {
-        _int_value(packet.get("step_index", 0)): str(packet.get("time_label", ""))
+    round_to_time_label = {
+        _int_value(packet.get("round_index", 0)): str(packet.get("time_label", ""))
         for packet in timeline_packets
     }
-    endgame_start_step = max(1, total_steps - 4)
+    endgame_start_round = max(1, total_rounds - 4)
     snapshots = []
     for actor in actors:
         actor_id = str(actor["actor_id"])
@@ -376,20 +376,20 @@ def build_final_actor_snapshots(
         endgame_activities = [
             item
             for item in related_activities
-            if _int_value(item.get("step_index", 0)) >= endgame_start_step
+            if _int_value(item.get("round_index", 0)) >= endgame_start_round
         ]
         if related_activities:
-            last_seen_step = max(
-                _int_value(item.get("step_index", 0)) for item in related_activities
+            last_seen_round = max(
+                _int_value(item.get("round_index", 0)) for item in related_activities
             )
         else:
-            last_seen_step = 0
+            last_seen_round = 0
         snapshots.append(
             {
                 "actor_id": actor_id,
                 "display_name": display_name,
-                "last_seen_step": last_seen_step,
-                "last_seen_time_label": step_to_time_label.get(last_seen_step, ""),
+                "last_seen_round": last_seen_round,
+                "last_seen_time_label": round_to_time_label.get(last_seen_round, ""),
                 "endgame_sent_to": unique_display_names(
                     activities=[
                         item
@@ -584,7 +584,7 @@ def build_intent_arc_packets(
         snapshots = _dict_list(entry.get("actor_intent_states", []))
         packets.append(
             {
-                "step_index": _int_value(entry.get("step_index", 0)),
+                "round_index": _int_value(entry.get("round_index", 0)),
                 "actor_intents": [
                     {
                         "actor_id": str(snapshot.get("actor_id", "")),

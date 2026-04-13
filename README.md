@@ -19,7 +19,7 @@ one opaque loop. `simula` keeps them separate.
 
 - Planning turns raw scenario text into one compact analysis bundle and one execution-plan bundle.
 - Generation turns the cast roster into actor cards through fan-out worker calls.
-- Runtime loops through directed steps instead of free-running until token exhaustion.
+- Runtime loops through directed rounds instead of free-running until token exhaustion.
 - Finalization turns the finished state into a report bundle and a JSONL log.
 
 The result is easier to inspect, test, and evolve than a single prompt chain.
@@ -80,7 +80,7 @@ This is the only flow described by the current documentation set.
 | --- | --- | --- |
 | `planning` | `build_planning_analysis -> build_execution_plan -> finalize_plan` | compact execution plan |
 | `generation` | `prepare_actor_slots -> generate_actor_slot -> finalize_generated_actors` | actor cards |
-| `runtime` | `initialize_runtime_state -> prepare_step -> plan_step -> generate_actor_proposal -> reduce_actor_proposals -> resolve_step` | adopted activities, observer reports, stop state |
+| `runtime` | `initialize_runtime_state -> prepare_round -> plan_round -> generate_actor_proposal -> reduce_actor_proposals -> resolve_round` | adopted activities, observer reports, stop state |
 | `finalization` | `resolve_timeline_anchor -> build_report_artifacts -> write_final_report_bundle -> render_and_persist_final_report` | final report payloads and markdown |
 
 `generate_actor_slot` and `generate_actor_proposal` both use fan-out/fan-in execution, but the
@@ -101,12 +101,13 @@ graph shape stays explicit.
 - simulation start
 - finalized plan
 - finalized actors
-- step focus selection
-- time advancement
+- round focus selection
+- round time advancement
 - background updates
 - adopted actions
 - observer reports
 - final report
+- LLM usage summary
 
 ## Configuration
 
@@ -119,7 +120,7 @@ Settings resolve in this order:
 
 Common runtime controls:
 
-- `runtime.max_steps`
+- `runtime.max_rounds`
 - `runtime.max_actor_calls_per_step`
 - `runtime.max_focus_slices_per_step`
 - `runtime.max_recipients_per_message`

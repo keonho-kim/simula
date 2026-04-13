@@ -24,7 +24,7 @@ class SimulationInputState(TypedDict):
     run_id: str
     scenario: str
     scenario_controls: ScenarioControls
-    max_steps: int
+    max_rounds: int
     rng_seed: int
 
 
@@ -33,6 +33,7 @@ class SimulationOutputState(TypedDict):
 
     run_id: str
     final_report: dict[str, Any]
+    llm_usage_summary: dict[str, Any]
     final_report_markdown: str
     simulation_log_jsonl: str
     stop_reason: str
@@ -45,7 +46,7 @@ class SimulationWorkflowState(TypedDict):
     run_id: str
     scenario: str
     scenario_controls: ScenarioControls
-    max_steps: int
+    max_rounds: int
     checkpoint_enabled: bool
     rng_seed: int
     planning_analysis: dict[str, Any]
@@ -53,20 +54,20 @@ class SimulationWorkflowState(TypedDict):
     actors: list[dict[str, Any]]
     activity_feeds: dict[str, dict[str, Any]]
     activities: list[dict[str, Any]]
-    latest_step_activities: list[dict[str, Any]]
+    latest_round_activities: list[dict[str, Any]]
     observer_reports: list[dict[str, Any]]
     focus_candidates: list[dict[str, Any]]
-    step_focus_history: list[dict[str, Any]]
+    round_focus_history: list[dict[str, Any]]
     selected_actor_ids: list[str]
     deferred_actor_ids: list[str]
     latest_background_updates: list[dict[str, Any]]
     background_updates: list[dict[str, Any]]
     actor_intent_states: list[dict[str, Any]]
     intent_history: list[dict[str, Any]]
-    step_focus_plan: dict[str, Any]
-    step_time_advance: dict[str, Any]
+    round_focus_plan: dict[str, Any]
+    round_time_advance: dict[str, Any]
     simulation_clock: dict[str, Any]
-    step_time_history: list[dict[str, Any]]
+    round_time_history: list[dict[str, Any]]
     pending_cast_slots: list[CastSlotSpec]
     cast_slot: CastSlotSpec
     generated_actor_results: Annotated[list[GeneratedActorResult], extend_list]
@@ -74,17 +75,18 @@ class SimulationWorkflowState(TypedDict):
     pending_actor_proposals: Annotated[list[ActorProposalResult], extend_list]
     parse_failures: int
     forced_idles: int
-    stagnation_steps: int
+    stagnation_rounds: int
     planning_latency_seconds: float
     generation_started_at: float
     generation_latency_seconds: float
-    current_step_started_at: float
-    last_step_latency_seconds: float
-    step_index: int
+    current_round_started_at: float
+    last_round_latency_seconds: float
+    round_index: int
     stop_requested: bool
     stop_reason: str
     world_state_summary: str
     final_report: dict[str, Any]
+    llm_usage_summary: dict[str, Any]
     simulation_log_jsonl: str
     report_projection_json: str
     report_timeline_anchor_json: dict[str, Any]

@@ -51,13 +51,13 @@ _ACTOR_ACTION_PROPOSAL_EXAMPLE: dict[str, Any] = {
 }
 
 _OBSERVER_REPORT_EXAMPLE: dict[str, Any] = {
-    "step_index": 1,
-    "summary": "직접 action이 먼저 쌓이며 다음 선택 압력이 커졌다.",
+    "round_index": 1,
+    "summary": "직접 action이 먼저 쌓이며 다음 round 선택 압력이 커졌다.",
     "notable_events": [
         "운영 총괄이 재검토를 제안했다.",
         "핵심 실무자들이 같은 방향으로 움직였다.",
     ],
     "atmosphere": "경계",
     "momentum": "medium",
-    "world_state_summary": "직접 조정 action이 누적되며 다음 선택 방향이 갈리기 시작했다.",
+    "world_state_summary": "직접 조정 action이 누적되며 다음 round 선택 방향이 갈리기 시작했다.",
 }

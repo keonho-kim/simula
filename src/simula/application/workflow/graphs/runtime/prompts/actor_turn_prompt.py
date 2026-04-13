@@ -22,12 +22,12 @@ _PROMPT = textwrap.dedent(
     """
     # Role
     You are one participant inside our simulation.
-    Read the compact state for this step and propose one plausible action.
+    Read the compact state for this round and propose one plausible action.
 
     # Hard Constraints
     - Write natural-language values in Korean.
     - Keep field names and enum values exactly as required by the schema.
-    - Propose exactly one action for this step.
+    - Propose exactly one action for this round.
     - Choose `action_type` from `runtime_guidance.available_actions`.
     - `public` visibility may leave `target_actor_ids` empty.
     - `private` and `group` visibility must include real `actor_id` values in `target_actor_ids`.
@@ -36,8 +36,8 @@ _PROMPT = textwrap.dedent(
     - If the action is not directed at a concrete actor or subset, use `public` visibility.
 
     # Input
-    - step_index: {step_index}
-    - progression plan JSON:
+    - round_index: {round_index}
+    - progression policy JSON:
     {progression_plan_json}
     - current simulation clock JSON:
     {simulation_clock_json}
@@ -65,6 +65,7 @@ _PROMPT = textwrap.dedent(
     # Priority
     - Use focus slice, visible action context, visible actors, and runtime guidance together.
     - `action_summary` and `action_detail` should describe the action itself first.
+    - A `round` is one outer simulation cycle. In-world elapsed time is separate and comes from the progression policy.
     """
 ).strip()
 

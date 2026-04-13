@@ -31,6 +31,7 @@ from simula.infrastructure.llm.renderers import (
     render_structured_response,
     render_text_response,
 )
+from simula.infrastructure.llm.usage import CallKind, LLMUsageTracker
 
 
 @dataclass(slots=True)
@@ -44,6 +45,7 @@ class StructuredLLMRouter:
     actor: BaseChatModel
     observer: BaseChatModel
     fixer: BaseChatModel
+    usage_tracker: LLMUsageTracker
 
     def for_role(self, role: str) -> BaseChatModel:
         """역할 이름으로 모델을 반환한다."""
@@ -65,7 +67,7 @@ class StructuredLLMRouter:
         started_at = time.perf_counter()
         self._log_structured_call_start(role=role, log_context=log_context)
         response, ttft_seconds, input_tokens, output_tokens, total_tokens = (
-            self._invoke_with_metrics(role, prompt)
+            self._invoke_with_metrics(role, prompt, call_kind="text")
         )
         content = _content_to_text(response.content).strip()
         if not content:
@@ -108,7 +110,7 @@ class StructuredLLMRouter:
             input_tokens,
             output_tokens,
             total_tokens,
-        ) = await self._ainvoke_with_metrics(role, prompt)
+        ) = await self._ainvoke_with_metrics(role, prompt, call_kind="text")
         content = _content_to_text(response.content).strip()
         if not content:
             raise ValueError("응답이 비어 있습니다.")
@@ -137,6 +139,8 @@ class StructuredLLMRouter:
         self,
         role: str,
         prompt: str,
+        *,
+        call_kind: CallKind,
     ) -> tuple[Any, float | None, int | None, int | None, int | None]:
         """응답과 벤치마크용 메타데이터를 함께 수집한다."""
 
@@ -153,6 +157,13 @@ class StructuredLLMRouter:
             raise ValueError(f"{role} stream 응답이 비어 있습니다.")
 
         input_tokens, output_tokens, total_tokens = _extract_token_usage(merged_chunk)
+        self.usage_tracker.record_transport_call(
+            role=role,
+            call_kind=call_kind,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+        )
         ttft_seconds = (
             first_chunk_at - started_at if first_chunk_at is not None else None
         )
@@ -168,6 +179,8 @@ class StructuredLLMRouter:
         self,
         role: str,
         prompt: str,
+        *,
+        call_kind: CallKind,
     ) -> tuple[Any, float | None, int | None, int | None, int | None]:
         """비동기 응답과 메타데이터를 함께 수집한다."""
 
@@ -184,6 +197,13 @@ class StructuredLLMRouter:
             raise ValueError(f"{role} astream 응답이 비어 있습니다.")
 
         input_tokens, output_tokens, total_tokens = _extract_token_usage(merged_chunk)
+        self.usage_tracker.record_transport_call(
+            role=role,
+            call_kind=call_kind,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+        )
         ttft_seconds = (
             first_chunk_at - started_at if first_chunk_at is not None else None
         )
@@ -283,6 +303,8 @@ class StructuredLLMRouter:
 
 def build_raw_model_router(
     settings: AppSettings,
+    *,
+    usage_tracker: LLMUsageTracker,
 ) -> StructuredLLMRouter:
     """역할별 raw 라우터를 생성한다."""
 
@@ -294,6 +316,7 @@ def build_raw_model_router(
         actor=build_provider_chat_model(settings.models.actor),
         observer=build_provider_chat_model(settings.models.observer),
         fixer=build_provider_chat_model(settings.models.fixer),
+        usage_tracker=usage_tracker,
     )
 
 
@@ -354,9 +377,9 @@ def _format_log_context_suffix(log_context: dict[str, object] | None) -> str:
         return ""
 
     parts: list[str] = []
-    step_index = log_context.get("step_index")
-    if step_index is not None:
-        parts.append(f"step_index={step_index}")
+    round_index = log_context.get("round_index")
+    if round_index is not None:
+        parts.append(f"round_index={round_index}")
 
     actor_display_name = log_context.get("actor_display_name")
     actor_id = log_context.get("actor_id")

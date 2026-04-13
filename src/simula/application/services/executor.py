@@ -33,6 +33,7 @@ from simula.application.workflow.graphs.simulation.states.initial_state import (
 from simula.domain.scenario_controls import ScenarioControls
 from simula.infrastructure.config.models import AppSettings
 from simula.infrastructure.llm.service import build_model_router
+from simula.infrastructure.llm.usage import LLMUsageTracker
 from simula.infrastructure.storage.app_store import RunIdConflictError
 from simula.infrastructure.storage.factory import (
     create_app_store,
@@ -69,7 +70,8 @@ class SimulationExecutor:
         self.scenario_controls = scenario_controls
         self.store = create_app_store(settings, env_file_hint=env_file_hint)
         self.logger = logging.getLogger("simula.application.executor")
-        self.llms = build_model_router(settings)
+        self.llm_usage_tracker = LLMUsageTracker()
+        self.llms = build_model_router(settings, usage_tracker=self.llm_usage_tracker)
         self.trial_index = trial_index
         self.total_trials = total_trials
         self.parallel = parallel
@@ -133,6 +135,7 @@ class SimulationExecutor:
             store=self.store,
             llms=self.llms,
             logger=run_logger,
+            llm_usage_tracker=self.llm_usage_tracker,
         )
         input_state = build_simulation_input_state(
             run_id=run_id,

@@ -42,7 +42,7 @@ from simula.domain.activity_feeds import (
 )
 from simula.domain.contracts import ActionCatalog, ActorActionProposal
 from simula.domain.reporting import latest_observer_summary
-from simula.domain.runtime_steps import ActorProposalPayload, apply_actor_proposals
+from simula.domain.runtime_actions import ActorProposalPayload, apply_actor_proposals
 
 
 def dispatch_selected_actor_proposals(
@@ -51,7 +51,7 @@ def dispatch_selected_actor_proposals(
     """선택된 actor action proposal 생성을 fan-out 한다."""
 
     if not state.get("selected_actor_ids"):
-        return "resolve_step"
+        return "resolve_round"
 
     actors_by_id = {str(actor["actor_id"]): actor for actor in state["actors"]}
     action_catalog = ActionCatalog.model_validate(state["plan"]["action_catalog"])
@@ -93,8 +93,8 @@ def dispatch_selected_actor_proposals(
             Send(
                 "generate_actor_proposal",
                 {
-                    "step_index": state["step_index"],
-        "progression_plan": state["plan"]["progression_plan"],
+                    "round_index": state["round_index"],
+                    "progression_plan": state["plan"]["progression_plan"],
                     "simulation_clock": state.get("simulation_clock", {}),
                     "actor_proposal_task": {
                         "actor": build_actor_prompt_actor_view(actor),
@@ -103,7 +103,7 @@ def dispatch_selected_actor_proposals(
                             for activity in unread_visible_activities
                         ],
                         "visible_action_context": visible_action_context,
-                "unread_backlog_digest": unread_backlog_digest,
+                        "unread_backlog_digest": unread_backlog_digest,
                         "visible_actors": visible_actors,
                         "focus_slice": focus_slice,
                         "runtime_guidance": runtime_guidance,
@@ -118,7 +118,7 @@ async def generate_actor_proposal(
     state: SimulationWorkflowState,
     runtime: Runtime[WorkflowRuntimeContext],
 ) -> dict[str, object]:
-    """actor 하나의 현재 step action proposal을 만든다."""
+    """actor 하나의 현재 round action proposal을 만든다."""
 
     actor_task = state["actor_proposal_task"]
     actor = actor_task["actor"]
@@ -149,7 +149,7 @@ async def generate_actor_proposal(
     )
     _log_actor_proposal_completed(
         logger=runtime.context.logger,
-        step_index=int(state["step_index"]),
+        round_index=int(state["round_index"]),
         actor=actor,
         proposal=proposal,
         forced_default=bool(meta.forced_default),
@@ -190,15 +190,15 @@ def reduce_actor_proposals(state: SimulationWorkflowState) -> dict[str, object]:
     }
 
 
-def route_step_activities(
+def route_round_activities(
     state: SimulationWorkflowState,
     runtime: Runtime[WorkflowRuntimeContext],
 ) -> dict[str, object]:
-    """병렬 actor action proposal 결과를 step action 상태로 반영한다."""
+    """병렬 actor action proposal 결과를 round action 상태로 반영한다."""
 
     routed = apply_actor_proposals(
         run_id=state["run_id"],
-        step_index=state["step_index"],
+        round_index=state["round_index"],
         actors=list(state["actors"]),
         activity_feeds=dict(state["activity_feeds"]),
         activities=list(state.get("activities", [])),
@@ -209,23 +209,23 @@ def route_step_activities(
         ),
         max_targets_per_activity=runtime.context.settings.runtime.max_recipients_per_message,
     )
-    step_latency = time.perf_counter() - float(
-        state.get("current_step_started_at", 0.0)
+    round_latency = time.perf_counter() - float(
+        state.get("current_round_started_at", 0.0)
     )
     runtime.context.logger.info(
-        "step %s 정리 완료, action %s건",
-        state["step_index"],
-        len(routed["latest_step_activities"]),
+        "round %s 정리 완료, action %s건",
+        state["round_index"],
+        len(routed["latest_round_activities"]),
     )
     return {
         "activity_feeds": routed["activity_feeds"],
         "activities": routed["activities"],
-        "latest_step_activities": routed["latest_step_activities"],
+        "latest_round_activities": routed["latest_round_activities"],
         "pending_actor_proposals": Overwrite(value=[]),
         "forced_idles": int(state.get("forced_idles", 0)) + routed["forced_idle_count"],
         "parse_failures": int(state.get("parse_failures", 0))
         + routed["parse_failure_count"],
-        "last_step_latency_seconds": step_latency,
+        "last_round_latency_seconds": round_latency,
     }
 
 
@@ -241,7 +241,7 @@ def _build_actor_proposal_prompt(
     max_recipients_per_message: int,
 ) -> str:
     return ACTOR_PROPOSAL_PROMPT.format(
-        step_index=state["step_index"],
+        round_index=state["round_index"],
         progression_plan_json=json.dumps(
             build_progression_plan_prompt_view(
                 cast(dict[str, object], state["plan"]["progression_plan"])
@@ -290,7 +290,7 @@ def _actor_log_context(
     actor: dict[str, Any],
 ) -> dict[str, object]:
     return {
-        "step_index": int(state["step_index"]),
+        "round_index": int(state["round_index"]),
         "simulation_clock_label": str(
             cast(dict[str, object], state.get("simulation_clock", {})).get(
                 "total_elapsed_label",
@@ -387,7 +387,7 @@ def _focus_slice_for_actor(
     state: SimulationWorkflowState,
     actor_id: str,
 ) -> dict[str, object]:
-    focus_plan = cast(dict[str, object], state.get("step_focus_plan", {}) or {})
+    focus_plan = cast(dict[str, object], state.get("round_focus_plan", {}) or {})
     for raw_focus_slice in _object_list(focus_plan.get("focus_slices", [])):
         if not isinstance(raw_focus_slice, dict):
             continue
@@ -550,7 +550,7 @@ def _string_list(value: object) -> list[str]:
 def _log_actor_proposal_completed(
     *,
     logger: Any,
-    step_index: int,
+    round_index: int,
     actor: dict[str, Any],
     proposal: ActorActionProposal,
     forced_default: bool,
@@ -561,7 +561,7 @@ def _log_actor_proposal_completed(
         logger.info(
             "%s action 정리 완료 | step %s | 기본 대기 적용 | 소요 %.2fs",
             actor_name,
-            step_index,
+            round_index,
             duration_seconds,
         )
         return
@@ -569,7 +569,7 @@ def _log_actor_proposal_completed(
     logger.info(
         "%s action 정리 완료 | step %s | %s | %s | 대상 %s | %s | 소요 %.2fs",
         actor_name,
-        step_index,
+        round_index,
         proposal.action_type,
         _visibility_label(proposal.visibility),
         _target_preview(proposal.target_actor_ids),

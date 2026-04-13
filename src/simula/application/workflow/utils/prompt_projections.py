@@ -529,9 +529,9 @@ def build_progression_plan_prompt_view(
     """prompt용 progression plan 축약본을 만든다."""
 
     return {
-        "max_steps": progression_plan.get("max_steps"),
-        "allowed_units": _string_list(progression_plan.get("allowed_units", [])),
-        "default_unit": progression_plan.get("default_unit"),
+        "max_rounds": progression_plan.get("max_rounds"),
+        "allowed_elapsed_units": _string_list(progression_plan.get("allowed_elapsed_units", [])),
+        "default_elapsed_unit": progression_plan.get("default_elapsed_unit"),
     }
 
 
@@ -542,7 +542,7 @@ def build_compact_background_updates(
 
     return [
         {
-            "step_index": _int_value(item.get("step_index", 0)),
+            "round_index": _int_value(item.get("round_index", 0)),
             "actor_id": str(item.get("actor_id", "")),
             "summary": truncate_text(item.get("summary", ""), 140),
             "pressure_level": str(item.get("pressure_level", "")),
@@ -556,7 +556,7 @@ def build_prior_state_digest(
     *,
     observer_reports: list[dict[str, object]],
     world_state_summary: object,
-    step_focus_history: list[dict[str, object]],
+    round_focus_history: list[dict[str, object]],
     simulation_clock: dict[str, object],
 ) -> dict[str, object]:
     """observer prompt용 직전 상태 digest를 만든다."""
@@ -565,8 +565,8 @@ def build_prior_state_digest(
     if observer_reports:
         previous_summary = str(observer_reports[-1].get("summary", ""))
     last_focus_summary = ""
-    if step_focus_history:
-        last_focus_summary = str(step_focus_history[-1].get("focus_summary", ""))
+    if round_focus_history:
+        last_focus_summary = str(round_focus_history[-1].get("focus_summary", ""))
     return {
         "previous_observer_summary": truncate_text(
             previous_summary,
@@ -600,7 +600,7 @@ def _compact_actor_reference(actor: dict[str, object]) -> dict[str, object]:
 def _compact_action_digest(activity: dict[str, object]) -> dict[str, object]:
     return {
         "activity_id": str(activity.get("activity_id", "")),
-        "step_index": _int_value(activity.get("step_index", 0)),
+        "round_index": _int_value(activity.get("round_index", 0)),
         "source_actor_id": str(activity.get("source_actor_id", "")),
         "target_actor_ids": _string_list(activity.get("target_actor_ids", [])),
         "visibility": str(activity.get("visibility", "")),
@@ -769,7 +769,7 @@ def _activity_key(activity: dict[str, object]) -> str:
         return activity_id
     return "|".join(
         [
-            str(activity.get("step_index", "")),
+            str(activity.get("round_index", "")),
             str(activity.get("source_actor_id", "")),
             str(activity.get("action_type", "")),
             str(activity.get("thread_id", "")),

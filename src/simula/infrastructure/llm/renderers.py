@@ -31,12 +31,12 @@ from simula.domain.contracts import (
     RuntimeProgressionPlan,
     ScenarioTimeScope,
     SimulationClockSnapshot,
-    StepDirective,
-    StepResolution,
-    StepTimeAdvanceProposal,
+    RoundDirective,
+    RoundResolution,
+    RoundTimeAdvanceProposal,
     SituationBundle,
 )
-from simula.domain.time_steps import duration_label
+from simula.domain.time_units import duration_label
 
 
 def render_structured_response(
@@ -70,16 +70,16 @@ def render_structured_response(
     if isinstance(parsed, RuntimeProgressionPlan):
         return (
             "실행 시간 진행 계획을 정했습니다.\n"
-            f"허용 단위: {', '.join(parsed.allowed_units)}\n"
-            f"기본 단위: {parsed.default_unit}\n"
-            f"최대 단계: {parsed.max_steps}\n"
+            f"허용 시간 단위: {', '.join(parsed.allowed_elapsed_units)}\n"
+            f"기본 시간 단위: {parsed.default_elapsed_unit}\n"
+            f"최대 round 수: {parsed.max_rounds}\n"
             f"이유: {parsed.selection_reason}"
         )
 
-    if isinstance(parsed, StepTimeAdvanceProposal):
+    if isinstance(parsed, RoundTimeAdvanceProposal):
         return (
-            "step 시간 경과를 추정했습니다.\n"
-            f"이번 step 경과: {duration_label(time_unit=parsed.elapsed_unit, amount=parsed.elapsed_amount)}\n"
+            "round 경과 시간을 추정했습니다.\n"
+            f"이번 round 경과: {duration_label(time_unit=parsed.elapsed_unit, amount=parsed.elapsed_amount)}\n"
             f"이유: {parsed.selection_reason}"
         )
 
@@ -87,7 +87,7 @@ def render_structured_response(
         return (
             "시뮬레이션 clock 상태를 갱신했습니다.\n"
             f"누적 시간: {parsed.total_elapsed_label}\n"
-            f"직전 step 경과: {parsed.last_elapsed_label}"
+            f"직전 round 경과: {parsed.last_elapsed_label}"
         )
 
     if isinstance(parsed, SituationBundle):
@@ -108,7 +108,7 @@ def render_structured_response(
 
     if isinstance(parsed, CoordinationFrame):
         return (
-            "step 조율 기준 프레임을 만들었습니다.\n"
+            "round 조율 기준 프레임을 만들었습니다.\n"
             f"focus 규칙: {_list_preview(parsed.focus_selection_rules, limit=2)}\n"
             f"배경 규칙: {_list_preview(parsed.background_motion_rules, limit=2)}"
         )
@@ -136,9 +136,9 @@ def render_structured_response(
             f"공개 성향: {_truncate(parsed.public_profile, 120)}"
         )
 
-    if isinstance(parsed, StepDirective):
+    if isinstance(parsed, RoundDirective):
         return (
-            "step 지시를 정했습니다.\n"
+            "round 지시를 정했습니다.\n"
             f"선택 actor: {len(parsed.selected_actor_ids)}명 / slice: {len(parsed.focus_slices)}개\n"
             f"요약: {_truncate(parsed.focus_summary, 140)}"
         )
@@ -181,16 +181,16 @@ def render_structured_response(
         events = ", ".join(parsed.notable_events[:3]) or "-"
         return (
             f"관찰 요약을 정리했습니다.\n"
-            f"시간 시점: {_elapsed_label(log_context, parsed.step_index)}\n"
+            f"시간 시점: {_elapsed_label(log_context, parsed.round_index)}\n"
             f"분위기: {parsed.atmosphere} / 흐름 속도: {_momentum_text(parsed.momentum)}({parsed.momentum})\n"
             f"요약: {parsed.summary}\n"
             f"주요 사건: {events}\n"
             f"세계 상태: {_truncate(parsed.world_state_summary, 160)}"
         )
 
-    if isinstance(parsed, StepResolution):
+    if isinstance(parsed, RoundResolution):
         return (
-            "step 해소 결과를 정리했습니다.\n"
+            "round 해소 결과를 정리했습니다.\n"
             f"채택 actor: {len(parsed.adopted_actor_ids)}명\n"
             f"세계 상태: {_truncate(parsed.world_state_summary, 140)}"
         )
@@ -313,10 +313,10 @@ def _has_batchim(text: str) -> bool:
     return (code - 0xAC00) % 28 != 0
 
 
-def _elapsed_label(log_context: dict[str, object] | None, step_index: int) -> str:
+def _elapsed_label(log_context: dict[str, object] | None, round_index: int) -> str:
     if not log_context:
-        return f"{step_index}단계"
+        return f"{round_index}단계"
     simulation_clock_label = log_context.get("simulation_clock_label")
     if isinstance(simulation_clock_label, str) and simulation_clock_label.strip():
         return simulation_clock_label
-    return f"{step_index}단계"
+    return f"{round_index}단계"

@@ -38,9 +38,9 @@ def _build_cli_overrides(args: argparse.Namespace) -> dict[str, str]:
 
     cli_overrides: dict[str, str] = {}
 
-    max_steps = getattr(args, "max_steps", None)
-    if max_steps is not None:
-        cli_overrides["SIM_MAX_STEPS"] = str(max_steps)
+    max_rounds = getattr(args, "max_rounds", None)
+    if max_rounds is not None:
+        cli_overrides["SIM_MAX_ROUNDS"] = str(max_rounds)
 
     log_level = getattr(args, "log_level", None)
     if log_level is not None:

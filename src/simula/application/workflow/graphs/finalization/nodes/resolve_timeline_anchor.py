@@ -66,7 +66,7 @@ async def resolve_timeline_anchor(
                 "0분",
             )
         ),
-        max_steps=state["max_steps"],
+        max_rounds=state["max_rounds"],
         **build_timeline_anchor_decision_prompt_bundle(),
     )
     anchor, _ = await runtime.context.llms.ainvoke_structured_with_meta(

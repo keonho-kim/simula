@@ -57,7 +57,7 @@ def build_settings_from_values(values: dict[str, str]) -> AppSettings:
     return AppSettings(
         log_level=env_str(values, "SIM_LOG_LEVEL", "INFO").upper(),
         runtime=RuntimeConfig(
-            max_steps=env_int(values, "SIM_MAX_STEPS", 16),
+            max_rounds=env_int(values, "SIM_MAX_ROUNDS", 16),
             max_actor_calls_per_step=env_int(
                 values,
                 "SIM_MAX_ACTOR_CALLS_PER_STEP",
@@ -94,7 +94,7 @@ def build_settings_from_values(values: dict[str, str]) -> AppSettings:
                 user=env_str(values, "SIM_POSTGRES_USER", "postgres"),
                 password=env_str(values, "SIM_POSTGRES_PASSWORD", "1234"),
                 database=env_str(values, "SIM_POSTGRES_DATABASE", "simula"),
-                schema_name=env_str(values, "SIM_POSTGRES_SCHEMA", "simula"),
+                db_schema=env_str(values, "SIM_POSTGRES_SCHEMA", "simula"),
                 tables=PostgreSQLTableConfig(
                     runs=env_str(values, "SIM_POSTGRES_RUNS_TABLE", "runs"),
                     actors=env_str(values, "SIM_POSTGRES_ACTORS_TABLE", "actors"),

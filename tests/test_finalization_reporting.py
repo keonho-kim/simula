@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from simula.application.workflow.graphs.finalization.nodes.build_report_projection import (
-    cluster_step_activities,
+    cluster_round_activities,
     format_report_time_label,
 )
 from simula.application.workflow.utils.finalization_sections import (
@@ -70,13 +70,13 @@ def test_format_report_time_label_uses_absolute_timestamp() -> None:
     assert label == "2027-06-18 09:50"
 
 
-def test_cluster_step_activities_prioritizes_thread_grouping() -> None:
+def test_cluster_round_activities_prioritizes_thread_grouping() -> None:
     actors_by_id = {
         "alpha": {"display_name": "Alpha"},
         "beta": {"display_name": "Beta"},
     }
-    clusters = cluster_step_activities(
-        step_activities=[
+    clusters = cluster_round_activities(
+        round_activities=[
             {
                 "thread_id": "same-thread",
                 "source_actor_id": "alpha",

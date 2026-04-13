@@ -35,13 +35,13 @@ It expands:
 
 - `run_id`
 - `scenario`
-- `max_steps`
+- `max_rounds`
 - `rng_seed`
 
 into the fully initialized workflow state, including scratch channels such as:
 
 - `planning_analysis`
-- `step_focus_plan`
+- `round_focus_plan`
 - `simulation_clock`
 - `final_report_sections`
 - `errors`
@@ -56,5 +56,6 @@ The root graph also receives `WorkflowRuntimeContext`, which provides:
 - store
 - llms
 - logger
+- llm_usage_tracker
 
 Those dependencies stay outside the state surface.

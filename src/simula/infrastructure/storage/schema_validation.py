@@ -100,7 +100,7 @@ def validate_postgresql_schema(
     if storage.provider != "postgresql":
         return
 
-    schema = storage.postgresql.schema
+    schema = storage.postgresql.db_schema
     inspector = inspect(engine)
     if schema not in inspector.get_schema_names():
         raise StorageSchemaError(
@@ -169,12 +169,12 @@ def build_missing_schema_message(
     psql_command = (
         "psql "
         f"-h {postgres.host} -p {postgres.port} -U {postgres.user} -d {postgres.database} "
-        f"-c 'CREATE SCHEMA IF NOT EXISTS \"{postgres.schema}\";'"
+        f"-c 'CREATE SCHEMA IF NOT EXISTS \"{postgres.db_schema}\";'"
     )
     bootstrap_command = build_bootstrap_command(env_file_hint)
     action_target = "앱/체크포인트 테이블" if checkpoint_enabled else "앱 테이블"
     return (
-        f"postgresql schema `{postgres.schema}` 가 존재하지 않습니다.\n"
+        f"postgresql schema `{postgres.db_schema}` 가 존재하지 않습니다.\n"
         f"다음 명령으로 schema를 생성할 수 있습니다:\n{psql_command}\n"
         f"{action_target} 생성은 다음 명령을 사용하세요:\n{bootstrap_command}"
     )
@@ -194,7 +194,7 @@ def build_schema_validation_message(
 
     ddl_lines = render_app_table_ddl(models, engine)
     message_lines = [
-        f"postgresql schema `{storage.postgresql.schema}` 의 테이블 상태가 기대와 다릅니다.",
+        f"postgresql schema `{storage.postgresql.db_schema}` 의 테이블 상태가 기대와 다릅니다.",
     ]
     if missing_tables:
         message_lines.append(f"누락 테이블: {', '.join(sorted(missing_tables))}")

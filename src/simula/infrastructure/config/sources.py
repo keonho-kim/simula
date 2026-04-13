@@ -131,14 +131,11 @@ def _flatten_time_table(table: Any) -> dict[str, str]:
         raise ValueError("설정 파일의 [time] 값은 테이블이어야 합니다.")
 
     _reject_legacy_keys(table, table_name="[time]")
-    removed_keys = [key for key in ("time_unit", "time_step_size") if key in table]
-    if removed_keys:
-        removed = ", ".join(removed_keys)
-        raise ValueError(
-            f"[time]의 `{removed}` 는 더 이상 지원하지 않습니다. [time]에는 max_steps만 둘 수 있습니다."
-        )
+    unexpected_keys = sorted(set(table) - {"max_rounds"})
+    if unexpected_keys:
+        raise ValueError("[time]에는 `max_rounds`만 둘 수 있습니다.")
     key_map = {
-        "max_steps": "SIM_MAX_STEPS",
+        "max_rounds": "SIM_MAX_ROUNDS",
     }
     return _map_scalar_keys(table, key_map)
 

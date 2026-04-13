@@ -45,11 +45,11 @@ _PLANNING_ANALYSIS_EXAMPLE: dict[str, Any] = {
     "private_context": ["비공개 조율이 실제 선택을 움직인다."],
     "key_pressures": ["시간 압박", "정보 비대칭"],
     "progression_plan": {
-        "max_steps": 8,
-        "allowed_units": ["minute", "hour", "day"],
-        "default_unit": "hour",
-        "pacing_guidance": ["직접 반응은 짧게 보고, 재배치와 종결 접근은 길게 본다."],
-        "selection_reason": "짧은 반응과 긴 준비 구간이 함께 나온다.",
+        "max_rounds": 8,
+        "allowed_elapsed_units": ["minute", "hour", "day"],
+        "default_elapsed_unit": "hour",
+        "pacing_guidance": ["짧은 round는 분 단위로, 큰 전환은 시간 또는 하루 단위로 본다."],
+        "selection_reason": "round 수 예산과 별개로, 세계 안의 시간은 짧은 반응과 중간 길이 전환이 함께 나온다.",
     },
 }
 
@@ -84,14 +84,14 @@ _EXECUTION_PLAN_EXAMPLE: dict[str, Any] = {
                 "supports_utterance": True,
             },
         ],
-        "selection_guidance": ["한 step에는 broad action 몇 개만 유지한다."],
+        "selection_guidance": ["한 round에는 broad action 몇 개만 유지한다."],
     },
     "coordination_frame": {
         "focus_selection_rules": ["직접 반응 압력이 몰린 actor를 우선 본다."],
         "background_motion_rules": ["직접 추적하지 않은 actor는 배경 update로만 정리한다."],
         "focus_archetypes": ["직접 충돌", "조용한 정렬"],
         "attention_shift_rules": ["조용했던 actor도 압력이 높아지면 끌어올린다."],
-        "budget_guidance": ["한 step에는 소수 actor만 직접 호출한다."],
+        "budget_guidance": ["한 round에는 소수 actor만 직접 호출한다."],
     },
     "cast_roster": {
         "items": [

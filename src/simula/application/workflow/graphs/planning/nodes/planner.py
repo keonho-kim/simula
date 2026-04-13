@@ -34,7 +34,7 @@ async def build_planning_analysis(
 
     prompt = BUILD_PLANNING_ANALYSIS_PROMPT.format(
         scenario_text=state["scenario"],
-        max_steps=state["max_steps"],
+        max_rounds=state["max_rounds"],
         **build_planning_analysis_prompt_bundle(),
     )
     analysis, meta = await runtime.context.llms.ainvoke_structured_with_meta(
@@ -62,7 +62,7 @@ async def build_execution_plan(
             ensure_ascii=False,
             separators=(",", ":"),
         ),
-        max_steps=state["max_steps"],
+        max_rounds=state["max_rounds"],
         **build_execution_plan_prompt_bundle(
             create_all_participants=state["scenario_controls"][
                 "create_all_participants"

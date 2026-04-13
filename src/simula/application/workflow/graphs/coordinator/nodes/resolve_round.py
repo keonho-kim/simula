@@ -1,5 +1,5 @@
 """Purpose:
-- Resolve one runtime step in a single required bundle.
+- Resolve one runtime round in a single required bundle.
 """
 
 from __future__ import annotations
@@ -13,9 +13,9 @@ from langgraph.types import Overwrite
 
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.coordinator.output_schema.bundles import (
-    build_step_resolution_prompt_bundle,
+    build_round_resolution_prompt_bundle,
 )
-from simula.application.workflow.graphs.coordinator.prompts.adjudicate_step_focus_prompt import (
+from simula.application.workflow.graphs.coordinator.prompts.round_resolution_prompt import (
     PROMPT as STEP_RESOLUTION_PROMPT,
 )
 from simula.application.workflow.graphs.simulation.states.state import (
@@ -30,13 +30,16 @@ from simula.application.workflow.utils.prompt_projections import (
     build_visible_action_context,
     truncate_text,
 )
-from simula.domain.contracts import RuntimeProgressionPlan, StepResolution
+from simula.domain.contracts import RoundResolution, RuntimeProgressionPlan
 from simula.domain.reporting import evaluate_stop
 from simula.domain.runtime_policy import next_stagnation_steps
-from simula.domain.runtime_steps import ActorProposalPayload, apply_adopted_actor_proposals
+from simula.domain.runtime_actions import (
+    ActorProposalPayload,
+    apply_adopted_actor_proposals,
+)
 
 
-async def resolve_step(
+async def resolve_round(
     state: SimulationWorkflowState,
     runtime: Runtime[WorkflowRuntimeContext],
 ) -> dict[str, object]:
@@ -49,7 +52,7 @@ async def resolve_step(
     latest_background_updates = list(state["latest_background_updates"])
     latest_action_views, _ = build_visible_action_context(
         unread_visible_activities=[],
-        recent_visible_activities=list(state["latest_step_activities"]),
+        recent_visible_activities=list(state["latest_round_activities"]),
         limit=6,
     )
     relevant_actor_ids = [
@@ -61,9 +64,9 @@ async def resolve_step(
         ],
     ]
     prompt = STEP_RESOLUTION_PROMPT.format(
-        step_index=state["step_index"],
-        step_focus_plan_json=json.dumps(
-            state["step_focus_plan"],
+        round_index=state["round_index"],
+        round_focus_plan_json=json.dumps(
+            state["round_focus_plan"],
             ensure_ascii=False,
             separators=(",", ":"),
         ),
@@ -104,20 +107,23 @@ async def resolve_step(
             state["world_state_summary"],
             WORLD_STATE_SUMMARY_LIMIT,
         ),
-        **build_step_resolution_prompt_bundle(),
+        **build_round_resolution_prompt_bundle(),
     )
-    default_payload = _build_default_step_resolution_payload(state)
+    default_payload = _build_default_round_resolution_payload(state)
     resolution, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "coordinator",
         prompt,
-        StepResolution,
+        RoundResolution,
         allow_default_on_failure=True,
         default_payload=default_payload,
-        log_context={"scope": "step-resolution", "step_index": int(state["step_index"])},
+        log_context={
+            "scope": "round-resolution",
+            "round_index": int(state["round_index"]),
+        },
     )
     applied = apply_adopted_actor_proposals(
         run_id=state["run_id"],
-        step_index=int(state["step_index"]),
+        round_index=int(state["round_index"]),
         actors=list(state["actors"]),
         activity_feeds=dict(state["activity_feeds"]),
         activities=list(state["activities"]),
@@ -131,42 +137,42 @@ async def resolve_step(
     )
     clock = _build_updated_clock(
         state=state,
-        step_time_advance=resolution.step_time_advance.model_dump(mode="json"),
+        round_time_advance=resolution.round_time_advance.model_dump(mode="json"),
     )
     report_payload = resolution.observer_report.model_dump(mode="json")
     observer_reports = list(state["observer_reports"]) + [report_payload]
-    stagnation_steps = next_stagnation_steps(
-        previous_stagnation_steps=int(state["stagnation_steps"]),
-        latest_activities=list(applied["latest_step_activities"]),
+    stagnation_rounds = next_stagnation_steps(
+        previous_stagnation_steps=int(state["stagnation_rounds"]),
+        latest_activities=list(applied["latest_round_activities"]),
         momentum=resolution.observer_report.momentum,
     )
     should_stop, policy_reason = evaluate_stop(
-        step_index=int(state["step_index"]),
-        max_steps=int(state["max_steps"]),
-        stagnation_steps=stagnation_steps,
+        round_index=int(state["round_index"]),
+        max_rounds=int(state["max_rounds"]),
+        stagnation_rounds=stagnation_rounds,
         last_momentum=resolution.observer_report.momentum,
     )
     stop_reason = resolution.stop_reason.strip() or (policy_reason or "")
     stop_requested = bool(stop_reason) or should_stop
     runtime.context.logger.info(
-        "step %s 해소 완료 | adopted=%s background=%s stop=%s",
-        state["step_index"],
+        "round %s 해소 완료 | adopted=%s background=%s stop=%s",
+        state["round_index"],
         len(list(resolution.adopted_actor_ids)),
         len(latest_background_updates),
         stop_reason or "-",
     )
-    runtime.context.store.save_step_artifacts(
+    runtime.context.store.save_round_artifacts(
         state["run_id"],
-        activities=list(applied["latest_step_activities"]),
+        activities=list(applied["latest_round_activities"]),
         observer_report=report_payload,
     )
     errors = list(state["errors"])
     if meta.forced_default:
-        errors.append(f"step {state['step_index']} resolution defaulted")
+        errors.append(f"round {state['round_index']} resolution defaulted")
     return {
         "activity_feeds": applied["activity_feeds"],
         "activities": applied["activities"],
-        "latest_step_activities": applied["latest_step_activities"],
+        "latest_round_activities": applied["latest_round_activities"],
         "pending_actor_proposals": Overwrite(value=[]),
         "actor_intent_states": [
             item.model_dump(mode="json") for item in resolution.updated_intent_states
@@ -174,33 +180,33 @@ async def resolve_step(
         "intent_history": list(state["intent_history"])
         + [
             {
-                "step_index": int(state["step_index"]),
+                "round_index": int(state["round_index"]),
                 "actor_intent_states": [
                     item.model_dump(mode="json")
                     for item in resolution.updated_intent_states
                 ],
             }
         ],
-        "step_time_advance": clock["step_time_advance"],
+        "round_time_advance": clock["round_time_advance"],
         "simulation_clock": clock["simulation_clock"],
-        "step_time_history": list(state["step_time_history"])
-        + [clock["step_time_advance"]],
+        "round_time_history": list(state["round_time_history"])
+        + [clock["round_time_advance"]],
         "observer_reports": observer_reports,
         "world_state_summary": resolution.world_state_summary,
-        "stagnation_steps": stagnation_steps,
+        "stagnation_rounds": stagnation_rounds,
         "stop_requested": stop_requested,
         "stop_reason": stop_reason,
         "parse_failures": int(state["parse_failures"])
         + applied["parse_failure_count"]
         + meta.parse_failure_count,
         "forced_idles": int(state["forced_idles"]) + applied["forced_idle_count"],
-        "last_step_latency_seconds": time.perf_counter()
-        - float(state["current_step_started_at"]),
+        "last_round_latency_seconds": time.perf_counter()
+        - float(state["current_round_started_at"]),
         "errors": errors,
     }
 
 
-def _build_default_step_resolution_payload(
+def _build_default_round_resolution_payload(
     state: SimulationWorkflowState,
 ) -> dict[str, object]:
     adopted_actor_ids = [
@@ -234,9 +240,9 @@ def _build_default_step_resolution_payload(
     return {
         "adopted_actor_ids": adopted_actor_ids[:2],
         "updated_intent_states": current_intent_states,
-        "step_time_advance": _default_step_time_advance(state),
+        "round_time_advance": _default_round_time_advance(state),
         "observer_report": {
-            "step_index": int(state["step_index"]),
+            "round_index": int(state["round_index"]),
             "summary": "직접 행동과 배경 압력을 기준으로 현재 단계를 정리했다.",
             "notable_events": [
                 str(item.get("action_summary", "")).strip()
@@ -257,9 +263,9 @@ def _build_default_step_resolution_payload(
     }
 
 
-def _default_step_time_advance(state: SimulationWorkflowState) -> dict[str, object]:
+def _default_round_time_advance(state: SimulationWorkflowState) -> dict[str, object]:
     plan = RuntimeProgressionPlan.model_validate(state["plan"]["progression_plan"])
-    elapsed_unit = "minute" if "minute" in plan.allowed_units else plan.default_unit
+    elapsed_unit = "minute" if "minute" in plan.allowed_elapsed_units else plan.default_elapsed_unit
     elapsed_amount = 30 if elapsed_unit == "minute" else 1
     return {
         "elapsed_unit": elapsed_unit,
@@ -272,11 +278,11 @@ def _default_step_time_advance(state: SimulationWorkflowState) -> dict[str, obje
 def _build_updated_clock(
     *,
     state: SimulationWorkflowState,
-    step_time_advance: dict[str, object],
+    round_time_advance: dict[str, object],
 ) -> dict[str, dict[str, object]]:
     previous_clock = cast(dict[str, object], state["simulation_clock"])
-    elapsed_unit = str(step_time_advance["elapsed_unit"])
-    elapsed_amount = int(str(step_time_advance["elapsed_amount"]))
+    elapsed_unit = str(round_time_advance["elapsed_unit"])
+    elapsed_amount = int(str(round_time_advance["elapsed_amount"]))
     if elapsed_unit == "minute":
         elapsed_minutes = elapsed_amount
     elif elapsed_unit == "hour":
@@ -287,26 +293,26 @@ def _build_updated_clock(
         raise ValueError(f"지원하지 않는 elapsed_unit 입니다: {elapsed_unit}")
 
     total_elapsed_minutes = int(str(previous_clock.get("total_elapsed_minutes", 0))) + elapsed_minutes
-    step_time_record = {
-        "step_index": int(state["step_index"]),
+    round_time_record = {
+        "round_index": int(state["round_index"]),
         "elapsed_unit": elapsed_unit,
         "elapsed_amount": elapsed_amount,
         "elapsed_minutes": elapsed_minutes,
         "elapsed_label": _elapsed_label(elapsed_unit, elapsed_amount),
         "total_elapsed_minutes": total_elapsed_minutes,
         "total_elapsed_label": _minutes_label(total_elapsed_minutes),
-        "selection_reason": str(step_time_advance["selection_reason"]),
-        "signals": list(cast(list[object], step_time_advance.get("signals", []))),
+        "selection_reason": str(round_time_advance["selection_reason"]),
+        "signals": list(cast(list[object], round_time_advance.get("signals", []))),
     }
     clock = {
         "total_elapsed_minutes": total_elapsed_minutes,
-        "total_elapsed_label": step_time_record["total_elapsed_label"],
+        "total_elapsed_label": round_time_record["total_elapsed_label"],
         "last_elapsed_minutes": elapsed_minutes,
-        "last_elapsed_label": step_time_record["elapsed_label"],
-        "last_advanced_step_index": int(state["step_index"]),
+        "last_elapsed_label": round_time_record["elapsed_label"],
+        "last_advanced_round_index": int(state["round_index"]),
     }
     return {
-        "step_time_advance": cast(dict[str, object], step_time_record),
+        "round_time_advance": cast(dict[str, object], round_time_record),
         "simulation_clock": cast(dict[str, object], clock),
     }
 

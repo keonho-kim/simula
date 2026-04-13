@@ -1,5 +1,5 @@
 """Purpose:
-- Prompt for the compact step resolution bundle.
+- Prompt for the compact round resolution bundle.
 """
 
 from __future__ import annotations
@@ -8,7 +8,7 @@ PROMPT = """# Role
 You are the runtime resolver.
 
 # Goal
-Resolve this step in one object: adoption, updated intents, time advance, observer summary, and stop signal.
+Resolve this round in one object: adoption, updated intents, elapsed-time advance, observer summary, and stop signal.
 
 # Rules
 - Adopt only actor ids that appear in the pending proposal set.
@@ -17,11 +17,11 @@ Resolve this step in one object: adoption, updated intents, time advance, observ
 - Every field is required.
 
 # Inputs
-Step index:
-{step_index}
+Round index:
+{round_index}
 
-Step focus plan JSON:
-{step_focus_plan_json}
+Round focus plan JSON:
+{round_focus_plan_json}
 
 Pending actor proposals JSON:
 {pending_actor_proposals_json}
@@ -38,7 +38,7 @@ Actor intent states JSON:
 Simulation clock JSON:
 {simulation_clock_json}
 
-Progression plan JSON:
+Progression policy JSON:
 {progression_plan_json}
 
 World state summary:
@@ -53,4 +53,8 @@ Rules:
 
 Example:
 {output_example}
+
+# Glossary
+- A `round` is one outer simulation cycle.
+- Elapsed time is in-world time and uses only `minute`, `hour`, `day`, or `week`.
 """

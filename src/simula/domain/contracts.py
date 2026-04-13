@@ -12,7 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from simula.domain.time_steps import TimeUnit
+from simula.domain.time_units import TimeUnit
 
 VisibilityType = Literal["public", "private", "group"]
 SimulationMomentum = Literal["high", "medium", "low"]
@@ -38,26 +38,26 @@ class ScenarioTimeScope(BaseModel):
 class RuntimeProgressionPlan(BaseModel):
     """Runtime pacing policy."""
 
-    max_steps: int = Field(ge=1)
-    allowed_units: list[TimeUnit]
-    default_unit: TimeUnit
+    max_rounds: int = Field(ge=1)
+    allowed_elapsed_units: list[TimeUnit]
+    default_elapsed_unit: TimeUnit
     pacing_guidance: list[str]
     selection_reason: str
 
     @model_validator(mode="after")
     def validate_progression_plan(self) -> "RuntimeProgressionPlan":
-        if not self.allowed_units:
-            raise ValueError("allowed_units must not be empty.")
-        if len(self.allowed_units) != len(set(self.allowed_units)):
-            raise ValueError("allowed_units must be unique.")
-        if self.default_unit not in self.allowed_units:
-            raise ValueError("default_unit must be included in allowed_units.")
+        if not self.allowed_elapsed_units:
+            raise ValueError("allowed_elapsed_units must not be empty.")
+        if len(self.allowed_elapsed_units) != len(set(self.allowed_elapsed_units)):
+            raise ValueError("allowed_elapsed_units must be unique.")
+        if self.default_elapsed_unit not in self.allowed_elapsed_units:
+            raise ValueError("default_elapsed_unit must be included in allowed_elapsed_units.")
         if not self.selection_reason.strip():
             raise ValueError("selection_reason must not be empty.")
         return self
 
 
-class StepTimeAdvanceProposal(BaseModel):
+class RoundTimeAdvanceProposal(BaseModel):
     """Elapsed time chosen for one step."""
 
     elapsed_unit: TimeUnit
@@ -66,16 +66,16 @@ class StepTimeAdvanceProposal(BaseModel):
     signals: list[str]
 
     @model_validator(mode="after")
-    def validate_time_advance(self) -> "StepTimeAdvanceProposal":
+    def validate_time_advance(self) -> "RoundTimeAdvanceProposal":
         if not self.selection_reason.strip():
             raise ValueError("selection_reason must not be empty.")
         return self
 
 
-class StepTimeAdvanceRecord(BaseModel):
+class RoundTimeAdvanceRecord(BaseModel):
     """Persisted normalized step-time record."""
 
-    step_index: int = Field(ge=1)
+    round_index: int = Field(ge=1)
     elapsed_unit: TimeUnit
     elapsed_amount: int = Field(ge=1)
     elapsed_minutes: int = Field(ge=1)
@@ -93,7 +93,7 @@ class SimulationClockSnapshot(BaseModel):
     total_elapsed_label: str
     last_elapsed_minutes: int = Field(ge=0)
     last_elapsed_label: str
-    last_advanced_step_index: int = Field(ge=0)
+    last_advanced_round_index: int = Field(ge=0)
 
 
 class PlanningAnalysis(BaseModel):
@@ -311,7 +311,7 @@ class CanonicalAction(BaseModel):
 
     activity_id: str
     run_id: str
-    step_index: int
+    round_index: int
     source_actor_id: str
     visibility: VisibilityType
     target_actor_ids: list[str]
@@ -385,7 +385,7 @@ class FocusSlice(BaseModel):
 class BackgroundUpdate(BaseModel):
     """Compressed off-screen update."""
 
-    step_index: int = Field(ge=1)
+    round_index: int = Field(ge=1)
     actor_id: str
     summary: str
     pressure_level: PressureLevel
@@ -405,10 +405,10 @@ class BackgroundUpdateBatch(BaseModel):
     background_updates: list[BackgroundUpdate]
 
 
-class StepDirective(BaseModel):
-    """Single runtime directive for a step."""
+class RoundDirective(BaseModel):
+    """Single runtime directive for a round."""
 
-    step_index: int = Field(ge=1)
+    round_index: int = Field(ge=1)
     focus_summary: str
     selection_reason: str
     selected_actor_ids: list[str]
@@ -417,7 +417,7 @@ class StepDirective(BaseModel):
     background_updates: list[BackgroundUpdate]
 
     @model_validator(mode="after")
-    def validate_step_directive(self) -> "StepDirective":
+    def validate_round_directive(self) -> "RoundDirective":
         if not self.focus_summary.strip():
             raise ValueError("focus_summary must not be empty.")
         if not self.selection_reason.strip():
@@ -434,9 +434,9 @@ class StepDirective(BaseModel):
 
 
 class ObserverReport(BaseModel):
-    """Observer step summary."""
+    """Observer round summary."""
 
-    step_index: int = Field(ge=1)
+    round_index: int = Field(ge=1)
     summary: str
     notable_events: list[str]
     atmosphere: str
@@ -451,23 +451,37 @@ class ObserverReport(BaseModel):
         return self
 
 
-class StepResolution(BaseModel):
+class RoundResolution(BaseModel):
     """Single required runtime resolution bundle."""
 
     adopted_actor_ids: list[str]
     updated_intent_states: list[ActorIntentSnapshot]
-    step_time_advance: StepTimeAdvanceProposal
+    round_time_advance: RoundTimeAdvanceProposal
     observer_report: ObserverReport
     world_state_summary: str
     stop_reason: str
 
     @model_validator(mode="after")
-    def validate_step_resolution(self) -> "StepResolution":
+    def validate_round_resolution(self) -> "RoundResolution":
         if len(self.adopted_actor_ids) != len(set(self.adopted_actor_ids)):
             raise ValueError("adopted_actor_ids must be unique.")
         if not self.world_state_summary.strip():
             raise ValueError("world_state_summary must not be empty.")
         return self
+
+
+class LLMUsageSummary(BaseModel):
+    """Run-scoped LLM usage summary."""
+
+    total_calls: int
+    calls_by_role: dict[str, int]
+    structured_calls: int
+    text_calls: int
+    parse_failures: int
+    forced_defaults: int
+    input_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
 
 
 class FinalReport(BaseModel):
@@ -480,13 +494,14 @@ class FinalReport(BaseModel):
     world_state_summary: str
     elapsed_simulation_minutes: int
     elapsed_simulation_label: str
-    steps_completed: int
+    rounds_completed: int
     actor_count: int
     total_activities: int
     visibility_activity_counts: dict[str, int]
     last_observer_summary: str
     notable_events: list[str]
     errors: list[str]
+    llm_usage_summary: LLMUsageSummary
 
 
 class TimelineAnchorDecision(BaseModel):

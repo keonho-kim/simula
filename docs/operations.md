@@ -52,7 +52,7 @@ Settings resolve in this order:
 
 Important runtime controls:
 
-- `runtime.max_steps`
+- `runtime.max_rounds`
 - `runtime.max_actor_calls_per_step`
 - `runtime.max_focus_slices_per_step`
 - `runtime.max_recipients_per_message`

@@ -41,14 +41,14 @@ class AppStore(Protocol):
     def save_actors(self, run_id: str, actors: list[dict[str, object]]) -> None:
         """actor 목록을 저장한다."""
 
-    def save_step_artifacts(
+    def save_round_artifacts(
         self,
         run_id: str,
         *,
         activities: list[dict[str, object]],
         observer_report: dict[str, object],
     ) -> None:
-        """step activity와 observer 리포트를 함께 저장한다."""
+        """round activity와 observer 리포트를 함께 저장한다."""
 
     def save_final_report(self, run_id: str, report: dict[str, object]) -> None:
         """최종 리포트를 저장한다."""

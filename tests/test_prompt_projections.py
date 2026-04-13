@@ -24,7 +24,7 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
     unread = [
         {
             "activity_id": "a1",
-            "step_index": 1,
+            "round_index": 1,
             "source_actor_id": "b",
             "target_actor_ids": ["a"],
             "visibility": "private",
@@ -39,7 +39,7 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
     recent = [
         {
             "activity_id": "a1",
-            "step_index": 1,
+            "round_index": 1,
             "source_actor_id": "b",
             "target_actor_ids": ["a"],
             "visibility": "private",
@@ -50,7 +50,7 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
         },
         {
             "activity_id": "a2",
-            "step_index": 1,
+            "round_index": 1,
             "source_actor_id": "c",
             "target_actor_ids": ["a"],
             "visibility": "public",
@@ -73,7 +73,7 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
     overflow_unread = unread + [
         {
             "activity_id": f"a-extra-{index}",
-            "step_index": 1,
+            "round_index": 1,
             "source_actor_id": "d",
             "target_actor_ids": ["a"],
             "visibility": "private",

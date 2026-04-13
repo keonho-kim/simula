@@ -18,14 +18,17 @@ Compress the raw scenario into one reusable planning analysis object.
 - Ground every fact in the scenario text. If a duration, participant count, episode count, or format detail is not stated, do not infer a concrete value.
 - Do not import outside genre knowledge, show conventions, or likely defaults.
 - Do not turn the scenario into observation questions, analyst prompts, or viewer checklists.
-- `progression_plan.max_steps` must exactly equal the runtime hard ceiling.
+- `progression_plan.max_rounds` is the maximum number of simulation rounds, not an elapsed-time unit.
+- `progression_plan.allowed_elapsed_units` and `progression_plan.default_elapsed_unit` describe in-world elapsed time only.
+- Allowed elapsed-time units are only `minute`, `hour`, `day`, and `week`.
+- `progression_plan.max_rounds` must exactly equal the runtime round budget.
 
 # Input
 Scenario text:
 {scenario_text}
 
-Runtime hard ceiling:
-{max_steps}
+Runtime round budget:
+{max_rounds}
 
 # Output
 Format:

@@ -44,9 +44,9 @@ def build_focus_candidates(
     activities: list[dict[str, object]],
     actor_intent_states: list[dict[str, object]],
     background_updates: list[dict[str, object]],
-    step_focus_history: list[dict[str, object]],
+    round_focus_history: list[dict[str, object]],
     observer_reports: list[dict[str, object]],
-    current_step_index: int,
+    current_round_index: int,
     rng_seed: int,
 ) -> list[dict[str, object]]:
     """coordinator에 넘길 후보 actor pool을 구성한다."""
@@ -67,11 +67,11 @@ def build_focus_candidates(
     }
     targeted_counts = _recent_target_counts(
         activities=activities,
-        current_step_index=current_step_index,
+        current_round_index=current_round_index,
     )
     thread_counts = _recent_thread_counts(
         activities=activities,
-        current_step_index=current_step_index,
+        current_round_index=current_round_index,
     )
     intent_shift_flags = {
         str(snapshot.get("actor_id", "")): bool(snapshot.get("changed_from_previous"))
@@ -79,15 +79,15 @@ def build_focus_candidates(
     }
     background_pressure = _background_pressure_by_actor(
         background_updates=background_updates,
-        current_step_index=current_step_index,
+        current_round_index=current_round_index,
     )
     recent_focus_counts = _recent_focus_counts(
-        step_focus_history=step_focus_history,
-        current_step_index=current_step_index,
+        round_focus_history=round_focus_history,
+        current_round_index=current_round_index,
     )
     recent_activity_counts = _recent_activity_counts(
         activities=activities,
-        current_step_index=current_step_index,
+        current_round_index=current_round_index,
     )
 
     candidates = []
@@ -226,7 +226,7 @@ def build_focus_candidates(
             for actor_id in wildcard_source_ids
         },
         target_count=wildcard_count,
-        rng=random.Random(f"{rng_seed}:coordinator:wildcard:{current_step_index}"),
+        rng=random.Random(f"{rng_seed}:coordinator:wildcard:{current_round_index}"),
     )
     for actor_id in wildcard_ids:
         by_actor_id[actor_id]["selection_bucket"] = "wildcard"
@@ -249,7 +249,7 @@ def build_focus_candidates(
             for actor_id in weighted_source_ids
         },
         target_count=weighted_target_count,
-        rng=random.Random(f"{rng_seed}:coordinator:weighted:{current_step_index}"),
+        rng=random.Random(f"{rng_seed}:coordinator:weighted:{current_round_index}"),
     )
 
     final_ids = hard_include_ids + weighted_ids + wildcard_ids
@@ -271,13 +271,13 @@ def build_focus_candidates(
 def _recent_target_counts(
     *,
     activities: list[dict[str, object]],
-    current_step_index: int,
+    current_round_index: int,
 ) -> Counter[str]:
-    recent_start = max(1, current_step_index - 2)
+    recent_start = max(1, current_round_index - 2)
     counts: Counter[str] = Counter()
     for activity in activities:
-        step_index = int(str(activity.get("step_index", 0)))
-        if step_index < recent_start:
+        round_index = int(str(activity.get("round_index", 0)))
+        if round_index < recent_start:
             continue
         for actor_id in _string_list(activity.get("target_actor_ids", [])):
             counts[actor_id] += 1
@@ -289,13 +289,13 @@ def _recent_target_counts(
 def _recent_thread_counts(
     *,
     activities: list[dict[str, object]],
-    current_step_index: int,
+    current_round_index: int,
 ) -> Counter[str]:
-    recent_start = max(1, current_step_index - 2)
+    recent_start = max(1, current_round_index - 2)
     counts: Counter[str] = Counter()
     for activity in activities:
-        step_index = int(str(activity.get("step_index", 0)))
-        if step_index < recent_start:
+        round_index = int(str(activity.get("round_index", 0)))
+        if round_index < recent_start:
             continue
         if not str(activity.get("thread_id", "")).strip():
             continue
@@ -310,13 +310,13 @@ def _recent_thread_counts(
 def _background_pressure_by_actor(
     *,
     background_updates: list[dict[str, object]],
-    current_step_index: int,
+    current_round_index: int,
 ) -> dict[str, PressureLevel]:
     pressure_by_actor: dict[str, PressureLevel] = {}
-    recent_start = max(1, current_step_index - 1)
+    recent_start = max(1, current_round_index - 1)
     for item in background_updates:
-        step_index = int(str(item.get("step_index", 0)))
-        if step_index < recent_start:
+        round_index = int(str(item.get("round_index", 0)))
+        if round_index < recent_start:
             continue
         actor_id = str(item.get("actor_id", ""))
         pressure_level = str(item.get("pressure_level", ""))
@@ -327,22 +327,22 @@ def _background_pressure_by_actor(
 
 def _recent_focus_counts(
     *,
-    step_focus_history: list[dict[str, object]],
-    current_step_index: int,
+    round_focus_history: list[dict[str, object]],
+    current_round_index: int,
 ) -> dict[str, list[int]]:
     recent_steps = [
-        current_step_index - 1,
-        current_step_index - 2,
-        current_step_index - 3,
+        current_round_index - 1,
+        current_round_index - 2,
+        current_round_index - 3,
     ]
     counts: dict[str, list[int]] = {}
     history_by_step = {
-        int(str(item.get("step_index", 0))): item for item in step_focus_history
+        int(str(item.get("round_index", 0))): item for item in round_focus_history
     }
-    for offset_index, step_index in enumerate(recent_steps):
-        if step_index < 1:
+    for offset_index, round_index in enumerate(recent_steps):
+        if round_index < 1:
             continue
-        focus_plan = history_by_step.get(step_index, {})
+        focus_plan = history_by_step.get(round_index, {})
         for actor_id in _string_list(focus_plan.get("selected_actor_ids", [])):
             counts.setdefault(actor_id, [0, 0, 0])[offset_index] += 1
     return counts
@@ -351,13 +351,13 @@ def _recent_focus_counts(
 def _recent_activity_counts(
     *,
     activities: list[dict[str, object]],
-    current_step_index: int,
+    current_round_index: int,
 ) -> Counter[str]:
-    recent_start = max(1, current_step_index - 3)
+    recent_start = max(1, current_round_index - 3)
     counts: Counter[str] = Counter()
     for activity in activities:
-        step_index = int(str(activity.get("step_index", 0)))
-        if step_index < recent_start:
+        round_index = int(str(activity.get("round_index", 0)))
+        if round_index < recent_start:
             continue
         source_actor_id = str(activity.get("source_actor_id", ""))
         if source_actor_id:

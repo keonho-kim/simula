@@ -49,7 +49,7 @@ def build_postgresql_conn_string(postgresql: PostgreSQLConfig) -> str:
         host=postgresql.host,
         port=postgresql.port,
         database=postgresql.database,
-        query={"options": f"-csearch_path={postgresql.schema}"},
+        query={"options": f"-csearch_path={postgresql.db_schema}"},
     )
     return url.render_as_string(hide_password=False)
 
@@ -64,7 +64,7 @@ def build_postgresql_sqlalchemy_url(postgresql: PostgreSQLConfig) -> str:
         host=postgresql.host,
         port=postgresql.port,
         database=postgresql.database,
-        query={"options": f"-csearch_path={postgresql.schema}"},
+        query={"options": f"-csearch_path={postgresql.db_schema}"},
     )
     return url.render_as_string(hide_password=False)
 

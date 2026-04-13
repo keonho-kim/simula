@@ -55,9 +55,9 @@ def test_build_planning_analysis_returns_required_bundle() -> None:
                     private_context=["비공개 계산"],
                     key_pressures=["시간 압박"],
                     progression_plan={
-                        "max_steps": 6,
-                        "allowed_units": ["hour"],
-                        "default_unit": "hour",
+                        "max_rounds": 6,
+                        "allowed_elapsed_units": ["hour"],
+                        "default_elapsed_unit": "hour",
                         "pacing_guidance": ["짧게 본다."],
                         "selection_reason": "짧은 조율이 중심이다.",
                     },
@@ -68,7 +68,7 @@ def test_build_planning_analysis_returns_required_bundle() -> None:
     state = {
         "scenario": "테스트 시나리오",
         "scenario_controls": {"create_all_participants": False},
-        "max_steps": 6,
+        "max_rounds": 6,
         "planning_latency_seconds": 0.0,
     }
 
@@ -134,7 +134,7 @@ def test_build_execution_plan_returns_minimum_plan_payload() -> None:
 
     state = {
         "scenario_controls": {"create_all_participants": True},
-        "max_steps": 6,
+        "max_rounds": 6,
         "planning_latency_seconds": 0.0,
         "planning_analysis": {
             "brief_summary": "요약",
@@ -144,9 +144,9 @@ def test_build_execution_plan_returns_minimum_plan_payload() -> None:
             "private_context": ["비공개"],
             "key_pressures": ["압박"],
             "progression_plan": {
-                "max_steps": 6,
-                "allowed_units": ["hour"],
-                "default_unit": "hour",
+                "max_rounds": 6,
+                "allowed_elapsed_units": ["hour"],
+                "default_elapsed_unit": "hour",
                 "pacing_guidance": ["짧게 본다."],
                 "selection_reason": "짧은 조율이 중심이다.",
             },

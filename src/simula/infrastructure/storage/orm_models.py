@@ -39,7 +39,7 @@ class StoreModels:
 def build_store_models(storage: StorageConfig) -> StoreModels:
     """Storage 설정으로 ORM 모델 클래스를 생성한다."""
 
-    schema = storage.postgresql.schema if storage.provider == "postgresql" else None
+    schema = storage.postgresql.db_schema if storage.provider == "postgresql" else None
     tables = storage.postgresql.tables
 
     class Base(DeclarativeBase):
@@ -83,7 +83,7 @@ def build_store_models(storage: StorageConfig) -> StoreModels:
 
         activity_id: Mapped[str] = mapped_column(String, primary_key=True)
         run_id: Mapped[str] = mapped_column(String, nullable=False)
-        step_index: Mapped[int] = mapped_column(Integer, nullable=False)
+        round_index: Mapped[int] = mapped_column(Integer, nullable=False)
         source_actor_id: Mapped[str] = mapped_column(String, nullable=False)
         visibility: Mapped[str] = mapped_column(String, nullable=False)
         thread_id: Mapped[str | None] = mapped_column(String)
@@ -95,12 +95,12 @@ def build_store_models(storage: StorageConfig) -> StoreModels:
     class ObserverReportRecord(Base):
         __tablename__ = tables.observer_reports
         __table_args__ = (
-            PrimaryKeyConstraint("run_id", "step_index"),
+            PrimaryKeyConstraint("run_id", "round_index"),
             {"schema": schema} if schema else {},
         )
 
         run_id: Mapped[str] = mapped_column(String, nullable=False)
-        step_index: Mapped[int] = mapped_column(Integer, nullable=False)
+        round_index: Mapped[int] = mapped_column(Integer, nullable=False)
         report_json: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False)
         created_at: Mapped[datetime] = mapped_column(
             DateTime(timezone=True), nullable=False

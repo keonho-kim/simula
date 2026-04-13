@@ -1,5 +1,5 @@
 """목적:
-- 동적 시뮬레이션 시간 진행의 공용 단위와 라벨 규칙을 제공한다.
+- 동적 시뮬레이션 elapsed time의 공용 단위와 라벨 규칙을 제공한다.
 
 설명:
 - planner, runtime, finalization이 같은 canonical 시간 표현을 사용하도록

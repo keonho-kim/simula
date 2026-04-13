@@ -84,7 +84,7 @@ class SqlAlchemyAppStore(AppStore):
             self.models.base.metadata.create_all(self.engine)
             return
 
-        schema = self.storage.postgresql.schema
+        schema = self.storage.postgresql.db_schema
         with self.engine.begin() as connection:
             connection.exec_driver_sql(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
         self.models.base.metadata.create_all(self.engine)
@@ -155,7 +155,7 @@ class SqlAlchemyAppStore(AppStore):
                 )
             session.commit()
 
-    def save_step_artifacts(
+    def save_round_artifacts(
         self,
         run_id: str,
         *,
@@ -170,7 +170,7 @@ class SqlAlchemyAppStore(AppStore):
                     self.models.activity_record(
                         run_id=run_id,
                         activity_id=str(activity["activity_id"]),
-                        step_index=int(str(activity["step_index"])),
+                        round_index=int(str(activity["round_index"])),
                         source_actor_id=str(activity["source_actor_id"]),
                         visibility=str(activity["visibility"]),
                         thread_id=cast(str | None, activity.get("thread_id")),
@@ -181,7 +181,7 @@ class SqlAlchemyAppStore(AppStore):
             session.merge(
                 self.models.observer_report_record(
                     run_id=run_id,
-                    step_index=int(str(observer_report["step_index"])),
+                    round_index=int(str(observer_report["round_index"])),
                     report_json=observer_report,
                     created_at=_parse_timestamp(iso_timestamp()),
                 )

@@ -1,5 +1,5 @@
 """목적:
-- runtime 단계의 순수 상태 전이 규칙을 제공한다.
+- runtime round의 순수 action 상태 전이 규칙을 제공한다.
 
 설명:
 - actor action proposal 결과를 canonical action과 actor feed 상태에 반영하는
@@ -30,12 +30,12 @@ from simula.domain.activity_feeds import (
 from simula.domain.contracts import ActionCatalog, ActorActionProposal
 
 
-class RoutedStepState(TypedDict):
+class RoutedRoundState(TypedDict):
     """proposal 결과를 action 상태로 반영한 결과다."""
 
     activity_feeds: dict[str, dict[str, object]]
     activities: list[dict[str, object]]
-    latest_step_activities: list[dict[str, object]]
+    latest_round_activities: list[dict[str, object]]
     forced_idle_count: int
     parse_failure_count: int
 
@@ -54,19 +54,19 @@ class ActorProposalPayload(TypedDict):
 def apply_actor_proposals(
     *,
     run_id: str,
-    step_index: int,
+    round_index: int,
     actors: list[dict[str, object]],
     activity_feeds: dict[str, dict[str, object]],
     activities: list[dict[str, object]],
     action_catalog: dict[str, object],
     pending_actor_proposals: list[ActorProposalPayload],
     max_targets_per_activity: int,
-) -> RoutedStepState:
+) -> RoutedRoundState:
     """병렬 actor action proposal 결과를 feed/action 상태에 반영한다."""
 
     updated_feeds = dict(activity_feeds)
     all_activities = list(activities)
-    latest_step_activities: list[dict[str, object]] = []
+    latest_round_activities: list[dict[str, object]] = []
     forced_idle_count = 0
     parse_failure_count = 0
     catalog = ActionCatalog.model_validate(action_catalog)
@@ -84,7 +84,7 @@ def apply_actor_proposals(
 
         try:
             proposal = ActorActionProposal.model_validate(proposal_result["proposal"])
-        except ValidationError, ValueError, TypeError:
+        except (ValidationError, ValueError, TypeError):
             continue
 
         if proposal.action_type not in action_catalog_by_type:
@@ -125,7 +125,7 @@ def apply_actor_proposals(
 
         action = create_canonical_action(
             run_id=run_id,
-            step_index=step_index,
+            round_index=round_index,
             source_actor_id=actor_id,
             visibility=proposal.visibility,
             target_actor_ids=target_actor_ids,
@@ -144,13 +144,13 @@ def apply_actor_proposals(
         )
         action_payload = action.model_dump(mode="json")
         all_activities.append(action_payload)
-        latest_step_activities.append(action_payload)
+        latest_round_activities.append(action_payload)
         updated_feeds = route_activity(updated_feeds, action_payload)
 
     return {
         "activity_feeds": updated_feeds,
         "activities": all_activities,
-        "latest_step_activities": latest_step_activities,
+        "latest_round_activities": latest_round_activities,
         "forced_idle_count": forced_idle_count,
         "parse_failure_count": parse_failure_count,
     }
@@ -159,7 +159,7 @@ def apply_actor_proposals(
 def apply_adopted_actor_proposals(
     *,
     run_id: str,
-    step_index: int,
+    round_index: int,
     actors: list[dict[str, object]],
     activity_feeds: dict[str, dict[str, object]],
     activities: list[dict[str, object]],
@@ -167,7 +167,7 @@ def apply_adopted_actor_proposals(
     pending_actor_proposals: list[ActorProposalPayload],
     adopted_actor_ids: list[str],
     max_targets_per_activity: int,
-) -> RoutedStepState:
+) -> RoutedRoundState:
     """채택된 actor proposal만 canonical action으로 반영한다."""
 
     adopted_set = {str(actor_id) for actor_id in adopted_actor_ids}
@@ -178,7 +178,7 @@ def apply_adopted_actor_proposals(
     ]
     return apply_actor_proposals(
         run_id=run_id,
-        step_index=step_index,
+        round_index=round_index,
         actors=actors,
         activity_feeds=activity_feeds,
         activities=activities,

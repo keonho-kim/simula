@@ -47,12 +47,12 @@ def test_orm_store_persists_runtime_artifacts(tmp_path) -> None:
                 {"actor_id": "b", "display_name": "B"},
             ],
         )
-        store.save_step_artifacts(
+        store.save_round_artifacts(
             "run-1",
             activities=[
                 {
                     "activity_id": "a1",
-                    "step_index": 1,
+                    "round_index": 1,
                     "source_actor_id": "a",
                     "visibility": "public",
                     "thread_id": None,
@@ -60,7 +60,7 @@ def test_orm_store_persists_runtime_artifacts(tmp_path) -> None:
                 }
             ],
             observer_report={
-                "step_index": 1,
+                "round_index": 1,
                 "summary": "요약",
                 "notable_events": ["발언"],
                 "atmosphere": "긴장",
@@ -78,13 +78,24 @@ def test_orm_store_persists_runtime_artifacts(tmp_path) -> None:
                 "world_state_summary": "공개 흐름이 시작됐다.",
                 "elapsed_simulation_minutes": 30,
                 "elapsed_simulation_label": "30분",
-                "steps_completed": 1,
+                "rounds_completed": 1,
                 "actor_count": 2,
                 "total_activities": 1,
                 "visibility_activity_counts": {"public": 1},
                 "last_observer_summary": "요약",
                 "notable_events": ["발언"],
                 "errors": [],
+                "llm_usage_summary": {
+                    "total_calls": 1,
+                    "calls_by_role": {"planner": 1},
+                    "structured_calls": 1,
+                    "text_calls": 0,
+                    "parse_failures": 0,
+                    "forced_defaults": 0,
+                    "input_tokens": None,
+                    "output_tokens": None,
+                    "total_tokens": None,
+                },
             },
         )
         store.mark_run_status("run-1", "completed")

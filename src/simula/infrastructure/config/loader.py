@@ -28,11 +28,6 @@ from simula.infrastructure.config.sources import (
 )
 from simula.infrastructure.config.validation import validate_settings
 
-_REMOVED_RUNTIME_TIME_KEYS = (
-    "SIM_TIME_UNIT",
-    "SIM_TIME_STEP_SIZE",
-)
-
 
 @dataclass(frozen=True, slots=True)
 class LoadedSettingsBundle:
@@ -72,23 +67,10 @@ def load_settings_bundle(
             {key: value for key, value in cli_overrides.items() if value is not None}
         )
 
-    _validate_removed_runtime_time_keys(merged)
     _validate_raw_storage_shape(merged)
     settings = build_settings_from_values(merged)
     validate_settings(settings)
     return LoadedSettingsBundle(settings=settings)
-
-
-def _validate_removed_runtime_time_keys(values: dict[str, str]) -> None:
-    """제거된 고정 시간축 입력이 들어오면 명시적으로 실패시킨다."""
-
-    for key in _REMOVED_RUNTIME_TIME_KEYS:
-        value = values.get(key)
-        if value is not None and str(value).strip():
-            removed_name = key.removeprefix("SIM_").lower()
-            raise ValueError(
-                f"`{removed_name}` 설정은 더 이상 지원하지 않습니다. 동적 시간축에서는 max_steps만 설정할 수 있습니다."
-            )
 
 
 def _validate_raw_storage_shape(values: dict[str, str]) -> None:

@@ -25,8 +25,8 @@ from simula.domain.contracts import (
     ExecutionPlanBundle,
     FinalReportSections,
     PlanningAnalysis,
-    StepDirective,
-    StepResolution,
+    RoundDirective,
+    RoundResolution,
     TimelineAnchorDecision,
 )
 from simula.infrastructure.config.models import (
@@ -37,6 +37,7 @@ from simula.infrastructure.config.models import (
     RuntimeConfig,
     StorageConfig,
 )
+from simula.infrastructure.llm.usage import LLMUsageTracker
 
 
 @dataclass(slots=True)
@@ -66,9 +67,9 @@ class FakeRouter:
                     private_context=["비공개 조율이 실제 선택을 움직인다."],
                     key_pressures=["시간 압박"],
                     progression_plan={
-                        "max_steps": 1,
-                        "allowed_units": ["minute", "hour"],
-                        "default_unit": "minute",
+                        "max_rounds": 1,
+                        "allowed_elapsed_units": ["minute", "hour"],
+                        "default_elapsed_unit": "minute",
                         "pacing_guidance": ["직접 반응은 짧게 본다."],
                         "selection_reason": "짧은 직접 반응이 중심이다.",
                     },
@@ -107,7 +108,7 @@ class FakeRouter:
                         "background_motion_rules": ["직접 추적하지 않은 actor는 배경 update로만 남긴다."],
                         "focus_archetypes": ["직접 압박"],
                         "attention_shift_rules": ["조용했던 actor도 압력이 올라가면 끌어올린다."],
-                        "budget_guidance": ["한 step에는 소수 actor만 직접 호출한다."],
+                        "budget_guidance": ["한 round에는 소수 actor만 직접 호출한다."],
                     },
                     cast_roster={
                         "items": [
@@ -168,10 +169,10 @@ class FakeRouter:
                 ),
                 FakeMeta(),
             )
-        if schema is StepDirective:
+        if schema is RoundDirective:
             return (
-                StepDirective(
-                    step_index=1,
+                RoundDirective(
+                    round_index=1,
                     focus_summary="Alpha의 직접 압박을 따라간다.",
                     selection_reason="현재 직접 반응 압력이 가장 높다.",
                     selected_actor_ids=["alpha"],
@@ -188,7 +189,7 @@ class FakeRouter:
                     ],
                     background_updates=[
                         {
-                            "step_index": 1,
+                            "round_index": 1,
                             "actor_id": "beta",
                             "summary": "Beta는 직접 호출되지는 않았지만 반응 압력이 올라간다.",
                             "pressure_level": "medium",
@@ -213,9 +214,9 @@ class FakeRouter:
                 ),
                 FakeMeta(),
             )
-        if schema is StepResolution:
+        if schema is RoundResolution:
             return (
-                StepResolution(
+                RoundResolution(
                     adopted_actor_ids=["alpha"],
                     updated_intent_states=[
                         {
@@ -235,14 +236,14 @@ class FakeRouter:
                             "changed_from_previous": False,
                         },
                     ],
-                    step_time_advance={
+                    round_time_advance={
                         "elapsed_unit": "minute",
                         "elapsed_amount": 30,
                         "selection_reason": "짧은 직접 반응이 중심이다.",
                         "signals": ["직접 압박"],
                     },
                     observer_report={
-                        "step_index": 1,
+                        "round_index": 1,
                         "summary": "직접 압박이 쌓이며 다음 선택 압력이 커졌다.",
                         "notable_events": ["Alpha가 재검토를 요구했다."],
                         "atmosphere": "긴장",
@@ -282,7 +283,7 @@ class FakeStore:
     def __init__(self) -> None:
         self.plans: list[dict[str, object]] = []
         self.actors: list[list[dict[str, object]]] = []
-        self.step_artifacts: list[dict[str, object]] = []
+        self.round_artifacts: list[dict[str, object]] = []
         self.final_reports: list[dict[str, object]] = []
 
     def save_plan(self, run_id: str, plan: dict[str, object]) -> None:
@@ -291,14 +292,14 @@ class FakeStore:
     def save_actors(self, run_id: str, actors: list[dict[str, object]]) -> None:
         self.actors.append([{"run_id": run_id, **actor} for actor in actors])
 
-    def save_step_artifacts(
+    def save_round_artifacts(
         self,
         run_id: str,
         *,
         activities: list[dict[str, object]],
         observer_report: dict[str, object],
     ) -> None:
-        self.step_artifacts.append(
+        self.round_artifacts.append(
             {
                 "run_id": run_id,
                 "activities": activities,
@@ -322,7 +323,7 @@ def _settings() -> AppSettings:
             observer=model,
             fixer=model,
         ),
-        runtime=RuntimeConfig(max_steps=1, enable_checkpointing=False),
+        runtime=RuntimeConfig(max_rounds=1, enable_checkpointing=False),
         storage=StorageConfig(),
     )
 
@@ -349,10 +350,10 @@ def test_build_simulation_input_state_is_compact() -> None:
         "run_id",
         "scenario",
         "scenario_controls",
-        "max_steps",
+        "max_rounds",
         "rng_seed",
     }
-    assert input_state["max_steps"] == 1
+    assert input_state["max_rounds"] == 1
 
 
 def test_expand_input_state_to_workflow_state_fills_required_defaults() -> None:
@@ -374,7 +375,7 @@ def test_expand_input_state_to_workflow_state_fills_required_defaults() -> None:
     assert state["planning_latency_seconds"] == 0.0
     assert state["plan"] == {}
     assert state["scenario_controls"]["create_all_participants"] is False
-    assert state["step_focus_plan"] == {}
+    assert state["round_focus_plan"] == {}
     assert state["final_report_sections"] == {}
 def test_hydrate_initial_state_expands_compact_input_for_root_graph() -> None:
     settings = _settings()
@@ -384,6 +385,7 @@ def test_hydrate_initial_state_expands_compact_input_for_root_graph() -> None:
         store=store,  # type: ignore[arg-type]
         llms=FakeRouter(),  # type: ignore[arg-type]
         logger=logging.getLogger("simula.test.graph"),
+        llm_usage_tracker=LLMUsageTracker(),
     )
     input_state = build_simulation_input_state(
         run_id="run-graph",
@@ -398,7 +400,7 @@ def test_hydrate_initial_state_expands_compact_input_for_root_graph() -> None:
 
     assert hydrated["run_id"] == "run-graph"
     assert hydrated["planning_latency_seconds"] == 0.0
-    assert hydrated["step_focus_plan"] == {}
+    assert hydrated["round_focus_plan"] == {}
     assert hydrated["final_report_markdown"] == ""
 
 
@@ -440,7 +442,9 @@ def test_executor_uses_compact_input_state(monkeypatch) -> None:
     monkeypatch.setattr(
         executor_module,
         "build_model_router",
-        lambda settings: SimpleNamespace(logger=logging.getLogger("simula.test.llm")),
+        lambda settings, usage_tracker: SimpleNamespace(  # noqa: ARG005
+            logger=logging.getLogger("simula.test.llm")
+        ),
     )
     monkeypatch.setattr(executor_module, "SIMULATION_WORKFLOW", FakeApp())
 
@@ -472,7 +476,7 @@ def test_executor_uses_compact_input_state(monkeypatch) -> None:
         "run_id": "20260413.1",
         "scenario": "scenario",
         "scenario_controls": {"create_all_participants": False},
-        "max_steps": 1,
+        "max_rounds": 1,
         "rng_seed": captured["state"]["rng_seed"],
     }
     assert captured["context_logger_name"] == "simula.workflow.run.20260413.1"
@@ -505,7 +509,9 @@ def test_executor_logs_original_failure_traceback(monkeypatch, caplog) -> None:
     monkeypatch.setattr(
         executor_module,
         "build_model_router",
-        lambda settings: SimpleNamespace(logger=logging.getLogger("simula.test.llm")),
+        lambda settings, usage_tracker: SimpleNamespace(  # noqa: ARG005
+            logger=logging.getLogger("simula.test.llm")
+        ),
     )
     monkeypatch.setattr(executor_module, "SIMULATION_WORKFLOW", FakeApp())
 

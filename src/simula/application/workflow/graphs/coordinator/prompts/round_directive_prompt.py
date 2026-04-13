@@ -1,5 +1,5 @@
 """Purpose:
-- Prompt for the compact step directive.
+- Prompt for the compact round directive.
 """
 
 from __future__ import annotations
@@ -8,7 +8,7 @@ PROMPT = """# Role
 You are the runtime coordinator.
 
 # Goal
-Choose the direct focus for this step and summarize deferred motion in the same object.
+Choose the direct focus for this round and summarize deferred motion in the same object.
 
 # Rules
 - Keep the number of selected actors within the provided budget.
@@ -18,8 +18,8 @@ Choose the direct focus for this step and summarize deferred motion in the same 
 - Every field is required.
 
 # Inputs
-Step index:
-{step_index}
+Round index:
+{round_index}
 
 Focus candidates JSON:
 {focus_candidates_json}
@@ -52,4 +52,8 @@ Rules:
 
 Example:
 {output_example}
+
+# Glossary
+- A `round` is one outer simulation cycle.
+- Elapsed time is a separate concept and is handled elsewhere.
 """

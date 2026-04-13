@@ -30,7 +30,7 @@ def validate_settings(settings: AppSettings) -> None:
         postgres = settings.storage.postgresql
         if not postgres.database.strip():
             raise ValueError("postgresql database 이름이 비어 있습니다.")
-        if not postgres.schema_name.strip():
+        if not postgres.db_schema.strip():
             raise ValueError("postgresql schema 이름이 비어 있습니다.")
 
     role_configs = (

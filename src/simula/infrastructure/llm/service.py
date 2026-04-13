@@ -31,6 +31,7 @@ from simula.infrastructure.llm.router import (
     _merge_ttft,
     build_raw_model_router,
 )
+from simula.infrastructure.llm.usage import LLMUsageTracker
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
 
@@ -89,7 +90,11 @@ class AsyncStructuredLLMService:
                 attempt_input,
                 attempt_output,
                 attempt_total,
-            ) = await self.router._ainvoke_with_metrics(role, candidate)
+            ) = await self.router._ainvoke_with_metrics(
+                role,
+                candidate,
+                call_kind="structured",
+            )
             ttft_seconds = _merge_ttft(ttft_seconds, attempt_ttft)
             input_tokens = _merge_token_count(input_tokens, attempt_input)
             output_tokens = _merge_token_count(output_tokens, attempt_output)
@@ -110,6 +115,10 @@ class AsyncStructuredLLMService:
                     output_tokens=output_tokens,
                     total_tokens=total_tokens,
                     log_context=log_context,
+                )
+                self.router.usage_tracker.record_structured_outcome(
+                    parse_failures=parse_failure_count,
+                    forced_default=False,
                 )
                 return parsed, StructuredCallMeta(
                     parse_failure_count=parse_failure_count,
@@ -162,6 +171,10 @@ class AsyncStructuredLLMService:
                 total_tokens=total_tokens,
                 log_context=log_context,
             )
+            self.router.usage_tracker.record_structured_outcome(
+                parse_failures=parse_failure_count,
+                forced_default=False,
+            )
             return parsed, StructuredCallMeta(
                 parse_failure_count=parse_failure_count,
                 forced_default=False,
@@ -193,6 +206,10 @@ class AsyncStructuredLLMService:
                 raise ValueError(
                     f"{role} 기본 강등 payload가 스키마를 만족하지 않습니다. error={exc}"
                 ) from exc
+            self.router.usage_tracker.record_structured_outcome(
+                parse_failures=parse_failure_count,
+                forced_default=True,
+            )
             return default_parsed, StructuredCallMeta(
                 parse_failure_count=parse_failure_count,
                 forced_default=True,
@@ -239,10 +256,16 @@ class AsyncStructuredLLMService:
         )
 
 
-def build_model_router(settings: AppSettings) -> AsyncStructuredLLMService:
+def build_model_router(
+    settings: AppSettings,
+    *,
+    usage_tracker: LLMUsageTracker,
+) -> AsyncStructuredLLMService:
     """앱이 사용할 structured LLM service를 생성한다."""
 
-    return AsyncStructuredLLMService(build_raw_model_router(settings))
+    return AsyncStructuredLLMService(
+        build_raw_model_router(settings, usage_tracker=usage_tracker)
+    )
 
 
 def _build_structured_attempt_prompts(prompt: str, parser: Any) -> tuple[str, str]:

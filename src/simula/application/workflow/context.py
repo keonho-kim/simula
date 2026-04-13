@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from simula.application.ports.llm import StructuredLLM
 from simula.application.ports.storage import AppStore
 from simula.infrastructure.config.models import AppSettings
+from simula.infrastructure.llm.usage import LLMUsageTracker
 
 
 @dataclass(slots=True)
@@ -30,3 +31,4 @@ class WorkflowRuntimeContext:
     store: AppStore
     llms: StructuredLLM
     logger: logging.Logger
+    llm_usage_tracker: LLMUsageTracker

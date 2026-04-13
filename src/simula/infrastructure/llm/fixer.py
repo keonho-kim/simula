@@ -56,9 +56,9 @@ _KNOWN_VALIDATION_RULES: dict[str, tuple[str, ...]] = {
         "end must not be empty.",
     ),
     "RuntimeProgressionPlan": (
-        "allowed_units must not be empty.",
-        "allowed_units values must be unique.",
-        "default_unit must be included in allowed_units.",
+        "allowed_elapsed_units must not be empty.",
+        "allowed_elapsed_units values must be unique.",
+        "default_elapsed_unit must be included in allowed_elapsed_units.",
         "selection_reason must not be empty.",
     ),
     "PlanningAnalysis": (

@@ -35,7 +35,7 @@ def iso_timestamp() -> str:
 def create_canonical_action(
     *,
     run_id: str,
-    step_index: int,
+    round_index: int,
     source_actor_id: str,
     visibility: VisibilityType,
     target_actor_ids: list[str],
@@ -53,7 +53,7 @@ def create_canonical_action(
     return CanonicalAction(
         activity_id=new_action_id(),
         run_id=run_id,
-        step_index=step_index,
+        round_index=round_index,
         source_actor_id=source_actor_id,
         visibility=visibility,
         target_actor_ids=target_actor_ids,

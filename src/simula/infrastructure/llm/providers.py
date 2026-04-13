@@ -207,6 +207,7 @@ class OpenAIChatModelBuilder:
             "timeout": openai_spec.timeout_seconds,
             "api_key": openai_spec.api_key,
             "base_url": openai_spec.base_url,
+            "model_kwargs": {"stream_options": {"include_usage": True}},
         }
         if _is_openai_gpt5_model(openai_spec.model):
             model_kwargs["use_responses_api"] = True
@@ -350,6 +351,8 @@ class VllmChatModelBuilder:
             timeout=vllm_spec.timeout_seconds,
             api_key=vllm_spec.api_key,
             base_url=vllm_spec.base_url,
+            model_kwargs={"stream_options": {"include_usage": True}},
+            extra_body={"stream_include_usage": True},
         )
 
 
