@@ -27,7 +27,6 @@ Generates `PlanningAnalysis` in one structured call. This bundle captures:
 - public context
 - private context
 - key pressures
-- observation points
 - progression plan
 
 ### `build_execution_plan`
@@ -38,6 +37,8 @@ Generates `ExecutionPlanBundle` from the planning analysis. This bundle contains
 - `action_catalog`
 - `coordination_frame`
 - `cast_roster`
+
+`cast_roster` generation is guided by `scenario_controls.create_all_participants`.
 
 ### `finalize_plan`
 

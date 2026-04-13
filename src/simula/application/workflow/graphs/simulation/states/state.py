@@ -15,6 +15,7 @@ from simula.application.workflow.graphs.runtime.states.state import (
     ActorProposalTask,
 )
 from simula.application.workflow.reducer.collections import extend_list, extend_str_list
+from simula.domain.scenario_controls import ScenarioControls
 
 
 class SimulationInputState(TypedDict):
@@ -22,6 +23,7 @@ class SimulationInputState(TypedDict):
 
     run_id: str
     scenario: str
+    scenario_controls: ScenarioControls
     max_steps: int
     rng_seed: int
 
@@ -42,6 +44,7 @@ class SimulationWorkflowState(TypedDict):
 
     run_id: str
     scenario: str
+    scenario_controls: ScenarioControls
     max_steps: int
     checkpoint_enabled: bool
     rng_seed: int

@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from simula.application.services.executor import SimulationExecutor
+from simula.domain.scenario_controls import ScenarioControls
 from simula.infrastructure.config.loader import load_settings_bundle
 from simula.infrastructure.config.models import AppSettings
 
@@ -80,6 +81,7 @@ def execute_single_run(
     *,
     env_file: str | None,
     scenario_text: str,
+    scenario_controls: ScenarioControls,
     cli_overrides: dict[str, str],
 ) -> SingleRunOutcome:
     """단일 실행 유스케이스를 수행한다."""
@@ -91,6 +93,7 @@ def execute_single_run(
     settings = settings_bundle.settings
     executor = SimulationExecutor(
         settings,
+        scenario_controls=scenario_controls,
         env_file_hint=env_file,
         trial_index=None,
         total_trials=None,
@@ -122,6 +125,7 @@ def execute_multi_run(
     *,
     env_file: str | None,
     scenario_text: str,
+    scenario_controls: ScenarioControls,
     cli_overrides: dict[str, str],
     trials: int,
     parallel: bool,
@@ -140,6 +144,7 @@ def execute_multi_run(
         outcome = execute_single_run(
             env_file=env_file,
             scenario_text=scenario_text,
+            scenario_controls=scenario_controls,
             cli_overrides=cli_overrides,
         )
         return MultiRunOutcome(
@@ -164,6 +169,7 @@ def execute_multi_run(
             settings=settings,
             env_file=env_file,
             scenario_text=scenario_text,
+            scenario_controls=scenario_controls,
             trials=trials,
         )
     else:
@@ -172,6 +178,7 @@ def execute_multi_run(
                 base_settings=settings,
                 env_file=env_file,
                 scenario_text=scenario_text,
+                scenario_controls=scenario_controls,
                 trial_index=trial_index,
                 total_trials=trials,
             )
@@ -191,6 +198,7 @@ def _run_trials_parallel(
     settings: AppSettings,
     env_file: str | None,
     scenario_text: str,
+    scenario_controls: ScenarioControls,
     trials: int,
 ) -> list[TrialRunOutcome]:
     futures: list[concurrent.futures.Future[TrialRunOutcome]] = []
@@ -204,6 +212,7 @@ def _run_trials_parallel(
                     base_settings=settings,
                     env_file=env_file,
                     scenario_text=scenario_text,
+                    scenario_controls=scenario_controls,
                     trial_index=trial_index,
                     total_trials=trials,
                 )
@@ -224,6 +233,7 @@ def _execute_trial(
     base_settings: AppSettings,
     env_file: str | None,
     scenario_text: str,
+    scenario_controls: ScenarioControls,
     trial_index: int,
     total_trials: int,
 ) -> TrialRunOutcome:
@@ -237,6 +247,7 @@ def _execute_trial(
     )
     executor = SimulationExecutor(
         trial_settings,
+        scenario_controls=scenario_controls,
         env_file_hint=env_file,
         trial_index=trial_index,
         total_trials=total_trials,

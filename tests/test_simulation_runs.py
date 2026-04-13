@@ -28,12 +28,14 @@ class FakeExecutor:
         self,
         settings: object,
         *,
+        scenario_controls: dict[str, bool],
         env_file_hint: str | None = None,
         trial_index: int | None = None,
         total_trials: int | None = None,
         parallel: bool = False,
     ) -> None:
         self.settings = settings
+        self.scenario_controls = scenario_controls
         self.env_file_hint = env_file_hint
         self.trial_index = trial_index
         self.total_trials = total_trials
@@ -140,11 +142,19 @@ def _write_env_file(path: Path) -> None:
             provider = "openai"
             model = "gpt-5.4-mini"
 
+            [llm.coordinator]
+            provider = "openai"
+            model = "gpt-5.4-mini"
+
             [llm.actor]
             provider = "ollama"
             model = "qwen3:8b"
 
             [llm.observer]
+            provider = "openai"
+            model = "gpt-5.4-mini"
+
+            [llm.fixer]
             provider = "openai"
             model = "gpt-5.4-mini"
             """
@@ -161,6 +171,7 @@ def test_execute_multi_run_runs_trials_sequentially(monkeypatch, tmp_path) -> No
     outcome = simulation_runs.execute_multi_run(
         env_file=str(env_file),
         scenario_text="테스트 시나리오",
+        scenario_controls={"create_all_participants": False},
         cli_overrides={},
         trials=3,
         parallel=False,
@@ -183,6 +194,7 @@ def test_execute_multi_run_runs_trials_in_parallel(monkeypatch, tmp_path) -> Non
     outcome = simulation_runs.execute_multi_run(
         env_file=str(env_file),
         scenario_text="테스트 시나리오",
+        scenario_controls={"create_all_participants": False},
         cli_overrides={},
         trials=3,
         parallel=True,
@@ -244,6 +256,7 @@ def test_execute_multi_run_parallel_uses_cpu_capped_workers(
     outcome = simulation_runs.execute_multi_run(
         env_file=str(env_file),
         scenario_text="테스트 시나리오",
+        scenario_controls={"create_all_participants": False},
         cli_overrides={},
         trials=5,
         parallel=True,

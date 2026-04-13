@@ -105,7 +105,6 @@ class PlanningAnalysis(BaseModel):
     public_context: list[str]
     private_context: list[str]
     key_pressures: list[str]
-    observation_points: list[str]
     progression_plan: RuntimeProgressionPlan
 
     @model_validator(mode="after")

@@ -127,6 +127,12 @@ Common runtime controls:
 - `runtime.rng_seed`
 - `--log-level` for CLI-visible logging verbosity
 
+Scenario files may also include YAML frontmatter. The active authoring control is:
+
+- `create_all_participants`
+  - `true`: treat the scenario as a closed cast and include all implied participants
+  - `false`: generate a large-enough cast for autonomous simulation while preserving core actors
+
 ## Sample Scenarios
 
 The repository includes scenario seeds in [`senario.samples/`](./senario.samples/README.md):

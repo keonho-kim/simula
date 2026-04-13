@@ -21,12 +21,17 @@ def build_planning_analysis_prompt_bundle(
 
 def build_execution_plan_prompt_bundle(
     *,
+    create_all_participants: bool,
     example_mode: ExampleMode = "minimal",
 ) -> dict[str, str]:
-    return build_json_prompt_bundle(
+    bundle = build_json_prompt_bundle(
         example=_EXECUTION_PLAN_EXAMPLE,
         example_mode=example_mode,
     )
+    bundle["cast_roster_policy"] = _build_cast_roster_policy_text(
+        create_all_participants=create_all_participants
+    )
+    return bundle
 
 
 _PLANNING_ANALYSIS_EXAMPLE: dict[str, Any] = {
@@ -39,7 +44,6 @@ _PLANNING_ANALYSIS_EXAMPLE: dict[str, Any] = {
     "public_context": ["공개 발언이 판세를 흔들 수 있다."],
     "private_context": ["비공개 조율이 실제 선택을 움직인다."],
     "key_pressures": ["시간 압박", "정보 비대칭"],
-    "observation_points": ["누가 먼저 공개 신호를 내는가", "누가 마지막 정렬을 주도하는가"],
     "progression_plan": {
         "max_steps": 8,
         "allowed_units": ["minute", "hour", "day"],
@@ -101,3 +105,19 @@ _EXECUTION_PLAN_EXAMPLE: dict[str, Any] = {
         ]
     },
 }
+
+
+def _build_cast_roster_policy_text(*, create_all_participants: bool) -> str:
+    if create_all_participants:
+        return (
+            "- `create_all_participants` is true.\n"
+            "- Treat this as a closed-participant scenario.\n"
+            "- Include every participant implied by the scenario in `cast_roster`.\n"
+            "- Do not drop, merge, or summarize away participants."
+        )
+    return (
+        "- `create_all_participants` is false.\n"
+        "- Generate a large-enough `cast_roster` for the simulation to move autonomously.\n"
+        "- Always include the scenario's core actors.\n"
+        "- If the scenario structure suggests more participants, prefer adding enough participants over keeping the roster too small."
+    )

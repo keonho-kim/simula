@@ -54,7 +54,6 @@ def test_build_planning_analysis_returns_required_bundle() -> None:
                     public_context=["공개 압박"],
                     private_context=["비공개 계산"],
                     key_pressures=["시간 압박"],
-                    observation_points=["누가 먼저 움직이는가"],
                     progression_plan={
                         "max_steps": 6,
                         "allowed_units": ["hour"],
@@ -68,6 +67,7 @@ def test_build_planning_analysis_returns_required_bundle() -> None:
 
     state = {
         "scenario": "테스트 시나리오",
+        "scenario_controls": {"create_all_participants": False},
         "max_steps": 6,
         "planning_latency_seconds": 0.0,
     }
@@ -133,6 +133,7 @@ def test_build_execution_plan_returns_minimum_plan_payload() -> None:
             )
 
     state = {
+        "scenario_controls": {"create_all_participants": True},
         "max_steps": 6,
         "planning_latency_seconds": 0.0,
         "planning_analysis": {
@@ -142,7 +143,6 @@ def test_build_execution_plan_returns_minimum_plan_payload() -> None:
             "public_context": ["공개"],
             "private_context": ["비공개"],
             "key_pressures": ["압박"],
-            "observation_points": ["관찰"],
             "progression_plan": {
                 "max_steps": 6,
                 "allowed_units": ["hour"],

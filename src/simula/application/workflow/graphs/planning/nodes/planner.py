@@ -63,7 +63,11 @@ async def build_execution_plan(
             separators=(",", ":"),
         ),
         max_steps=state["max_steps"],
-        **build_execution_plan_prompt_bundle(),
+        **build_execution_plan_prompt_bundle(
+            create_all_participants=state["scenario_controls"][
+                "create_all_participants"
+            ]
+        ),
     )
     plan_bundle, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "planner",
@@ -111,7 +115,6 @@ def _build_plan_payload(
     public_context = planning_analysis.get("public_context", [])
     private_context = planning_analysis.get("private_context", [])
     key_pressures = planning_analysis.get("key_pressures", [])
-    observation_points = planning_analysis.get("observation_points", [])
     situation = cast(dict[str, object], execution_plan["situation"])
     progression_plan = cast(dict[str, object], planning_analysis["progression_plan"])
     action_catalog = cast(dict[str, object], execution_plan["action_catalog"])
@@ -127,7 +130,6 @@ def _build_plan_payload(
         "public_context": list(cast(list[object], public_context)),
         "private_context": list(cast(list[object], private_context)),
         "key_pressures": list(cast(list[object], key_pressures)),
-        "observation_points": list(cast(list[object], observation_points)),
     }
     return {
         "interpretation": interpretation,

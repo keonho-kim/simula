@@ -62,18 +62,24 @@ def test_planning_analysis_prompt_smoke() -> None:
     assert "{scenario_text}" not in prompt
     assert "brief_summary" in prompt
     assert "progression_plan" in prompt
+    assert "do not infer a concrete value" in prompt
+    assert "Do not import outside genre knowledge" in prompt
+    assert "Do not turn the scenario into observation questions" in prompt
 
 
 def test_execution_plan_prompt_smoke() -> None:
     prompt = BUILD_EXECUTION_PLAN_PROMPT.format(
         planning_analysis_json="{}",
         max_steps=8,
-        **build_execution_plan_prompt_bundle(),
+        **build_execution_plan_prompt_bundle(create_all_participants=True),
     )
 
     assert "{planning_analysis_json}" not in prompt
     assert "cast_roster" in prompt
     assert "action_catalog" in prompt
+    assert "Cast roster policy:" in prompt
+    assert "`create_all_participants` is true" in prompt
+    assert "Do not drop, merge, or summarize away participants" in prompt
 
 
 def test_generation_prompt_smoke() -> None:

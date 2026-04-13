@@ -275,11 +275,6 @@ def build_planning_interpretation_view(
             limit=3,
             text_limit=SHORT_DESCRIPTION_LIMIT,
         ),
-        "observation_points": _truncate_string_list(
-            interpretation.get("observation_points", []),
-            limit=3,
-            text_limit=SHORT_DESCRIPTION_LIMIT,
-        ),
     }
 
 

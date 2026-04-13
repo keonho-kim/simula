@@ -23,6 +23,9 @@ Planning analysis JSON:
 Runtime hard ceiling:
 {max_steps}
 
+Cast roster policy:
+{cast_roster_policy}
+
 # Output
 Format:
 {output_format_name}

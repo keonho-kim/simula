@@ -32,7 +32,6 @@ def test_render_planning_analysis_is_human_readable() -> None:
             public_context=["겉으로는 신중하다."],
             private_context=["속으로는 계산이 많다."],
             key_pressures=["시간 압박", "감정 경쟁"],
-            observation_points=["공개 신호", "비공개 정렬"],
             progression_plan=RuntimeProgressionPlan(
                 max_steps=4,
                 allowed_units=["minute", "hour", "day"],

@@ -30,7 +30,7 @@ from simula.application.services.presentation import (
     print_trial_run_summary,
     write_single_run_outputs,
 )
-from simula.application.services.scenario_inputs import read_scenario_text
+from simula.application.services.scenario_inputs import read_scenario_input
 
 
 def _build_cli_overrides(args: argparse.Namespace) -> dict[str, str]:
@@ -62,12 +62,13 @@ def run_from_cli(args: argparse.Namespace) -> int:
                 cli_overrides=cli_overrides,
             )
         )
-        scenario_text = read_scenario_text(args)
+        scenario_input = read_scenario_input(args)
         if args.trials == 1:
             logger.info("시뮬레이션 실행 시작 | trials=1 parallel=False")
             outcome = execute_single_run(
                 env_file=args.env,
-                scenario_text=scenario_text,
+                scenario_text=scenario_input.scenario_text,
+                scenario_controls=scenario_input.scenario_controls,
                 cli_overrides=cli_overrides,
             )
             saved_outputs = write_single_run_outputs(
@@ -94,7 +95,8 @@ def run_from_cli(args: argparse.Namespace) -> int:
         )
         summary = execute_multi_run(
             env_file=args.env,
-            scenario_text=scenario_text,
+            scenario_text=scenario_input.scenario_text,
+            scenario_controls=scenario_input.scenario_controls,
             cli_overrides=cli_overrides,
             trials=args.trials,
             parallel=args.parallel,

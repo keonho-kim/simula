@@ -11,6 +11,7 @@ from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
 from simula.domain.runtime_policy import derive_rng_seed
+from simula.domain.scenario_controls import ScenarioControls
 from simula.infrastructure.config.models import AppSettings
 
 
@@ -18,6 +19,7 @@ def build_simulation_input_state(
     *,
     run_id: str,
     scenario_text: str,
+    scenario_controls: ScenarioControls,
     settings: AppSettings,
 ) -> SimulationInputState:
     """Build the public graph input payload."""
@@ -25,6 +27,7 @@ def build_simulation_input_state(
     return {
         "run_id": run_id,
         "scenario": scenario_text,
+        "scenario_controls": scenario_controls,
         "max_steps": settings.runtime.max_steps,
         "rng_seed": derive_rng_seed(
             run_id=run_id,
@@ -45,6 +48,7 @@ def expand_input_state_to_workflow_state(
         {
             "run_id": input_state["run_id"],
             "scenario": input_state["scenario"],
+            "scenario_controls": input_state["scenario_controls"],
             "max_steps": input_state["max_steps"],
             "checkpoint_enabled": settings.runtime.enable_checkpointing,
             "rng_seed": input_state["rng_seed"],
