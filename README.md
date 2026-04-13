@@ -7,7 +7,7 @@ machine-friendly `simulation.log.jsonl`.
 
 [Documentation](./docs/README.md) · [Workflow Docs](./docs/workflows/README.md) · [Sample Scenarios](./senario.samples/README.md)
 
-![Python 3.14](https://img.shields.io/badge/python-3.14-blue)
+![Python 3.13](https://img.shields.io/badge/python-3.13-blue)
 ![Package manager uv](https://img.shields.io/badge/package_manager-uv-4B8BBE)
 ![Runtime LangGraph](https://img.shields.io/badge/runtime-LangGraph-1f6feb)
 ![Architecture staged](https://img.shields.io/badge/architecture-staged-0f766e)
@@ -128,11 +128,16 @@ Common runtime controls:
 - `runtime.rng_seed`
 - `--log-level` for CLI-visible logging verbosity
 
-Scenario files may also include YAML frontmatter. The active authoring control is:
+Scenario files must declare YAML frontmatter. The active authoring controls are:
 
-- `create_all_participants`
-  - `true`: treat the scenario as a closed cast and include all implied participants
-  - `false`: generate a large-enough cast for autonomous simulation while preserving core actors
+- `num_cast`
+  - required positive integer
+  - sets the requested cast count for planning and generation
+- `allow_additional_cast`
+  - optional boolean
+  - defaults to `true`
+  - `false`: require exactly `num_cast` cast entries
+  - `true`: require at least `num_cast` cast entries
 
 ## Sample Scenarios
 

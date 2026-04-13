@@ -19,7 +19,9 @@ Sample scenario seeds for local runs.
 
 ## Authoring Rules
 
-- Each sample may start with YAML frontmatter.
-- `create_all_participants: true` means the planner must include the full closed cast in `cast_roster`.
-- `create_all_participants: false` means the planner should generate a large-enough cast for autonomous simulation while preserving core scenario actors.
+- Each sample must start with YAML frontmatter.
+- `num_cast` is required and sets the requested cast count for the scenario.
+- `allow_additional_cast` is optional and defaults to `true`.
+- When `allow_additional_cast: false`, the planner must return exactly `num_cast` cast entries.
+- When `allow_additional_cast: true`, the planner must return at least `num_cast` cast entries.
 - Samples should describe actors, pressures, channels, turning points, and stop conditions without adding viewer-style observation questions.

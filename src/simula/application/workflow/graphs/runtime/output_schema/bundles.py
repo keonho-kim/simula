@@ -39,25 +39,22 @@ def build_observer_report_prompt_bundle(
 
 
 _ACTOR_ACTION_PROPOSAL_EXAMPLE: dict[str, Any] = {
-    "action_type": "speech",
-    "intent": "상대가 우선순위를 다시 보게 만든다.",
-    "intent_target_actor_ids": ["finance-director"],
-    "action_summary": "운영 총괄이 비공개로 재검토를 요청한다.",
-    "action_detail": "운영 총괄은 바로 결정하지 말고 일정 리스크를 다시 확인하자고 조용히 압박한다.",
-    "utterance": "지금 바로 확정하지 말고 일정 리스크부터 다시 보죠.",
-    "visibility": "private",
-    "target_actor_ids": ["finance-director"],
-    "thread_id": "ops-private-thread",
+    "action_type": "<choose one action_type from runtime_guidance.available_actions>",
+    "intent": "<one Korean sentence describing the intended change>",
+    "intent_target_actor_ids": ["<actor_id string or an empty list>"],
+    "action_summary": "<one Korean sentence summarizing the action>",
+    "action_detail": "<one Korean sentence describing the concrete action in more detail>",
+    "utterance": "<one Korean spoken line or an empty string>",
+    "visibility": "<choose exactly one of public, private, group>",
+    "target_actor_ids": ["<real actor_id string when visibility is private or group>"],
+    "thread_id": "<stable thread identifier or an empty string>",
 }
 
 _OBSERVER_REPORT_EXAMPLE: dict[str, Any] = {
-    "round_index": 1,
-    "summary": "직접 action이 먼저 쌓이며 다음 round 선택 압력이 커졌다.",
-    "notable_events": [
-        "운영 총괄이 재검토를 제안했다.",
-        "핵심 실무자들이 같은 방향으로 움직였다.",
-    ],
-    "atmosphere": "경계",
-    "momentum": "medium",
-    "world_state_summary": "직접 조정 action이 누적되며 다음 round 선택 방향이 갈리기 시작했다.",
+    "round_index": "<copy the current round index as an integer>",
+    "summary": "<one Korean sentence summarizing the round outcome>",
+    "notable_events": ["<one notable event from this round>"],
+    "atmosphere": "<short Korean atmosphere label>",
+    "momentum": "<choose exactly one of high, medium, low>",
+    "world_state_summary": "<one Korean sentence describing the updated world state>",
 }

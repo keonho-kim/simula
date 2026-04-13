@@ -68,6 +68,10 @@ async def generate_actor_slot(
             ensure_ascii=False,
             separators=(",", ":"),
         ),
+        requested_num_cast=state["scenario_controls"]["num_cast"],
+        allow_additional_cast=str(
+            state["scenario_controls"]["allow_additional_cast"]
+        ).lower(),
         actor_slot_index=slot["slot_index"],
         target_actor_count=len(list(state["plan"].get("cast_roster", []))),
         cast_item_json=json.dumps(cast_item, ensure_ascii=False, separators=(",", ":")),

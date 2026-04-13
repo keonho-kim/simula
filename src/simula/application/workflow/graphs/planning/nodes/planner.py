@@ -57,16 +57,22 @@ async def build_execution_plan(
     """Build the required execution plan bundle in one call."""
 
     prompt = BUILD_EXECUTION_PLAN_PROMPT.format(
+        scenario_text=state["scenario"],
         planning_analysis_json=json.dumps(
             state["planning_analysis"],
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         max_rounds=state["max_rounds"],
+        num_cast=state["scenario_controls"]["num_cast"],
+        allow_additional_cast=str(
+            state["scenario_controls"]["allow_additional_cast"]
+        ).lower(),
         **build_execution_plan_prompt_bundle(
-            create_all_participants=state["scenario_controls"][
-                "create_all_participants"
-            ]
+            num_cast=state["scenario_controls"]["num_cast"],
+            allow_additional_cast=state["scenario_controls"][
+                "allow_additional_cast"
+            ],
         ),
     )
     plan_bundle, meta = await runtime.context.llms.ainvoke_structured_with_meta(
@@ -94,6 +100,13 @@ def finalize_plan(
     plan = dict(state["plan"])
     cast_roster = list(plan.get("cast_roster", []))
     _validate_unique_cast_roster(cast_roster)
+    _validate_cast_roster_count(
+        cast_roster=cast_roster,
+        num_cast=int(state["scenario_controls"]["num_cast"]),
+        allow_additional_cast=bool(
+            state["scenario_controls"]["allow_additional_cast"]
+        ),
+    )
     action_catalog = cast(dict[str, object], plan.get("action_catalog", {}))
     raw_actions = action_catalog.get("actions", [])
     action_count = len(raw_actions) if isinstance(raw_actions, list) else 0
@@ -148,3 +161,22 @@ def _validate_unique_cast_roster(cast_roster: list[dict[str, object]]) -> None:
         raise ValueError("cast roster에 중복 cast_id를 허용하지 않습니다.")
     if len(display_names) != len(set(display_names)):
         raise ValueError("cast roster에 중복 display_name을 허용하지 않습니다.")
+
+
+def _validate_cast_roster_count(
+    *,
+    cast_roster: list[dict[str, object]],
+    num_cast: int,
+    allow_additional_cast: bool,
+) -> None:
+    cast_count = len(cast_roster)
+    if allow_additional_cast:
+        if cast_count < num_cast:
+            raise ValueError(
+                f"cast roster는 최소 {num_cast}명을 포함해야 합니다. 현재 {cast_count}명입니다."
+            )
+        return
+    if cast_count != num_cast:
+        raise ValueError(
+            f"cast roster는 정확히 {num_cast}명이어야 합니다. 현재 {cast_count}명입니다."
+        )

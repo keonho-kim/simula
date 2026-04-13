@@ -43,6 +43,8 @@ _PROMPT = textwrap.dedent(
     {action_catalog_json}
     - Coordination frame summary JSON:
     {coordination_frame_json}
+    - Requested cast count: {requested_num_cast}
+    - Allow additional cast beyond the requested count: {allow_additional_cast}
     - Current slot: {actor_slot_index} / {target_actor_count}
     - Current cast item JSON:
     {cast_item_json}
@@ -51,7 +53,7 @@ _PROMPT = textwrap.dedent(
     - Return format: {output_format_name}
     {format_rules}
 
-    # Example
+    # Shape Guide
     {output_example}
     """
 ).strip()

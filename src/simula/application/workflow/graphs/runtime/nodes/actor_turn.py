@@ -93,6 +93,7 @@ def dispatch_selected_actor_proposals(
             Send(
                 "generate_actor_proposal",
                 {
+                    "plan": state["plan"],
                     "round_index": state["round_index"],
                     "progression_plan": state["plan"]["progression_plan"],
                     "simulation_clock": state.get("simulation_clock", {}),

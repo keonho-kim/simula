@@ -803,7 +803,7 @@ def _optional_truncated_text(value: object, limit: int) -> str:
 def _int_value(value: object) -> int:
     try:
         return int(str(value))
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return 0
 
 

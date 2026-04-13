@@ -51,7 +51,7 @@ Format:
 Rules:
 {format_rules}
 
-Example:
+Shape guide:
 {output_example}
 
 # Glossary

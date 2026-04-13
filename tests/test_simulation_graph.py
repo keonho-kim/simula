@@ -342,7 +342,7 @@ def test_build_simulation_input_state_is_compact() -> None:
     input_state = build_simulation_input_state(
         run_id="run-1",
         scenario_text="scenario",
-        scenario_controls={"create_all_participants": False},
+        scenario_controls={"num_cast": 2, "allow_additional_cast": True},
         settings=settings,
     )
 
@@ -361,7 +361,7 @@ def test_expand_input_state_to_workflow_state_fills_required_defaults() -> None:
     input_state = build_simulation_input_state(
         run_id="run-1",
         scenario_text="scenario",
-        scenario_controls={"create_all_participants": False},
+        scenario_controls={"num_cast": 2, "allow_additional_cast": True},
         settings=settings,
     )
 
@@ -374,7 +374,8 @@ def test_expand_input_state_to_workflow_state_fills_required_defaults() -> None:
     assert state["checkpoint_enabled"] is False
     assert state["planning_latency_seconds"] == 0.0
     assert state["plan"] == {}
-    assert state["scenario_controls"]["create_all_participants"] is False
+    assert state["scenario_controls"]["num_cast"] == 2
+    assert state["scenario_controls"]["allow_additional_cast"] is True
     assert state["round_focus_plan"] == {}
     assert state["final_report_sections"] == {}
 def test_hydrate_initial_state_expands_compact_input_for_root_graph() -> None:
@@ -390,7 +391,7 @@ def test_hydrate_initial_state_expands_compact_input_for_root_graph() -> None:
     input_state = build_simulation_input_state(
         run_id="run-graph",
         scenario_text="2027-06-18 03:20에 시작하는 테스트 시나리오",
-        scenario_controls={"create_all_participants": False},
+        scenario_controls={"num_cast": 2, "allow_additional_cast": True},
         settings=settings,
     )
     hydrated = hydrate_initial_state(
@@ -464,7 +465,7 @@ def test_executor_uses_compact_input_state(monkeypatch) -> None:
     settings = _settings()
     executor = executor_module.SimulationExecutor(
         settings,
-        scenario_controls={"create_all_participants": False},
+        scenario_controls={"num_cast": 2, "allow_additional_cast": True},
     )
     try:
         result = asyncio.run(executor.run_async("scenario"))
@@ -475,7 +476,7 @@ def test_executor_uses_compact_input_state(monkeypatch) -> None:
     assert captured["state"] == {
         "run_id": "20260413.1",
         "scenario": "scenario",
-        "scenario_controls": {"create_all_participants": False},
+        "scenario_controls": {"num_cast": 2, "allow_additional_cast": True},
         "max_rounds": 1,
         "rng_seed": captured["state"]["rng_seed"],
     }
@@ -531,7 +532,7 @@ def test_executor_logs_original_failure_traceback(monkeypatch, caplog) -> None:
     settings = _settings()
     executor = executor_module.SimulationExecutor(
         settings,
-        scenario_controls={"create_all_participants": False},
+        scenario_controls={"num_cast": 2, "allow_additional_cast": True},
     )
     try:
         with caplog.at_level(logging.ERROR, logger="simula"):

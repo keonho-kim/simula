@@ -8,7 +8,7 @@ The root graph accepts a compact `SimulationInputState`.
 | --- | --- |
 | `run_id` | stable identifier for one run |
 | `scenario` | cleaned scenario body without YAML frontmatter |
-| `scenario_controls` | parsed scenario authoring controls |
+| `scenario_controls` | parsed scenario authoring controls (`num_cast`, `allow_additional_cast`) |
 | `max_rounds` | runtime stop ceiling |
 | `rng_seed` | deterministic seed derived before graph execution |
 

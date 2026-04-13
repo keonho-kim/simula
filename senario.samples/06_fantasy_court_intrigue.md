@@ -1,5 +1,5 @@
 ---
-create_all_participants: false
+num_cast: 8
 ---
 
 # 시나리오 06

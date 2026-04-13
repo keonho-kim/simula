@@ -16,8 +16,6 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 
-from simula._warning_filters import configure_warning_filters
-
 
 def build_parser() -> argparse.ArgumentParser:
     """프로토타입 CLI 파서를 구성한다."""
@@ -73,7 +71,6 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     """CLI 인자를 파싱하고 실행한다."""
 
-    configure_warning_filters()
     parser = build_parser()
     args = parser.parse_args(argv)
 

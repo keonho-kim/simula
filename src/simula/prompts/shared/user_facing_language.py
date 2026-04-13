@@ -11,18 +11,41 @@
 from __future__ import annotations
 
 import re
+import textwrap
 
-_BASE_STYLE_LINES = [
-    "Use short, direct Korean sentences that read easily on first pass.",
-    "Name the subject and the target explicitly whenever possible.",
-    "Prefer everyday words over analyst jargon.",
-    "Prefer action verbs over abstract nouns.",
-    "Avoid expressions such as `~축`, `수렴`, `정렬`, `재편`, `재배치`, `허브`, `다이내믹`, `텍스처` unless the scenario text clearly requires them.",
-]
+_FULL_STYLE_BLOCK = textwrap.dedent(
+    """
+    - Use short, direct Korean sentences that read easily on first pass.
+    - Put the result first when the reader mainly cares about the outcome.
+    - Name the subject and the target explicitly whenever possible.
+    - Prefer everyday words over analyst jargon.
+    - Prefer action verbs over abstract nouns.
+    - Avoid expressions such as `~축`, `수렴`, `정렬`, `재편`, `재배치`, `허브`, `다이내믹`, `텍스처` unless the scenario text clearly requires them.
+    """
+).strip()
 
-_RESULT_FIRST_LINE = (
-    "Put the result first when the reader mainly cares about the outcome."
-)
+_FULL_STYLE_BLOCK_WITHOUT_RESULT = textwrap.dedent(
+    """
+    - Use short, direct Korean sentences that read easily on first pass.
+    - Name the subject and the target explicitly whenever possible.
+    - Prefer everyday words over analyst jargon.
+    - Prefer action verbs over abstract nouns.
+    - Avoid expressions such as `~축`, `수렴`, `정렬`, `재편`, `재배치`, `허브`, `다이내믹`, `텍스처` unless the scenario text clearly requires them.
+    """
+).strip()
+
+_COMPACT_STYLE_BLOCK = textwrap.dedent(
+    """
+    - Use short, direct Korean sentences that read easily on first pass.
+    - Put the result first when the reader mainly cares about the outcome.
+    """
+).strip()
+
+_COMPACT_STYLE_BLOCK_WITHOUT_RESULT = textwrap.dedent(
+    """
+    - Use short, direct Korean sentences that read easily on first pass.
+    """
+).strip()
 
 FORBIDDEN_USER_FACING_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("`~축` 표현", re.compile(r"(?:보조|중심|핵심|조정|관계|주도|영향)\s*축")),
@@ -44,17 +67,12 @@ def build_user_facing_style_block(
     """사용자 노출 자연어 스타일 지침 블록을 만든다."""
 
     if compact:
-        lines = [
-            _BASE_STYLE_LINES[0],
-            _RESULT_FIRST_LINE,
-        ]
-        if not include_result_first:
-            lines = [_BASE_STYLE_LINES[0]]
-    else:
-        lines = list(_BASE_STYLE_LINES)
         if include_result_first:
-            lines.insert(1, _RESULT_FIRST_LINE)
-    return "\n".join(f"- {line}" for line in lines)
+            return _COMPACT_STYLE_BLOCK
+        return _COMPACT_STYLE_BLOCK_WITHOUT_RESULT
+    if include_result_first:
+        return _FULL_STYLE_BLOCK
+    return _FULL_STYLE_BLOCK_WITHOUT_RESULT
 
 
 def find_forbidden_user_facing_term(

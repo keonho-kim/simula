@@ -30,58 +30,58 @@ def build_round_resolution_prompt_bundle(
 
 
 _STEP_DIRECTIVE_EXAMPLE: dict[str, Any] = {
-    "round_index": 2,
-    "focus_summary": "이번 round의 핵심 압박 축을 직접 따라간다.",
-    "selection_reason": "직접 반응 압력이 가장 높다.",
-    "selected_actor_ids": ["operations-lead", "finance-director"],
-    "deferred_actor_ids": ["field-lead"],
+    "round_index": "<copy the current round index as an integer>",
+    "focus_summary": "<one Korean sentence summarizing the direct focus for this round>",
+    "selection_reason": "<one Korean sentence explaining why these actors were selected>",
+    "selected_actor_ids": ["<actor_id selected for direct focus>"],
+    "deferred_actor_ids": ["<actor_id deferred to background motion>"],
     "focus_slices": [
         {
-            "slice_id": "round-2-focus-1",
-            "title": "비공개 압박",
-            "focus_actor_ids": ["operations-lead", "finance-director"],
-            "visibility": "private",
-            "stakes": "즉시 반응이 필요하다.",
-            "selection_reason": "핵심 압박이 몰린 축이다.",
+            "slice_id": "<stable slice identifier>",
+            "title": "<short Korean slice title>",
+            "focus_actor_ids": ["<actor_id included in this slice>"],
+            "visibility": "<choose exactly one of public, private, group>",
+            "stakes": "<one Korean sentence describing what is at stake>",
+            "selection_reason": "<one Korean sentence explaining why this slice matters now>",
         }
     ],
     "background_updates": [
         {
-            "round_index": 2,
-            "actor_id": "field-lead",
-            "summary": "직접 호출되지는 않았지만 준비 압력이 유지된다.",
-            "pressure_level": "medium",
-            "future_hook": "다음 round에서 직접 충돌 축으로 올라올 수 있다.",
+            "round_index": "<copy the current round index as an integer>",
+            "actor_id": "<deferred actor_id>",
+            "summary": "<one Korean sentence describing deferred motion>",
+            "pressure_level": "<choose exactly one of low, medium, high>",
+            "future_hook": "<one Korean sentence describing a plausible next hook>",
         }
     ],
 }
 
 _STEP_RESOLUTION_EXAMPLE: dict[str, Any] = {
-    "adopted_actor_ids": ["operations-lead"],
+    "adopted_actor_ids": ["<actor_id whose proposal was adopted>"],
     "updated_intent_states": [
         {
-            "actor_id": "operations-lead",
-            "current_intent": "상대가 재검토를 피하지 못하게 만든다.",
-            "target_actor_ids": ["finance-director"],
-            "supporting_action_type": "private_coordination",
-            "confidence": 0.82,
-            "changed_from_previous": True,
+            "actor_id": "<actor_id>",
+            "current_intent": "<one Korean sentence describing the current intent>",
+            "target_actor_ids": ["<actor_id string or an empty list>"],
+            "supporting_action_type": "<action_type string>",
+            "confidence": "<float between 0.0 and 1.0>",
+            "changed_from_previous": "<true or false>",
         }
     ],
     "round_time_advance": {
-        "elapsed_unit": "hour",
-        "elapsed_amount": 1,
-        "selection_reason": "이번 round는 공개 메시지와 비공개 조율이 같은 날 안에서 이어졌다.",
-        "signals": ["짧은 반응", "즉시 조율"],
+        "elapsed_unit": "<choose exactly one of minute, hour, day, week>",
+        "elapsed_amount": "<positive integer greater than or equal to 1>",
+        "selection_reason": "<one Korean sentence explaining the elapsed-time choice>",
+        "signals": ["<one Korean signal that supports the elapsed-time choice>"],
     },
     "observer_report": {
-        "round_index": 2,
-        "summary": "직접 조정 action이 쌓이며 다음 round 선택 압력이 커졌다.",
-        "notable_events": ["운영 총괄이 재검토를 요청했다."],
-        "atmosphere": "경계",
-        "momentum": "medium",
-        "world_state_summary": "직접 조정과 배경 준비가 함께 누적되며 선택 폭이 좁아졌다.",
+        "round_index": "<copy the current round index as an integer>",
+        "summary": "<one Korean sentence summarizing the round outcome>",
+        "notable_events": ["<one notable event from this round>"],
+        "atmosphere": "<short Korean atmosphere label>",
+        "momentum": "<choose exactly one of high, medium, low>",
+        "world_state_summary": "<one Korean sentence describing the updated world state>",
     },
-    "world_state_summary": "직접 조정과 배경 준비가 함께 누적되며 선택 폭이 좁아졌다.",
-    "stop_reason": "",
+    "world_state_summary": "<one Korean sentence summarizing the global state after resolution>",
+    "stop_reason": "<empty string to continue, or a short Korean stop reason>",
 }

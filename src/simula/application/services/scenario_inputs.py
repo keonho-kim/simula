@@ -21,7 +21,7 @@ from pathlib import Path
 
 from simula.domain.scenario_controls import (
     ScenarioControls,
-    default_scenario_controls,
+    build_scenario_controls,
 )
 
 _FRONTMATTER_PATTERN = re.compile(
@@ -58,12 +58,13 @@ def parse_scenario_document(text: str) -> ScenarioInput:
     if not raw_text:
         raise ValueError("시나리오 입력이 비어 있습니다.")
 
-    controls = default_scenario_controls()
     body = raw_text
     frontmatter_match = _FRONTMATTER_PATTERN.match(raw_text)
     if frontmatter_match is not None:
         controls = _parse_frontmatter(frontmatter_match.group("frontmatter"))
         body = raw_text[frontmatter_match.end() :].strip()
+    else:
+        raise ValueError("scenario frontmatter에 `num_cast`를 반드시 선언해야 합니다.")
 
     if not body:
         raise ValueError("frontmatter를 제거한 뒤 시나리오 본문이 비어 있습니다.")
@@ -88,8 +89,9 @@ def _read_raw_scenario_text(args: argparse.Namespace) -> str:
 
 
 def _parse_frontmatter(frontmatter: str) -> ScenarioControls:
-    controls = default_scenario_controls()
     seen_keys: set[str] = set()
+    num_cast: int | None = None
+    allow_additional_cast = True
 
     for raw_line in frontmatter.splitlines():
         line = raw_line.strip()
@@ -103,13 +105,28 @@ def _parse_frontmatter(frontmatter: str) -> ScenarioControls:
         if key in seen_keys:
             raise ValueError(f"scenario frontmatter에 중복 키를 허용하지 않습니다: {key}")
         seen_keys.add(key)
-        if key != "create_all_participants":
+        if key not in {"num_cast", "allow_additional_cast"}:
             raise ValueError(f"지원하지 않는 scenario frontmatter 키입니다: {key}")
+        if key == "num_cast":
+            try:
+                parsed_num_cast = int(raw_value)
+            except ValueError as exc:
+                raise ValueError("num_cast는 1 이상의 정수여야 합니다.") from exc
+            if parsed_num_cast < 1:
+                raise ValueError("num_cast는 1 이상의 정수여야 합니다.")
+            num_cast = parsed_num_cast
+            continue
         lowered = raw_value.lower()
         if lowered not in {"true", "false"}:
             raise ValueError(
-                "create_all_participants는 true 또는 false 여야 합니다."
+                "allow_additional_cast는 true 또는 false 여야 합니다."
             )
-        controls["create_all_participants"] = lowered == "true"
+        allow_additional_cast = lowered == "true"
 
-    return controls
+    if num_cast is None:
+        raise ValueError("scenario frontmatter에 `num_cast`를 반드시 선언해야 합니다.")
+
+    return build_scenario_controls(
+        num_cast=num_cast,
+        allow_additional_cast=allow_additional_cast,
+    )

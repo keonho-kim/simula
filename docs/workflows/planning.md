@@ -31,14 +31,16 @@ Generates `PlanningAnalysis` in one structured call. This bundle captures:
 
 ### `build_execution_plan`
 
-Generates `ExecutionPlanBundle` from the planning analysis. This bundle contains:
+Generates `ExecutionPlanBundle` from the planning analysis plus the raw scenario text and
+cast-count controls. This bundle contains:
 
 - `situation`
 - `action_catalog`
 - `coordination_frame`
 - `cast_roster`
 
-`cast_roster` generation is guided by `scenario_controls.create_all_participants`.
+`cast_roster` generation is guided by `scenario_controls.num_cast` and
+`scenario_controls.allow_additional_cast`.
 
 ### `finalize_plan`
 

@@ -83,7 +83,7 @@ def latest_observer_signal(
     try:
         report = ObserverReport.model_validate(raw_report)
         return report.momentum, report.atmosphere
-    except ValidationError, ValueError, TypeError:
+    except (ValidationError, ValueError, TypeError):
         momentum = raw_report.get("momentum")
         atmosphere = raw_report.get("atmosphere")
         return _string_or_none(momentum), _string_or_none(atmosphere)

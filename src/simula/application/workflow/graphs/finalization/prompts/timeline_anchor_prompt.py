@@ -42,7 +42,7 @@ _PROMPT = (
     - Return format: {output_format_name}
     {format_rules}
 
-    # Example
+    # Shape Guide
     {output_example}
 
     # Instructions

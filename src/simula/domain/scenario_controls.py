@@ -10,10 +10,18 @@ from typing import TypedDict
 class ScenarioControls(TypedDict):
     """Scenario-level controls parsed before workflow execution."""
 
-    create_all_participants: bool
+    num_cast: int
+    allow_additional_cast: bool
 
 
-def default_scenario_controls() -> ScenarioControls:
-    """Return the default scenario-control payload."""
+def build_scenario_controls(
+    *,
+    num_cast: int,
+    allow_additional_cast: bool = True,
+) -> ScenarioControls:
+    """Build the normalized scenario-control payload."""
 
-    return {"create_all_participants": False}
+    return {
+        "num_cast": num_cast,
+        "allow_additional_cast": allow_additional_cast,
+    }

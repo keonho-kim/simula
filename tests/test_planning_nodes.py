@@ -67,7 +67,7 @@ def test_build_planning_analysis_returns_required_bundle() -> None:
 
     state = {
         "scenario": "테스트 시나리오",
-        "scenario_controls": {"create_all_participants": False},
+        "scenario_controls": {"num_cast": 4, "allow_additional_cast": True},
         "max_rounds": 6,
         "planning_latency_seconds": 0.0,
     }
@@ -83,7 +83,8 @@ def test_build_execution_plan_returns_minimum_plan_payload() -> None:
             del kwargs
             assert role == "planner"
             assert schema is ExecutionPlanBundle
-            assert "cast_roster" in prompt
+            assert "Requested cast count" in prompt
+            assert "Scenario text" in prompt
             return (
                 ExecutionPlanBundle(
                     situation={
@@ -133,7 +134,8 @@ def test_build_execution_plan_returns_minimum_plan_payload() -> None:
             )
 
     state = {
-        "scenario_controls": {"create_all_participants": True},
+        "scenario": "등장인물 1명이 있는 테스트 시나리오",
+        "scenario_controls": {"num_cast": 1, "allow_additional_cast": False},
         "max_rounds": 6,
         "planning_latency_seconds": 0.0,
         "planning_analysis": {
@@ -163,6 +165,7 @@ def test_finalize_plan_persists_compact_plan() -> None:
     runtime = _build_runtime(object())
     state = {
         "run_id": "run-1",
+        "scenario_controls": {"num_cast": 2, "allow_additional_cast": False},
         "plan": {
             "cast_roster": [
                 {"cast_id": "a", "display_name": "A"},
@@ -181,6 +184,7 @@ def test_finalize_plan_rejects_duplicate_cast_names() -> None:
     runtime = _build_runtime(object())
     state = {
         "run_id": "run-1",
+        "scenario_controls": {"num_cast": 2, "allow_additional_cast": False},
         "plan": {
             "cast_roster": [
                 {"cast_id": "a", "display_name": "A"},
@@ -190,4 +194,37 @@ def test_finalize_plan_rejects_duplicate_cast_names() -> None:
     }
 
     with pytest.raises(ValueError, match="display_name"):
+        finalize_plan(state, runtime)
+
+
+def test_finalize_plan_rejects_cast_count_below_required_minimum() -> None:
+    runtime = _build_runtime(object())
+    state = {
+        "run_id": "run-1",
+        "scenario_controls": {"num_cast": 3, "allow_additional_cast": True},
+        "plan": {
+            "cast_roster": [
+                {"cast_id": "a", "display_name": "A"},
+                {"cast_id": "b", "display_name": "B"},
+            ]
+        },
+    }
+
+    with pytest.raises(ValueError, match="최소 3명"):
+        finalize_plan(state, runtime)
+
+
+def test_finalize_plan_rejects_cast_count_when_exact_count_is_required() -> None:
+    runtime = _build_runtime(object())
+    state = {
+        "run_id": "run-1",
+        "scenario_controls": {"num_cast": 2, "allow_additional_cast": False},
+        "plan": {
+            "cast_roster": [
+                {"cast_id": "a", "display_name": "A"},
+            ]
+        },
+    }
+
+    with pytest.raises(ValueError, match="정확히 2명"):
         finalize_plan(state, runtime)

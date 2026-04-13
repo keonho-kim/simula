@@ -57,6 +57,7 @@ def dispatch_actor_slots(state: SimulationWorkflowState) -> list[Send] | str:
             {
                 "run_id": state["run_id"],
                 "scenario": state["scenario"],
+                "scenario_controls": state["scenario_controls"],
                 "plan": state["plan"],
                 "cast_slot": slot,
             },

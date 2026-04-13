@@ -21,7 +21,8 @@ def build_planning_analysis_prompt_bundle(
 
 def build_execution_plan_prompt_bundle(
     *,
-    create_all_participants: bool,
+    num_cast: int,
+    allow_additional_cast: bool,
     example_mode: ExampleMode = "minimal",
 ) -> dict[str, str]:
     bundle = build_json_prompt_bundle(
@@ -29,95 +30,116 @@ def build_execution_plan_prompt_bundle(
         example_mode=example_mode,
     )
     bundle["cast_roster_policy"] = _build_cast_roster_policy_text(
-        create_all_participants=create_all_participants
+        num_cast=num_cast,
+        allow_additional_cast=allow_additional_cast,
     )
     return bundle
 
 
 _PLANNING_ANALYSIS_EXAMPLE: dict[str, Any] = {
-    "brief_summary": "공개 신호와 비공개 계산이 한정된 시간 안에서 겹친다.",
-    "premise": "표면적 입장과 실제 계산이 다를 수 있어 말보다 정렬 방향을 봐야 한다.",
+    "brief_summary": "<one concise Korean summary grounded only in the scenario text>",
+    "premise": "<one Korean sentence explaining the core scenario premise>",
     "time_scope": {
-        "start": "초기 대면 직후",
-        "end": "핵심 선택 직전",
+        "start": "<scenario-grounded start point>",
+        "end": "<scenario-grounded end point>",
     },
-    "public_context": ["공개 발언이 판세를 흔들 수 있다."],
-    "private_context": ["비공개 조율이 실제 선택을 움직인다."],
-    "key_pressures": ["시간 압박", "정보 비대칭"],
+    "public_context": ["<one public-facing pressure or interaction pattern>"],
+    "private_context": ["<one private coordination or hidden-pressure pattern>"],
+    "key_pressures": ["<one key pressure stated or strongly implied by the scenario>"],
     "progression_plan": {
-        "max_rounds": 8,
-        "allowed_elapsed_units": ["minute", "hour", "day"],
-        "default_elapsed_unit": "hour",
-        "pacing_guidance": ["짧은 round는 분 단위로, 큰 전환은 시간 또는 하루 단위로 본다."],
-        "selection_reason": "round 수 예산과 별개로, 세계 안의 시간은 짧은 반응과 중간 길이 전환이 함께 나온다.",
+        "max_rounds": "<copy the runtime round budget exactly as an integer>",
+        "allowed_elapsed_units": [
+            "<choose one or more of minute, hour, day, week>",
+        ],
+        "default_elapsed_unit": "<choose exactly one of minute, hour, day, week>",
+        "pacing_guidance": [
+            "<one Korean sentence describing how elapsed time should move between rounds>",
+        ],
+        "selection_reason": "<one Korean sentence explaining why the elapsed-time units fit this scenario>",
     },
 }
 
 _EXECUTION_PLAN_EXAMPLE: dict[str, Any] = {
     "situation": {
-        "simulation_objective": "누가 어떤 정렬을 통해 종결 국면을 만드는지 추적한다.",
-        "world_summary": "여러 actor가 공개 행동과 비공개 조율을 병행한다.",
-        "initial_tensions": ["공개 체면과 실제 선택이 어긋난다.", "남은 시간이 짧다."],
+        "simulation_objective": "<one Korean sentence describing what the simulation should resolve>",
+        "world_summary": "<one Korean sentence summarizing the world and current state>",
+        "initial_tensions": [
+            "<one initial tension grounded in the scenario>",
+        ],
         "channel_guidance": {
-            "public": "공개 신호와 입장 표명에 쓴다.",
-            "private": "비공개 압박과 조건 조율에 쓴다.",
-            "group": "여러 actor의 즉시 반응을 묶어 확인할 때 쓴다.",
+            "public": "<how public actions should be used in this scenario>",
+            "private": "<how private actions should be used in this scenario>",
+            "group": "<how group actions should be used in this scenario>",
         },
-        "current_constraints": ["모든 actor가 같은 정보를 갖고 있지 않다.", "핵심 결론 전까지 시간이 짧다."],
+        "current_constraints": [
+            "<one current operational or narrative constraint>",
+        ],
     },
     "action_catalog": {
         "actions": [
             {
-                "action_type": "public_signal",
-                "label": "공개 신호",
-                "description": "밖으로 보이는 입장과 압박을 만든다.",
-                "supported_visibility": ["public", "group"],
-                "requires_target": False,
-                "supports_utterance": True,
-            },
-            {
-                "action_type": "private_coordination",
-                "label": "비공개 조율",
-                "description": "조용한 접촉으로 조건과 방향을 맞춘다.",
-                "supported_visibility": ["private", "group"],
-                "requires_target": True,
-                "supports_utterance": True,
+                "action_type": "<short snake_case action identifier>",
+                "label": "<short Korean action label>",
+                "description": "<one Korean sentence describing the action>",
+                "supported_visibility": [
+                    "<choose one or more of public, private, group>",
+                ],
+                "requires_target": "<true or false>",
+                "supports_utterance": "<true or false>",
             },
         ],
-        "selection_guidance": ["한 round에는 broad action 몇 개만 유지한다."],
+        "selection_guidance": [
+            "<one Korean sentence for how to choose from the action catalog>",
+        ],
     },
     "coordination_frame": {
-        "focus_selection_rules": ["직접 반응 압력이 몰린 actor를 우선 본다."],
-        "background_motion_rules": ["직접 추적하지 않은 actor는 배경 update로만 정리한다."],
-        "focus_archetypes": ["직접 충돌", "조용한 정렬"],
-        "attention_shift_rules": ["조용했던 actor도 압력이 높아지면 끌어올린다."],
-        "budget_guidance": ["한 round에는 소수 actor만 직접 호출한다."],
+        "focus_selection_rules": [
+            "<one Korean rule for selecting focus actors>",
+        ],
+        "background_motion_rules": [
+            "<one Korean rule for background-only motion>",
+        ],
+        "focus_archetypes": [
+            "<one short Korean focus archetype label>",
+        ],
+        "attention_shift_rules": [
+            "<one Korean rule for changing who gets attention>",
+        ],
+        "budget_guidance": [
+            "<one Korean rule for direct-call budget per round>",
+        ],
     },
     "cast_roster": {
         "items": [
             {
-                "cast_id": "cast-ops",
-                "display_name": "운영 총괄",
-                "role_hint": "실행 조정자",
-                "group_name": "운영팀",
-                "core_tension": "속도를 높이고 싶다.",
+                "cast_id": "<stable snake_case or kebab-case cast identifier>",
+                "display_name": "<participant name or role label grounded in the scenario>",
+                "role_hint": "<short Korean role hint>",
+                "group_name": "<team, camp, faction, or participant group name>",
+                "core_tension": "<one Korean sentence describing this actor's core tension>",
             }
         ]
     },
 }
 
 
-def _build_cast_roster_policy_text(*, create_all_participants: bool) -> str:
-    if create_all_participants:
+def _build_cast_roster_policy_text(
+    *,
+    num_cast: int,
+    allow_additional_cast: bool,
+) -> str:
+    if allow_additional_cast:
         return (
-            "- `create_all_participants` is true.\n"
-            "- Treat this as a closed-participant scenario.\n"
-            "- Include every participant implied by the scenario in `cast_roster`.\n"
-            "- Do not drop, merge, or summarize away participants."
+            f"- `num_cast` is {num_cast}.\n"
+            "- `allow_additional_cast` is true.\n"
+            f"- Include at least {num_cast} cast entries in `cast_roster`.\n"
+            "- Prefer named or clearly implied scenario participants first.\n"
+            "- You may add more cast entries only if the scenario structure genuinely needs them."
         )
     return (
-        "- `create_all_participants` is false.\n"
-        "- Generate a large-enough `cast_roster` for the simulation to move autonomously.\n"
-        "- Always include the scenario's core actors.\n"
-        "- If the scenario structure suggests more participants, prefer adding enough participants over keeping the roster too small."
+        f"- `num_cast` is {num_cast}.\n"
+        "- `allow_additional_cast` is false.\n"
+        f"- Include exactly {num_cast} cast entries in `cast_roster`.\n"
+        "- Prefer named or clearly implied scenario participants first.\n"
+        "- Do not add extra cast entries beyond the requested count."
     )

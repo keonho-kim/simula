@@ -48,17 +48,25 @@ def test_planning_analysis_prompt_smoke() -> None:
     assert "progression_plan.max_rounds" in prompt
     assert "allowed_elapsed_units" in prompt
     assert "Do not import outside genre knowledge" in prompt
+    assert '"brief_summary":"<one concise Korean summary grounded only in the scenario text>"' in prompt
 
 
 def test_execution_plan_prompt_smoke() -> None:
     prompt = BUILD_EXECUTION_PLAN_PROMPT.format(
+        scenario_text="Scenario text",
         planning_analysis_json="{}",
         max_rounds=8,
-        **build_execution_plan_prompt_bundle(create_all_participants=True),
+        num_cast=14,
+        allow_additional_cast="false",
+        **build_execution_plan_prompt_bundle(
+            num_cast=14,
+            allow_additional_cast=False,
+        ),
     )
 
     assert "cast_roster" in prompt
-    assert "Do not drop, merge, or summarize away participants" in prompt
+    assert "Include exactly 14 cast entries" in prompt
+    assert '"display_name":"<participant name or role label grounded in the scenario>"' in prompt
 
 
 def test_actor_prompt_smoke_uses_compact_inputs_only() -> None:
@@ -78,6 +86,7 @@ def test_actor_prompt_smoke_uses_compact_inputs_only() -> None:
 
     assert "A `round` is one outer simulation cycle." in prompt
     assert "visible action context JSON:" in prompt
+    assert '"action_type":"<choose one action_type from runtime_guidance.available_actions>"' in prompt
 
 
 def test_round_prompts_smoke() -> None:
@@ -107,7 +116,7 @@ def test_round_prompts_smoke() -> None:
     )
 
     assert "selected_actor_ids" in directive_prompt
-    assert "observer_report" in resolution_prompt
+    assert '"confidence":"<float between 0.0 and 1.0>"' in resolution_prompt
 
 
 def test_final_report_bundle_prompt_smoke() -> None:
@@ -119,4 +128,4 @@ def test_final_report_bundle_prompt_smoke() -> None:
     )
 
     assert "timeline_section" in prompt
-    assert "major_events_section" in prompt
+    assert "<bullet lines only" in prompt

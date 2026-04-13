@@ -17,11 +17,20 @@ Turn the planning analysis into the minimum execution plan bundle.
 - Do not output commentary outside the JSON object.
 
 # Input
+Scenario text:
+{scenario_text}
+
 Planning analysis JSON:
 {planning_analysis_json}
 
 Runtime hard ceiling:
 {max_rounds}
+
+Requested cast count:
+{num_cast}
+
+Allow additional cast beyond the requested count:
+{allow_additional_cast}
 
 Cast roster policy:
 {cast_roster_policy}
@@ -33,6 +42,6 @@ Format:
 Rules:
 {format_rules}
 
-Example:
+Shape guide:
 {output_example}
 """
