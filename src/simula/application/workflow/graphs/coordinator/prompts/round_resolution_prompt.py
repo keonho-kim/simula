@@ -15,6 +15,12 @@ Resolve this round in one object: adoption, updated intents, elapsed-time advanc
 - Keep the observer summary grounded in the supplied actions and background updates.
 - `stop_reason` must be an empty string when the simulation should continue.
 - Every field is required.
+- Return only the JSON object that matches the required output schema.
+- Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
+- Do not add extra keys that are not in the output schema.
+- Do not omit any required keys from the output schema.
+- If a field is a string, return a JSON string and never wrap it in an array.
+- If a field is an array, return a JSON array even when it has only one item.
 
 # Inputs
 Round index:

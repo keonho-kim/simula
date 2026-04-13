@@ -38,8 +38,13 @@ Rewrite the provided content into exactly one valid JSON object that satisfies t
 
 # Rules
 - Return one JSON object only.
+- Return only the JSON object that matches the required output schema.
 - Do not add markdown fences.
 - Do not add explanations, notes, or commentary.
+- Do not add extra keys that are not in the output schema.
+- Do not omit any required keys from the output schema.
+- If a field is a string, return a JSON string and never wrap it in an array.
+- If a field is an array, return a JSON array even when it has only one item.
 - Preserve the original meaning as much as possible.
 - If parts are malformed, infer the smallest valid JSON rewrite that keeps the content intact.
 - All required fields must be present.

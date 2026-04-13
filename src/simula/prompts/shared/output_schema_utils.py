@@ -20,7 +20,13 @@ ExampleMode = Literal["minimal", "compact"]
 _JSON_FORMAT_RULES = textwrap.dedent(
     """
     - Return one JSON object only.
+    - Return only the JSON object that matches the required output schema.
     - Do not add code fences, explanations, or extra commentary.
+    - Do not return any prose, labels, headings, or commentary outside the JSON object.
+    - Do not add extra keys that are not in the output schema.
+    - Do not omit any required keys from the output schema.
+    - If a field is a string, return a JSON string and never wrap it in an array.
+    - If a field is an array, return a JSON array even when it has only one item.
     - Keep every string key explicitly wrapped in double quotes.
     - The shape guide below uses instruction strings only. Replace them with schema-valid values.
     """
@@ -31,6 +37,11 @@ _NDJSON_FORMAT_RULES = textwrap.dedent(
     - Return one JSON object per line.
     - Do not wrap the lines in a JSON array.
     - Do not add code fences, explanations, or blank lines.
+    - Return only schema-valid JSON object lines and no extra prose.
+    - Do not add extra keys that are not in the output schema.
+    - Do not omit any required keys from the output schema.
+    - If a field is a string, return a JSON string and never wrap it in an array.
+    - If a field is an array, return a JSON array even when it has only one item.
     - Keep every string key explicitly wrapped in double quotes.
     - The shape guide below uses instruction strings only. Replace them with schema-valid values.
     """

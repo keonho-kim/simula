@@ -14,6 +14,12 @@ Compress the raw scenario into one reusable planning analysis object.
 - Keep the output compact and concrete.
 - Preserve only information needed to drive later generation and runtime steps.
 - Every field is required.
+- Return only the JSON object that matches the required output schema.
+- Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
+- Do not add extra keys that are not in the output schema.
+- Do not omit any required keys from the output schema.
+- If a field is a string, return a JSON string and never wrap it in an array.
+- If a field is an array, return a JSON array even when it has only one item.
 - Do not invent actors beyond what the scenario implies.
 - Ground every fact in the scenario text. If a duration, participant count, episode count, or format detail is not stated, do not infer a concrete value.
 - Do not import outside genre knowledge, show conventions, or likely defaults.

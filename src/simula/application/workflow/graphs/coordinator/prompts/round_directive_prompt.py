@@ -16,6 +16,12 @@ Choose the direct focus for this round and summarize deferred motion in the same
 - Only actors from `focus_candidates_json` may appear in `selected_actor_ids`.
 - `background_updates` should only describe deferred actors.
 - Every field is required.
+- Return only the JSON object that matches the required output schema.
+- Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
+- Do not add extra keys that are not in the output schema.
+- Do not omit any required keys from the output schema.
+- If a field is a string, return a JSON string and never wrap it in an array.
+- If a field is an array, return a JSON array even when it has only one item.
 
 # Inputs
 Round index:
