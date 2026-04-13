@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 from simula.application.services import executor as executor_module
 from simula.application.workflow.context import WorkflowRuntimeContext
@@ -398,6 +399,8 @@ def test_executor_uses_compact_input_state(monkeypatch) -> None:
         async def ainvoke(self, state, **kwargs):  # noqa: ANN001
             captured["state"] = state
             captured["kwargs"] = kwargs
+            captured["context_logger_name"] = kwargs["context"].logger.name
+            captured["llm_logger_name"] = kwargs["context"].llms.logger.name
             return {
                 "run_id": state["run_id"],
                 "final_report": {"run_id": state["run_id"]},
@@ -424,7 +427,11 @@ def test_executor_uses_compact_input_state(monkeypatch) -> None:
             return None
 
     monkeypatch.setattr(executor_module, "create_app_store", lambda *args, **kwargs: FakeStore())
-    monkeypatch.setattr(executor_module, "build_model_router", lambda settings: object())
+    monkeypatch.setattr(
+        executor_module,
+        "build_model_router",
+        lambda settings: SimpleNamespace(logger=logging.getLogger("simula.test.llm")),
+    )
     monkeypatch.setattr(executor_module, "SIMULATION_WORKFLOW", FakeApp())
 
     class _NoCheckpointer:
@@ -454,3 +461,62 @@ def test_executor_uses_compact_input_state(monkeypatch) -> None:
         "max_steps": 1,
         "rng_seed": captured["state"]["rng_seed"],
     }
+    assert captured["context_logger_name"] == "simula.workflow.run.20260413.1"
+    assert captured["llm_logger_name"] == "simula.llm.run.20260413.1"
+
+
+def test_executor_logs_original_failure_traceback(monkeypatch, caplog) -> None:
+    class FakeApp:
+        async def ainvoke(self, state, **kwargs):  # noqa: ANN001
+            del state, kwargs
+            raise RuntimeError("boom")
+
+    class FakeStore:
+        def __init__(self) -> None:
+            self._run_id = "20260413.2"
+
+        def next_run_id(self) -> str:
+            return self._run_id
+
+        def save_run_started(self, **kwargs):  # noqa: ANN003
+            return None
+
+        def mark_run_status(self, *args, **kwargs):  # noqa: ANN002, ANN003
+            return None
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(executor_module, "create_app_store", lambda *args, **kwargs: FakeStore())
+    monkeypatch.setattr(
+        executor_module,
+        "build_model_router",
+        lambda settings: SimpleNamespace(logger=logging.getLogger("simula.test.llm")),
+    )
+    monkeypatch.setattr(executor_module, "SIMULATION_WORKFLOW", FakeApp())
+
+    class _NoCheckpointer:
+        async def __aenter__(self):
+            return None
+
+        async def __aexit__(self, exc_type, exc, tb):  # noqa: ANN001
+            return None
+
+    monkeypatch.setattr(
+        executor_module,
+        "create_async_checkpointer_context",
+        lambda settings: _NoCheckpointer(),
+    )
+
+    settings = _settings()
+    executor = executor_module.SimulationExecutor(settings)
+    try:
+        with caplog.at_level(logging.ERROR, logger="simula"):
+            result = asyncio.run(executor.run_async("scenario"))
+    finally:
+        executor.close()
+
+    assert result.success is False
+    assert result.error == "boom"
+    assert "run 실패" in caplog.text
+    assert "RuntimeError: boom" in caplog.text

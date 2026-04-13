@@ -49,6 +49,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--log-level",
+        choices=("DEBUG", "INFO", "WARNING", "ERROR"),
+        help="CLI와 workflow 로그 레벨 override",
+    )
+
+    parser.add_argument(
         "--trials",
         type=int,
         default=1,

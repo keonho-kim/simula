@@ -92,7 +92,15 @@ def finalize_plan(
     plan = dict(state["plan"])
     cast_roster = list(plan.get("cast_roster", []))
     _validate_unique_cast_roster(cast_roster)
+    action_catalog = cast(dict[str, object], plan.get("action_catalog", {}))
+    raw_actions = action_catalog.get("actions", [])
+    action_count = len(raw_actions) if isinstance(raw_actions, list) else 0
     runtime.context.store.save_plan(state["run_id"], plan)
+    runtime.context.logger.info(
+        "계획 정리 완료 | cast=%s action_types=%s",
+        len(cast_roster),
+        action_count,
+    )
     return {"plan": plan}
 
 

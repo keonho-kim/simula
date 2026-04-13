@@ -28,7 +28,6 @@ def prepare_actor_slots(
 ) -> dict[str, object]:
     """병렬 actor 생성에 필요한 cast slot spec을 만든다."""
 
-    del runtime
     cast_roster = list(state["plan"].get("cast_roster", []))
     if not cast_roster:
         raise ValueError("cast roster 없이 actor generation을 수행할 수 없습니다.")
@@ -37,6 +36,7 @@ def prepare_actor_slots(
         for index, cast_item in enumerate(cast_roster, start=1)
     ]
 
+    runtime.context.logger.info("등장 주체 생성 시작 | slots=%s", len(slot_specs))
     return {
         "pending_cast_slots": slot_specs,
         "generated_actor_results": Overwrite(value=[]),

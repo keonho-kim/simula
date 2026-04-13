@@ -10,6 +10,12 @@ uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md
 
 You can also provide scenario text inline through the CLI entrypoint if needed.
 
+To inspect detailed local workflow and LLM logs without changing persisted artifacts:
+
+```bash
+uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md --log-level DEBUG
+```
+
 ## Output Layout
 
 Each run writes to:

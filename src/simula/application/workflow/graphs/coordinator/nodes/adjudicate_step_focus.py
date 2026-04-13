@@ -148,6 +148,13 @@ async def resolve_step(
     )
     stop_reason = resolution.stop_reason.strip() or (policy_reason or "")
     stop_requested = bool(stop_reason) or should_stop
+    runtime.context.logger.info(
+        "step %s 해소 완료 | adopted=%s background=%s stop=%s",
+        state["step_index"],
+        len(list(resolution.adopted_actor_ids)),
+        len(latest_background_updates),
+        stop_reason or "-",
+    )
     runtime.context.store.save_step_artifacts(
         state["run_id"],
         activities=list(applied["latest_step_activities"]),

@@ -15,12 +15,14 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 import time
 from dataclasses import dataclass
 from typing import Any, cast
 
 from simula.application.ports.storage import StorageSchemaError
+from simula.application.services.logging_setup import build_run_logger_name
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.simulation.graph import (
     SIMULATION_WORKFLOW,
@@ -58,11 +60,17 @@ class SimulationExecutor:
         settings: AppSettings,
         *,
         env_file_hint: str | None = None,
+        trial_index: int | None = None,
+        total_trials: int | None = None,
+        parallel: bool = False,
     ) -> None:
         self.settings = settings
         self.store = create_app_store(settings, env_file_hint=env_file_hint)
         self.logger = logging.getLogger("simula.application.executor")
         self.llms = build_model_router(settings)
+        self.trial_index = trial_index
+        self.total_trials = total_trials
+        self.parallel = parallel
 
     def close(self) -> None:
         """열린 리소스를 닫는다."""
@@ -95,13 +103,37 @@ class SimulationExecutor:
         if not run_id:
             raise StorageSchemaError("run_id 생성에 반복적으로 실패했습니다.")
 
-        self.logger.info("run 시작: %s", run_id)
+        run_logger = logging.getLogger(
+            build_run_logger_name(
+                base_name="simula.workflow",
+                run_id=run_id,
+                trial_index=self.trial_index,
+                total_trials=self.total_trials,
+                parallel=self.parallel,
+            )
+        )
+        llm_logger = logging.getLogger(
+            build_run_logger_name(
+                base_name="simula.llm",
+                run_id=run_id,
+                trial_index=self.trial_index,
+                total_trials=self.total_trials,
+                parallel=self.parallel,
+            )
+        )
+        if hasattr(self.llms, "logger"):
+            if dataclasses.is_dataclass(self.llms):
+                self.llms = dataclasses.replace(self.llms, logger=llm_logger)
+            else:
+                setattr(self.llms, "logger", llm_logger)
+
+        run_logger.info("run 시작")
 
         context = WorkflowRuntimeContext(
             settings=self.settings,
             store=self.store,
             llms=self.llms,
-            logger=self.logger,
+            logger=run_logger,
         )
         input_state = build_simulation_input_state(
             run_id=run_id,
@@ -129,6 +161,7 @@ class SimulationExecutor:
             final_state = _unwrap_graph_output(raw_result)
             wall_clock = time.perf_counter() - started_at
             self.store.mark_run_status(run_id, "completed")
+            run_logger.info("run 완료 | wall_clock=%.2fs", wall_clock)
             return SimulationExecutionResult(
                 run_id=run_id,
                 success=True,
@@ -139,6 +172,7 @@ class SimulationExecutor:
             )
         except Exception as exc:  # noqa: BLE001
             wall_clock = time.perf_counter() - started_at
+            run_logger.exception("run 실패 | wall_clock=%.2fs", wall_clock)
             self.store.mark_run_status(run_id, "failed", str(exc))
             return SimulationExecutionResult(
                 run_id=run_id,

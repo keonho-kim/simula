@@ -19,6 +19,7 @@ import logging
 import sys
 
 from simula.application.commands.simulation_runs import (
+    SimulationRunFailedError,
     execute_multi_run,
     execute_single_run,
     resolve_single_run_log_level,
@@ -41,6 +42,10 @@ def _build_cli_overrides(args: argparse.Namespace) -> dict[str, str]:
     if max_steps is not None:
         cli_overrides["SIM_MAX_STEPS"] = str(max_steps)
 
+    log_level = getattr(args, "log_level", None)
+    if log_level is not None:
+        cli_overrides["SIM_LOG_LEVEL"] = str(log_level)
+
     return cli_overrides
 
 
@@ -59,7 +64,7 @@ def run_from_cli(args: argparse.Namespace) -> int:
         )
         scenario_text = read_scenario_text(args)
         if args.trials == 1:
-            logger.info("시뮬레이션 실행 시작")
+            logger.info("시뮬레이션 실행 시작 | trials=1 parallel=False")
             outcome = execute_single_run(
                 env_file=args.env,
                 scenario_text=scenario_text,
@@ -79,10 +84,14 @@ def run_from_cli(args: argparse.Namespace) -> int:
             )
             print(f"시뮬레이션 로그: {saved_outputs.simulation_log_path}")
             print(f"최종 보고서: {saved_outputs.final_report_path}")
-            logger.info("시뮬레이션 실행 완료")
+            logger.info("시뮬레이션 실행 완료 | run_id=%s", outcome.run_id)
             return 0
 
-        logger.info("반복 시뮬레이션 실행 시작")
+        logger.info(
+            "반복 시뮬레이션 실행 시작 | trials=%s parallel=%s",
+            args.trials,
+            args.parallel,
+        )
         summary = execute_multi_run(
             env_file=args.env,
             scenario_text=scenario_text,
@@ -108,9 +117,12 @@ def run_from_cli(args: argparse.Namespace) -> int:
                     f"trial {trial.trial_index} 보고서: {saved_outputs.final_report_path}"
                 )
         print_trial_run_summary(summary.trials, parallel=summary.parallel)
-        logger.info("반복 시뮬레이션 실행 완료")
+        logger.info("반복 시뮬레이션 실행 완료 | trials=%s", len(summary.trials))
         return 0 if all(trial.success for trial in summary.trials) else 1
     except Exception as exc:  # noqa: BLE001
-        logger.exception("실행 실패")
+        if isinstance(exc, SimulationRunFailedError):
+            logger.error("실행 실패: %s", exc)
+        else:
+            logger.exception("실행 실패")
         print(f"실행 실패: {exc}", file=sys.stderr)
         return 1

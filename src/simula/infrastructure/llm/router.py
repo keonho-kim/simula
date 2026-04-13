@@ -702,13 +702,14 @@ class StructuredLLMRouter:
         )
         if parse_error is not None:
             meta_line = f"{meta_line}\n파싱 경고: {parse_error}"
-
-        self.logger.info(
-            "\n%s\n%s\n%s\n",
-            _format_response_title(role=role, log_context=log_context),
-            pretty_text,
-            meta_line,
-        )
+        title = _format_response_title(role=role, log_context=log_context)
+        summary = meta_line.replace("\n", " | ")
+        if parse_error is None:
+            self.logger.info("%s | %s", title, summary)
+        else:
+            self.logger.warning("%s | %s", title, summary)
+        if pretty_text.strip():
+            self.logger.debug("\n%s\n%s\n", title, pretty_text)
 
     def _log_structured_call_start(
         self,
@@ -749,12 +750,10 @@ class StructuredLLMRouter:
             content=_strip_json_fence(content),
             log_context=log_context,
         )
-        self.logger.info(
-            "\n%s\n%s\n%s\n",
-            _format_response_title(role=role, log_context=log_context),
-            pretty_text,
-            meta_line,
-        )
+        title = _format_response_title(role=role, log_context=log_context)
+        self.logger.info("%s | %s", title, meta_line)
+        if pretty_text.strip():
+            self.logger.debug("\n%s\n%s\n", title, pretty_text)
 
 
 def build_model_router(

@@ -67,7 +67,7 @@ class FakeModel:
 
 def _build_router(model: FakeModel) -> StructuredLLMRouter:
     logger = logging.getLogger("simula.test.llm_router")
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     return StructuredLLMRouter(
         logger=logger,
         planner=model,  # type: ignore[arg-type]
@@ -99,6 +99,7 @@ def test_router_uses_stream_for_structured_calls(caplog) -> None:
     assert model.invoke_called is False
     assert "planner 호출 시작" in caplog.text
     assert "planner 완료" in caplog.text
+    assert "초기 대면 직후" not in caplog.text
 
 
 def test_router_direct_invoke_uses_runnable_sequence() -> None:
@@ -155,3 +156,36 @@ def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
     assert model.stream_called is True
     assert "planner · 실행 계획 번들 정리 시작" in caplog.text
     assert "planner · 실행 계획 번들 정리 완료" in caplog.text
+
+
+def test_router_logs_pretty_payload_only_at_debug(caplog) -> None:
+    model = FakeModel(_time_scope_json())
+    router = _build_router(model)
+
+    with caplog.at_level(logging.DEBUG, logger="simula.test.llm_router"):
+        router.invoke_structured_with_meta(
+            "planner",
+            "prompt",
+            ScenarioTimeScope,
+        )
+
+    assert "초기 대면 직후" in caplog.text
+    assert "핵심 선택 직전" in caplog.text
+
+
+def test_router_warns_when_default_payload_is_used(caplog) -> None:
+    model = FakeModel("not json")
+    router = _build_router(model)
+
+    with caplog.at_level(logging.WARNING, logger="simula.test.llm_router"):
+        parsed, meta = router.invoke_structured_with_meta(
+            "planner",
+            "prompt",
+            ScenarioTimeScope,
+            allow_default_on_failure=True,
+            default_payload={"start": "기본 시작", "end": "기본 종료"},
+        )
+
+    assert parsed.start == "기본 시작"
+    assert meta.forced_default is True
+    assert "기본값으로 강등합니다" in caplog.text

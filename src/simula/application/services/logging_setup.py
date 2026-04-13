@@ -37,7 +37,7 @@ def configure_logging(level: str) -> None:
         "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
     simula_formatter = logging.Formatter(
-        "%(asctime)s | %(message)s",
+        "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
         datefmt="%H:%M:%S",
     )
 
@@ -63,3 +63,21 @@ def configure_logging(level: str) -> None:
     for logger_name in NOISY_LOGGER_NAMES:
         external_logger = logging.getLogger(logger_name)
         external_logger.setLevel(logging.WARNING)
+
+
+def build_run_logger_name(
+    *,
+    base_name: str,
+    run_id: str,
+    trial_index: int | None,
+    total_trials: int | None,
+    parallel: bool,
+) -> str:
+    """Build a stable per-run logger name for CLI-visible correlation."""
+
+    parts = [base_name]
+    if trial_index is not None and total_trials is not None:
+        mode = "parallel" if parallel else "serial"
+        parts.extend([mode, f"trial-{trial_index}-of-{total_trials}"])
+    parts.extend(["run", run_id])
+    return ".".join(parts)

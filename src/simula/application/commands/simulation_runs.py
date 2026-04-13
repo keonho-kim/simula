@@ -24,6 +24,10 @@ from simula.infrastructure.config.loader import load_settings_bundle
 from simula.infrastructure.config.models import AppSettings
 
 
+class SimulationRunFailedError(RuntimeError):
+    """Raised when one workflow run fails after the executor boundary."""
+
+
 @dataclass(slots=True)
 class SingleRunOutcome:
     """단일 실행 결과 묶음이다."""
@@ -88,6 +92,9 @@ def execute_single_run(
     executor = SimulationExecutor(
         settings,
         env_file_hint=env_file,
+        trial_index=None,
+        total_trials=None,
+        parallel=False,
     )
     try:
         result = executor.run(scenario_text)
@@ -96,7 +103,10 @@ def execute_single_run(
             or result.final_report is None
             or result.final_state is None
         ):
-            raise ValueError(result.error or "최종 리포트를 생성하지 못했습니다.")
+            raise SimulationRunFailedError(
+                f"run_id={result.run_id} failed: "
+                f"{result.error or '최종 리포트를 생성하지 못했습니다.'}"
+            )
         return SingleRunOutcome(
             run_id=result.run_id,
             final_state=result.final_state,
@@ -228,6 +238,9 @@ def _execute_trial(
     executor = SimulationExecutor(
         trial_settings,
         env_file_hint=env_file,
+        trial_index=trial_index,
+        total_trials=total_trials,
+        parallel=total_trials > 1,
     )
     try:
         result = executor.run(scenario_text)

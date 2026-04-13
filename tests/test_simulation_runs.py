@@ -29,9 +29,15 @@ class FakeExecutor:
         settings: object,
         *,
         env_file_hint: str | None = None,
+        trial_index: int | None = None,
+        total_trials: int | None = None,
+        parallel: bool = False,
     ) -> None:
         self.settings = settings
         self.env_file_hint = env_file_hint
+        self.trial_index = trial_index
+        self.total_trials = total_trials
+        self.parallel = parallel
 
     def close(self) -> None:
         return None

@@ -40,6 +40,12 @@ cp env.sample.toml env.toml
 uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md
 ```
 
+For detailed local workflow logs:
+
+```bash
+uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md --log-level DEBUG
+```
+
 Outputs land in:
 
 ```text
@@ -119,6 +125,7 @@ Common runtime controls:
 - `runtime.max_recipients_per_message`
 - `runtime.enable_checkpointing`
 - `runtime.rng_seed`
+- `--log-level` for CLI-visible logging verbosity
 
 ## Sample Scenarios
 

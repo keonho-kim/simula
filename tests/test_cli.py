@@ -25,6 +25,7 @@ def test_cli_parses_defaults() -> None:
 
     assert args.env is None
     assert args.max_steps is None
+    assert args.log_level is None
     assert args.trials == 1
     assert args.parallel is False
 
@@ -64,12 +65,26 @@ def test_cli_parses_repeat_options() -> None:
     assert args.parallel is True
 
 
+def test_cli_parses_log_level_override() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "--scenario-text",
+            "테스트",
+            "--log-level",
+            "DEBUG",
+        ]
+    )
+
+    assert args.log_level == "DEBUG"
+
+
 @pytest.mark.parametrize(
     "removed_flag",
     [
         "--mode",
         "--max-round",
-        "--log-level",
         "--output-dir",
         "--sqlite-dir",
         "--time-unit",
