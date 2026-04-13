@@ -14,6 +14,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import cast
+
 from pydantic import BaseModel
 
 from simula.domain.contracts import (
@@ -393,6 +396,14 @@ def _render_nested(
             if _is_scalar(item):
                 lines.append(f"{prefix}- {_format_scalar(item)}")
                 continue
+            if isinstance(item, dict):
+                lines.extend(
+                    _render_dict_list_item(
+                        cast(Mapping[object, object], item),
+                        indent=indent,
+                    )
+                )
+                continue
             lines.append(f"{prefix}-")
             lines.extend(_render_nested(item, indent=indent + 4))
         if lines:
@@ -426,6 +437,39 @@ def _render_empty_value(key: str | None, value: object) -> str:
     if key == "stop_reason" and value == "":
         return "continue"
     return "empty"
+
+
+def _render_dict_list_item(item: Mapping[object, object], *, indent: int) -> list[str]:
+    prefix = " " * indent
+    nested_prefix = indent + 4
+    entries = [(str(raw_key), value) for raw_key, value in item.items()]
+    if not entries:
+        return [f"{prefix}- empty"]
+
+    first_key, first_value = entries[0]
+    lines: list[str] = []
+    if _is_empty_value(first_value):
+        lines.append(f"{prefix}- {first_key}: {_render_empty_value(first_key, first_value)}")
+    elif _is_scalar(first_value):
+        lines.append(f"{prefix}- {first_key}: {_format_scalar(first_value)}")
+    else:
+        lines.append(f"{prefix}- {first_key}:")
+        lines.extend(
+            _render_nested(first_value, indent=nested_prefix + 4, parent_key=first_key)
+        )
+
+    for key, value in entries[1:]:
+        if _is_empty_value(value):
+            lines.append(
+                f"{' ' * nested_prefix}{key}: {_render_empty_value(key, value)}"
+            )
+            continue
+        if _is_scalar(value):
+            lines.append(f"{' ' * nested_prefix}{key}: {_format_scalar(value)}")
+            continue
+        lines.append(f"{' ' * nested_prefix}{key}:")
+        lines.extend(_render_nested(value, indent=nested_prefix + 4, parent_key=key))
+    return lines
 
 
 def _has_batchim(text: str) -> bool:
