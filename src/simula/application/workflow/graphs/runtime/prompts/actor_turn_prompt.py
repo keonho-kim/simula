@@ -31,7 +31,8 @@ _PROMPT = textwrap.dedent(
     - Choose `action_type` from `runtime_guidance.available_actions`.
     - `public` visibility may leave `target_actor_ids` empty.
     - `private` and `group` visibility must include real `actor_id` values in `target_actor_ids`.
-    - If there is no spoken line, set `utterance` to null.
+    - If there is no spoken line, set `utterance` to an empty string.
+    - If there is no stable thread identifier, set `thread_id` to an empty string.
     - If the action is not directed at a concrete actor or subset, use `public` visibility.
 
     # Input

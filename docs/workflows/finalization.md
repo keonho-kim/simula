@@ -1,110 +1,57 @@
-# Finalization Subgraph
+# Finalization Workflow
 
 ## Purpose
 
-The finalization subgraph converts runtime state into report-ready artifacts. It builds a
-structured final report, derives a report projection, generates markdown sections, and
-persists the final report JSON.
+Finalization turns the completed runtime trace into stable report artifacts.
 
-## Graph Shape
+## Active Path
 
 ```mermaid
-flowchart TD
-    START --> build_final_report_payload
-    build_final_report_payload --> build_simulation_log
-    build_simulation_log --> resolve_timeline_anchor
-    resolve_timeline_anchor --> build_report_projection
-    build_report_projection --> write_timeline_section
-    build_report_projection --> write_actor_dynamics_section
-    build_report_projection --> write_major_events_section
-    write_timeline_section --> assemble_body_sections
-    write_actor_dynamics_section --> assemble_body_sections
-    write_major_events_section --> assemble_body_sections
-    assemble_body_sections --> write_actor_final_results_section
-    write_actor_final_results_section --> write_simulation_conclusion_section
-    write_simulation_conclusion_section --> assemble_markdown_report
-    assemble_markdown_report --> persist_final_report
-    persist_final_report --> END
+flowchart LR
+    Start([START]) --> Anchor["resolve_timeline_anchor"]
+    Anchor --> Artifacts["build_report_artifacts"]
+    Artifacts --> Bundle["write_final_report_bundle"]
+    Bundle --> Render["render_and_persist_final_report"]
+    Render --> End([END])
 ```
 
-## Inputs and Outputs
+## Node Responsibilities
 
-| Input | Meaning |
-| --- | --- |
-| `activities` | canonical activity history |
-| `observer_reports` | per-step summaries |
-| `step_time_history` | normalized runtime time history |
-| `step_focus_history` | focus history |
-| `actor_intent_states` | final intent snapshots |
-| `simulation_clock` | cumulative runtime clock |
-| `world_state_summary` | latest world digest |
+### `resolve_timeline_anchor`
 
-| Output | Meaning |
-| --- | --- |
-| `final_report` | structured final report JSON |
-| `simulation_log_jsonl` | JSONL log string |
-| `report_timeline_anchor_json` | absolute report-time anchor |
-| `report_projection_json` | report-specific projection JSON |
-| `report_body_sections_markdown` | assembled body markdown |
-| `final_report_markdown` | full markdown report |
+Uses a parser-first strategy:
 
-## Sequence Summary
+1. parse explicit absolute date/time from the scenario when possible
+2. extract partial hints when the scenario is incomplete
+3. call the `observer` role only when inference is still needed
 
-1. `build_final_report_payload` creates the structured JSON summary.
-2. `build_simulation_log` renders the JSONL log string.
-3. `resolve_timeline_anchor` chooses one absolute timestamp anchor for the report.
-4. `build_report_projection` derives timeline packets, actor digests, and endgame clues.
-5. three body sections are generated in parallel:
-   - timeline
-   - actor dynamics
-   - major events
-6. `assemble_body_sections` puts those sections in a fixed order.
-7. the final actor results section and conclusion section are generated next.
-8. `assemble_markdown_report` renders the full markdown document.
-9. `persist_final_report` stores the structured final report JSON.
+The output is always one required `TimelineAnchorDecision`.
 
-The finalization prompts currently reuse the `observer` role for timeline-anchor inference
-and report section writing.
+### `build_report_artifacts`
 
-## Report Projection vs. Prompt Projection
+Builds:
 
-Finalization uses `report_projection_json`, which is not the same thing as the compact
-prompt projections used in generation or runtime.
+- `final_report`
+- `simulation_log_jsonl`
+- `report_projection_json`
 
-- prompt projections
-  - ephemeral prompt-facing views derived right before one LLM call
-- report projection
-  - a finalization-stage artifact built from completed runtime state for report writing
+This is a code-only node. It does not call an LLM.
 
-Finalization is therefore not another consumer of the runtime prompt-projection helpers. It
-builds its own report-writing projection and then feeds that into section-writing prompts.
+### `write_final_report_bundle`
 
-## Report Projection Focus
+Calls the `observer` role to generate one `FinalReportSections` bundle. The bundle is validated
+and retried once if the first attempt violates section rules.
 
-The projection stage is where finalization becomes different from a raw log dump. It
-derives report-friendly structures such as:
+### `render_and_persist_final_report`
 
-- `timeline_packets`
-- `endgame_packets`
-- `actor_digests`
-- `intent_arc_packets`
-- `final_actor_snapshots`
-- `final_outcome_clues`
+Renders Markdown from the validated section bundle and stores the final report artifact.
 
-## Current Section Order
+## Final Outputs
 
-The assembled markdown report currently renders:
+The finalization stage populates the public output surface used by the root graph:
 
-1. simulation conclusion
-2. actor final results
-3. simulation timeline
-4. actor dynamics
-5. major events and outcomes
-
-## Important Current Behaviors
-
-- the finalization graph persists structured final report JSON, not the markdown file
-- `final_report.md` and `simulation.log.jsonl` files are written later by the presentation
-  layer from the final state
-- report timestamps are rebuilt from the absolute anchor plus accumulated elapsed minutes,
-  not from a fixed step size
+- `final_report`
+- `final_report_markdown`
+- `simulation_log_jsonl`
+- `stop_reason`
+- `errors`

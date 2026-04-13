@@ -1,15 +1,5 @@
-"""목적:
-- 콘솔 출력과 단일 실행 결과 파일 저장을 담당한다.
-
-설명:
-- entrypoint가 직접 JSON 렌더링과 파일 작성을 하지 않도록 표시/저장 로직을 분리한다.
-
-사용한 설계 패턴:
-- presenter 패턴
-
-연관된 다른 모듈/구조:
-- simula.entrypoints.bootstrap
-- simula.application.commands.simulation_runs
+"""Purpose:
+- Render the console summary and persist single-run outputs.
 """
 
 from __future__ import annotations
@@ -19,7 +9,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from simula.application.commands.simulation_runs import TrialRunOutcome
-from simula.domain.reporting import build_simulation_log_entries
 
 
 @dataclass(slots=True)
@@ -57,19 +46,18 @@ def write_single_run_outputs(
     run_id: str,
     final_state: dict[str, object],
 ) -> SavedRunOutputs:
-    """단일 실행 결과를 output 디렉터리에 저장한다."""
+    """Persist one run's JSONL log and markdown report."""
 
     run_dir = Path(output_dir) / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     simulation_log_path = run_dir / "simulation.log.jsonl"
     final_report_path = run_dir / "final_report.md"
 
-    simulation_log_entries = build_simulation_log_entries(final_state)
+    simulation_log_jsonl = final_state.get("simulation_log_jsonl")
+    if not isinstance(simulation_log_jsonl, str) or not simulation_log_jsonl.strip():
+        raise ValueError("simulation_log_jsonl is empty.")
     simulation_log_path.write_text(
-        "\n".join(
-            json.dumps(entry, ensure_ascii=False) for entry in simulation_log_entries
-        )
-        + "\n",
+        simulation_log_jsonl.rstrip() + "\n",
         encoding="utf-8",
     )
     final_report_markdown = final_state.get("final_report_markdown")

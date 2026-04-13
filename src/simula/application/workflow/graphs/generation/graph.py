@@ -18,9 +18,6 @@ from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.generation.nodes.finalize import (
     finalize_generated_actors,
 )
-from simula.application.workflow.graphs.generation.nodes.persistence import (
-    persist_generated_actors,
-)
 from simula.application.workflow.graphs.generation.nodes.preparation import (
     dispatch_actor_slots,
     prepare_actor_slots,
@@ -39,11 +36,9 @@ _graph = StateGraph(
 _graph.add_node("prepare_actor_slots", prepare_actor_slots)
 _graph.add_node("generate_actor_slot", generate_actor_slot)
 _graph.add_node("finalize_generated_actors", finalize_generated_actors)
-_graph.add_node("persist_generated_actors", persist_generated_actors)
 _graph.add_edge(START, "prepare_actor_slots")
 _graph.add_conditional_edges("prepare_actor_slots", dispatch_actor_slots)
 _graph.add_edge("generate_actor_slot", "finalize_generated_actors")
-_graph.add_edge("finalize_generated_actors", "persist_generated_actors")
-_graph.add_edge("persist_generated_actors", END)
+_graph.add_edge("finalize_generated_actors", END)
 
 GENERATION_SUBGRAPH = _graph.compile(name="generation")

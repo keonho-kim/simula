@@ -1,20 +1,14 @@
-"""목적:
-- 런타임의 구조화 출력 계약을 정의한다.
+"""Purpose:
+- Define the required structured contracts used across planning, runtime, and reporting.
 
-설명:
-- Planner 3단계 출력, Actor Generator, Actor Proposal, Observer, Final Report의 JSON 스키마를 고정한다.
-
-사용한 설계 패턴:
-- Pydantic 계약 모델 패턴
-
-연관된 다른 모듈/구조:
-- simula.application.workflow.graphs
-- simula.infrastructure.llm.router
+Description:
+- Keep LLM-facing schemas compact and required-only.
+- Keep runtime/report payloads explicit and validation-friendly.
 """
 
 from __future__ import annotations
 
-from typing import Literal, cast
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -27,78 +21,73 @@ PressureLevel = Literal["low", "medium", "high"]
 
 
 class ScenarioTimeScope(BaseModel):
-    """시나리오 시간 범위 해석이다."""
+    """Scenario time window."""
 
     start: str
     end: str
 
-
-class ScenarioBrief(BaseModel):
-    """후속 planner 단계가 재사용할 시나리오 요약 분석이다."""
-
-    summary: str
-    key_entities: list[str] = Field(default_factory=list)
-    explicit_time_signals: list[str] = Field(default_factory=list)
-    public_facts: list[str] = Field(default_factory=list)
-    private_dynamics: list[str] = Field(default_factory=list)
-    terminal_conditions: list[str] = Field(default_factory=list)
-
     @model_validator(mode="after")
-    def validate_scenario_brief(self) -> "ScenarioBrief":
-        """요약 분석 필수 필드를 검증한다."""
-
-        if not self.summary.strip():
-            raise ValueError("summary는 비어 있을 수 없습니다.")
+    def validate_time_scope(self) -> "ScenarioTimeScope":
+        if not self.start.strip():
+            raise ValueError("start must not be empty.")
+        if not self.end.strip():
+            raise ValueError("end must not be empty.")
         return self
 
 
 class RuntimeProgressionPlan(BaseModel):
-    """Planner가 제안하는 실행 시간 진행 계획이다."""
+    """Runtime pacing policy."""
 
     max_steps: int = Field(ge=1)
-    allowed_units: list[TimeUnit] = Field(default_factory=list)
+    allowed_units: list[TimeUnit]
     default_unit: TimeUnit
-    pacing_guidance: list[str] = Field(default_factory=list)
+    pacing_guidance: list[str]
     selection_reason: str
 
     @model_validator(mode="after")
     def validate_progression_plan(self) -> "RuntimeProgressionPlan":
-        """허용 단위와 기본 단위 정합성을 검증한다."""
-
         if not self.allowed_units:
-            raise ValueError("allowed_units는 최소 1개 이상 필요합니다.")
+            raise ValueError("allowed_units must not be empty.")
         if len(self.allowed_units) != len(set(self.allowed_units)):
-            raise ValueError("allowed_units에 중복 단위를 허용하지 않습니다.")
+            raise ValueError("allowed_units must be unique.")
         if self.default_unit not in self.allowed_units:
-            raise ValueError("default_unit은 allowed_units 안에 있어야 합니다.")
+            raise ValueError("default_unit must be included in allowed_units.")
+        if not self.selection_reason.strip():
+            raise ValueError("selection_reason must not be empty.")
         return self
 
 
 class StepTimeAdvanceProposal(BaseModel):
-    """한 step의 경과 시간을 해석한 결과다."""
+    """Elapsed time chosen for one step."""
 
     elapsed_unit: TimeUnit
     elapsed_amount: int = Field(ge=1)
     selection_reason: str
-    signals: list[str] = Field(default_factory=list)
+    signals: list[str]
+
+    @model_validator(mode="after")
+    def validate_time_advance(self) -> "StepTimeAdvanceProposal":
+        if not self.selection_reason.strip():
+            raise ValueError("selection_reason must not be empty.")
+        return self
 
 
 class StepTimeAdvanceRecord(BaseModel):
-    """저장 및 보고용으로 정규화한 step 시간 기록이다."""
+    """Persisted normalized step-time record."""
 
     step_index: int = Field(ge=1)
     elapsed_unit: TimeUnit
     elapsed_amount: int = Field(ge=1)
-    elapsed_minutes: int = Field(ge=30)
+    elapsed_minutes: int = Field(ge=1)
     elapsed_label: str
-    total_elapsed_minutes: int = Field(ge=30)
+    total_elapsed_minutes: int = Field(ge=0)
     total_elapsed_label: str
     selection_reason: str
-    signals: list[str] = Field(default_factory=list)
+    signals: list[str]
 
 
 class SimulationClockSnapshot(BaseModel):
-    """현재 시뮬레이션 누적 시간 상태다."""
+    """Accumulated simulation clock snapshot."""
 
     total_elapsed_minutes: int = Field(ge=0)
     total_elapsed_label: str
@@ -107,19 +96,28 @@ class SimulationClockSnapshot(BaseModel):
     last_advanced_step_index: int = Field(ge=0)
 
 
-class ScenarioInterpretation(BaseModel):
-    """시나리오 1차 해석 결과다."""
+class PlanningAnalysis(BaseModel):
+    """Single required planning-analysis bundle."""
 
+    brief_summary: str
     premise: str
     time_scope: ScenarioTimeScope
     public_context: list[str]
     private_context: list[str]
     key_pressures: list[str]
     observation_points: list[str]
+    progression_plan: RuntimeProgressionPlan
+
+    @model_validator(mode="after")
+    def validate_planning_analysis(self) -> "PlanningAnalysis":
+        for field_name in ("brief_summary", "premise"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        return self
 
 
 class SituationBundle(BaseModel):
-    """실행용 상황 번들이다."""
+    """Compact execution situation bundle."""
 
     simulation_objective: str
     world_summary: str
@@ -127,20 +125,28 @@ class SituationBundle(BaseModel):
     channel_guidance: dict[VisibilityType, str]
     current_constraints: list[str]
 
+    @model_validator(mode="after")
+    def validate_situation_bundle(self) -> "SituationBundle":
+        if not self.simulation_objective.strip():
+            raise ValueError("simulation_objective must not be empty.")
+        if not self.world_summary.strip():
+            raise ValueError("world_summary must not be empty.")
+        if not self.channel_guidance:
+            raise ValueError("channel_guidance must not be empty.")
+        return self
+
 
 class CoordinationFrame(BaseModel):
-    """Planner가 만드는 step 조율 기준 프레임이다."""
+    """Runtime coordination rules."""
 
-    focus_selection_rules: list[str] = Field(default_factory=list)
-    background_motion_rules: list[str] = Field(default_factory=list)
-    focus_archetypes: list[str] = Field(default_factory=list)
-    attention_shift_rules: list[str] = Field(default_factory=list)
-    budget_guidance: list[str] = Field(default_factory=list)
+    focus_selection_rules: list[str]
+    background_motion_rules: list[str]
+    focus_archetypes: list[str]
+    attention_shift_rules: list[str]
+    budget_guidance: list[str]
 
     @model_validator(mode="after")
     def validate_coordination_frame(self) -> "CoordinationFrame":
-        """조율 프레임 각 항목이 최소 1개 이상 있는지 검증한다."""
-
         for field_name in (
             "focus_selection_rules",
             "background_motion_rules",
@@ -149,158 +155,160 @@ class CoordinationFrame(BaseModel):
             "budget_guidance",
         ):
             if not getattr(self, field_name):
-                raise ValueError(f"{field_name}는 최소 1개 이상 필요합니다.")
+                raise ValueError(f"{field_name} must not be empty.")
         return self
 
 
 class ActionCatalogItem(BaseModel):
-    """시나리오 전역 액션 카탈로그 항목이다."""
+    """One broad action option."""
 
     action_type: str
     label: str
     description: str
-    role_hints: list[str] = Field(default_factory=list)
-    group_hints: list[str] = Field(default_factory=list)
-    supported_visibility: list[VisibilityType] = Field(default_factory=list)
-    requires_target: bool = False
-    supports_utterance: bool = False
-    examples_or_usage_notes: list[str] = Field(default_factory=list)
+    supported_visibility: list[VisibilityType]
+    requires_target: bool
+    supports_utterance: bool
 
     @model_validator(mode="after")
     def validate_action_catalog_item(self) -> "ActionCatalogItem":
-        """액션 카탈로그 항목 필수 필드를 검증한다."""
-
         if not self.action_type.strip():
-            raise ValueError("action_type은 비어 있을 수 없습니다.")
+            raise ValueError("action_type must not be empty.")
         if not self.label.strip():
-            raise ValueError("label은 비어 있을 수 없습니다.")
+            raise ValueError("label must not be empty.")
         if not self.description.strip():
-            raise ValueError("description은 비어 있을 수 없습니다.")
+            raise ValueError("description must not be empty.")
         if not self.supported_visibility:
-            raise ValueError("supported_visibility는 최소 1개 이상 필요합니다.")
+            raise ValueError("supported_visibility must not be empty.")
         return self
 
 
 class ActionCatalog(BaseModel):
-    """시나리오 전역 액션 카탈로그다."""
+    """Scenario-wide action catalog."""
 
     actions: list[ActionCatalogItem]
-    selection_guidance: list[str] = Field(default_factory=list)
+    selection_guidance: list[str]
 
     @model_validator(mode="after")
     def validate_action_catalog(self) -> "ActionCatalog":
-        """action_type 중복을 허용하지 않는다."""
-
+        if not self.actions:
+            raise ValueError("actions must not be empty.")
         action_types = [item.action_type for item in self.actions]
-        if not action_types:
-            raise ValueError("actions는 최소 1개 이상 필요합니다.")
-        if len(action_types) > 5:
-            raise ValueError("action catalog는 최대 5개 action만 허용합니다.")
         if len(action_types) != len(set(action_types)):
-            raise ValueError("action catalog에 중복 action_type을 허용하지 않습니다.")
+            raise ValueError("action_type values must be unique.")
+        if len(action_types) > 5:
+            raise ValueError("actions must contain at most 5 items.")
         return self
 
 
 class CastRosterItem(BaseModel):
-    """고유 등장인물 roster item이다."""
+    """One cast roster item."""
 
     cast_id: str
     display_name: str
     role_hint: str
-    group_name: str | None = None
+    group_name: str
     core_tension: str
 
-
-class CastRoster(BaseModel):
-    """구조화 출력용 cast roster 묶음이다."""
-
-    items: list[CastRosterItem] = Field(default_factory=list)
-
     @model_validator(mode="after")
-    def validate_cast_roster(self) -> "CastRoster":
-        """cast roster의 필수 항목과 유일성을 검증한다."""
-
-        if not self.items:
-            raise ValueError("items는 최소 1개 이상 필요합니다.")
-
-        cast_ids = [item.cast_id for item in self.items]
-        display_names = [item.display_name for item in self.items]
-        if len(cast_ids) != len(set(cast_ids)):
-            raise ValueError("cast roster에 중복 cast_id를 허용하지 않습니다.")
-        if len(display_names) != len(set(display_names)):
-            raise ValueError("cast roster에 중복 display_name을 허용하지 않습니다.")
+    def validate_cast_roster_item(self) -> "CastRosterItem":
+        for field_name in (
+            "cast_id",
+            "display_name",
+            "role_hint",
+            "core_tension",
+        ):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
         return self
 
 
+class CastRoster(BaseModel):
+    """Compact required cast roster."""
+
+    items: list[CastRosterItem]
+
+    @model_validator(mode="after")
+    def validate_cast_roster(self) -> "CastRoster":
+        if not self.items:
+            raise ValueError("items must not be empty.")
+        cast_ids = [item.cast_id for item in self.items]
+        display_names = [item.display_name for item in self.items]
+        if len(cast_ids) != len(set(cast_ids)):
+            raise ValueError("cast_id values must be unique.")
+        if len(display_names) != len(set(display_names)):
+            raise ValueError("display_name values must be unique.")
+        return self
+
+
+class ExecutionPlanBundle(BaseModel):
+    """Single execution-plan bundle."""
+
+    situation: SituationBundle
+    action_catalog: ActionCatalog
+    coordination_frame: CoordinationFrame
+    cast_roster: CastRoster
+
+
 class ActorCard(BaseModel):
-    """실행 중인 actor의 최소 표현이다."""
+    """Runtime actor card."""
 
     cast_id: str
     actor_id: str
     display_name: str
     role: str
-    group_name: str | None = None
+    group_name: str
     public_profile: str
     private_goal: str
     speaking_style: str
     avatar_seed: str
     baseline_attention_tier: AttentionTier
     story_function: str
-    preferred_action_types: list[str] = Field(default_factory=list)
-    action_bias_notes: list[str] = Field(default_factory=list)
+    preferred_action_types: list[str]
+    action_bias_notes: list[str]
+
+    @model_validator(mode="after")
+    def validate_actor_card(self) -> "ActorCard":
+        for field_name in (
+            "cast_id",
+            "actor_id",
+            "display_name",
+            "role",
+            "public_profile",
+            "private_goal",
+            "speaking_style",
+            "avatar_seed",
+            "story_function",
+        ):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        return self
 
 
 class ActorActionProposal(BaseModel):
-    """Actor 한 명의 한 단계 자유행동 제안이다."""
+    """One actor proposal for one step."""
 
     action_type: str
     intent: str
-    intent_target_actor_ids: list[str] = Field(default_factory=list)
+    intent_target_actor_ids: list[str]
     action_summary: str
     action_detail: str
-    utterance: str | None = None
-    visibility: VisibilityType = "private"
-    target_actor_ids: list[str] = Field(default_factory=list)
-    thread_id: str | None = None
-    expected_outcome: str | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_optional_utterance(cls, value: object) -> object:
-        """빈 utterance 문자열을 None으로 정규화한다."""
-
-        if not isinstance(value, dict):
-            return value
-        payload = cast(dict[str, object], value)
-        raw_utterance = payload.get("utterance")
-        if isinstance(raw_utterance, str) and not raw_utterance.strip():
-            return {
-                **payload,
-                "utterance": None,
-            }
-        return value
+    utterance: str
+    visibility: VisibilityType
+    target_actor_ids: list[str]
+    thread_id: str
 
     @model_validator(mode="after")
-    def validate_proposal(self) -> "ActorActionProposal":
-        """visibility별 target 요구사항을 검증한다."""
-
+    def validate_actor_action_proposal(self) -> "ActorActionProposal":
+        for field_name in ("action_type", "intent", "action_summary", "action_detail"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
         if self.visibility in {"private", "group"} and not self.target_actor_ids:
-            raise ValueError("private/group 활동은 target_actor_ids가 필요합니다.")
-        if not self.action_type.strip():
-            raise ValueError("활동 제안은 action_type이 필요합니다.")
-        if not self.intent.strip():
-            raise ValueError("활동 제안은 intent가 필요합니다.")
-        if not self.action_summary.strip():
-            raise ValueError("활동 제안은 action_summary가 필요합니다.")
-        if not self.action_detail.strip():
-            raise ValueError("활동 제안은 action_detail이 필요합니다.")
-        if self.utterance is not None and not self.utterance.strip():
-            raise ValueError("utterance가 있으면 비어 있을 수 없습니다.")
+            raise ValueError("private/group proposals require target_actor_ids.")
         return self
 
 
 class CanonicalAction(BaseModel):
-    """실제 저장되는 canonical action이다."""
+    """Persisted canonical action."""
 
     activity_id: str
     run_id: str
@@ -314,54 +322,44 @@ class CanonicalAction(BaseModel):
     intent_target_actor_ids: list[str]
     action_summary: str
     action_detail: str
-    utterance: str | None = None
-    expected_outcome: str | None = None
-    thread_id: str | None = None
+    utterance: str
+    thread_id: str
     created_at: str
 
 
 class ActorIntentSnapshot(BaseModel):
-    """actor의 현재 의도 snapshot이다."""
+    """Actor intent snapshot."""
 
     actor_id: str
     current_intent: str
-    target_actor_ids: list[str] = Field(default_factory=list)
+    target_actor_ids: list[str]
     supporting_action_type: str
     confidence: float = Field(ge=0.0, le=1.0)
-    changed_from_previous: bool = False
+    changed_from_previous: bool
 
     @model_validator(mode="after")
     def validate_intent_snapshot(self) -> "ActorIntentSnapshot":
-        """의도 snapshot 필수 필드를 검증한다."""
-
-        if not self.actor_id.strip():
-            raise ValueError("actor_id는 비어 있을 수 없습니다.")
-        if not self.current_intent.strip():
-            raise ValueError("current_intent는 비어 있을 수 없습니다.")
-        if not self.supporting_action_type.strip():
-            raise ValueError("supporting_action_type은 비어 있을 수 없습니다.")
+        for field_name in ("actor_id", "current_intent", "supporting_action_type"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
         return self
 
 
 class ActorIntentStateBatch(BaseModel):
-    """step 종료 후 actor intent snapshot 묶음이다."""
+    """Batch of intent snapshots."""
 
     actor_intent_states: list[ActorIntentSnapshot]
 
     @model_validator(mode="after")
     def validate_intent_batch(self) -> "ActorIntentStateBatch":
-        """배치 내 actor_id 중복을 허용하지 않는다."""
-
         actor_ids = [item.actor_id for item in self.actor_intent_states]
         if len(actor_ids) != len(set(actor_ids)):
-            raise ValueError(
-                "actor intent snapshot에 중복 actor_id를 허용하지 않습니다."
-            )
+            raise ValueError("actor_intent_states must use unique actor_id values.")
         return self
 
 
 class FocusSlice(BaseModel):
-    """한 step 안에서 coordinator가 선택한 focus slice다."""
+    """Selected focus slice."""
 
     slice_id: str
     title: str
@@ -372,54 +370,21 @@ class FocusSlice(BaseModel):
 
     @model_validator(mode="after")
     def validate_focus_slice(self) -> "FocusSlice":
-        """focus slice 핵심 필드를 검증한다."""
-
         if not self.slice_id.strip():
-            raise ValueError("slice_id는 비어 있을 수 없습니다.")
+            raise ValueError("slice_id must not be empty.")
         if not self.title.strip():
-            raise ValueError("title은 비어 있을 수 없습니다.")
+            raise ValueError("title must not be empty.")
         if not self.focus_actor_ids:
-            raise ValueError("focus_actor_ids는 최소 1명 이상 필요합니다.")
+            raise ValueError("focus_actor_ids must not be empty.")
         if not self.stakes.strip():
-            raise ValueError("stakes는 비어 있을 수 없습니다.")
+            raise ValueError("stakes must not be empty.")
         if not self.selection_reason.strip():
-            raise ValueError("selection_reason은 비어 있을 수 없습니다.")
-        return self
-
-
-class StepFocusPlan(BaseModel):
-    """Coordinator가 한 step에 대해 세운 focus 계획이다."""
-
-    step_index: int = Field(ge=1)
-    focus_summary: str
-    selection_reason: str
-    selected_actor_ids: list[str] = Field(default_factory=list)
-    deferred_actor_ids: list[str] = Field(default_factory=list)
-    focus_slices: list[FocusSlice] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def validate_step_focus_plan(self) -> "StepFocusPlan":
-        """selected/deferred와 slice 정합성을 검증한다."""
-
-        if not self.focus_summary.strip():
-            raise ValueError("focus_summary는 비어 있을 수 없습니다.")
-        if not self.selection_reason.strip():
-            raise ValueError("selection_reason은 비어 있을 수 없습니다.")
-        if len(self.selected_actor_ids) != len(set(self.selected_actor_ids)):
-            raise ValueError("selected_actor_ids에 중복을 허용하지 않습니다.")
-        if len(self.deferred_actor_ids) != len(set(self.deferred_actor_ids)):
-            raise ValueError("deferred_actor_ids에 중복을 허용하지 않습니다.")
-        for focus_slice in self.focus_slices:
-            for actor_id in focus_slice.focus_actor_ids:
-                if actor_id not in self.selected_actor_ids:
-                    raise ValueError(
-                        "focus_slices의 focus_actor_ids는 selected_actor_ids 안에 있어야 합니다."
-                    )
+            raise ValueError("selection_reason must not be empty.")
         return self
 
 
 class BackgroundUpdate(BaseModel):
-    """off-screen actor의 배경 상태 변화를 요약한 항목이다."""
+    """Compressed off-screen update."""
 
     step_index: int = Field(ge=1)
     actor_id: str
@@ -429,102 +394,85 @@ class BackgroundUpdate(BaseModel):
 
     @model_validator(mode="after")
     def validate_background_update(self) -> "BackgroundUpdate":
-        """배경 업데이트 핵심 필드를 검증한다."""
-
-        if not self.actor_id.strip():
-            raise ValueError("actor_id는 비어 있을 수 없습니다.")
-        if not self.summary.strip():
-            raise ValueError("summary는 비어 있을 수 없습니다.")
-        if not self.future_hook.strip():
-            raise ValueError("future_hook은 비어 있을 수 없습니다.")
+        for field_name in ("actor_id", "summary", "future_hook"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
         return self
 
 
 class BackgroundUpdateBatch(BaseModel):
-    """한 step의 background update 묶음이다."""
+    """Batch of background updates."""
 
-    background_updates: list[BackgroundUpdate] = Field(default_factory=list)
+    background_updates: list[BackgroundUpdate]
 
 
-class StepAdjudication(BaseModel):
-    """Coordinator가 actor proposal을 채택하고 상태를 정리한 결과다."""
+class StepDirective(BaseModel):
+    """Single runtime directive for a step."""
 
-    adopted_actor_ids: list[str] = Field(default_factory=list)
-    rejected_action_notes: list[str] = Field(default_factory=list)
-    updated_intent_states: list[ActorIntentSnapshot] = Field(default_factory=list)
-    step_time_advance: StepTimeAdvanceProposal
-    background_updates: list[BackgroundUpdate] = Field(default_factory=list)
-    event_action: ObserverEventProposal | None = None
-    world_state_summary_hint: str
+    step_index: int = Field(ge=1)
+    focus_summary: str
+    selection_reason: str
+    selected_actor_ids: list[str]
+    deferred_actor_ids: list[str]
+    focus_slices: list[FocusSlice]
+    background_updates: list[BackgroundUpdate]
 
     @model_validator(mode="after")
-    def validate_step_adjudication(self) -> "StepAdjudication":
-        """채택 결과 핵심 필드를 검증한다."""
-
-        if not self.world_state_summary_hint.strip():
-            raise ValueError("world_state_summary_hint는 비어 있을 수 없습니다.")
-        if len(self.adopted_actor_ids) != len(set(self.adopted_actor_ids)):
-            raise ValueError("adopted_actor_ids에 중복을 허용하지 않습니다.")
+    def validate_step_directive(self) -> "StepDirective":
+        if not self.focus_summary.strip():
+            raise ValueError("focus_summary must not be empty.")
+        if not self.selection_reason.strip():
+            raise ValueError("selection_reason must not be empty.")
+        if len(self.selected_actor_ids) != len(set(self.selected_actor_ids)):
+            raise ValueError("selected_actor_ids must be unique.")
+        if len(self.deferred_actor_ids) != len(set(self.deferred_actor_ids)):
+            raise ValueError("deferred_actor_ids must be unique.")
+        selected_set = set(self.selected_actor_ids)
+        for focus_slice in self.focus_slices:
+            if not set(focus_slice.focus_actor_ids).issubset(selected_set):
+                raise ValueError("focus_actor_ids must be contained in selected_actor_ids.")
         return self
 
 
 class ObserverReport(BaseModel):
-    """Observer가 작성하는 단계 요약이다."""
+    """Observer step summary."""
 
-    step_index: int
+    step_index: int = Field(ge=1)
     summary: str
     notable_events: list[str]
     atmosphere: str
-    momentum: SimulationMomentum = "medium"
+    momentum: SimulationMomentum
     world_state_summary: str
 
+    @model_validator(mode="after")
+    def validate_observer_report(self) -> "ObserverReport":
+        for field_name in ("summary", "atmosphere", "world_state_summary"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        return self
 
-class ObserverEventProposal(BaseModel):
-    """Observer가 확률 분기에서 생성하는 공용 action/event 제안이다."""
 
-    action_type: str
-    intent: str
-    action_summary: str
-    action_detail: str
-    utterance: str | None = None
-    thread_id: str | None = None
-    expected_outcome: str | None = None
+class StepResolution(BaseModel):
+    """Single required runtime resolution bundle."""
 
-    @model_validator(mode="before")
-    @classmethod
-    def normalize_optional_utterance(cls, value: object) -> object:
-        """빈 utterance 문자열을 None으로 정규화한다."""
-
-        if not isinstance(value, dict):
-            return value
-        payload = cast(dict[str, object], value)
-        raw_utterance = payload.get("utterance")
-        if isinstance(raw_utterance, str) and not raw_utterance.strip():
-            return {
-                **payload,
-                "utterance": None,
-            }
-        return value
+    adopted_actor_ids: list[str]
+    updated_intent_states: list[ActorIntentSnapshot]
+    step_time_advance: StepTimeAdvanceProposal
+    observer_report: ObserverReport
+    world_state_summary: str
+    stop_reason: str
 
     @model_validator(mode="after")
-    def validate_event(self) -> "ObserverEventProposal":
-        """사건 제안 필수 텍스트를 검증한다."""
-
-        if not self.action_type.strip():
-            raise ValueError("사건 제안은 action_type이 필요합니다.")
-        if not self.intent.strip():
-            raise ValueError("사건 제안은 intent가 필요합니다.")
-        if not self.action_summary.strip():
-            raise ValueError("사건 제안은 action_summary가 필요합니다.")
-        if not self.action_detail.strip():
-            raise ValueError("사건 제안은 action_detail이 필요합니다.")
-        if self.utterance is not None and not self.utterance.strip():
-            raise ValueError("utterance가 있으면 비어 있을 수 없습니다.")
+    def validate_step_resolution(self) -> "StepResolution":
+        if len(self.adopted_actor_ids) != len(set(self.adopted_actor_ids)):
+            raise ValueError("adopted_actor_ids must be unique.")
+        if not self.world_state_summary.strip():
+            raise ValueError("world_state_summary must not be empty.")
         return self
 
 
 class FinalReport(BaseModel):
-    """최종 실행 결과 요약이다."""
+    """Final aggregate report."""
 
     run_id: str
     scenario: str
@@ -543,7 +491,38 @@ class FinalReport(BaseModel):
 
 
 class TimelineAnchorDecision(BaseModel):
-    """최종 보고서 타임라인의 시작 시각 결정이다."""
+    """Absolute timeline anchor."""
 
     anchor_iso: str
     selection_reason: str
+
+    @model_validator(mode="after")
+    def validate_timeline_anchor(self) -> "TimelineAnchorDecision":
+        if not self.anchor_iso.strip():
+            raise ValueError("anchor_iso must not be empty.")
+        if not self.selection_reason.strip():
+            raise ValueError("selection_reason must not be empty.")
+        return self
+
+
+class FinalReportSections(BaseModel):
+    """Single final-report writing bundle."""
+
+    conclusion_section: str
+    actor_results_rows: str
+    timeline_section: str
+    actor_dynamics_section: str
+    major_events_section: str
+
+    @model_validator(mode="after")
+    def validate_final_report_sections(self) -> "FinalReportSections":
+        for field_name in (
+            "conclusion_section",
+            "actor_results_rows",
+            "timeline_section",
+            "actor_dynamics_section",
+            "major_events_section",
+        ):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        return self

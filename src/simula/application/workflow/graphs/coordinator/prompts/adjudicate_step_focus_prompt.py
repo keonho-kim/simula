@@ -1,62 +1,56 @@
-"""목적:
-- coordinator step adjudication 프롬프트 singleton을 제공한다.
-
-설명:
-- actor proposal과 background update를 읽고 채택 action, intent, 시간 진행을 정리한다.
-
-사용한 설계 패턴:
-- PromptTemplate singleton 패턴
+"""Purpose:
+- Prompt for the compact step resolution bundle.
 """
 
 from __future__ import annotations
 
-import textwrap
+PROMPT = """# Role
+You are the runtime resolver.
 
-from langchain_core.prompts import PromptTemplate
+# Goal
+Resolve this step in one object: adoption, updated intents, time advance, observer summary, and stop signal.
 
-_PROMPT = textwrap.dedent(
-    """
-    # Role
-    You are a simulation coordinator at our company.
-    Your task is to adjudicate the selected actor proposals for this step and decide what becomes part of the canonical simulation state.
+# Rules
+- Adopt only actor ids that appear in the pending proposal set.
+- Keep the observer summary grounded in the supplied actions and background updates.
+- `stop_reason` must be an empty string when the simulation should continue.
+- Every field is required.
 
-    # Input
-    - step_index: {step_index}
-    - step focus plan JSON:
-    {step_focus_plan_json}
-    - pending actor proposals JSON:
-    {pending_actor_proposals_json}
-    - current intent states JSON:
-    {actor_intent_states_json}
-    - latest background updates JSON:
-    {latest_background_updates_json}
-    - simulation clock JSON:
-    {simulation_clock_json}
-    - progression plan JSON:
-    {progression_plan_json}
-    - world state summary:
-    {world_state_summary}
+# Inputs
+Step index:
+{step_index}
 
-    # Output Format
-    - Return format: {output_format_name}
-    {format_rules}
+Step focus plan JSON:
+{step_focus_plan_json}
 
-    # Example
-    {output_example}
+Pending actor proposals JSON:
+{pending_actor_proposals_json}
 
-    # Instructions
-    - Write all natural-language values in Korean.
-    - Keep identifiers, field names, and enum values in the required schema format.
-    - adopted_actor_ids should only include actors present in pending_actor_proposals.
-    - Do not adopt every proposal by default; keep only the actions that best express this step's focus.
-    - updated_intent_states should return one snapshot per actor.
-    - `step_time_advance` must include `elapsed_unit`, `elapsed_amount`, `selection_reason`, and `signals`.
-    - `elapsed_unit` must be one of `minute`, `hour`, `day`, `week`.
-    - `elapsed_amount` must be an integer >= 1.
-    - step_time_advance must respect the dynamic time rules and remain at least 30 minutes.
-    - event_action is optional and should remain null unless a public situation change is clearly justified.
-    - world_state_summary_hint should compress the resulting state into a reusable summary for the next step.
-    """
-).strip()
+Latest background updates JSON:
+{latest_background_updates_json}
 
-PROMPT = PromptTemplate.from_template(_PROMPT)
+Latest activities JSON:
+{latest_activities_json}
+
+Actor intent states JSON:
+{actor_intent_states_json}
+
+Simulation clock JSON:
+{simulation_clock_json}
+
+Progression plan JSON:
+{progression_plan_json}
+
+World state summary:
+{world_state_summary}
+
+# Output
+Format:
+{output_format_name}
+
+Rules:
+{format_rules}
+
+Example:
+{output_example}
+"""

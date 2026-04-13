@@ -48,7 +48,6 @@ _ACTOR_ACTION_PROPOSAL_EXAMPLE: dict[str, Any] = {
     "visibility": "private",
     "target_actor_ids": ["finance-director"],
     "thread_id": "ops-private-thread",
-    "expected_outcome": "다음 단계 판단이 더 신중해진다.",
 }
 
 _OBSERVER_REPORT_EXAMPLE: dict[str, Any] = {

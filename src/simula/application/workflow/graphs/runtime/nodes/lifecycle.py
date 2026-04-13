@@ -10,12 +10,8 @@
 
 from __future__ import annotations
 
-import time
-
-from langgraph.runtime import Runtime
 from langgraph.types import Overwrite
 
-from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
@@ -32,7 +28,7 @@ def initialize_runtime_state(state: SimulationWorkflowState) -> dict[str, object
         "latest_step_activities": [],
         "observer_reports": [],
         "focus_candidates": [],
-        "step_focus_plan": None,
+        "step_focus_plan": {},
         "step_focus_history": [],
         "selected_actor_ids": [],
         "deferred_actor_ids": [],
@@ -40,13 +36,21 @@ def initialize_runtime_state(state: SimulationWorkflowState) -> dict[str, object
         "background_updates": [],
         "actor_intent_states": build_initial_intent_snapshots(list(state["actors"])),
         "intent_history": [],
-        "pending_step_time_advance": None,
+        "step_time_advance": {},
         "pending_actor_proposals": Overwrite(value=[]),
-        "pending_observer_report": None,
+        "actor_proposal_task": {
+            "actor": {},
+            "unread_activity_ids": [],
+            "visible_action_context": [],
+            "unread_backlog_digest": {},
+            "visible_actors": [],
+            "focus_slice": {},
+            "runtime_guidance": {},
+        },
         "step_index": 0,
         "stop_requested": False,
-        "stop_reason": None,
-        "final_report": None,
+        "stop_reason": "",
+        "final_report": {},
         "errors": [],
         "parse_failures": 0,
         "forced_idles": 0,

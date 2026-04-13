@@ -422,7 +422,6 @@ class StructuredLLMRouter:
         output_tokens: int | None = None
         total_tokens: int | None = None
         parsed = result
-        parsing_error: Exception | None = None
 
         duration_seconds = time.perf_counter() - started_at
         if isinstance(parsed, schema):
@@ -899,15 +898,8 @@ def _format_response_title(
 
 def _planner_scope_label(scope: str, *, suffix: str = "") -> str:
     labels = {
-        "scenario-brief": "planner · 시나리오 요약 분석",
-        "interpretation-core": "planner · 핵심 전제 정리",
-        "runtime-window": "planner · 실행 시간축 결정",
-        "runtime-progression": "planner · 실행 시간축 결정",
-        "interpretation-time": "planner · 시간 범위 정리",
-        "interpretation-visibility": "planner · 공개/비공개 맥락 정리",
-        "interpretation-pressure": "planner · 압박 요인·관찰 포인트 정리",
-        "situation": "planner · 상황 정리",
-        "cast_roster": "planner · 등장 주체 목록 확정",
+        "planning-analysis": "planner · 계획 분석 정리",
+        "execution-plan": "planner · 실행 계획 번들 정리",
     }
     base = labels.get(scope, "planner")
     if suffix:
@@ -917,7 +909,6 @@ def _planner_scope_label(scope: str, *, suffix: str = "") -> str:
 
 def _observer_scope_label(scope: str, *, suffix: str = "") -> str:
     labels = {
-        "event": "observer · 상황 이벤트 생성",
         "final-report": "observer · 최종 보고서 작성",
     }
     base = labels.get(scope, "관찰 요약")

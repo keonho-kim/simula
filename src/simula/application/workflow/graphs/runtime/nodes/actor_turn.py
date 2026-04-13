@@ -51,7 +51,7 @@ def dispatch_selected_actor_proposals(
     """선택된 actor action proposal 생성을 fan-out 한다."""
 
     if not state.get("selected_actor_ids"):
-        return "reduce_actor_proposals"
+        return "resolve_step"
 
     actors_by_id = {str(actor["actor_id"]): actor for actor in state["actors"]}
     action_catalog = ActionCatalog.model_validate(state["plan"]["action_catalog"])
@@ -94,7 +94,7 @@ def dispatch_selected_actor_proposals(
                 "generate_actor_proposal",
                 {
                     "step_index": state["step_index"],
-                    "progression_plan": state["plan"]["progression_plan"],
+        "progression_plan": state["plan"]["progression_plan"],
                     "simulation_clock": state.get("simulation_clock", {}),
                     "actor_proposal_task": {
                         "actor": build_actor_prompt_actor_view(actor),
@@ -103,7 +103,7 @@ def dispatch_selected_actor_proposals(
                             for activity in unread_visible_activities
                         ],
                         "visible_action_context": visible_action_context,
-                        "unread_backlog_digest": unread_backlog_digest,
+                "unread_backlog_digest": unread_backlog_digest,
                         "visible_actors": visible_actors,
                         "focus_slice": focus_slice,
                         "runtime_guidance": runtime_guidance,
@@ -244,7 +244,7 @@ def _build_actor_proposal_prompt(
         step_index=state["step_index"],
         progression_plan_json=json.dumps(
             build_progression_plan_prompt_view(
-                cast(dict[str, object], state.get("progression_plan", {}))
+                cast(dict[str, object], state["plan"]["progression_plan"])
             ),
             ensure_ascii=False,
             separators=(",", ":"),
@@ -354,7 +354,6 @@ def _filter_action_catalog_for_actor(
             str(actor.get("private_goal", "")),
         ]
     )
-    group_name = str(actor.get("group_name", "")).strip()
 
     matched: list[dict[str, object]] = []
     fallback: list[dict[str, object]] = []
@@ -364,10 +363,7 @@ def _filter_action_catalog_for_actor(
         if action.action_type in preferred_action_types:
             matched.append(dumped)
             continue
-        if group_name and group_name in action.group_hints:
-            matched.append(dumped)
-            continue
-        if any(hint and hint in role_text for hint in action.role_hints):
+        if action.label and action.label in role_text:
             matched.append(dumped)
             continue
 
@@ -445,11 +441,10 @@ def _build_default_action_proposal(
         "intent_target_actor_ids": intent_target_actor_ids,
         "action_summary": "이번 단계에는 즉시 큰 움직임보다 상황 파악에 집중한다.",
         "action_detail": "지금 단계에서는 급하게 새로운 조치를 밀어붙이기보다, 현재 action 흐름과 상대 반응을 더 살핀다.",
-        "utterance": None,
+        "utterance": "",
         "visibility": visibility,
         "target_actor_ids": target_actor_ids,
-        "thread_id": None,
-        "expected_outcome": "다음 단계 판단에 필요한 단서를 더 확보한다.",
+        "thread_id": "",
     }
 
 

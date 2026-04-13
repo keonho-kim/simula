@@ -1,126 +1,79 @@
-# Runtime Subgraph
+# Runtime Workflow
 
 ## Purpose
 
-The runtime subgraph owns the repeating step loop. It initializes runtime-only channels,
-runs the coordinator subgraph, asks the observer for a step summary, persists step
-artifacts, and decides whether to continue.
+Runtime is the only looping stage. It chooses the next focus, fans out actor proposals, resolves
+the step, and decides whether to continue.
 
-## Current Compiled Loop
+## Active Path
 
 ```mermaid
-flowchart LR
-    START --> initialize_runtime_state
-    initialize_runtime_state --> coordinator
-    coordinator --> observe_step
-    observe_step --> persist_step_artifacts
-    persist_step_artifacts --> stop_step
-    stop_step -- continue --> coordinator
-    stop_step -- complete --> END
+flowchart TD
+    Start([START]) --> Init["initialize_runtime_state"]
+    Init --> Prepare["prepare_step"]
+    Prepare --> Plan["plan_step"]
+    Plan --> FanOut["generate_actor_proposal*"]
+    FanOut --> Reduce["reduce_actor_proposals"]
+    Reduce --> Resolve["resolve_step"]
+    Resolve --> Route{"stop?"}
+    Route -->|continue| Prepare
+    Route -->|complete| End([END])
 ```
 
-## Inputs and Outputs
+`generate_actor_proposal*` fans out once per selected actor in the current step.
 
-| Input | Meaning |
-| --- | --- |
-| `plan` | planning bundle |
-| `actors` | runtime actor registry |
-| runtime settings | step, focus, and routing limits |
-| `rng_seed` | deterministic selection seed |
-
-| Output | Meaning |
-| --- | --- |
-| `activities` | canonical runtime activity log |
-| `observer_reports` | per-step summaries |
-| `simulation_clock` | cumulative time snapshot |
-| `step_time_history` | normalized time-advance records |
-| `actor_intent_states` | latest intent snapshots |
-| `intent_history` | per-step intent history |
-| `stop_requested` / `stop_reason` | stop decision |
-
-## Runtime Responsibilities
+## Node Responsibilities
 
 ### `initialize_runtime_state`
 
-Initializes the mailbox/feed state and clears runtime-only channels such as:
+Normalizes runtime counters and ensures the runtime loop starts from a clean state.
 
-- `activity_feeds`
+### `prepare_step`
+
+Advances `step_index`, compresses focus candidates, resets current-step scratch fields, and starts
+step timing.
+
+### `plan_step`
+
+Generates one `StepDirective` bundle:
+
+- focus summary
+- selection reason
+- selected actor ids
+- deferred actor ids
+- focus slices
+- background updates
+
+It also appends the directive to `step_focus_history`.
+
+### `generate_actor_proposal`
+
+Generates one `ActorActionProposal` for one selected actor from compact runtime inputs.
+
+### `reduce_actor_proposals`
+
+Restores deterministic actor order after fan-in.
+
+### `resolve_step`
+
+Generates one `StepResolution` bundle, applies adopted actions, advances the simulation clock,
+writes observer output, persists step artifacts, and sets stop state.
+
+## Stop Behavior
+
+The runtime loop ends when either:
+
+- the resolution explicitly returns a non-empty `stop_reason`
+- the runtime policy decides to stop, such as reaching `max_steps`
+
+## Stage Output
+
+Runtime leaves behind the full execution trace used by finalization:
+
+- `activities`
 - `observer_reports`
-- `focus_candidates`
 - `step_focus_history`
-- `actor_intent_states`
+- `step_time_history`
+- `background_updates`
 - `world_state_summary`
-
-The current runtime reset does not include the older `observer_event_*` scratch channels.
-
-### `coordinator`
-
-Delegates the step execution core:
-
-- focus candidate compression
-- focus slice planning
-- deferred actor digestion
-- actor proposal fan-out and reduce
-- action adoption
-- intent updates
-- time advancement
-
-### `observe_step`
-
-Produces the observer report for the current step and updates:
-
-- `observer_reports`
-- `pending_observer_report`
-- `world_state_summary`
-- `stagnation_steps`
-
-The observer input is built from compact views, not from the full runtime state:
-
-- compact latest-step actions
-- compact latest background updates
-- relevant intent subset
-- `prior_state_digest`
-- current clock and current step time-advance snapshot
-
-### `persist_step_artifacts`
-
-Persists the latest adopted activities together with the observer report.
-
-### `stop_step`
-
-Decides whether the runtime loop ends or returns to the coordinator.
-
-## What the Observer Does Today
-
-- summarizes the step in `ObserverReport`
-- sets `momentum` and `atmosphere`
-- refreshes `world_state_summary`
-- contributes to stop logic through `momentum`
-- reads compact prompt projections tailored to the latest step instead of the full activity
-  history
-
-## What the Observer Does Not Own Today
-
-- it does not choose focus slices
-- it does not adopt actor actions
-- it does not own intent snapshot updates
-- it does not own normalized time advancement in the current compiled path
-
-Those responsibilities currently live in coordinator adjudication.
-
-## Stop Conditions
-
-The runtime stops when either condition is met:
-
-- `step_index >= max_steps`
-- stagnation accumulates after repeated low-momentum steps
-
-## Important Current Behaviors
-
-- runtime uses prompt projections to keep role inputs smaller than the full stored state
-- the compiled runtime path is smaller than the full set of prompt modules present in the
-  tree
-- prompts such as step-time estimation or alternative event decomposition exist in the
-  repository, but the current compiled path uses coordinator adjudication plus observer
-  summary as the active runtime split
-- persistence happens after each observed step, not only at the end of the run
+- `stop_reason`

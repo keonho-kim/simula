@@ -27,7 +27,7 @@ from simula.application.workflow.graphs.simulation.graph import (
     SIMULATION_WORKFLOW_GRAPH,
 )
 from simula.application.workflow.graphs.simulation.states.initial_state import (
-    build_initial_workflow_state,
+    build_simulation_input_state,
 )
 from simula.infrastructure.config.models import AppSettings
 from simula.infrastructure.llm.router import build_model_router
@@ -103,7 +103,7 @@ class SimulationExecutor:
             llms=self.llms,
             logger=self.logger,
         )
-        initial_state = build_initial_workflow_state(
+        input_state = build_simulation_input_state(
             run_id=run_id,
             scenario_text=scenario_text,
             settings=self.settings,
@@ -121,7 +121,7 @@ class SimulationExecutor:
                     else SIMULATION_WORKFLOW
                 )
                 raw_result = await app.ainvoke(
-                    initial_state,
+                    input_state,
                     config={"configurable": {"thread_id": run_id}},
                     context=context,
                     version="v2",

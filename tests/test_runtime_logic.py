@@ -166,7 +166,7 @@ def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> Non
                     "utterance": "확인했습니다.",
                     "visibility": "private",
                     "target_actor_ids": ["b"],
-                    "thread_id": None,
+                    "thread_id": "",
                 },
                 "forced_idle": False,
                 "parse_failure_count": 0,

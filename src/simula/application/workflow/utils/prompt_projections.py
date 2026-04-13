@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Iterable, cast
+from typing import Iterable, cast
 
 ACTOR_VISIBLE_ACTOR_LIMIT = 6
 ACTOR_ACTION_CONTEXT_LIMIT = 6
@@ -123,7 +123,7 @@ def build_visible_action_context(
     unread_visible_activities: list[dict[str, object]],
     recent_visible_activities: list[dict[str, object]],
     limit: int = ACTOR_ACTION_CONTEXT_LIMIT,
-) -> tuple[list[dict[str, object]], dict[str, object] | None]:
+) -> tuple[list[dict[str, object]], dict[str, object]]:
     """actor prompt용 visible action context와 unread backlog digest를 만든다."""
 
     deduped_unread = _dedupe_activities(unread_visible_activities)
@@ -625,11 +625,11 @@ def _build_unread_backlog_digest(
     *,
     unread_visible_activities: list[dict[str, object]],
     omitted_unread: list[dict[str, object]],
-) -> dict[str, object] | None:
+) -> dict[str, object]:
     unread_count = len(unread_visible_activities)
     omitted_count = len(omitted_unread)
     if unread_count == 0 or omitted_count == 0:
-        return None
+        return {}
     return {
         "unread_count": unread_count,
         "omitted_count": omitted_count,
@@ -730,10 +730,6 @@ def _compact_action_proposal_for_prompt(proposal: object) -> dict[str, object]:
         "visibility": str(dumped.get("visibility", "")),
         "target_actor_ids": _string_list(dumped.get("target_actor_ids", [])),
         "thread_id": _optional_string(dumped.get("thread_id")),
-        "expected_outcome": _optional_truncated_text(
-            dumped.get("expected_outcome"),
-            EXPECTED_OUTCOME_LIMIT,
-        ),
     }
 
 
@@ -799,18 +795,14 @@ def _truncate_string_list(
     return [truncate_text(item, text_limit) for item in _string_list(value)[:limit]]
 
 
-def _optional_string(value: object) -> str | None:
+def _optional_string(value: object) -> str:
     text = str(value or "").strip()
-    if not text:
-        return None
     return text
 
 
-def _optional_truncated_text(value: object, limit: int) -> str | None:
+def _optional_truncated_text(value: object, limit: int) -> str:
     text = str(value or "").strip()
-    if not text:
-        return None
-    return truncate_text(text, limit)
+    return truncate_text(text, limit) if text else ""
 
 
 def _int_value(value: object) -> int:

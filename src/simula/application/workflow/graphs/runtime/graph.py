@@ -1,11 +1,5 @@
-"""목적:
-- runtime 서브그래프 singleton을 제공한다.
-
-설명:
-- step 초기화, actor proposal fan-out/fan-in, observer, 저장, 종료 분기를 하나의 subgraph로 묶는다.
-
-사용한 설계 패턴:
-- runtime loop subgraph singleton 패턴
+"""Purpose:
+- Provide the compact runtime subgraph singleton.
 """
 
 from __future__ import annotations
@@ -15,19 +9,23 @@ from typing import Any, cast
 from langgraph.graph import END, START, StateGraph
 
 from simula.application.workflow.context import WorkflowRuntimeContext
-from simula.application.workflow.graphs.coordinator.graph import (
-    COORDINATOR_SUBGRAPH,
+from simula.application.workflow.graphs.coordinator.nodes.adjudicate_step_focus import (
+    resolve_step,
+)
+from simula.application.workflow.graphs.coordinator.nodes.build_step_focus_plan import (
+    build_step_directive,
+)
+from simula.application.workflow.graphs.coordinator.nodes.prepare_focus_candidates import (
+    prepare_focus_candidates,
+)
+from simula.application.workflow.graphs.runtime.nodes.actor_turn import (
+    dispatch_selected_actor_proposals,
+    generate_actor_proposal,
+    reduce_actor_proposals,
 )
 from simula.application.workflow.graphs.runtime.nodes.lifecycle import (
     initialize_runtime_state,
     route_after_stop,
-)
-from simula.application.workflow.graphs.runtime.nodes.observation import (
-    observe_step,
-    stop_step,
-)
-from simula.application.workflow.graphs.runtime.nodes.persistence import (
-    persist_step_artifacts,
 )
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
@@ -38,20 +36,22 @@ _graph = StateGraph(
     context_schema=WorkflowRuntimeContext,
 )
 _graph.add_node("initialize_runtime_state", initialize_runtime_state)
-_graph.add_node("coordinator", COORDINATOR_SUBGRAPH)
-_graph.add_node("observe_step", observe_step)
-_graph.add_node("persist_step_artifacts", persist_step_artifacts)
-_graph.add_node("stop_step", stop_step)
+_graph.add_node("prepare_step", prepare_focus_candidates)
+_graph.add_node("plan_step", build_step_directive)
+_graph.add_node("generate_actor_proposal", generate_actor_proposal)
+_graph.add_node("reduce_actor_proposals", reduce_actor_proposals)
+_graph.add_node("resolve_step", resolve_step)
 _graph.add_edge(START, "initialize_runtime_state")
-_graph.add_edge("initialize_runtime_state", "coordinator")
-_graph.add_edge("coordinator", "observe_step")
-_graph.add_edge("persist_step_artifacts", "stop_step")
-_graph.add_edge("observe_step", "persist_step_artifacts")
+_graph.add_edge("initialize_runtime_state", "prepare_step")
+_graph.add_edge("prepare_step", "plan_step")
+_graph.add_conditional_edges("plan_step", dispatch_selected_actor_proposals)
+_graph.add_edge("generate_actor_proposal", "reduce_actor_proposals")
+_graph.add_edge("reduce_actor_proposals", "resolve_step")
 _graph.add_conditional_edges(
-    "stop_step",
+    "resolve_step",
     route_after_stop,
     {
-        "coordinator": "coordinator",
+        "coordinator": "prepare_step",
         "complete": END,
     },
 )

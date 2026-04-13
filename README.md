@@ -1,141 +1,38 @@
-<div align="center">
-  <h1>simula</h1>
-  <p><strong>State-driven multi-agent simulation built on LangGraph.</strong></p>
-  <p>
-    simula turns one scenario into a planning pass, an actor registry, a runtime
-    adjudication loop, observer summaries, and a final markdown report.
-  </p>
-  <p>
-    <a href="./docs/README.md">Documentation</a>
-    ·
-    <a href="./docs/workflows/README.md">Workflow Docs</a>
-    ·
-    <a href="./senario.samples/README.md">Sample Scenarios</a>
-  </p>
-  <p>
-    <img alt="Python 3.14" src="https://img.shields.io/badge/python-3.14-blue" />
-    <img alt="Package manager uv" src="https://img.shields.io/badge/package_manager-uv-4B8BBE" />
-    <img alt="Runtime LangGraph" src="https://img.shields.io/badge/runtime-LangGraph-1f6feb" />
-    <img alt="Architecture mailbox-first" src="https://img.shields.io/badge/architecture-mailbox--first-0f766e" />
-  </p>
-</div>
+# simula
 
-## What This Is
+`simula` is a scenario-to-report simulation engine built on LangGraph. It takes one scenario,
+hydrates a compact public input into a richer workflow state, runs a staged multi-agent
+simulation, and produces two outputs you can actually inspect: a final Markdown report and a
+machine-friendly `simulation.log.jsonl`.
 
-`simula` is a scenario-to-report simulation engine for multi-actor situations such as
-boardroom conflicts, public crises, political rumor cascades, or relationship-heavy
-social games.
+[Documentation](./docs/README.md) · [Workflow Docs](./docs/workflows/README.md) · [Sample Scenarios](./senario.samples/README.md)
 
-The current compiled workflow is organized around five distinct LLM-facing roles:
+![Python 3.14](https://img.shields.io/badge/python-3.14-blue)
+![Package manager uv](https://img.shields.io/badge/package_manager-uv-4B8BBE)
+![Runtime LangGraph](https://img.shields.io/badge/runtime-LangGraph-1f6feb)
+![Architecture staged](https://img.shields.io/badge/architecture-staged-0f766e)
 
-- `planner`
-- `generator`
-- `coordinator`
-- `actor`
-- `observer`
+## What It Does
 
-The project is opinionated about state:
+Most simulation prototypes collapse setup, actor generation, runtime pacing, and reporting into
+one opaque loop. `simula` keeps them separate.
 
-- planning produces structured execution inputs instead of loose prose
-- runtime keeps visible activities, background updates, focus history, intent snapshots,
-  and simulation time as explicit state channels
-- finalization rebuilds a report projection instead of dumping raw logs directly
+- Planning turns raw scenario text into one compact analysis bundle and one execution-plan bundle.
+- Generation turns the cast roster into actor cards through fan-out worker calls.
+- Runtime loops through directed steps instead of free-running until token exhaustion.
+- Finalization turns the finished state into a report bundle and a JSONL log.
 
-The LLM-facing nodes do not read the full workflow state directly. Generation,
-coordinator, actor, and observer prompts now receive compact prompt projections derived
-from rich workflow state, while finalization uses a separate report projection for
-report-writing tasks.
+The result is easier to inspect, test, and evolve than a single prompt chain.
 
-Planning now follows the same direction after the initial scenario-reading steps: late
-planner stages reuse a structured scenario brief plus compact interpretation/situation
-summaries, and the cast-roster step uses schema-enforced structured output instead of raw
-NDJSON text parsing.
+## Why This Design
 
-Structured output examples are no longer kept in one shared monolith. Each graph now owns
-its own `output_schema` assets so prompt examples stay local to the node family that uses
-them.
+- Small public API, rich internal state: the root graph accepts `SimulationInputState`, then
+  hydrates it once into `SimulationWorkflowState`.
+- Required-only structured outputs: active LLM contracts do not rely on optional fields.
+- Narrow prompt projections: each role receives only the data required for its task.
+- Durable artifacts: runtime state, final report data, and JSONL output are explicit products.
 
-## Why It Exists
-
-Most LLM simulations collapse planning, action generation, pacing, and summarization into
-one undifferentiated loop. `simula` deliberately splits them apart so each phase has a
-clear contract:
-
-- planning interprets the scenario and defines the execution frame
-- generation turns the cast roster into runnable actor cards
-- runtime chooses who matters now, adjudicates actions, advances time, and tracks momentum
-- finalization assembles a report that is readable by humans and stable enough for tooling
-
-## How It Works
-
-### System Blueprint
-
-```mermaid
-flowchart LR
-    Scenario["Scenario input"] --> CLI["CLI / bootstrap"]
-    Env["env.toml + env vars + CLI overrides"] --> CLI
-    CLI --> Commands["Application commands"]
-    Commands --> Executor["SimulationExecutor"]
-    Executor --> Init["Initial state + runtime context"]
-    Init --> Workflow["LangGraph simulation workflow"]
-    Workflow --> Store["App store"]
-    Workflow --> State["Shared workflow state"]
-    State --> PromptViews["prompt projections"]
-    PromptViews --> RolePrompts["role prompts"]
-    RolePrompts --> Models["LLM router<br/>planner / generator / coordinator / actor / observer"]
-    Workflow --> FinalState["Final workflow state"]
-    FinalState --> ReportProjection["report_projection_json"]
-    FinalState --> Presentation["Presentation / file writer"]
-    Presentation --> Outputs["output/<run_id>/simulation.log.jsonl<br/>output/<run_id>/final_report.md"]
-```
-
-### Workflow Blueprint
-
-```mermaid
-flowchart TD
-    Simulation["simulation"] --> Planning["planning"]
-    Planning --> Generation["generation"]
-    Generation --> Runtime["runtime"]
-    Runtime --> Finalization["finalization"]
-
-    subgraph RuntimeLoop["runtime internals"]
-        RuntimeInit["initialize_runtime_state"] --> Coordinator["coordinator"]
-        Coordinator --> Observe["observe_step"]
-        Observe --> Persist["persist_step_artifacts"]
-        Persist --> Stop["stop_step"]
-        Stop -- continue --> Coordinator
-        Stop -- complete --> RuntimeDone["runtime end"]
-    end
-
-    Runtime -. enters .-> RuntimeInit
-```
-
-### Stage Map
-
-| Stage | Primary owner | What it produces |
-| --- | --- | --- |
-| Planning | `planner` | scenario brief, interpretation, situation bundle, runtime progression plan, action catalog, coordination frame, cast roster, persisted `plan` |
-| Generation | `generator` | actor registry from compact interpretation, situation, action-catalog, and coordination-frame views |
-| Runtime | `coordinator`, `actor`, `observer` | compressed candidate/focus decisions, compact actor prompt inputs, compact observer inputs, adopted activities, intent history, simulation clock, stop signals |
-| Finalization | `observer` + finalization assembly nodes | final report JSON, report projection JSON, markdown report state |
-
-### Core Runtime Terms
-
-| Term | Meaning |
-| --- | --- |
-| `action catalog` | scenario-wide list of allowed action types that actors choose from |
-| `coordination frame` | planner-produced rules that guide runtime focus and background motion |
-| `focus slice` | the actor cluster that the coordinator decides to follow directly in one step |
-| `prompt projection` | compact prompt-facing view derived from rich workflow state for one role or node |
-| `visible action context` | compact action digest set shown to one actor instead of the full visible history |
-| `unread backlog digest` | summary of unread actions omitted from the compact actor context window |
-| `background update` | structured digest for deferred actors that were not called directly |
-| `observer report` | per-step summary with `momentum`, `atmosphere`, and `world_state_summary` |
-| `report projection` | finalization-only report-writing structure, separate from prompt projections |
-
-## Run It
-
-### Quick Start
+## Quick Start
 
 ```bash
 uv sync
@@ -143,37 +40,7 @@ cp env.sample.toml env.toml
 uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md
 ```
 
-### Common CLI Patterns
-
-```bash
-# Override max steps
-uv run simula \
-  --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
-  --max-steps 16
-
-# Run the same scenario three times
-uv run simula \
-  --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
-  --trials 3
-
-# Run trials in parallel
-uv run simula \
-  --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
-  --trials 3 \
-  --parallel
-```
-
-### Configuration Notes
-
-- `env.toml` is optional. If it exists, it is loaded automatically.
-- effective precedence is: CLI overrides -> environment variables -> `env.toml` -> defaults
-- the fixed-time settings `time_unit` and `time_step_size` are intentionally not supported
-- the coordinator is a first-class role in config and can have its own model settings
-
-## Output Artifacts
-
-The workflow itself produces structured state. After the graph returns, the presentation
-layer writes the file artifacts for a run.
+Outputs land in:
 
 ```text
 output/
@@ -182,12 +49,80 @@ output/
     simulation.log.jsonl
 ```
 
-When SQLite-backed multi-run execution is used, each trial also gets its own database file
-under `data/db/trial-runs/`.
+## One End-to-End Flow
+
+```mermaid
+flowchart LR
+    Scenario["Scenario file or inline scenario"] --> CLI["CLI / bootstrap"]
+    CLI --> Executor["SimulationExecutor"]
+    Executor --> Input["SimulationInputState"]
+    Input --> Hydrate["hydrate_initial_state"]
+    Hydrate --> Planning["planning"]
+    Planning --> Generation["generation"]
+    Generation --> Runtime["runtime"]
+    Runtime --> Finalization["finalization"]
+    Finalization --> Output["SimulationOutputState"]
+    Output --> Report["final_report.md"]
+    Output --> Log["simulation.log.jsonl"]
+```
+
+This is the only flow described by the current documentation set.
+
+## Workflow Stages
+
+| Stage | Active path | Output |
+| --- | --- | --- |
+| `planning` | `build_planning_analysis -> build_execution_plan -> finalize_plan` | compact execution plan |
+| `generation` | `prepare_actor_slots -> generate_actor_slot -> finalize_generated_actors` | actor cards |
+| `runtime` | `initialize_runtime_state -> prepare_step -> plan_step -> generate_actor_proposal -> reduce_actor_proposals -> resolve_step` | adopted activities, observer reports, stop state |
+| `finalization` | `resolve_timeline_anchor -> build_report_artifacts -> write_final_report_bundle -> render_and_persist_final_report` | final report payloads and markdown |
+
+`generate_actor_slot` and `generate_actor_proposal` both use fan-out/fan-in execution, but the
+graph shape stays explicit.
+
+## Outputs
+
+`final_report.md` contains:
+
+- simulation conclusion
+- actor results table
+- timeline
+- actor dynamics
+- major events
+
+`simulation.log.jsonl` records:
+
+- simulation start
+- finalized plan
+- finalized actors
+- step focus selection
+- time advancement
+- background updates
+- adopted actions
+- observer reports
+- final report
+
+## Configuration
+
+Settings resolve in this order:
+
+1. built-in defaults
+2. `env.toml`
+3. environment variables
+4. CLI overrides
+
+Common runtime controls:
+
+- `runtime.max_steps`
+- `runtime.max_actor_calls_per_step`
+- `runtime.max_focus_slices_per_step`
+- `runtime.max_recipients_per_message`
+- `runtime.enable_checkpointing`
+- `runtime.rng_seed`
 
 ## Sample Scenarios
 
-The repository ships with scenario seeds in [`senario.samples/`](./senario.samples/README.md):
+The repository includes scenario seeds in [`senario.samples/`](./senario.samples/README.md):
 
 - `01_i-am-solo_31_2026-04-10.md`
 - `02_wargame_iran_us.md`
@@ -196,18 +131,24 @@ The repository ships with scenario seeds in [`senario.samples/`](./senario.sampl
 - `05_campus_election_scandal.md`
 - `06_fantasy_court_intrigue.md`
 
-These samples are designed to start near a meaningful decision point and end near a clear
-judgment, settlement, collapse, or final choice.
+## Documentation Map
 
-## Read More
-
-| Document | When to read it |
+| Document | Focus |
 | --- | --- |
-| [`docs/README.md`](./docs/README.md) | Start here for the full documentation map |
-| [`docs/architecture.md`](./docs/architecture.md) | Understand layers, execution path, and system boundaries |
-| [`docs/workflows/README.md`](./docs/workflows/README.md) | See how the graph is split into subgraphs |
-| [`docs/workflows/runtime.md`](./docs/workflows/runtime.md) | Debug the runtime loop and stop conditions |
-| [`docs/workflows/coordinator.md`](./docs/workflows/coordinator.md) | Inspect focus planning, actor task payloads, and adjudication responsibilities |
-| [`docs/contracts.md`](./docs/contracts.md) | Check state channels, config fields, and output contracts |
-| [`docs/llm.md`](./docs/llm.md) | Review role responsibilities, model routing, and compact prompt inputs |
-| [`docs/operations.md`](./docs/operations.md) | Run the project locally and validate the environment |
+| [`docs/README.md`](./docs/README.md) | documentation map and reading order |
+| [`docs/architecture.md`](./docs/architecture.md) | layers, execution path, and runtime boundaries |
+| [`docs/contracts.md`](./docs/contracts.md) | public state surfaces, internal state groups, and artifacts |
+| [`docs/llm.md`](./docs/llm.md) | role routing, prompt projections, and structured-output policy |
+| [`docs/workflows/README.md`](./docs/workflows/README.md) | workflow hub and stage handoffs |
+| [`docs/operations.md`](./docs/operations.md) | local execution, validation, and maintenance |
+
+## Development
+
+Validate changes with:
+
+```bash
+uv run pytest -q
+uv run ty check src
+uv run ruff check src tests
+uv run ruff clean
+```

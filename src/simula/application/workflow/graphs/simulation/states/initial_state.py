@@ -1,37 +1,54 @@
-"""목적:
-- simulation workflow 초기 상태를 생성한다.
-
-설명:
-- executor가 workflow 실행 전에 필요한 기본 상태를 한 곳에서 초기화한다.
-
-사용한 설계 패턴:
-- 상태 빌더 패턴
+"""Purpose:
+- Build the compact public input and expand it into workflow state.
 """
 
 from __future__ import annotations
 
 from typing import cast
 
-from simula.domain.runtime_policy import derive_rng_seed
 from simula.application.workflow.graphs.simulation.states.state import (
+    SimulationInputState,
     SimulationWorkflowState,
 )
+from simula.domain.runtime_policy import derive_rng_seed
 from simula.infrastructure.config.models import AppSettings
 
 
-def build_initial_workflow_state(
+def build_simulation_input_state(
     *,
     run_id: str,
     scenario_text: str,
     settings: AppSettings,
+) -> SimulationInputState:
+    """Build the public graph input payload."""
+
+    return {
+        "run_id": run_id,
+        "scenario": scenario_text,
+        "max_steps": settings.runtime.max_steps,
+        "rng_seed": derive_rng_seed(
+            run_id=run_id,
+            configured_seed=settings.runtime.rng_seed,
+        ),
+    }
+
+
+def expand_input_state_to_workflow_state(
+    *,
+    input_state: SimulationInputState,
+    settings: AppSettings,
 ) -> SimulationWorkflowState:
-    """workflow 실행용 초기 상태를 만든다."""
+    """Expand the compact public input into the full workflow state."""
 
     return cast(
         SimulationWorkflowState,
         {
-            "run_id": run_id,
-            "scenario": scenario_text,
+            "run_id": input_state["run_id"],
+            "scenario": input_state["scenario"],
+            "max_steps": input_state["max_steps"],
+            "checkpoint_enabled": settings.runtime.enable_checkpointing,
+            "rng_seed": input_state["rng_seed"],
+            "planning_analysis": {},
             "plan": {},
             "actors": [],
             "activity_feeds": {},
@@ -39,7 +56,6 @@ def build_initial_workflow_state(
             "latest_step_activities": [],
             "observer_reports": [],
             "focus_candidates": [],
-            "step_focus_plan": None,
             "step_focus_history": [],
             "selected_actor_ids": [],
             "deferred_actor_ids": [],
@@ -47,7 +63,8 @@ def build_initial_workflow_state(
             "background_updates": [],
             "actor_intent_states": [],
             "intent_history": [],
-            "pending_step_time_advance": None,
+            "step_focus_plan": {},
+            "step_time_advance": {},
             "simulation_clock": {
                 "total_elapsed_minutes": 0,
                 "total_elapsed_label": "0분",
@@ -56,26 +73,19 @@ def build_initial_workflow_state(
                 "last_advanced_step_index": 0,
             },
             "step_time_history": [],
-            "pending_scenario_brief": None,
-            "pending_interpretation_core": None,
-            "pending_progression_plan": None,
-            "pending_time_scope": None,
-            "pending_public_context": [],
-            "pending_private_context": [],
-            "pending_key_pressures": [],
-            "pending_observation_points": [],
-            "pending_interpretation": None,
-            "pending_situation": None,
-            "pending_action_catalog": None,
-            "pending_coordination_frame": None,
-            "pending_cast_roster": [],
             "pending_cast_slots": [],
+            "cast_slot": {"slot_index": 0, "cast_item": {}},
             "generated_actor_results": [],
-            "actor_proposal_task": {},
+            "actor_proposal_task": {
+                "actor": {},
+                "unread_activity_ids": [],
+                "visible_action_context": [],
+                "unread_backlog_digest": {},
+                "visible_actors": [],
+                "focus_slice": {},
+                "runtime_guidance": {},
+            },
             "pending_actor_proposals": [],
-            "pending_plan": None,
-            "pending_actors": [],
-            "pending_observer_report": None,
             "parse_failures": 0,
             "forced_idles": 0,
             "stagnation_steps": 0,
@@ -85,27 +95,15 @@ def build_initial_workflow_state(
             "current_step_started_at": 0.0,
             "last_step_latency_seconds": 0.0,
             "step_index": 0,
-            "max_steps": settings.runtime.max_steps,
-            "checkpoint_enabled": settings.runtime.enable_checkpointing,
-            "rng_seed": derive_rng_seed(
-                run_id=run_id,
-                configured_seed=settings.runtime.rng_seed,
-            ),
             "stop_requested": False,
-            "stop_reason": None,
+            "stop_reason": "",
             "world_state_summary": "",
-            "final_report": None,
-            "simulation_log_jsonl": None,
-            "report_projection_json": None,
-            "report_timeline_anchor_json": None,
-            "report_timeline_section": None,
-            "report_actor_dynamics_section": None,
-            "report_major_events_section": None,
-            "report_body_sections": [],
-            "report_body_sections_markdown": None,
-            "report_actor_final_results_section": None,
-            "report_simulation_conclusion_section": None,
-            "final_report_markdown": None,
+            "final_report": {},
+            "simulation_log_jsonl": "",
+            "report_projection_json": "",
+            "report_timeline_anchor_json": {},
+            "final_report_sections": {},
+            "final_report_markdown": "",
             "errors": [],
         },
     )

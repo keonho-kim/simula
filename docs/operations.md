@@ -1,12 +1,6 @@
 # Operations
 
-## Local Requirements
-
-- Python `>=3.14,<3.15`
-- `uv`
-- at least one configured LLM provider
-
-## Basic Run Flow
+## Local Run
 
 ```bash
 uv sync
@@ -14,116 +8,53 @@ cp env.sample.toml env.toml
 uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md
 ```
 
-You can inspect the CLI surface directly with:
+You can also provide scenario text inline through the CLI entrypoint if needed.
 
-```bash
-uv run simula --help
-```
+## Output Layout
 
-## CLI Surface
-
-| Flag | Meaning |
-| --- | --- |
-| `--scenario-file` | read the scenario from a file |
-| `--scenario-text` | pass the scenario inline |
-| `--env` | explicit config file path |
-| `--max-steps` | override the runtime step cap |
-| `--trials` | run the same scenario multiple times |
-| `--parallel` | execute trials in parallel |
-
-## Common Run Patterns
-
-### Single Run
-
-```bash
-uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md
-```
-
-### Override Step Budget
-
-```bash
-uv run simula \
-  --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
-  --max-steps 12
-```
-
-### Repeated Trials
-
-```bash
-uv run simula \
-  --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
-  --trials 3
-```
-
-### Parallel Trials
-
-```bash
-uv run simula \
-  --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
-  --trials 3 \
-  --parallel
-```
-
-## Config Workflow
-
-- if `--env` is omitted and `env.toml` exists, it is loaded automatically
-- effective precedence is:
-  - CLI overrides
-  - environment variables
-  - `env.toml`
-  - defaults
-- shared provider defaults can be placed under `[llm.<provider>]`
-- role-specific routing goes under `[llm.planner]`, `[llm.generator]`,
-  `[llm.coordinator]`, `[llm.actor]`, and `[llm.observer]`
-
-## Output and Storage Behavior
-
-### File Outputs
-
-After a successful run, the presentation layer writes:
+Each run writes to:
 
 ```text
-output/
-  <run_id>/
-    simulation.log.jsonl
-    final_report.md
+output/<run_id>/
+  final_report.md
+  simulation.log.jsonl
 ```
 
-### Multi-Run SQLite Behavior
+The graph returns both artifacts before the presentation layer writes them to disk.
 
-When `--trials` is greater than `1` and the storage provider is `sqlite`, each trial gets
-its own SQLite database file under:
+## Validation Commands
 
-```text
-data/db/trial-runs/
-```
-
-## Maintenance Commands
-
-### Tests
+Run the full local validation set after behavior changes:
 
 ```bash
-uv run pytest
-```
-
-### Type Checks
-
-```bash
+uv run pytest -q
 uv run ty check src
+uv run ruff check src tests
+uv run ruff clean
 ```
 
-### Formatting
+Use `uv run ruff format src tests` only when formatting changes are actually needed.
 
-```bash
-uv run ruff format src tests -v
-```
+## Configuration Flow
 
-## Operational Notes
+Settings resolve in this order:
 
-- the runtime stops on `max_steps` or on accumulated stagnation after repeated low-momentum
-  steps
-- deterministic branching can be influenced through `SIM_RNG_SEED` or `[env].rng_seed`
-- the removed fixed-time settings `time_unit` and `time_step_size` are rejected on purpose
-- prompt projections are transient in-memory prompt inputs; `report_projection_json` is the
-  finalization-specific persisted report-writing artifact
-- file outputs are produced after the workflow returns, not from inside the graph itself
+1. built-in defaults
+2. `env.toml`
+3. environment variables
+4. CLI overrides
+
+Important runtime controls:
+
+- `runtime.max_steps`
+- `runtime.max_actor_calls_per_step`
+- `runtime.max_focus_slices_per_step`
+- `runtime.max_recipients_per_message`
+- `runtime.enable_checkpointing`
+- `runtime.rng_seed`
+
+## Maintenance Notes
+
+- Keep documentation aligned with the compiled graph, not historical files.
+- Treat `simulation.log.jsonl` as a graph artifact, not a presentation-layer reconstruction.
+- Remove stale prompt assets and workflow docs when stage structure changes.

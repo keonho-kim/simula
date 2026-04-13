@@ -26,7 +26,7 @@ def finalize_generated_actors(
     state: SimulationWorkflowState,
     runtime: Runtime[WorkflowRuntimeContext],
 ) -> dict[str, object]:
-    """fan-out 결과를 정렬하고 actor registry로 확정한다."""
+    """fan-out 결과를 정렬하고 actor registry로 확정 및 저장한다."""
 
     sorted_results = sorted(
         state.get("generated_actor_results", []),
@@ -46,11 +46,12 @@ def finalize_generated_actors(
     latency = time.perf_counter() - float(state.get("generation_started_at", 0.0))
     parse_failures = sum(int(item["parse_failure_count"]) for item in sorted_results)
     runtime.context.logger.info("등장 주체 생성 완료")
+    runtime.context.store.save_actors(state["run_id"], actors)
 
     return {
         "actors": actors,
-        "pending_actors": actors,
         "generation_latency_seconds": latency,
         "generated_actor_results": Overwrite(value=[]),
+        "pending_cast_slots": [],
         "parse_failures": int(state.get("parse_failures", 0)) + parse_failures,
     }

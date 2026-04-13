@@ -27,19 +27,28 @@ from simula.application.workflow.graphs.finalization.graph import (
 from simula.application.workflow.graphs.generation.graph import GENERATION_SUBGRAPH
 from simula.application.workflow.graphs.planning.graph import PLANNING_SUBGRAPH
 from simula.application.workflow.graphs.runtime.graph import RUNTIME_SUBGRAPH
+from simula.application.workflow.graphs.simulation.nodes.hydration import (
+    hydrate_initial_state,
+)
 from simula.application.workflow.graphs.simulation.states.state import (
+    SimulationInputState,
+    SimulationOutputState,
     SimulationWorkflowState,
 )
 
 SIMULATION_WORKFLOW_GRAPH = StateGraph(
     state_schema=cast(Any, SimulationWorkflowState),
     context_schema=WorkflowRuntimeContext,
+    input_schema=cast(Any, SimulationInputState),
+    output_schema=cast(Any, SimulationOutputState),
 )
+SIMULATION_WORKFLOW_GRAPH.add_node("hydrate_initial_state", hydrate_initial_state)
 SIMULATION_WORKFLOW_GRAPH.add_node("planning", PLANNING_SUBGRAPH)
 SIMULATION_WORKFLOW_GRAPH.add_node("generation", GENERATION_SUBGRAPH)
 SIMULATION_WORKFLOW_GRAPH.add_node("runtime", RUNTIME_SUBGRAPH)
 SIMULATION_WORKFLOW_GRAPH.add_node("finalization", FINALIZATION_SUBGRAPH)
-SIMULATION_WORKFLOW_GRAPH.add_edge(START, "planning")
+SIMULATION_WORKFLOW_GRAPH.add_edge(START, "hydrate_initial_state")
+SIMULATION_WORKFLOW_GRAPH.add_edge("hydrate_initial_state", "planning")
 SIMULATION_WORKFLOW_GRAPH.add_edge("planning", "generation")
 SIMULATION_WORKFLOW_GRAPH.add_edge("generation", "runtime")
 SIMULATION_WORKFLOW_GRAPH.add_edge("runtime", "finalization")

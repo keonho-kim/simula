@@ -14,8 +14,6 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 from pydantic import BaseModel
 
 from simula.domain.contracts import (
@@ -26,15 +24,15 @@ from simula.domain.contracts import (
     BackgroundUpdateBatch,
     CastRoster,
     CoordinationFrame,
-    ObserverEventProposal,
     ObserverReport,
+    ExecutionPlanBundle,
+    FinalReportSections,
+    PlanningAnalysis,
     RuntimeProgressionPlan,
-    ScenarioBrief,
-    ScenarioInterpretation,
     ScenarioTimeScope,
     SimulationClockSnapshot,
-    StepAdjudication,
-    StepFocusPlan,
+    StepDirective,
+    StepResolution,
     StepTimeAdvanceProposal,
     SituationBundle,
 )
@@ -55,21 +53,15 @@ def render_structured_response(
             return f"{role} 응답이 비어 있습니다."
         return f"{role} 응답을 구조적으로 해석하지 못했습니다. 원문 요약: {_truncate(content.strip(), 220)}"
 
-    if isinstance(parsed, ScenarioInterpretation):
+    if isinstance(parsed, PlanningAnalysis):
         pressures = ", ".join(parsed.key_pressures[:2]) or "-"
         return (
-            f"시나리오 1차 해석을 완료했습니다.\n"
+            f"계획 분석을 완료했습니다.\n"
+            f"요약: {parsed.brief_summary}\n"
             f"전제: {parsed.premise}\n"
             f"시간 범위: {parsed.time_scope.start} -> {parsed.time_scope.end}\n"
             f"공개 맥락 {len(parsed.public_context)}개 / 비공개 맥락 {len(parsed.private_context)}개\n"
             f"중요 변수: {pressures}"
-        )
-
-    if isinstance(parsed, ScenarioBrief):
-        return (
-            "시나리오 요약 분석을 만들었습니다.\n"
-            f"핵심 주체: {_list_preview(parsed.key_entities, limit=3)}\n"
-            f"요약: {_truncate(parsed.summary, 220)}"
         )
 
     if isinstance(parsed, ScenarioTimeScope):
@@ -107,6 +99,13 @@ def render_structured_response(
             f"처음 갈등: {tensions}"
         )
 
+    if isinstance(parsed, ExecutionPlanBundle):
+        return (
+            "실행 계획 번들을 만들었습니다.\n"
+            f"action 수: {len(parsed.action_catalog.actions)}\n"
+            f"cast 수: {len(parsed.cast_roster.items)}"
+        )
+
     if isinstance(parsed, CoordinationFrame):
         return (
             "step 조율 기준 프레임을 만들었습니다.\n"
@@ -133,13 +132,13 @@ def render_structured_response(
         group_name = parsed.group_name or "무소속"
         return (
             f"{parsed.display_name} 역할 카드를 만들었습니다.\n"
-            f"역할: {parsed.role} / 소속: {group_name} / attention: {parsed.baseline_attention_tier}\n"
+            f"역할: {parsed.role} / 소속: {group_name or '미지정'} / attention: {parsed.baseline_attention_tier}\n"
             f"공개 성향: {_truncate(parsed.public_profile, 120)}"
         )
 
-    if isinstance(parsed, StepFocusPlan):
+    if isinstance(parsed, StepDirective):
         return (
-            "step focus 계획을 정했습니다.\n"
+            "step 지시를 정했습니다.\n"
             f"선택 actor: {len(parsed.selected_actor_ids)}명 / slice: {len(parsed.focus_slices)}개\n"
             f"요약: {_truncate(parsed.focus_summary, 140)}"
         )
@@ -155,7 +154,7 @@ def render_structured_response(
         targets = _target_description(parsed.target_actor_ids)
         utterance_line = (
             f"\n발화: {_truncate(parsed.utterance, 120)}"
-            if parsed.utterance is not None
+            if parsed.utterance.strip()
             else ""
         )
         return (
@@ -189,46 +188,18 @@ def render_structured_response(
             f"세계 상태: {_truncate(parsed.world_state_summary, 160)}"
         )
 
-    if isinstance(parsed, ObserverEventProposal):
-        utterance_line = (
-            f"\n발화: {_truncate(parsed.utterance, 120)}"
-            if parsed.utterance is not None
-            else ""
-        )
+    if isinstance(parsed, StepResolution):
         return (
-            "관찰 기반 상황 이벤트를 제안했습니다.\n"
-            f"action_type: {parsed.action_type}\n"
-            f"의도: {parsed.intent}\n"
-            f"액션: {parsed.action_summary}\n"
-            f"내용: {_truncate(parsed.action_detail, 180)}"
-            f"{utterance_line}"
+            "step 해소 결과를 정리했습니다.\n"
+            f"채택 actor: {len(parsed.adopted_actor_ids)}명\n"
+            f"세계 상태: {_truncate(parsed.world_state_summary, 140)}"
         )
 
-    if isinstance(parsed, StepAdjudication):
+    if isinstance(parsed, FinalReportSections):
         return (
-            "step 채택 결과를 정리했습니다.\n"
-            f"채택 actor: {len(parsed.adopted_actor_ids)}명 / 배경 update: {len(parsed.background_updates)}건\n"
-            f"세계 상태 힌트: {_truncate(parsed.world_state_summary_hint, 140)}"
-        )
-
-    if parsed.__class__.__name__ == "VisibilityContextBundle":
-        dumped = parsed.model_dump(mode="json")
-        public_items = _list_preview(dumped.get("public_context", []), limit=2)
-        private_items = _list_preview(dumped.get("private_context", []), limit=2)
-        return (
-            "공개/비공개 맥락을 정리했습니다.\n"
-            f"공개 맥락: {public_items}\n"
-            f"비공개 맥락: {private_items}"
-        )
-
-    if parsed.__class__.__name__ == "PressurePointBundle":
-        dumped = parsed.model_dump(mode="json")
-        pressures = _list_preview(dumped.get("key_pressures", []), limit=2)
-        observations = _list_preview(dumped.get("observation_points", []), limit=2)
-        return (
-            "중요 변수와 관찰 포인트를 정리했습니다.\n"
-            f"중요 변수: {pressures}\n"
-            f"관찰 포인트: {observations}"
+            "최종 보고서 번들을 작성했습니다.\n"
+            f"타임라인 줄 수: {len([line for line in parsed.timeline_section.splitlines() if line.strip()])}\n"
+            f"주요 사건 줄 수: {len([line for line in parsed.major_events_section.splitlines() if line.strip()])}"
         )
 
     if isinstance(parsed, BaseModel):

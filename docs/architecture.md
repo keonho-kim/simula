@@ -2,118 +2,93 @@
 
 ## Purpose
 
-`simula` is organized as a layered application around a compiled LangGraph workflow. The
-graph is the core execution engine, but it is not the whole system: CLI parsing, settings
-loading, storage, model routing, and output writing are owned by different layers.
+`simula` is a layered application centered on one compiled LangGraph workflow. The workflow owns
+simulation state transitions. Everything else around it exists to supply context, persist
+artifacts, and expose a clean operator interface.
 
-## Layer Boundaries
+## Layers
 
 | Layer | Responsibility | Representative modules |
 | --- | --- | --- |
-| Entry | parse CLI arguments, bootstrap execution, print results | `main.py`, `simula.entrypoints.cli`, `simula.entrypoints.bootstrap` |
-| Application | assemble workflows, run commands, orchestrate runtime services | `simula.application.commands`, `simula.application.services`, `simula.application.workflow` |
-| Domain | pure contracts and policy functions | `simula.domain.*` |
-| Infrastructure | config loading, provider routing, storage backends | `simula.infrastructure.config`, `simula.infrastructure.llm`, `simula.infrastructure.storage` |
+| Entry | CLI parsing and process bootstrap | `simula.entrypoints.*` |
+| Application | command handling, workflow execution, presentation | `simula.application.*` |
+| Domain | contracts, policy, report builders, pure reducers | `simula.domain.*` |
+| Infrastructure | config loading, LLM routing, storage backends | `simula.infrastructure.*` |
 
 ## Execution Path
 
 ```mermaid
 flowchart LR
-    Main["main.py"] --> CLI["entrypoints.cli"]
-    CLI --> Bootstrap["entrypoints.bootstrap"]
-    Bootstrap --> Commands["application.commands.simulation_runs"]
-    Commands --> Executor["application.services.executor"]
-    Executor --> Workflow["SIMULATION_WORKFLOW / recompiled graph"]
-    Executor --> Store["app store"]
-    Workflow --> State["shared workflow state"]
-    State --> PromptViews["prompt projections"]
-    PromptViews --> RolePrompts["role prompts"]
-    RolePrompts --> Router["LLM router"]
-    Workflow --> FinalState["final state"]
-    FinalState --> ReportProjection["report_projection_json"]
-    FinalState --> Presentation["application.services.presentation"]
+    CLI["entrypoints.cli"] --> Bootstrap["entrypoints.bootstrap"]
+    Bootstrap --> Command["application.commands.simulation_runs"]
+    Command --> Executor["application.services.executor"]
+    Executor --> Input["SimulationInputState"]
+    Input --> Hydrate["hydrate_initial_state"]
+    Hydrate --> Workflow["SIMULATION_WORKFLOW"]
+    Executor --> Context["WorkflowRuntimeContext"]
+    Context --> Workflow
+    Workflow --> Output["SimulationOutputState"]
+    Output --> Presentation["application.services.presentation"]
+    Presentation --> Files["output/<run_id>/*"]
 ```
 
-## Shared Runtime Context
+## Runtime Context
 
-The workflow executes with a shared `WorkflowRuntimeContext` that carries:
+The graph does not carry service dependencies inside state. Nodes read shared execution context
+through `WorkflowRuntimeContext`.
 
 - `settings`
 - `store`
 - `llms`
 - `logger`
 
-This keeps graph nodes thin. Nodes read and write workflow state, while external concerns
-stay in the runtime context instead of being threaded through every state channel.
+That keeps workflow state focused on simulation data, not infrastructure handles.
 
-## Graph-of-Graphs Model
+## State Surfaces
 
-The root simulation workflow is a sequential composition of four subgraphs:
+The root graph exposes three distinct state surfaces.
 
-- planning
-- generation
-- runtime
-- finalization
+| Surface | Purpose |
+| --- | --- |
+| `SimulationInputState` | compact public input accepted by the root graph |
+| `SimulationWorkflowState` | hydrated internal state used between nodes |
+| `SimulationOutputState` | compact public output returned by the root graph |
 
-Each subgraph owns a distinct part of the lifecycle, but they all share the same
-`SimulationWorkflowState` object. The root assembly is documented in
-[`workflows/simulation.md`](./workflows/simulation.md), and each subgraph has its own
-document under [`workflows/`](./workflows/README.md).
+The hydration boundary exists because the planning node needs fully initialized runtime channels,
+but operators should not need to pass the entire internal state shape by hand.
 
-## System Boundaries That Matter
+## Graph Composition
 
-### Workflow State vs. File Outputs
+The root path is linear at the stage level:
 
-The workflow produces structured state fields such as:
+1. `hydrate_initial_state`
+2. `planning`
+3. `generation`
+4. `runtime`
+5. `finalization`
 
-- `final_report`
-- `simulation_log_jsonl`
-- `report_projection_json`
-- `final_report_markdown`
+The runtime stage itself contains the loop. The other stages are straight-line subgraphs.
 
-Actual files in `output/<run_id>/` are written later by the presentation layer, not by the
-graph itself.
+## System Boundaries
 
-### Rich State vs. Prompt Projections
+### Workflow state vs. file output
 
-The workflow stores richer state than any single role sees. Runtime and generation nodes
-derive compact prompt projections before invoking LLMs so that prompt payloads stay small
-and role-specific.
+The graph returns structured data such as `final_report`, `final_report_markdown`, and
+`simulation_log_jsonl`. The presentation layer turns those into files.
 
-Examples:
+### Rich state vs. prompt projections
 
-- actor prompts receive compact actor views, visible action context, unread backlog digests,
-  visible actors, and compact runtime guidance
-- coordinator prompts receive compact focus candidates, compact pending proposals, compact
-  background updates, and relevant intent subsets
-- observer prompts receive compact latest-step actions, compact background updates, and a
-  prior-state digest
+LLM-facing nodes do not consume the full workflow state. They receive compact JSON projections
+assembled for their role.
 
-These prompt projections are ephemeral node inputs, not persisted workflow channels.
+### Prompt projections vs. report projection
 
-### Graph Persistence vs. Human-Facing Reports
-
-Runtime and finalization nodes persist structured artifacts to the app store. Human-readable
-report files are derived from the final state after the run completes.
-
-### Prompt Projections vs. Report Projection
-
-`report_projection_json` belongs only to finalization. It is a report-writing artifact built
-after runtime completes, and it should not be confused with the prompt projection helpers
-used during generation, coordinator, actor, or observer calls.
-
-### Runtime Summary vs. Runtime Adjudication
-
-The current compiled runtime splits responsibilities on purpose:
-
-- `coordinator` selects focus, summarizes deferred actors, adopts actions, updates intent,
-  and advances time
-- `observer` summarizes what happened in the step, updates `world_state_summary`, and
-  provides stop-signal inputs such as `momentum`
+Planning, generation, and runtime use transient prompt projections. Finalization additionally
+builds a persistent `report_projection_json` artifact for report writing.
 
 ## Related Docs
 
-- workflow composition: [`workflows/README.md`](./workflows/README.md)
-- config and state contracts: [`contracts.md`](./contracts.md)
-- role and model routing details: [`llm.md`](./llm.md)
-- local execution details: [`operations.md`](./operations.md)
+- contracts: [`contracts.md`](./contracts.md)
+- model routing and structured outputs: [`llm.md`](./llm.md)
+- workflow hub: [`workflows/README.md`](./workflows/README.md)
+- local operations: [`operations.md`](./operations.md)

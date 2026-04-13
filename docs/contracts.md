@@ -1,182 +1,146 @@
 # Contracts
 
-## Configuration Merge Contract
+## Public Graph Input
 
-Settings are built from four layers in this order:
-
-1. defaults
-2. `env.toml`
-3. environment variables
-4. CLI overrides
-
-At load time the repository flattens structured TOML into internal env-style keys, merges
-real environment variables, then applies CLI overrides.
-
-## Key Runtime Settings
+The root graph accepts a compact `SimulationInputState`.
 
 | Field | Meaning |
 | --- | --- |
-| `runtime.max_steps` | hard cap for runtime steps |
-| `runtime.max_actor_calls_per_step` | upper bound for directly called actors in one step |
-| `runtime.max_focus_slices_per_step` | upper bound for coordinator focus slices |
-| `runtime.max_recipients_per_message` | limit for routed activity targets |
-| `runtime.enable_checkpointing` | enables checkpointer-backed graph compilation |
-| `runtime.rng_seed` | optional deterministic seed override |
-| `storage.provider` | `sqlite` or `postgresql` |
-| `storage.output_dir` | directory used by the presentation layer for file outputs |
-
-### Removed Time Inputs
-
-The fixed-time settings `time_unit` and `time_step_size` are intentionally rejected. The
-current runtime supports only `max_steps` as a direct time-related setting.
-
-## State Channel Groups
-
-### Planning and Shared Inputs
-
-| Channel | Meaning |
-| --- | --- |
+| `run_id` | stable identifier for one run |
 | `scenario` | raw scenario text |
-| `plan` | persisted planning result bundle |
-| `progression_plan` | planner-selected dynamic time policy |
-| `action_catalog` | scenario-wide action menu |
-| `coordination_frame` | planner-produced runtime guidance |
+| `max_steps` | runtime stop ceiling |
+| `rng_seed` | deterministic seed derived before graph execution |
 
-### Generation
+`checkpoint_enabled` is not part of the public input. It is injected during hydration from
+runtime settings.
 
-| Channel | Meaning |
-| --- | --- |
-| `pending_cast_slots` | fan-out work items for actor generation |
-| `generated_actor_results` | slot-level generator results |
-| `actors` | finalized actor registry |
+## Internal Workflow State
 
-### Runtime
+`SimulationWorkflowState` is the fully hydrated internal state. Every active field is required,
+and absence is represented with explicit empty values such as `""`, `[]`, or `{}`.
 
-| Channel | Meaning |
-| --- | --- |
-| `activity_feeds` | mailbox-like visibility feeds per actor |
-| `activities` | canonical activity log |
-| `latest_step_activities` | activities adopted in the current step |
-| `focus_candidates` | compressed coordinator candidate pool |
-| `step_focus_plan` | selected focus slices for the current step |
-| `step_focus_history` | historical focus plans |
-| `selected_actor_ids` | actors called directly in the current step |
-| `deferred_actor_ids` | actors summarized through background updates only |
-| `latest_background_updates` | deferred-actor digest for the current step |
-| `background_updates` | accumulated deferred-actor digest history |
-| `actor_intent_states` | latest intent snapshots |
-| `intent_history` | step-level intent history |
-| `pending_step_time_advance` | normalized time-advance record for the current step |
-| `simulation_clock` | cumulative time snapshot |
-| `step_time_history` | historical time-advance records |
-| `observer_reports` | per-step observer summaries |
-| `world_state_summary` | current world digest used across steps |
-| `stagnation_steps` | low-momentum accumulation counter |
-| `stop_requested` / `stop_reason` | runtime stop flags |
+### Planning and cast
 
-The current runtime state no longer carries the older observer-event scratch channels.
+- `planning_analysis`
+- `plan`
+- `actors`
+- `pending_cast_slots`
+- `cast_slot`
+- `generated_actor_results`
 
-### Actor Proposal Task Payload
+### Runtime activity and feeds
 
-`ActorProposalTask` is the prompt-facing runtime payload used for one selected actor call.
+- `activity_feeds`
+- `activities`
+- `latest_step_activities`
+- `observer_reports`
+- `background_updates`
+- `latest_background_updates`
+
+### Runtime coordination and intent
+
+- `focus_candidates`
+- `step_focus_history`
+- `selected_actor_ids`
+- `deferred_actor_ids`
+- `actor_intent_states`
+- `intent_history`
+- `step_focus_plan`
+- `step_time_advance`
+- `step_time_history`
+- `actor_proposal_task`
+- `pending_actor_proposals`
+
+### Runtime lifecycle and metrics
+
+- `step_index`
+- `simulation_clock`
+- `stop_requested`
+- `stop_reason`
+- `world_state_summary`
+- `parse_failures`
+- `forced_idles`
+- `stagnation_steps`
+- `planning_latency_seconds`
+- `generation_started_at`
+- `generation_latency_seconds`
+- `current_step_started_at`
+- `last_step_latency_seconds`
+
+### Finalization artifacts
+
+- `final_report`
+- `simulation_log_jsonl`
+- `report_projection_json`
+- `report_timeline_anchor_json`
+- `final_report_sections`
+- `final_report_markdown`
+- `errors`
+
+## Public Graph Output
+
+The root graph returns `SimulationOutputState`.
 
 | Field | Meaning |
 | --- | --- |
-| `actor` | compact actor view for the selected actor |
-| `unread_activity_ids` | unread activity identifiers that will be consumed on adoption |
-| `visible_action_context` | compact recent and unread activity digest shown to the actor |
-| `unread_backlog_digest` | summary of unread items omitted from the compact context window |
-| `visible_actors` | compact actor references relevant to the current step |
-| `focus_slice` | the selected focus slice that contains the actor |
-| `runtime_guidance` | compact simulation objective, world digest, previous observer signal, constraints, intent snapshot, and available actions |
+| `run_id` | completed run identifier |
+| `final_report` | structured report payload |
+| `final_report_markdown` | rendered Markdown report |
+| `simulation_log_jsonl` | newline-delimited event log |
+| `stop_reason` | final stop reason string |
+| `errors` | accumulated explicit errors/default notices |
 
-### Finalization
+## Structured LLM Contracts
 
-| Channel | Meaning |
+All active structured outputs are required-only. There are no optional response fields in the
+active prompt-facing contracts.
+
+| Stage | Contract |
 | --- | --- |
-| `final_report` | structured final report JSON |
-| `simulation_log_jsonl` | rendered log string in JSONL form |
-| `report_timeline_anchor_json` | absolute anchor for report timestamps |
-| `report_projection_json` | report-specific projection over runtime state |
-| `report_*_section` | generated markdown section bodies |
-| `final_report_markdown` | final markdown report assembled in-state |
+| planning | `PlanningAnalysis`, `ExecutionPlanBundle` |
+| generation | `ActorCard` |
+| runtime step planning | `StepDirective` |
+| runtime actor turn | `ActorActionProposal` |
+| runtime step resolution | `StepResolution` |
+| finalization anchor | `TimelineAnchorDecision` |
+| finalization report bundle | `FinalReportSections` |
 
-### Projection Vocabulary
+## Artifact Contracts
 
-- `prompt projection`
-  - compact in-memory prompt input derived from workflow state for generation, coordinator,
-    actor, or observer nodes
-- `report_projection_json`
-  - persisted finalization state channel used for report-writing, not a runtime prompt
-    projection
+### `final_report`
 
-## Structured Output Surface
+Structured summary of the completed run, including scenario, objective, elapsed time, step count,
+activity totals, visibility counts, notable events, and explicit errors.
 
-### Planning Outputs
+### `simulation_log_jsonl`
 
-- `ScenarioBrief`
-- `ScenarioInterpretation`
-- `RuntimeProgressionPlan`
-- `SituationBundle`
-- `ActionCatalog`
-- `CoordinationFrame`
-- `CastRoster`
-- `CastRosterItem`
+Ordered event stream containing:
 
-### Generation and Runtime Outputs
+- simulation start
+- finalized plan
+- finalized actors
+- step focus selection
+- step time advancement
+- background updates
+- adopted actions
+- observer reports
+- final report
 
-- `ActorCard`
-- `StepFocusPlan`
-- `BackgroundUpdateBatch`
-- `ActorActionProposal`
-- `CanonicalAction`
-- `StepAdjudication`
-- `ActorIntentSnapshot`
-- `ObserverReport`
-- `SimulationClockSnapshot`
-- `StepTimeAdvanceRecord`
+### `final_report_sections`
 
-### Optional Output Fields
+Intermediate structured bundle used to render the final Markdown report. It contains:
 
-- `ActorActionProposal.expected_outcome`
-  - optional predicted result of the proposed action
-- `CanonicalAction.expected_outcome`
-  - optional carried-through expected result on stored actions
+- `conclusion_section`
+- `actor_results_rows`
+- `timeline_section`
+- `actor_dynamics_section`
+- `major_events_section`
 
-### Finalization Outputs
+## Failure Policy
 
-- `FinalReport`
-- `TimelineAnchorDecision`
-
-## Persistence Contract
-
-Structured artifacts are persisted through the app store:
-
-| Stored artifact | Meaning |
-| --- | --- |
-| `runs` | run metadata and status |
-| `plan` | persisted planning bundle |
-| `actors` | finalized actor registry |
-| `activities` | canonical activities |
-| `observer_reports` | per-step observer summaries |
-| `final_reports` | structured final report JSON |
-
-Human-facing files are written separately after the workflow completes:
-
-- `output/<run_id>/simulation.log.jsonl`
-- `output/<run_id>/final_report.md`
-
-## Failure Contract
-
-The repository does not treat all roles the same.
-
-- planning structured generation is expected to succeed without silent degradation
-- generation is expected to return a valid actor registry or fail
-- coordinator nodes can fall back to default payloads for focus planning, background
-  updates, and step adjudication
-- actor proposals can fall back to a forced idle/default action path
-- observer summaries are expected to return a structured report without the same
-  default-fallback path
-- config validation and storage shape mismatches fail explicitly
-
-For role-by-role details, see [`llm.md`](./llm.md).
+- Planning and generation are strict structured calls. If the contract cannot be satisfied, the
+  run fails instead of silently degrading.
+- Runtime actor proposals, step directives, and step resolutions may use explicit default payloads.
+  When that happens, the event is recorded through `errors`.
+- Final report section writing retries once with validation feedback. It does not silently
+  substitute a synthetic report bundle.

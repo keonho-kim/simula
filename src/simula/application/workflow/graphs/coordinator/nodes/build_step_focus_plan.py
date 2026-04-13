@@ -1,11 +1,5 @@
-"""목적:
-- step focus 계획 노드를 제공한다.
-
-설명:
-- 후보 actor pool을 읽어 이번 step의 focus slice와 선택 actor를 확정한다.
-
-사용한 설계 패턴:
-- single node module 패턴
+"""Purpose:
+- Build the single required step directive.
 """
 
 from __future__ import annotations
@@ -15,42 +9,56 @@ import json
 from langgraph.runtime import Runtime
 
 from simula.application.workflow.context import WorkflowRuntimeContext
-from simula.application.workflow.utils.coercion import (
-    as_dict_list,
-    as_string_list,
+from simula.application.workflow.graphs.coordinator.output_schema.bundles import (
+    build_step_directive_prompt_bundle,
 )
+from simula.application.workflow.graphs.coordinator.prompts.build_step_focus_plan_prompt import (
+    PROMPT as BUILD_STEP_DIRECTIVE_PROMPT,
+)
+from simula.application.workflow.graphs.simulation.states.state import (
+    SimulationWorkflowState,
+)
+from simula.application.workflow.utils.coercion import as_dict_list, as_string_list
 from simula.application.workflow.utils.prompt_projections import (
     PREVIOUS_SUMMARY_LIMIT,
+    build_deferred_actor_views,
     build_focus_candidates_prompt_view,
     build_focus_plan_coordination_frame_view,
     build_focus_plan_situation_view,
     truncate_text,
 )
-from simula.application.workflow.graphs.coordinator.prompts.build_step_focus_plan_prompt import (
-    PROMPT as BUILD_STEP_FOCUS_PLAN_PROMPT,
-)
-from simula.application.workflow.graphs.coordinator.output_schema.bundles import (
-    build_step_focus_plan_prompt_bundle,
-)
-from simula.application.workflow.graphs.simulation.states.state import (
-    SimulationWorkflowState,
-)
-from simula.domain.contracts import StepFocusPlan
+from simula.domain.contracts import StepDirective
 from simula.domain.reporting import latest_observer_summary
 
 
-async def build_step_focus_plan(
+async def build_step_directive(
     state: SimulationWorkflowState,
     runtime: Runtime[WorkflowRuntimeContext],
 ) -> dict[str, object]:
-    """이번 step의 focus slice 계획을 만든다."""
+    """Build one required step directive including background updates."""
 
     max_focus_slices = runtime.context.settings.runtime.max_focus_slices_per_step
     max_actor_calls = runtime.context.settings.runtime.max_actor_calls_per_step
-    prompt = BUILD_STEP_FOCUS_PLAN_PROMPT.format(
+    candidate_ids = [
+        str(item.get("actor_id", ""))
+        for item in list(state.get("focus_candidates", []))
+        if str(item.get("actor_id", "")).strip()
+    ]
+    deferred_actor_ids = candidate_ids[max_actor_calls:]
+    deferred_actors = [
+        actor
+        for actor in list(state["actors"])
+        if str(actor.get("actor_id", "")) in set(deferred_actor_ids)
+    ]
+    prompt = BUILD_STEP_DIRECTIVE_PROMPT.format(
         step_index=state["step_index"],
         focus_candidates_json=json.dumps(
-            build_focus_candidates_prompt_view(list(state.get("focus_candidates", []))),
+            build_focus_candidates_prompt_view(list(state["focus_candidates"])),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        deferred_actors_json=json.dumps(
+            build_deferred_actor_views(deferred_actors),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
@@ -67,64 +75,67 @@ async def build_step_focus_plan(
             separators=(",", ":"),
         ),
         simulation_clock_json=json.dumps(
-            state.get("simulation_clock", {}),
+            state["simulation_clock"],
             ensure_ascii=False,
             separators=(",", ":"),
         ),
         previous_observer_summary=truncate_text(
-            latest_observer_summary(list(state.get("observer_reports", []))),
+            latest_observer_summary(list(state["observer_reports"])),
             PREVIOUS_SUMMARY_LIMIT,
         ),
         max_focus_slices_per_step=max_focus_slices,
         max_actor_calls_per_step=max_actor_calls,
-        **build_step_focus_plan_prompt_bundle(),
+        **build_step_directive_prompt_bundle(),
     )
-    default_payload = _build_default_step_focus_plan_payload(
+    default_payload = _build_default_step_directive_payload(
         state=state,
         max_focus_slices=max_focus_slices,
         max_actor_calls=max_actor_calls,
     )
-    focus_plan, _ = await runtime.context.llms.ainvoke_structured_with_meta(
+    directive, meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "coordinator",
         prompt,
-        StepFocusPlan,
+        StepDirective,
         allow_default_on_failure=True,
         default_payload=default_payload,
-        log_context={"scope": "step-focus", "step_index": int(state["step_index"])},
+        log_context={"scope": "step-directive", "step_index": int(state["step_index"])},
     )
-    normalized = _normalize_step_focus_plan(
-        step_focus_plan=focus_plan.model_dump(mode="json"),
-        focus_candidates=list(state.get("focus_candidates", [])),
+    normalized = _normalize_step_directive(
+        directive=directive.model_dump(mode="json"),
+        focus_candidates=list(state["focus_candidates"]),
         max_focus_slices=max_focus_slices,
         max_actor_calls=max_actor_calls,
     )
-    runtime.context.logger.info(
-        "step %s focus 계획 완료 | slice %s개 | 선택 actor %s명",
-        state["step_index"],
-        len(as_dict_list(normalized.get("focus_slices", []))),
-        len(as_string_list(normalized.get("selected_actor_ids", []))),
-    )
+    errors = list(state["errors"])
+    if meta.forced_default:
+        errors.append(f"step {state['step_index']} directive defaulted")
     return {
         "step_focus_plan": normalized,
-        "step_focus_history": list(state.get("step_focus_history", [])) + [normalized],
+        "step_focus_history": list(state["step_focus_history"]) + [normalized],
         "selected_actor_ids": as_string_list(normalized.get("selected_actor_ids", [])),
         "deferred_actor_ids": as_string_list(normalized.get("deferred_actor_ids", [])),
+        "latest_background_updates": as_dict_list(
+            normalized.get("background_updates", [])
+        ),
+        "background_updates": list(state["background_updates"])
+        + as_dict_list(normalized.get("background_updates", [])),
+        "errors": errors,
     }
 
 
-def _build_default_step_focus_plan_payload(
+def _build_default_step_directive_payload(
     *,
     state: SimulationWorkflowState,
     max_focus_slices: int,
     max_actor_calls: int,
 ) -> dict[str, object]:
-    candidates = list(state.get("focus_candidates", []))
+    candidates = list(state["focus_candidates"])
     selected_actor_ids = [
         str(item.get("actor_id", ""))
         for item in candidates[: min(max_actor_calls, len(candidates), 2)]
         if str(item.get("actor_id", "")).strip()
     ]
-    focus_slices = []
+    focus_slices: list[dict[str, object]] = []
     if selected_actor_ids and max_focus_slices > 0:
         focus_slices.append(
             {
@@ -147,12 +158,13 @@ def _build_default_step_focus_plan_payload(
             if str(item.get("actor_id", "")) not in set(selected_actor_ids)
         ],
         "focus_slices": focus_slices,
+        "background_updates": [],
     }
 
 
-def _normalize_step_focus_plan(
+def _normalize_step_directive(
     *,
-    step_focus_plan: dict[str, object],
+    directive: dict[str, object],
     focus_candidates: list[dict[str, object]],
     max_focus_slices: int,
     max_actor_calls: int,
@@ -164,14 +176,10 @@ def _normalize_step_focus_plan(
     ]
     seen_actor_ids: set[str] = set()
     normalized_slices = []
-    for raw_slice in as_dict_list(step_focus_plan.get("focus_slices", []))[
-        :max_focus_slices
-    ]:
+    for raw_slice in as_dict_list(directive.get("focus_slices", []))[:max_focus_slices]:
         slice_actor_ids: list[str] = []
         for actor_id in as_string_list(raw_slice.get("focus_actor_ids", [])):
-            if actor_id in seen_actor_ids:
-                continue
-            if actor_id not in candidate_ids:
+            if actor_id in seen_actor_ids or actor_id not in candidate_ids:
                 continue
             if len(seen_actor_ids) + len(slice_actor_ids) >= max_actor_calls:
                 break
@@ -179,31 +187,39 @@ def _normalize_step_focus_plan(
         if not slice_actor_ids:
             continue
         seen_actor_ids.update(slice_actor_ids)
-        normalized_slices.append(
-            {
-                **raw_slice,
-                "focus_actor_ids": slice_actor_ids,
-            }
-        )
+        normalized_slices.append({**raw_slice, "focus_actor_ids": slice_actor_ids})
 
-    selected_actor_ids = []
+    selected_actor_ids: list[str] = []
     for focus_slice in normalized_slices:
         for actor_id in as_string_list(focus_slice.get("focus_actor_ids", [])):
             if actor_id not in selected_actor_ids:
                 selected_actor_ids.append(actor_id)
-
     deferred_actor_ids = [
-        actor_id
-        for actor_id in candidate_ids
-        if actor_id not in set(selected_actor_ids)
+        actor_id for actor_id in candidate_ids if actor_id not in set(selected_actor_ids)
     ]
+    background_updates = []
+    for raw_update in as_dict_list(directive.get("background_updates", [])):
+        actor_id = str(raw_update.get("actor_id", "")).strip()
+        if not actor_id or actor_id not in deferred_actor_ids:
+            continue
+        background_updates.append(
+            {
+                "step_index": int(str(directive.get("step_index", 0) or 0)),
+                "actor_id": actor_id,
+                "summary": str(raw_update.get("summary", "")).strip(),
+                "pressure_level": str(raw_update.get("pressure_level", "low")).strip()
+                or "low",
+                "future_hook": str(raw_update.get("future_hook", "")).strip(),
+            }
+        )
     return {
-        "step_index": int(str(step_focus_plan.get("step_index", 0))),
-        "focus_summary": str(step_focus_plan.get("focus_summary", "")).strip()
-        or "이번 단계에서 직접 따라갈 축을 우선 정리했다.",
-        "selection_reason": str(step_focus_plan.get("selection_reason", "")).strip()
+        "step_index": int(str(directive.get("step_index", 0))),
+        "focus_summary": str(directive.get("focus_summary", "")).strip()
+        or "이번 단계에서 직접 따라갈 축을 정리했다.",
+        "selection_reason": str(directive.get("selection_reason", "")).strip()
         or "후보 압력과 연속성을 기준으로 focus를 정리했다.",
         "selected_actor_ids": selected_actor_ids,
         "deferred_actor_ids": deferred_actor_ids,
         "focus_slices": normalized_slices,
+        "background_updates": background_updates,
     }

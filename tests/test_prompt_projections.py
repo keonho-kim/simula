@@ -56,8 +56,8 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
             "visibility": "public",
             "action_type": "signal",
             "action_summary": "두 번째 요약",
-            "utterance": None,
-            "thread_id": None,
+            "utterance": "",
+            "thread_id": "",
         },
     ]
 
@@ -68,7 +68,7 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
 
     assert len(context) == 2
     assert [item["activity_id"] for item in context] == ["a1", "a2"]
-    assert digest is None
+    assert digest == {}
 
     overflow_unread = unread + [
         {
@@ -79,7 +79,7 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
             "visibility": "private",
             "action_type": "signal",
             "action_summary": "추가 요약",
-            "utterance": None,
+            "utterance": "",
             "thread_id": f"t-{index}",
         }
         for index in range(6)
@@ -90,7 +90,7 @@ def test_build_visible_action_context_dedupes_and_creates_backlog_digest() -> No
     )
 
     assert len(context) == 6
-    assert digest is not None
+    assert digest != {}
     assert digest["unread_count"] == 7
     assert digest["omitted_count"] == 1
 
@@ -188,7 +188,6 @@ def test_build_compact_pending_actor_proposals_strips_metadata() -> None:
                     "visibility": "private",
                     "target_actor_ids": ["b"],
                     "thread_id": "t-1",
-                    "expected_outcome": "기대 결과",
                 },
             }
         ]

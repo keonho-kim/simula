@@ -13,7 +13,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from simula.domain.contracts import ScenarioTimeScope
@@ -117,28 +116,6 @@ def test_router_direct_invoke_uses_runnable_sequence() -> None:
     assert model.stream_called is False
 
 
-def test_router_async_uses_astream(caplog) -> None:
-    model = FakeModel(_time_scope_json())
-    router = _build_router(model)
-
-    async def _run() -> tuple[ScenarioTimeScope, object]:
-        with caplog.at_level(logging.INFO, logger="simula.test.llm_router"):
-            return await router.ainvoke_structured_with_meta(
-                "planner",
-                "prompt",
-                ScenarioTimeScope,
-            )
-
-    result, meta = asyncio.run(_run())
-
-    assert result.end == "핵심 선택 직전"
-    assert meta.ttft_seconds is not None
-    assert model.astream_called is True
-    assert model.invoke_called is False
-    assert "planner 호출 시작" in caplog.text
-    assert "planner 완료" in caplog.text
-
-
 def test_router_logs_structured_call_start_once(caplog) -> None:
     model = FakeModel(_time_scope_json())
     router = _build_router(model)
@@ -149,29 +126,15 @@ def test_router_logs_structured_call_start_once(caplog) -> None:
             "prompt",
             ScenarioTimeScope,
             log_context={
-                "scope": "interpretation-time",
+                "scope": "planning-analysis",
                 "step_index": 2,
                 "slot_index": 1,
             },
         )
 
-    assert caplog.text.count("planner · 시간 범위 정리 시작") == 1
-    assert "planner · 시간 범위 정리 시작 | step_index=2 slot_index=1" in caplog.text
-    assert "planner · 시간 범위 정리 완료" in caplog.text
-
-
-def test_router_direct_ainvoke_uses_runnable_sequence() -> None:
-    model = FakeModel(_time_scope_json())
-    router = _build_router(model)
-
-    async def _run() -> ScenarioTimeScope:
-        return await router.ainvoke_structured("planner", "prompt", ScenarioTimeScope)
-
-    result = asyncio.run(_run())
-
-    assert result.start == "초기 대면 직후"
-    assert model.ainvoke_called is True
-    assert model.astream_called is False
+    assert caplog.text.count("planner · 계획 분석 정리 시작") == 1
+    assert "planner · 계획 분석 정리 시작 | step_index=2 slot_index=1" in caplog.text
+    assert "planner · 계획 분석 정리 완료" in caplog.text
 
 
 def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
@@ -184,11 +147,11 @@ def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
         result, meta = router.invoke_text_with_meta(
             "planner",
             "prompt",
-            log_context={"scope": "cast_roster"},
+            log_context={"scope": "execution-plan"},
         )
 
     assert result.startswith('{"cast_id":"a"')
     assert meta.ttft_seconds is not None
     assert model.stream_called is True
-    assert "planner · 등장 주체 목록 확정 시작" in caplog.text
-    assert "planner · 등장 주체 목록 확정 완료" in caplog.text
+    assert "planner · 실행 계획 번들 정리 시작" in caplog.text
+    assert "planner · 실행 계획 번들 정리 완료" in caplog.text

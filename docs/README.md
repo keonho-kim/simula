@@ -1,66 +1,36 @@
 # Documentation
 
-This documentation set follows the current compiled graph and runtime path in the
-repository. It is meant to answer two questions quickly:
+This documentation set describes the current compiled workflow only. Each document owns one
+layer of detail so the same concept is not explained in five places.
 
-- what is wired today
-- where a specific behavior actually lives
+## Reading Order
 
-## Recommended Reading Paths
-
-| Goal | Read this first | Then read |
+| Goal | Start here | Then read |
 | --- | --- | --- |
-| Understand the whole project | [`../README.md`](../README.md) | [`architecture.md`](./architecture.md), [`workflows/README.md`](./workflows/README.md) |
-| Understand graph composition | [`workflows/simulation.md`](./workflows/simulation.md) | [`workflows/planning.md`](./workflows/planning.md), [`workflows/runtime.md`](./workflows/runtime.md) |
-| Debug one runtime step | [`workflows/runtime.md`](./workflows/runtime.md) | [`workflows/coordinator.md`](./workflows/coordinator.md), [`contracts.md`](./contracts.md) |
-| Understand prompt-facing inputs | [`llm.md`](./llm.md) | [`architecture.md`](./architecture.md), [`workflows/generation.md`](./workflows/generation.md), [`workflows/coordinator.md`](./workflows/coordinator.md) |
-| Change model routing or prompt ownership | [`llm.md`](./llm.md) | relevant workflow document for the stage you are editing |
-| Run locally or verify config | [`operations.md`](./operations.md) | [`contracts.md`](./contracts.md) |
+| Understand the project quickly | [`../README.md`](../README.md) | [`architecture.md`](./architecture.md) |
+| Understand graph boundaries | [`architecture.md`](./architecture.md) | [`contracts.md`](./contracts.md) |
+| Understand stage handoffs | [`workflows/README.md`](./workflows/README.md) | the stage document you need |
+| Change prompts or model routing | [`llm.md`](./llm.md) | the matching workflow doc |
+| Run locally and validate changes | [`operations.md`](./operations.md) | [`contracts.md`](./contracts.md) |
 
-## Documentation Map
+## Document Roles
 
-### System Docs
+| Document | Owns |
+| --- | --- |
+| [`../README.md`](../README.md) | project pitch, quick start, high-level flow |
+| [`architecture.md`](./architecture.md) | layers, execution path, state/runtime boundaries |
+| [`contracts.md`](./contracts.md) | public I/O, internal state groups, structured contracts, artifacts |
+| [`llm.md`](./llm.md) | model roles, prompt projections, structured-output policy |
+| [`operations.md`](./operations.md) | commands, validation, outputs, maintenance |
+| [`workflows/README.md`](./workflows/README.md) | workflow hub and stage handoffs |
+| [`workflows/simulation.md`](./workflows/simulation.md) | root graph assembly and hydration |
+| [`workflows/planning.md`](./workflows/planning.md) | compact planning path |
+| [`workflows/generation.md`](./workflows/generation.md) | actor generation fan-out/fan-in |
+| [`workflows/runtime.md`](./workflows/runtime.md) | runtime loop and step resolution |
+| [`workflows/finalization.md`](./workflows/finalization.md) | report finalization path |
 
-- [`architecture.md`](./architecture.md)
-  - layer boundaries, execution path, shared runtime context, and the prompt-projection layer
-- [`contracts.md`](./contracts.md)
-  - config merge rules, state channels, actor task payloads, structured outputs, and persistence surface
-- [`llm.md`](./llm.md)
-  - role responsibilities, provider wiring, compact prompt inputs, and prompt ownership
-- [`operations.md`](./operations.md)
-  - local run commands, config workflow, multi-run behavior, and maintenance commands
+## Rules
 
-### Workflow Docs
-
-- [`workflows/README.md`](./workflows/README.md)
-  - workflow hub and handoff summary
-- [`workflows/simulation.md`](./workflows/simulation.md)
-  - root graph assembly, executor handoff, and the prompt-projection boundary
-- [`workflows/planning.md`](./workflows/planning.md)
-  - scenario interpretation and plan construction
-- [`workflows/generation.md`](./workflows/generation.md)
-  - actor-slot fan-out, compact generator inputs, and actor registry finalization
-- [`workflows/runtime.md`](./workflows/runtime.md)
-  - step loop, observer role, compact observer inputs, persistence, and stop branching
-- [`workflows/coordinator.md`](./workflows/coordinator.md)
-  - focus selection, deferred actor digestion, actor task payloads, and adjudication
-- [`workflows/finalization.md`](./workflows/finalization.md)
-  - report payloads, timeline anchoring, report projection building, and markdown assembly
-
-## Projection Vocabulary
-
-- `prompt projection`
-  - an in-memory compact view derived from rich workflow state before one LLM call
-- `report projection`
-  - the persisted finalization artifact in `report_projection_json` used for report writing
-
-## Documentation Conventions
-
-- “current compiled graph” means the path wired by `*_SUBGRAPH` and `SIMULATION_WORKFLOW`
-  today, not every prompt or helper module present in the tree
-- workflow docs describe inputs and outputs at the state-channel level instead of repeating
-  every implementation detail from the code
-- runtime/generation/coordinator prompt inputs are documented as compact prompt projections,
-  not as persisted workflow channels
-- file outputs such as `final_report.md` are documented separately from state outputs because
-  they are written after the workflow returns
+- These docs follow the compiled graph, not historical module layout.
+- Workflow docs use active node names.
+- `README.md` stays product-oriented; `docs/` holds the implementation detail.

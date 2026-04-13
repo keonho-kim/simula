@@ -118,7 +118,7 @@ def apply_actor_proposals(
             raise ValueError(
                 f"action_type `{proposal.action_type}` 는 target_actor_ids가 필요합니다."
             )
-        if proposal.utterance is not None and not action_spec.supports_utterance:
+        if proposal.utterance.strip() and not action_spec.supports_utterance:
             raise ValueError(
                 f"action_type `{proposal.action_type}` 는 utterance를 지원하지 않습니다."
             )
@@ -139,10 +139,8 @@ def apply_actor_proposals(
             intent_target_actor_ids=intent_target_actor_ids,
             action_summary=proposal.action_summary.strip(),
             action_detail=proposal.action_detail.strip(),
-            utterance=proposal.utterance.strip()
-            if proposal.utterance is not None
-            else None,
-            thread_id=proposal.thread_id,
+            utterance=proposal.utterance.strip(),
+            thread_id=proposal.thread_id.strip(),
         )
         action_payload = action.model_dump(mode="json")
         all_activities.append(action_payload)

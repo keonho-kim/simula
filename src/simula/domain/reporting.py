@@ -1,15 +1,5 @@
-"""목적:
-- 중단 판단과 최종 리포트 조립 규칙을 제공한다.
-
-설명:
-- observer 결과 해석과 실행 요약 조립을 순수 함수로 분리한다.
-
-사용한 설계 패턴:
-- 순수 보고 규칙 함수 패턴
-
-연관된 다른 모듈/구조:
-- simula.application.workflow.graphs.runtime.nodes.observation
-- simula.application.workflow.graphs.finalization.nodes.build_final_report_payload
+"""Purpose:
+- Provide pure stop-evaluation and reporting helpers.
 """
 
 from __future__ import annotations

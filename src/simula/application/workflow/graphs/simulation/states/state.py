@@ -1,11 +1,5 @@
-"""목적:
-- simulation workflow 상태 구조를 정의한다.
-
-설명:
-- planning, generation, runtime, finalization 서브그래프가 공유하는 상태 채널을 정의한다.
-
-사용한 설계 패턴:
-- 명시적 상태 계약 패턴
+"""Purpose:
+- Define the required simulation workflow state contracts.
 """
 
 from __future__ import annotations
@@ -16,24 +10,42 @@ from simula.application.workflow.graphs.generation.states.state import (
     CastSlotSpec,
     GeneratedActorResult,
 )
-from simula.application.workflow.graphs.planning.states.state import (
-    PlanningStateFragment,
-)
-from simula.application.workflow.reducer.collections import (
-    extend_list,
-    extend_str_list,
-)
 from simula.application.workflow.graphs.runtime.states.state import (
     ActorProposalResult,
     ActorProposalTask,
 )
+from simula.application.workflow.reducer.collections import extend_list, extend_str_list
 
 
-class SimulationWorkflowState(PlanningStateFragment, TypedDict, total=False):
-    """simulation workflow 상태 계약이다."""
+class SimulationInputState(TypedDict):
+    """Public graph input."""
 
     run_id: str
     scenario: str
+    max_steps: int
+    rng_seed: int
+
+
+class SimulationOutputState(TypedDict):
+    """Public graph output."""
+
+    run_id: str
+    final_report: dict[str, Any]
+    final_report_markdown: str
+    simulation_log_jsonl: str
+    stop_reason: str
+    errors: list[str]
+
+
+class SimulationWorkflowState(TypedDict):
+    """Internal graph state with required fields only."""
+
+    run_id: str
+    scenario: str
+    max_steps: int
+    checkpoint_enabled: bool
+    rng_seed: int
+    planning_analysis: dict[str, Any]
     plan: dict[str, Any]
     actors: list[dict[str, Any]]
     activity_feeds: dict[str, dict[str, Any]]
@@ -41,7 +53,6 @@ class SimulationWorkflowState(PlanningStateFragment, TypedDict, total=False):
     latest_step_activities: list[dict[str, Any]]
     observer_reports: list[dict[str, Any]]
     focus_candidates: list[dict[str, Any]]
-    step_focus_plan: dict[str, Any] | None
     step_focus_history: list[dict[str, Any]]
     selected_actor_ids: list[str]
     deferred_actor_ids: list[str]
@@ -49,7 +60,8 @@ class SimulationWorkflowState(PlanningStateFragment, TypedDict, total=False):
     background_updates: list[dict[str, Any]]
     actor_intent_states: list[dict[str, Any]]
     intent_history: list[dict[str, Any]]
-    pending_step_time_advance: dict[str, Any] | None
+    step_focus_plan: dict[str, Any]
+    step_time_advance: dict[str, Any]
     simulation_clock: dict[str, Any]
     step_time_history: list[dict[str, Any]]
     pending_cast_slots: list[CastSlotSpec]
@@ -57,8 +69,6 @@ class SimulationWorkflowState(PlanningStateFragment, TypedDict, total=False):
     generated_actor_results: Annotated[list[GeneratedActorResult], extend_list]
     actor_proposal_task: ActorProposalTask
     pending_actor_proposals: Annotated[list[ActorProposalResult], extend_list]
-    pending_actors: list[dict[str, Any]]
-    pending_observer_report: dict[str, Any] | None
     parse_failures: int
     forced_idles: int
     stagnation_steps: int
@@ -68,22 +78,13 @@ class SimulationWorkflowState(PlanningStateFragment, TypedDict, total=False):
     current_step_started_at: float
     last_step_latency_seconds: float
     step_index: int
-    max_steps: int
-    checkpoint_enabled: bool
-    rng_seed: int
     stop_requested: bool
-    stop_reason: str | None
+    stop_reason: str
     world_state_summary: str
-    final_report: dict[str, Any] | None
-    simulation_log_jsonl: str | None
-    report_projection_json: str | None
-    report_timeline_anchor_json: dict[str, Any] | None
-    report_timeline_section: str | None
-    report_actor_dynamics_section: str | None
-    report_major_events_section: str | None
-    report_body_sections: list[dict[str, str]]
-    report_body_sections_markdown: str | None
-    report_actor_final_results_section: str | None
-    report_simulation_conclusion_section: str | None
-    final_report_markdown: str | None
+    final_report: dict[str, Any]
+    simulation_log_jsonl: str
+    report_projection_json: str
+    report_timeline_anchor_json: dict[str, Any]
+    final_report_sections: dict[str, Any]
+    final_report_markdown: str
     errors: Annotated[list[str], extend_str_list]

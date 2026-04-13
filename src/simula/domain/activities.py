@@ -45,8 +45,8 @@ def create_canonical_action(
     intent_target_actor_ids: list[str],
     action_summary: str,
     action_detail: str,
-    utterance: str | None = None,
-    thread_id: str | None = None,
+    utterance: str = "",
+    thread_id: str = "",
 ) -> CanonicalAction:
     """canonical action을 생성한다."""
 
