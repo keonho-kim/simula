@@ -24,6 +24,8 @@ Choose the direct focus for this round and summarize deferred motion in the same
 - If a field is an array, return a JSON array even when it has only one item.
 - Keep the directive realistic for the scenario and the current moment. Select slices that could plausibly become the next visible beat.
 - Do not introduce new institutions, written artifacts, or escalation frames unless they are already grounded in the scenario or previous rounds.
+- Avoid overly narrow two-person loops when the current conflict clearly implicates additional related candidates.
+- If the candidate pool is rich enough and the direct-call budget allows it, prefer selecting 3 to 4 closely related cast members rather than only 1 to 2.
 
 # Inputs
 Round index:

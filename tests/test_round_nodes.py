@@ -128,6 +128,70 @@ def test_build_round_directive_sets_selected_cast_ids() -> None:
     assert result["latest_background_updates"][0]["cast_id"] == "c"
 
 
+def test_build_round_directive_backfills_more_related_casts_when_pool_is_rich() -> None:
+    class FakeRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            return (
+                schema.model_validate(
+                    RoundDirective(
+                        round_index=3,
+                        focus_summary="핵심 갈등 축을 우선 추적한다.",
+                        selection_reason="직접 반응 압력이 가장 높다.",
+                        selected_cast_ids=["a", "b"],
+                        deferred_cast_ids=["c", "d", "e"],
+                        focus_slices=[
+                            {
+                                "slice_id": "focus-1",
+                                "title": "핵심 갈등",
+                                "focus_cast_ids": ["a", "b"],
+                                "visibility": "public",
+                                "stakes": "즉시 반응이 필요하다.",
+                                "selection_reason": "핵심 압박이 몰렸다.",
+                            }
+                        ],
+                        background_updates=[],
+                    )
+                ),
+                SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+            )
+
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(
+            llms=FakeRouter(),
+            logger=logging.getLogger("simula.test.round"),
+            settings=SimpleNamespace(
+                runtime=SimpleNamespace(
+                    max_focus_slices_per_step=3,
+                    max_actor_calls_per_step=6,
+                )
+            ),
+        )
+    )
+    state = {
+        "round_index": 3,
+        "actors": [{"cast_id": cast_id, "display_name": cast_id.upper()} for cast_id in ["a", "b", "c", "d", "e"]],
+        "focus_candidates": [{"cast_id": cast_id} for cast_id in ["a", "b", "c", "d", "e"]],
+        "plan": {
+            "coordination_frame": {"focus_selection_rules": ["규칙"]},
+            "situation": {"simulation_objective": "긴장 추적"},
+        },
+        "simulation_clock": {"total_elapsed_label": "2시간"},
+        "observer_reports": [{"summary": "직전"}],
+        "round_focus_history": [],
+        "background_updates": [],
+        "errors": [],
+    }
+
+    result = asyncio.run(build_round_directive(state, runtime))
+
+    assert result["selected_cast_ids"] == ["a", "b", "c"]
+    assert any(
+        item.get("title") == "주변 반응 확대"
+        for item in result["round_focus_plan"]["focus_slices"]
+    )
+
+
 def test_resolve_round_persists_round_artifacts() -> None:
     class FakeRouter:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001

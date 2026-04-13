@@ -133,9 +133,13 @@ def _build_default_round_directive_payload(
     max_actor_calls: int,
 ) -> dict[str, object]:
     candidates = list(state["focus_candidates"])
+    desired_selected_count = _desired_selected_count(
+        candidate_count=len(candidates),
+        max_actor_calls=max_actor_calls,
+    )
     selected_cast_ids = [
         str(item.get("cast_id", ""))
-        for item in candidates[: min(max_actor_calls, len(candidates), 2)]
+        for item in candidates[:desired_selected_count]
         if str(item.get("cast_id", "")).strip()
     ]
     focus_slices: list[dict[str, object]] = []
@@ -172,6 +176,10 @@ def _normalize_round_directive(
     max_focus_slices: int,
     max_actor_calls: int,
 ) -> dict[str, object]:
+    desired_selected_count = _desired_selected_count(
+        candidate_count=len(focus_candidates),
+        max_actor_calls=max_actor_calls,
+    )
     candidate_ids = [
         str(item.get("cast_id", ""))
         for item in focus_candidates
@@ -197,6 +205,40 @@ def _normalize_round_directive(
         for cast_id in as_string_list(focus_slice.get("focus_cast_ids", [])):
             if cast_id not in selected_cast_ids:
                 selected_cast_ids.append(cast_id)
+
+    backfill_cast_ids = [
+        cast_id
+        for cast_id in candidate_ids
+        if cast_id not in set(selected_cast_ids)
+    ][: max(0, desired_selected_count - len(selected_cast_ids))]
+    if backfill_cast_ids:
+        if len(normalized_slices) < max_focus_slices:
+            normalized_slices.append(
+                {
+                    "slice_id": f"round-{int(str(directive.get('round_index', 0)))}-context-expansion",
+                    "title": "주변 반응 확대",
+                    "focus_cast_ids": backfill_cast_ids,
+                    "visibility": "public",
+                    "stakes": "핵심 갈등에 반응하는 주변 인물의 선택도 다음 국면을 바꿀 수 있다.",
+                    "selection_reason": "핵심 축과 직접 연결된 주변 반응까지 이번 라운드에서 함께 추적한다.",
+                }
+            )
+        elif normalized_slices:
+            expanded = list(as_string_list(normalized_slices[0].get("focus_cast_ids", [])))
+            for cast_id in backfill_cast_ids:
+                if cast_id not in expanded:
+                    expanded.append(cast_id)
+            normalized_slices[0] = {
+                **normalized_slices[0],
+                "focus_cast_ids": expanded[:max_actor_calls],
+            }
+
+    selected_cast_ids = []
+    for focus_slice in normalized_slices:
+        for cast_id in as_string_list(focus_slice.get("focus_cast_ids", [])):
+            if cast_id not in selected_cast_ids:
+                selected_cast_ids.append(cast_id)
+
     deferred_cast_ids = [
         cast_id for cast_id in candidate_ids if cast_id not in set(selected_cast_ids)
     ]
@@ -226,3 +268,11 @@ def _normalize_round_directive(
         "focus_slices": normalized_slices,
         "background_updates": background_updates,
     }
+
+
+def _desired_selected_count(*, candidate_count: int, max_actor_calls: int) -> int:
+    if candidate_count >= 8:
+        return min(max_actor_calls, 4)
+    if candidate_count >= 5:
+        return min(max_actor_calls, 3)
+    return min(max_actor_calls, candidate_count, 2)

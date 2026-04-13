@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from simula.domain.contracts import ActorCard
+from simula.domain.contracts import ActorCard, RoundResolution
 from simula.infrastructure.llm.renderers import (
     render_structured_response,
     render_text_response,
@@ -87,3 +87,46 @@ def test_render_structured_response_formats_nested_values_as_indented_blocks() -
     assert "    - private_confide" in rendered
     assert "action_bias_notes:" in rendered
     assert "    - 직접 묻는다." in rendered
+
+
+def test_render_structured_response_formats_empty_values_and_stop_reason() -> None:
+    rendered = render_structured_response(
+        role="coordinator",
+        parsed=RoundResolution(
+            adopted_cast_ids=[],
+            updated_intent_states=[],
+            round_time_advance={
+                "elapsed_unit": "hour",
+                "elapsed_amount": 1,
+                "selection_reason": "기본 진행",
+                "signals": [],
+            },
+            observer_report={
+                "round_index": 1,
+                "summary": "요약",
+                "notable_events": [],
+                "atmosphere": "긴장",
+                "momentum": "medium",
+                "world_state_summary": "상태",
+            },
+            actor_facing_scenario_digest={
+                "round_index": 1,
+                "relationship_map_summary": "관계",
+                "current_pressures": ["압력"],
+                "talking_points": ["포인트"],
+                "avoid_repetition_notes": ["반복 금지"],
+                "recommended_tone": "톤",
+                "world_state_summary": "상태",
+            },
+            world_state_summary="상태",
+            stop_reason="",
+        ),
+        content="",
+        log_context=None,
+    )
+
+    assert "adopted_cast_ids: empty" in rendered
+    assert "updated_intent_states: empty" in rendered
+    assert "signals: empty" in rendered
+    assert "notable_events: empty" in rendered
+    assert "stop_reason: continue" in rendered

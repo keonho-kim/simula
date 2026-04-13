@@ -345,9 +345,11 @@ def _render_mapping(mapping: dict[str, object]) -> str:
 
 
 def _render_field_lines(key: str, value: object) -> list[str]:
+    if _is_empty_value(value):
+        return [f"{key}: {_render_empty_value(key, value)}"]
     return [f"{key}: {_format_scalar(value)}"] if _is_scalar(value) else [
         f"{key}:",
-        *_render_nested(value, indent=4),
+        *_render_nested(value, indent=4, parent_key=key),
     ]
 
 
@@ -356,24 +358,38 @@ def _indent_block(text: str) -> str:
     return "\n".join(f"  {line}" for line in lines)
 
 
-def _render_nested(value: object, *, indent: int) -> list[str]:
+def _render_nested(
+    value: object,
+    *,
+    indent: int,
+    parent_key: str | None = None,
+) -> list[str]:
     prefix = " " * indent
 
     if isinstance(value, dict):
         lines: list[str] = []
-        for key, item in value.items():
+        for raw_key, item in value.items():
+            key = str(raw_key)
+            if _is_empty_value(item):
+                lines.append(f"{prefix}{key}: {_render_empty_value(key, item)}")
+                continue
             if _is_scalar(item):
                 lines.append(f"{prefix}{key}: {_format_scalar(item)}")
                 continue
             lines.append(f"{prefix}{key}:")
-            lines.extend(_render_nested(item, indent=indent + 4))
+            lines.extend(_render_nested(item, indent=indent + 4, parent_key=key))
         if lines:
             return lines
-        return [f"{prefix}{{}}"]
+        return [f"{prefix}{_render_empty_value(parent_key, value)}"]
 
     if isinstance(value, list):
+        if not value:
+            return [f"{prefix}{_render_empty_value(parent_key, value)}"]
         lines: list[str] = []
         for item in value:
+            if _is_empty_value(item):
+                lines.append(f"{prefix}- {_render_empty_value(None, item)}")
+                continue
             if _is_scalar(item):
                 lines.append(f"{prefix}- {_format_scalar(item)}")
                 continue
@@ -381,7 +397,7 @@ def _render_nested(value: object, *, indent: int) -> list[str]:
             lines.extend(_render_nested(item, indent=indent + 4))
         if lines:
             return lines
-        return [f"{prefix}[]"]
+        return [f"{prefix}{_render_empty_value(parent_key, value)}"]
 
     return [f"{prefix}{_format_scalar(value)}"]
 
@@ -396,6 +412,20 @@ def _format_scalar(value: object) -> str:
     if value is None:
         return "null"
     return str(value)
+
+
+def _is_empty_value(value: object) -> bool:
+    if isinstance(value, str):
+        return value == ""
+    if isinstance(value, (dict, list)):
+        return len(value) == 0
+    return False
+
+
+def _render_empty_value(key: str | None, value: object) -> str:
+    if key == "stop_reason" and value == "":
+        return "continue"
+    return "empty"
 
 
 def _has_batchim(text: str) -> bool:
