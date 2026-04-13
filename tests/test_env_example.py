@@ -33,3 +33,4 @@ def test_env_example_can_be_loaded_after_placeholder_replacement(tmp_path) -> No
     assert settings.models.planner.provider == "openai"
     assert settings.models.planner.openai.api_key == "test-key"
     assert settings.models.actor.provider == "ollama"
+    assert settings.models.fixer.provider == "openai"

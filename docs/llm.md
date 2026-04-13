@@ -2,7 +2,7 @@
 
 ## Role Model
 
-`simula` routes structured calls through five logical roles.
+`simula` routes LLM calls through six logical roles.
 
 | Role | Owns |
 | --- | --- |
@@ -11,6 +11,7 @@
 | `coordinator` | step directive and step resolution |
 | `actor` | one actor action proposal |
 | `observer` | timeline anchor inference and final report sections |
+| `fixer` | JSON-only repair for failed structured responses |
 
 The router maps those roles onto configured provider models. The role boundary is stable even when
 the underlying provider changes.
@@ -63,8 +64,13 @@ projection assembled for the job at hand.
 Active structured responses are required-only. Missing data is represented through explicit empty
 values inside workflow state, not through optional schema fields.
 
-Planning uses native structured output where available. Runtime nodes keep an explicit default path
-for resiliency, but that path is recorded in `errors` instead of being hidden.
+All structured responses use the local JSON parser path. Native provider structured-output APIs are
+not used.
+
+If a structured response fails parsing, `simula` retries the original prompt with a stricter JSON
+suffix. If that still fails, it calls the `fixer` role with only the malformed response text and
+re-validates the repaired JSON locally. Runtime nodes that already define `default_payload` values
+still keep that explicit fallback path, and the fallback remains observable.
 
 ## Retry and Default Strategy
 
@@ -78,6 +84,7 @@ for resiliency, but that path is recorded in `errors` instead of being hidden.
 | step resolution | structured call with explicit default payload |
 | timeline anchor | strict structured call after parser hints |
 | final report bundle | structured call with one validation-driven retry |
+| fixer helper | JSON-only repair with up to 3 retries and 60-second wait |
 
 ## Validation Rules
 

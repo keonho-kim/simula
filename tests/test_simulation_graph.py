@@ -321,6 +321,7 @@ def _settings() -> AppSettings:
             coordinator=model,
             actor=model,
             observer=model,
+            fixer=model,
         ),
         runtime=RuntimeConfig(max_steps=1, enable_checkpointing=False),
         storage=StorageConfig(),

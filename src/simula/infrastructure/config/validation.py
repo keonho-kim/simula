@@ -39,6 +39,7 @@ def validate_settings(settings: AppSettings) -> None:
         ("coordinator", settings.models.coordinator),
         ("actor", settings.models.actor),
         ("observer", settings.models.observer),
+        ("fixer", settings.models.fixer),
     )
     for role_name, config in role_configs:
         if not config.model.strip():

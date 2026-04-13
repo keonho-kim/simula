@@ -42,7 +42,6 @@ async def build_planning_analysis(
         prompt,
         PlanningAnalysis,
         log_context={"scope": "planning-analysis"},
-        enforce_native_structured_output=True,
     )
     return {
         "planning_analysis": analysis.model_dump(mode="json"),
@@ -71,7 +70,6 @@ async def build_execution_plan(
         prompt,
         ExecutionPlanBundle,
         log_context={"scope": "execution-plan"},
-        enforce_native_structured_output=True,
     )
     return {
         "plan": _build_plan_payload(

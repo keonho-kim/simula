@@ -42,9 +42,9 @@ def _build_runtime(llms: object) -> SimpleNamespace:
 def test_build_planning_analysis_returns_required_bundle() -> None:
     class FakeLLM:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del kwargs
             assert role == "planner"
             assert schema is PlanningAnalysis
-            assert kwargs["enforce_native_structured_output"] is True
             assert "brief_summary" in prompt
             return (
                 PlanningAnalysis(
@@ -80,9 +80,9 @@ def test_build_planning_analysis_returns_required_bundle() -> None:
 def test_build_execution_plan_returns_minimum_plan_payload() -> None:
     class FakeLLM:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del kwargs
             assert role == "planner"
             assert schema is ExecutionPlanBundle
-            assert kwargs["enforce_native_structured_output"] is True
             assert "cast_roster" in prompt
             return (
                 ExecutionPlanBundle(

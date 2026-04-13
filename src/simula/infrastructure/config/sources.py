@@ -28,7 +28,7 @@ SUPPORTED_PREFIXES = (
     "VLLM_",
 )
 
-ROLE_NAMES = ("planner", "generator", "coordinator", "actor", "observer")
+ROLE_NAMES = ("planner", "generator", "coordinator", "actor", "observer", "fixer")
 PROVIDER_NAMES = ("openai", "anthropic", "google", "ollama", "vllm", "bedrock")
 _LEGACY_KEY_PREFIXES = SUPPORTED_PREFIXES
 

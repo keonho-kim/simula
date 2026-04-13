@@ -34,6 +34,8 @@ def _clear_known_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in list(__import__("os").environ):
         if key.startswith(prefixes):
             monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("SIM_FIXER_PROVIDER", "ollama")
+    monkeypatch.setenv("SIM_FIXER_MODEL", "qwen3:8b")
 
 
 def test_load_settings_reads_provider_defaults(

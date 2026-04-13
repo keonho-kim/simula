@@ -228,6 +228,8 @@ def render_text_response(
             f"등장 주체 {len(names)}명을 확정했습니다.\n"
             f"인물: {', '.join(names[:6]) if names else '-'}"
         )
+    if role == "fixer" and scope == "json-fix":
+        return f"JSON 복구 결과를 받았습니다.\n출력: {_truncate(stripped, 220)}"
     return _truncate(stripped, 220)
 
 

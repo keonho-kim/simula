@@ -35,6 +35,9 @@ from simula.infrastructure.config.scalar_parsers import env_optional_int
 def build_settings_from_values(values: dict[str, str]) -> AppSettings:
     """원시 문자열 값을 최종 `AppSettings`로 조립한다."""
 
+    if not _has_role_specific_values(values, "FIXER"):
+        raise ValueError("llm.fixer 설정이 필요합니다.")
+
     planner_model = build_model_config(
         values,
         role="PLANNER",
@@ -131,6 +134,12 @@ def build_settings_from_values(values: dict[str, str]) -> AppSettings:
             observer=build_model_config(
                 values,
                 role="OBSERVER",
+                default_provider="openai",
+                default_model="gpt-4.1-mini",
+            ),
+            fixer=build_model_config(
+                values,
+                role="FIXER",
                 default_provider="openai",
                 default_model="gpt-4.1-mini",
             ),

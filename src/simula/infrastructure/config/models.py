@@ -210,6 +210,7 @@ class ModelRouterConfig(BaseModel):
     coordinator: ModelConfig
     actor: ModelConfig
     observer: ModelConfig
+    fixer: ModelConfig
 
 
 class AppSettings(BaseModel):
@@ -224,7 +225,14 @@ class AppSettings(BaseModel):
         """저장 가능한 형태로 민감정보를 마스킹한다."""
 
         data = self.model_dump(mode="json")
-        for role in ("planner", "generator", "coordinator", "actor", "observer"):
+        for role in (
+            "planner",
+            "generator",
+            "coordinator",
+            "actor",
+            "observer",
+            "fixer",
+        ):
             role_cfg = data["models"][role]
             for provider_name in ("openai", "anthropic", "google", "vllm"):
                 provider_cfg = role_cfg.get(provider_name)

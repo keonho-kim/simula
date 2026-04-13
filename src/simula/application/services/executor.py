@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 import asyncio
-import dataclasses
 import logging
 import time
 from dataclasses import dataclass
@@ -32,7 +31,7 @@ from simula.application.workflow.graphs.simulation.states.initial_state import (
     build_simulation_input_state,
 )
 from simula.infrastructure.config.models import AppSettings
-from simula.infrastructure.llm.router import build_model_router
+from simula.infrastructure.llm.service import build_model_router
 from simula.infrastructure.storage.app_store import RunIdConflictError
 from simula.infrastructure.storage.factory import (
     create_app_store,
@@ -122,10 +121,7 @@ class SimulationExecutor:
             )
         )
         if hasattr(self.llms, "logger"):
-            if dataclasses.is_dataclass(self.llms):
-                self.llms = dataclasses.replace(self.llms, logger=llm_logger)
-            else:
-                setattr(self.llms, "logger", llm_logger)
+            setattr(self.llms, "logger", llm_logger)
 
         run_logger.info("run 시작")
 

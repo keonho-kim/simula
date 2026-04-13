@@ -39,24 +39,6 @@ class StructuredCallMeta:
 class StructuredLLM(Protocol):
     """구조화 LLM 라우터 공통 포트다."""
 
-    def invoke_structured(
-        self, role: str, prompt: str, schema: type[SchemaT]
-    ) -> SchemaT:
-        """LLM을 호출하고 schema를 검증한다."""
-
-    def invoke_structured_with_meta(
-        self,
-        role: str,
-        prompt: str,
-        schema: type[SchemaT],
-        *,
-        allow_default_on_failure: bool = False,
-        default_payload: dict[str, object] | None = None,
-        log_context: dict[str, object] | None = None,
-        enforce_native_structured_output: bool = False,
-    ) -> tuple[SchemaT, StructuredCallMeta]:
-        """LLM 구조화 응답과 메타데이터를 함께 반환한다."""
-
     async def ainvoke_structured(
         self, role: str, prompt: str, schema: type[SchemaT]
     ) -> SchemaT:
@@ -71,7 +53,6 @@ class StructuredLLM(Protocol):
         allow_default_on_failure: bool = False,
         default_payload: dict[str, object] | None = None,
         log_context: dict[str, object] | None = None,
-        enforce_native_structured_output: bool = False,
     ) -> tuple[SchemaT, StructuredCallMeta]:
         """비동기 LLM 구조화 응답과 메타데이터를 함께 반환한다."""
 
