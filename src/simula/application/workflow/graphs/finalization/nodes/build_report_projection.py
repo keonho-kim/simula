@@ -139,6 +139,9 @@ def build_report_projection(
             )
         ),
         "current_intent_states": list(state.get("actor_intent_states", [])),
+        "actor_facing_scenario_digest": _dict_value(
+            state.get("actor_facing_scenario_digest", {})
+        ),
         "active_lead_candidates": [
             {
                 "display_name": digest["display_name"],

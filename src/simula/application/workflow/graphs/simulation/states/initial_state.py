@@ -77,6 +77,7 @@ def expand_input_state_to_workflow_state(
                 "last_advanced_round_index": 0,
             },
             "round_time_history": [],
+            "actor_facing_scenario_digest": {},
             "pending_cast_slots": [],
             "cast_slot": {"slot_index": 0, "cast_item": {}},
             "generated_actor_results": [],

@@ -16,12 +16,18 @@ from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
 from simula.domain.activity_feeds import initialize_activity_feeds
-from simula.domain.runtime_policy import build_initial_intent_snapshots
+from simula.domain.runtime_policy import (
+    build_initial_actor_facing_scenario_digest,
+    build_initial_intent_snapshots,
+)
 
 
 def initialize_runtime_state(state: SimulationWorkflowState) -> dict[str, object]:
     """planner/generation 이후 시간 단계 실행 상태를 초기화한다."""
 
+    initial_digest = build_initial_actor_facing_scenario_digest(
+        dict(state.get("plan", {}))
+    )
     return {
         "activity_feeds": initialize_activity_feeds(state["actors"]),
         "activities": [],
@@ -37,6 +43,7 @@ def initialize_runtime_state(state: SimulationWorkflowState) -> dict[str, object
         "actor_intent_states": build_initial_intent_snapshots(list(state["actors"])),
         "intent_history": [],
         "round_time_advance": {},
+        "actor_facing_scenario_digest": initial_digest,
         "pending_actor_proposals": Overwrite(value=[]),
         "actor_proposal_task": {
             "actor": {},
@@ -56,7 +63,7 @@ def initialize_runtime_state(state: SimulationWorkflowState) -> dict[str, object
         "forced_idles": 0,
         "stagnation_rounds": 0,
         "world_state_summary": str(
-            state.get("plan", {}).get("situation", {}).get("world_summary", "")
+            initial_digest.get("world_state_summary", "")
         ),
     }
 

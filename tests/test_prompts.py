@@ -109,6 +109,7 @@ def test_round_prompts_smoke() -> None:
         latest_background_updates_json="[]",
         latest_activities_json="[]",
         actor_intent_states_json="[]",
+        actor_facing_scenario_digest_json="{}",
         simulation_clock_json="{}",
         progression_plan_json="{}",
         world_state_summary="state",
@@ -117,6 +118,7 @@ def test_round_prompts_smoke() -> None:
 
     assert "selected_actor_ids" in directive_prompt
     assert '"confidence":"<float between 0.0 and 1.0>"' in resolution_prompt
+    assert '"thought":"<one Korean sentence explaining why this actor chose the direction now>"' in resolution_prompt
 
 
 def test_final_report_bundle_prompt_smoke() -> None:

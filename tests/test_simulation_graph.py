@@ -222,6 +222,7 @@ class FakeRouter:
                         {
                             "actor_id": "alpha",
                             "current_intent": "Beta의 결정을 늦춘다.",
+                            "thought": "지금 압박해야 다음 선택을 자신에게 유리하게 돌릴 수 있다고 본다.",
                             "target_actor_ids": ["beta"],
                             "supporting_action_type": "speech",
                             "confidence": 0.8,
@@ -230,6 +231,7 @@ class FakeRouter:
                         {
                             "actor_id": "beta",
                             "current_intent": "상황을 더 본다.",
+                            "thought": "즉시 답하면 밀릴 수 있어 시간을 더 벌고 싶다.",
                             "target_actor_ids": [],
                             "supporting_action_type": "initial_state",
                             "confidence": 0.5,
@@ -248,6 +250,15 @@ class FakeRouter:
                         "notable_events": ["Alpha가 재검토를 요구했다."],
                         "atmosphere": "긴장",
                         "momentum": "medium",
+                        "world_state_summary": "직접 압박과 배경 압력이 함께 누적됐다.",
+                    },
+                    actor_facing_scenario_digest={
+                        "round_index": 1,
+                        "relationship_map_summary": "Alpha가 압박을 주도하고 Beta가 방어적으로 반응한다.",
+                        "current_pressures": ["비공개 압박이 다음 선택을 좌우할 수 있다."],
+                        "talking_points": ["다음에는 결정을 미루지 못하게 더 직접적으로 묻는다."],
+                        "avoid_repetition_notes": ["이미 한 요구를 같은 표현으로만 반복하지 않는다."],
+                        "recommended_tone": "짧고 단호한 설득 톤",
                         "world_state_summary": "직접 압박과 배경 압력이 함께 누적됐다.",
                     },
                     world_state_summary="직접 압박과 배경 압력이 함께 누적됐다.",

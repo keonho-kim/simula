@@ -331,6 +331,7 @@ class ActorIntentSnapshot(BaseModel):
 
     actor_id: str
     current_intent: str
+    thought: str
     target_actor_ids: list[str]
     supporting_action_type: str
     confidence: float = Field(ge=0.0, le=1.0)
@@ -338,7 +339,12 @@ class ActorIntentSnapshot(BaseModel):
 
     @model_validator(mode="after")
     def validate_intent_snapshot(self) -> "ActorIntentSnapshot":
-        for field_name in ("actor_id", "current_intent", "supporting_action_type"):
+        for field_name in (
+            "actor_id",
+            "current_intent",
+            "thought",
+            "supporting_action_type",
+        ):
             if not getattr(self, field_name).strip():
                 raise ValueError(f"{field_name} must not be empty.")
         return self
@@ -405,6 +411,38 @@ class BackgroundUpdateBatch(BaseModel):
     background_updates: list[BackgroundUpdate]
 
 
+class ActorFacingScenarioDigest(BaseModel):
+    """Actor-facing round digest for the next decision."""
+
+    round_index: int = Field(ge=0)
+    relationship_map_summary: str
+    current_pressures: list[str]
+    talking_points: list[str]
+    avoid_repetition_notes: list[str]
+    recommended_tone: str
+    world_state_summary: str
+
+    @model_validator(mode="after")
+    def validate_actor_facing_scenario_digest(
+        self,
+    ) -> "ActorFacingScenarioDigest":
+        for field_name in (
+            "relationship_map_summary",
+            "recommended_tone",
+            "world_state_summary",
+        ):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        for field_name in (
+            "current_pressures",
+            "talking_points",
+            "avoid_repetition_notes",
+        ):
+            if not getattr(self, field_name):
+                raise ValueError(f"{field_name} must not be empty.")
+        return self
+
+
 class RoundDirective(BaseModel):
     """Single runtime directive for a round."""
 
@@ -458,6 +496,7 @@ class RoundResolution(BaseModel):
     updated_intent_states: list[ActorIntentSnapshot]
     round_time_advance: RoundTimeAdvanceProposal
     observer_report: ObserverReport
+    actor_facing_scenario_digest: ActorFacingScenarioDigest
     world_state_summary: str
     stop_reason: str
 
@@ -467,6 +506,13 @@ class RoundResolution(BaseModel):
             raise ValueError("adopted_actor_ids must be unique.")
         if not self.world_state_summary.strip():
             raise ValueError("world_state_summary must not be empty.")
+        if (
+            self.actor_facing_scenario_digest.world_state_summary
+            != self.world_state_summary
+        ):
+            raise ValueError(
+                "actor_facing_scenario_digest.world_state_summary must match world_state_summary."
+            )
         return self
 
 

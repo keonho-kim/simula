@@ -21,6 +21,9 @@ Resolve this round in one object: adoption, updated intents, elapsed-time advanc
 - Do not omit any required keys from the output schema.
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
+- Each `updated_intent_states` item must keep `current_intent` concrete and add `thought` that explains why this actor chose that direction now.
+- `actor_facing_scenario_digest` must describe the next round for actors, including relationship map, current pressures, talking points, repetition to avoid, and recommended tone.
+- `actor_facing_scenario_digest.world_state_summary` must match the top-level `world_state_summary`.
 
 # Inputs
 Round index:
@@ -40,6 +43,9 @@ Latest activities JSON:
 
 Actor intent states JSON:
 {actor_intent_states_json}
+
+Previous actor-facing scenario digest JSON:
+{actor_facing_scenario_digest_json}
 
 Simulation clock JSON:
 {simulation_clock_json}

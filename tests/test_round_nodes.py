@@ -139,6 +139,7 @@ def test_resolve_round_persists_round_artifacts() -> None:
                         {
                             "actor_id": "a",
                             "current_intent": "b를 압박한다.",
+                            "thought": "지금 압박해야 다음 선택 주도권을 잡을 수 있다고 본다.",
                             "target_actor_ids": ["b"],
                             "supporting_action_type": "speech",
                             "confidence": 0.8,
@@ -147,6 +148,7 @@ def test_resolve_round_persists_round_artifacts() -> None:
                         {
                             "actor_id": "b",
                             "current_intent": "상황을 더 본다.",
+                            "thought": "바로 답하면 밀릴 수 있어 한 번 더 상황을 읽으려 한다.",
                             "target_actor_ids": [],
                             "supporting_action_type": "initial_state",
                             "confidence": 0.5,
@@ -165,6 +167,15 @@ def test_resolve_round_persists_round_artifacts() -> None:
                         "notable_events": ["a가 압박 action을 보냈다."],
                         "atmosphere": "긴장",
                         "momentum": "medium",
+                        "world_state_summary": "직접 압박 축은 좁게 유지되지만 반응 압력은 커졌다.",
+                    },
+                    actor_facing_scenario_digest={
+                        "round_index": 2,
+                        "relationship_map_summary": "a의 직접 압박과 b의 신중한 후퇴가 대비된다.",
+                        "current_pressures": ["a는 지금 주도권을 굳히고 싶다."],
+                        "talking_points": ["다음 대화에서는 답을 미루지 못하게 더 분명히 압박한다."],
+                        "avoid_repetition_notes": ["막연한 호감 표현만 반복하지 않는다."],
+                        "recommended_tone": "짧고 분명한 압박 톤",
                         "world_state_summary": "직접 압박 축은 좁게 유지되지만 반응 압력은 커졌다.",
                     },
                     world_state_summary="직접 압박 축은 좁게 유지되지만 반응 압력은 커졌다.",
@@ -205,6 +216,7 @@ def test_resolve_round_persists_round_artifacts() -> None:
         "latest_background_updates": [],
         "selected_actor_ids": ["a"],
         "actor_intent_states": [],
+        "actor_facing_scenario_digest": {},
         "world_state_summary": "기존 상태",
         "plan": {
             "progression_plan": {
@@ -284,6 +296,7 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
                         {
                             "actor_id": "a",
                             "current_intent": "b에게 비공개 고백을 시도한다.",
+                            "thought": "지금 감정을 밀어야 반응을 확인할 수 있다고 본다.",
                             "target_actor_ids": ["b"],
                             "supporting_action_type": "private_confide",
                             "confidence": 0.8,
@@ -302,6 +315,15 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
                         "notable_events": ["invalid proposal dropped"],
                         "atmosphere": "긴장",
                         "momentum": "medium",
+                        "world_state_summary": "직접 행동은 보류됐다.",
+                    },
+                    actor_facing_scenario_digest={
+                        "round_index": 2,
+                        "relationship_map_summary": "고백 시도는 있었지만 직접 행동은 보류됐다.",
+                        "current_pressures": ["다음 선택 전에 감정 확인 압력이 남아 있다."],
+                        "talking_points": ["다음에는 실제 상대를 특정한 말로 접근한다."],
+                        "avoid_repetition_notes": ["대상 없는 고백 시도는 반복하지 않는다."],
+                        "recommended_tone": "조심스럽지만 분명한 확인 톤",
                         "world_state_summary": "직접 행동은 보류됐다.",
                     },
                     world_state_summary="직접 행동은 보류됐다.",
@@ -335,6 +357,7 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
         "latest_background_updates": [],
         "selected_actor_ids": ["a"],
         "actor_intent_states": [],
+        "actor_facing_scenario_digest": {},
         "world_state_summary": "기존 상태",
         "plan": {
             "progression_plan": {

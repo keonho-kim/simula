@@ -204,6 +204,7 @@ def test_build_relevant_intent_states_filters_subset() -> None:
         {
             "actor_id": actor_id,
             "current_intent": f"{actor_id} intent",
+            "thought": f"{actor_id} thought",
             "target_actor_ids": [],
             "supporting_action_type": "speech",
             "confidence": 0.5,
@@ -218,3 +219,4 @@ def test_build_relevant_intent_states_filters_subset() -> None:
     )
 
     assert [item["actor_id"] for item in selected] == ["b", "c"]
+    assert selected[0]["thought"] == "b thought"

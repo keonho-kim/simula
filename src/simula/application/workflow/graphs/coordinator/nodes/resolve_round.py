@@ -102,6 +102,11 @@ async def resolve_round(
             ensure_ascii=False,
             separators=(",", ":"),
         ),
+        actor_facing_scenario_digest_json=json.dumps(
+            state.get("actor_facing_scenario_digest", {}),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
         simulation_clock_json=json.dumps(
             state["simulation_clock"],
             ensure_ascii=False,
@@ -211,6 +216,9 @@ async def resolve_round(
         "round_time_history": list(state["round_time_history"])
         + [clock["round_time_advance"]],
         "observer_reports": observer_reports,
+        "actor_facing_scenario_digest": resolution.actor_facing_scenario_digest.model_dump(
+            mode="json"
+        ),
         "world_state_summary": resolution.world_state_summary,
         "stagnation_rounds": stagnation_rounds,
         "stop_requested": stop_requested,
@@ -296,6 +304,7 @@ def _build_default_round_resolution_payload(
                 "actor_id": str(actor.get("actor_id", "")),
                 "current_intent": str(actor.get("private_goal", "")).strip()
                 or "현재 상황을 더 관찰한다.",
+                "thought": f"{str(actor.get('display_name', actor.get('actor_id', 'actor')))}는 아직 상대 반응을 더 확인해야 한다고 본다.",
                 "target_actor_ids": [],
                 "supporting_action_type": "initial_state",
                 "confidence": 0.5,
@@ -309,6 +318,9 @@ def _build_default_round_resolution_payload(
         if str(item.get("actor_id", "")) in set(adopted_actor_ids)
         and isinstance(item.get("proposal", {}), dict)
     ]
+    world_state_summary = str(
+        state["world_state_summary"] or "현재 압력은 유지되고 있다."
+    )
     return {
         "adopted_actor_ids": adopted_actor_ids[:2],
         "updated_intent_states": current_intent_states,
@@ -324,14 +336,54 @@ def _build_default_round_resolution_payload(
             or ["큰 변화 없이 현재 국면이 유지됐다."],
             "atmosphere": "긴장",
             "momentum": "medium",
-            "world_state_summary": str(
-                state["world_state_summary"] or "현재 압력은 유지되고 있다."
-            ),
+            "world_state_summary": world_state_summary,
         },
-        "world_state_summary": str(
-            state["world_state_summary"] or "현재 압력은 유지되고 있다."
+        "actor_facing_scenario_digest": _default_actor_facing_scenario_digest(
+            state=state,
+            world_state_summary=world_state_summary,
+            latest_activities=latest_activities,
         ),
+        "world_state_summary": world_state_summary,
         "stop_reason": "",
+    }
+
+
+def _default_actor_facing_scenario_digest(
+    *,
+    state: SimulationWorkflowState,
+    world_state_summary: str,
+    latest_activities: list[dict[str, object]],
+) -> dict[str, object]:
+    existing = cast(dict[str, object], state.get("actor_facing_scenario_digest", {}))
+    talking_points = [
+        str(item.get("action_summary", "")).strip()
+        for item in latest_activities[:2]
+        if str(item.get("action_summary", "")).strip()
+    ] or _string_list(existing.get("talking_points", []))[:2]
+    if not talking_points:
+        talking_points = ["이번 단계에서 관계를 바꿀 한 문장을 더 분명하게 던진다."]
+    current_pressures = _string_list(existing.get("current_pressures", []))[:3]
+    if not current_pressures:
+        current_pressures = ["직전 반응 이후 다음 선택 압력이 유지되고 있다."]
+    avoid_repetition_notes = _string_list(
+        existing.get("avoid_repetition_notes", [])
+    )[:2]
+    if not avoid_repetition_notes:
+        avoid_repetition_notes = ["이미 나온 감탄사나 모호한 호감 표현만 반복하지 않는다."]
+    return {
+        "round_index": int(state["round_index"]),
+        "relationship_map_summary": str(
+            existing.get("relationship_map_summary", world_state_summary)
+        ).strip()
+        or world_state_summary,
+        "current_pressures": current_pressures,
+        "talking_points": talking_points,
+        "avoid_repetition_notes": avoid_repetition_notes,
+        "recommended_tone": str(
+            existing.get("recommended_tone", "상대를 읽되 의도를 분명하게 말하는 톤")
+        ).strip()
+        or "상대를 읽되 의도를 분명하게 말하는 톤",
+        "world_state_summary": world_state_summary,
     }
 
 
@@ -406,3 +458,9 @@ def _minutes_label(total_elapsed_minutes: int) -> str:
     if minutes == 0:
         return f"{hours}시간"
     return f"{hours}시간 {minutes}분"
+
+
+def _string_list(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]

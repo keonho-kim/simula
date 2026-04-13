@@ -356,6 +356,7 @@ def _build_runtime_guidance(
         ),
         previous_observer_momentum=previous_report.get("momentum", ""),
         previous_observer_atmosphere=previous_report.get("atmosphere", ""),
+        actor_facing_scenario_digest=state.get("actor_facing_scenario_digest", {}),
         channel_guidance=cast(dict[str, object], situation.get("channel_guidance", {})),
         current_constraints=_object_list(situation.get("current_constraints", [])),
         current_intent_snapshot=current_intent_snapshot,
@@ -455,17 +456,37 @@ def _build_default_action_proposal(
     current_intent = str(
         intent_snapshot.get("current_intent", "현재 상황을 조금 더 파악한다.")
     )
+    current_thought = str(
+        intent_snapshot.get(
+            "thought",
+            "아직은 관계 신호와 상대 반응을 더 읽어야 한다고 본다.",
+        )
+    )
     intent_target_actor_ids = _string_list(intent_snapshot.get("target_actor_ids", []))
     if visibility == "public":
         target_actor_ids = []
     if not intent_target_actor_ids:
         intent_target_actor_ids = list(target_actor_ids)
+    digest = cast(
+        dict[str, object],
+        runtime_guidance.get("actor_facing_scenario_digest", {}),
+    )
+    talking_points = _string_list(digest.get("talking_points", []))
+    avoid_notes = _string_list(digest.get("avoid_repetition_notes", []))
+    action_summary = "이번 단계에는 즉시 큰 움직임보다 상황 파악에 집중한다."
+    action_detail = (
+        "지금 단계에서는 급하게 새로운 조치를 밀어붙이기보다, 현재 action 흐름과 상대 반응을 더 살핀다."
+    )
+    if talking_points:
+        action_summary = f"이번 단계에는 {talking_points[0]} 방향으로 반응을 정리한다."
+    if avoid_notes:
+        action_detail += f" 같은 말 반복은 피하고 {avoid_notes[0]}."
     return {
         "action_type": str(selected_action.get("action_type", "observe")),
         "intent": current_intent,
         "intent_target_actor_ids": intent_target_actor_ids,
-        "action_summary": "이번 단계에는 즉시 큰 움직임보다 상황 파악에 집중한다.",
-        "action_detail": "지금 단계에서는 급하게 새로운 조치를 밀어붙이기보다, 현재 action 흐름과 상대 반응을 더 살핀다.",
+        "action_summary": action_summary,
+        "action_detail": f"{action_detail} 판단 이유는 {current_thought}",
         "utterance": "",
         "visibility": visibility,
         "target_actor_ids": target_actor_ids,

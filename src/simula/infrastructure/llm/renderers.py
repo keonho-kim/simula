@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from simula.domain.contracts import (
     ActionCatalog,
+    ActorFacingScenarioDigest,
     ActorActionProposal,
     ActorCard,
     ActorIntentStateBatch,
@@ -177,6 +178,14 @@ def render_structured_response(
             f"변경된 intent: {changed}명"
         )
 
+    if isinstance(parsed, ActorFacingScenarioDigest):
+        return (
+            "다음 round용 actor-facing digest를 정리했습니다.\n"
+            f"관계 판도: {_truncate(parsed.relationship_map_summary, 120)}\n"
+            f"현재 압력: {_list_preview(parsed.current_pressures, limit=2)}\n"
+            f"말 포인트: {_list_preview(parsed.talking_points, limit=2)}"
+        )
+
     if isinstance(parsed, ObserverReport):
         events = ", ".join(parsed.notable_events[:3]) or "-"
         return (
@@ -189,10 +198,13 @@ def render_structured_response(
         )
 
     if isinstance(parsed, RoundResolution):
+        digest = parsed.actor_facing_scenario_digest
         return (
             "round 해소 결과를 정리했습니다.\n"
             f"채택 actor: {len(parsed.adopted_actor_ids)}명\n"
-            f"세계 상태: {_truncate(parsed.world_state_summary, 140)}"
+            f"세계 상태: {_truncate(parsed.world_state_summary, 140)}\n"
+            f"관계 판도: {_truncate(digest.relationship_map_summary, 120)}\n"
+            f"말 포인트: {_list_preview(digest.talking_points, limit=2)}"
         )
 
     if isinstance(parsed, FinalReportSections):

@@ -68,6 +68,7 @@ class SimulationWorkflowState(TypedDict):
     round_time_advance: dict[str, Any]
     simulation_clock: dict[str, Any]
     round_time_history: list[dict[str, Any]]
+    actor_facing_scenario_digest: dict[str, Any]
     pending_cast_slots: list[CastSlotSpec]
     cast_slot: CastSlotSpec
     generated_actor_results: Annotated[list[GeneratedActorResult], extend_list]

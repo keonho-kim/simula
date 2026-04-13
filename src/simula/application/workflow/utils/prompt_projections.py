@@ -167,6 +167,7 @@ def build_actor_runtime_guidance_view(
     previous_observer_summary: object,
     previous_observer_momentum: object,
     previous_observer_atmosphere: object,
+    actor_facing_scenario_digest: object,
     channel_guidance: object,
     current_constraints: object,
     current_intent_snapshot: object,
@@ -189,6 +190,9 @@ def build_actor_runtime_guidance_view(
         "previous_observer_atmosphere": truncate_text(
             previous_observer_atmosphere,
             40,
+        ),
+        "actor_facing_scenario_digest": _compact_actor_facing_scenario_digest(
+            actor_facing_scenario_digest
         ),
         "channel_guidance": _compact_channel_guidance(channel_guidance),
         "current_constraints": _truncate_string_list(
@@ -668,10 +672,43 @@ def _compact_intent_snapshot(snapshot: object) -> dict[str, object]:
     return {
         "actor_id": str(dumped.get("actor_id", "")),
         "current_intent": truncate_text(dumped.get("current_intent", ""), 140),
+        "thought": truncate_text(dumped.get("thought", ""), 140),
         "target_actor_ids": _string_list(dumped.get("target_actor_ids", [])),
         "supporting_action_type": str(dumped.get("supporting_action_type", "")),
         "confidence": dumped.get("confidence"),
         "changed_from_previous": bool(dumped.get("changed_from_previous", False)),
+    }
+
+
+def _compact_actor_facing_scenario_digest(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    dumped = cast(dict[str, object], value)
+    return {
+        "relationship_map_summary": truncate_text(
+            dumped.get("relationship_map_summary", ""),
+            180,
+        ),
+        "current_pressures": _truncate_string_list(
+            dumped.get("current_pressures", []),
+            limit=3,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
+        "talking_points": _truncate_string_list(
+            dumped.get("talking_points", []),
+            limit=3,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
+        "avoid_repetition_notes": _truncate_string_list(
+            dumped.get("avoid_repetition_notes", []),
+            limit=2,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
+        "recommended_tone": truncate_text(dumped.get("recommended_tone", ""), 80),
+        "world_state_summary": truncate_text(
+            dumped.get("world_state_summary", ""),
+            WORLD_STATE_SUMMARY_LIMIT,
+        ),
     }
 
 

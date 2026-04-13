@@ -62,6 +62,7 @@ _STEP_RESOLUTION_EXAMPLE: dict[str, Any] = {
         {
             "actor_id": "<actor_id>",
             "current_intent": "<one Korean sentence describing the current intent>",
+            "thought": "<one Korean sentence explaining why this actor chose the direction now>",
             "target_actor_ids": ["<actor_id string or an empty list>"],
             "supporting_action_type": "<action_type string>",
             "confidence": "<float between 0.0 and 1.0>",
@@ -81,6 +82,15 @@ _STEP_RESOLUTION_EXAMPLE: dict[str, Any] = {
         "atmosphere": "<short Korean atmosphere label>",
         "momentum": "<choose exactly one of high, medium, low>",
         "world_state_summary": "<one Korean sentence describing the updated world state>",
+    },
+    "actor_facing_scenario_digest": {
+        "round_index": "<copy the current round index as an integer>",
+        "relationship_map_summary": "<one Korean sentence describing the current relationship map>",
+        "current_pressures": ["<one Korean pressure shaping the next action>"],
+        "talking_points": ["<one Korean point the next actor should push verbally>"],
+        "avoid_repetition_notes": ["<one Korean note about what repetitive move to avoid>"],
+        "recommended_tone": "<one short Korean tone guide>",
+        "world_state_summary": "<same summary string as the top-level world_state_summary>",
     },
     "world_state_summary": "<one Korean sentence summarizing the global state after resolution>",
     "stop_reason": "<empty string to continue, or a short Korean stop reason>",

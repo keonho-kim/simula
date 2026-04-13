@@ -40,6 +40,9 @@ _PROMPT = textwrap.dedent(
     - If there is no spoken line, set `utterance` to an empty string.
     - If there is no stable thread identifier, set `thread_id` to an empty string.
     - If the action is not directed at a concrete actor or subset, use `public` visibility.
+    - Use `runtime_guidance.current_intent_snapshot.current_intent` for what to do and `runtime_guidance.current_intent_snapshot.thought` for why this actor is choosing it now.
+    - Use `runtime_guidance.actor_facing_scenario_digest.talking_points` to decide what should be pushed verbally.
+    - Use `runtime_guidance.actor_facing_scenario_digest.avoid_repetition_notes` to avoid flat repetition or generic filler.
 
     # Input
     - round_index: {round_index}
