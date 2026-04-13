@@ -14,8 +14,6 @@
 
 from __future__ import annotations
 
-import json
-
 from pydantic import BaseModel
 
 from simula.domain.contracts import (
@@ -347,29 +345,57 @@ def _render_mapping(mapping: dict[str, object]) -> str:
 
 
 def _render_field_lines(key: str, value: object) -> list[str]:
-    if isinstance(value, str):
-        if "\n" not in value:
-            return [f"{key}: {value}"]
-        return [f"{key}:", _indent_block(value)]
-
-    if isinstance(value, (dict, list)):
-        return [
-            f"{key}:",
-            _indent_block(json.dumps(value, ensure_ascii=False, indent=2)),
-        ]
-
-    if isinstance(value, bool):
-        return [f"{key}: {'true' if value else 'false'}"]
-
-    if value is None:
-        return [f"{key}: null"]
-
-    return [f"{key}: {value}"]
+    return [f"{key}: {_format_scalar(value)}"] if _is_scalar(value) else [
+        f"{key}:",
+        *_render_nested(value, indent=4),
+    ]
 
 
 def _indent_block(text: str) -> str:
     lines = text.splitlines() or [text]
     return "\n".join(f"  {line}" for line in lines)
+
+
+def _render_nested(value: object, *, indent: int) -> list[str]:
+    prefix = " " * indent
+
+    if isinstance(value, dict):
+        lines: list[str] = []
+        for key, item in value.items():
+            if _is_scalar(item):
+                lines.append(f"{prefix}{key}: {_format_scalar(item)}")
+                continue
+            lines.append(f"{prefix}{key}:")
+            lines.extend(_render_nested(item, indent=indent + 4))
+        if lines:
+            return lines
+        return [f"{prefix}{{}}"]
+
+    if isinstance(value, list):
+        lines: list[str] = []
+        for item in value:
+            if _is_scalar(item):
+                lines.append(f"{prefix}- {_format_scalar(item)}")
+                continue
+            lines.append(f"{prefix}-")
+            lines.extend(_render_nested(item, indent=indent + 4))
+        if lines:
+            return lines
+        return [f"{prefix}[]"]
+
+    return [f"{prefix}{_format_scalar(value)}"]
+
+
+def _is_scalar(value: object) -> bool:
+    return not isinstance(value, (dict, list))
+
+
+def _format_scalar(value: object) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if value is None:
+        return "null"
+    return str(value)
 
 
 def _has_batchim(text: str) -> bool:

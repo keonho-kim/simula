@@ -50,3 +50,40 @@ def test_render_text_response_keeps_full_content_without_truncation() -> None:
     assert "fixer | JSON 복구 결과" in rendered
     assert content in rendered
     assert "..." not in rendered
+
+
+def test_render_structured_response_formats_nested_values_as_indented_blocks() -> None:
+    rendered = render_text_response(
+        role="planner",
+        content="placeholder",
+        log_context=None,
+    )
+    del rendered
+
+    actor = ActorCard(
+        cast_id="cast-alpha",
+        display_name="Alpha",
+        role="선도자",
+        group_name="A",
+        public_profile="차분하다.",
+        private_goal="관계를 확인한다.",
+        speaking_style="짧게 말한다.",
+        avatar_seed="alpha-seed",
+        baseline_attention_tier="lead",
+        story_function="주요 축",
+        preferred_action_types=["speech", "private_confide"],
+        action_bias_notes=["직접 묻는다.", "반응을 본다."],
+    )
+
+    rendered = render_structured_response(
+        role="generator",
+        parsed=actor,
+        content="",
+        log_context=None,
+    )
+
+    assert "preferred_action_types:" in rendered
+    assert "    - speech" in rendered
+    assert "    - private_confide" in rendered
+    assert "action_bias_notes:" in rendered
+    assert "    - 직접 묻는다." in rendered
