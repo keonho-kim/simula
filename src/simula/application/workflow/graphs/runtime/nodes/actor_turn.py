@@ -21,6 +21,10 @@ from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.runtime.output_schema.bundles import (
     build_actor_action_proposal_prompt_bundle,
 )
+from simula.application.workflow.graphs.runtime.proposal_contract import (
+    build_actor_proposal_repair_context,
+    validate_actor_action_proposal_semantics,
+)
 from simula.application.workflow.graphs.runtime.prompts.actor_turn_prompt import (
     PROMPT as ACTOR_PROPOSAL_PROMPT,
 )
@@ -145,6 +149,26 @@ async def generate_actor_proposal(
             actor=actor,
             visible_actors=list(actor_task.get("visible_actors", [])),
             runtime_guidance=runtime_guidance,
+        ),
+        semantic_validator=_build_actor_proposal_semantic_validator(
+            actor=actor,
+            visible_actors=list(actor_task.get("visible_actors", [])),
+            runtime_guidance=runtime_guidance,
+            max_recipients_per_message=runtime.context.settings.runtime.max_recipients_per_message,
+        ),
+        repair_context=build_actor_proposal_repair_context(
+            actor_id=actor_id,
+            available_actions=[
+                cast(dict[str, object], item)
+                for item in _object_list(runtime_guidance.get("available_actions", []))
+                if isinstance(item, dict)
+            ],
+            valid_target_actor_ids=[
+                str(item.get("actor_id", ""))
+                for item in list(actor_task.get("visible_actors", []))
+                if str(item.get("actor_id", "")).strip()
+            ],
+            max_target_count=runtime.context.settings.runtime.max_recipients_per_message,
         ),
         log_context=_actor_log_context(state, actor),
     )
@@ -447,6 +471,37 @@ def _build_default_action_proposal(
         "target_actor_ids": target_actor_ids,
         "thread_id": "",
     }
+
+
+def _build_actor_proposal_semantic_validator(
+    *,
+    actor: dict[str, Any],
+    visible_actors: list[dict[str, object]],
+    runtime_guidance: dict[str, object],
+    max_recipients_per_message: int,
+):
+    actor_id = str(actor.get("actor_id", ""))
+    available_actions = [
+        cast(dict[str, object], item)
+        for item in _object_list(runtime_guidance.get("available_actions", []))
+        if isinstance(item, dict)
+    ]
+    valid_target_actor_ids = [
+        str(item.get("actor_id", ""))
+        for item in visible_actors
+        if str(item.get("actor_id", "")).strip()
+    ]
+
+    def validator(proposal: ActorActionProposal) -> list[str]:
+        return validate_actor_action_proposal_semantics(
+            proposal=proposal,
+            actor_id=actor_id,
+            available_actions=available_actions,
+            valid_target_actor_ids=valid_target_actor_ids,
+            max_target_count=max_recipients_per_message,
+        )
+
+    return validator
 
 
 def _select_default_action(

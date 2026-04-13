@@ -15,7 +15,8 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from types import UnionType
+from typing import Any, Union, get_args, get_origin
 
 from json_repair import repair_json
 from langchain_core.exceptions import OutputParserException
@@ -49,7 +50,11 @@ class JsonRepairOutputParser(_PydanticParserBase):
                 return_objects=True,
                 skip_json_loads=False,
             )
-            return self.target_schema.model_validate(repaired)
+            normalized = _normalize_value_for_annotation(
+                repaired,
+                self.target_schema,
+            )
+            return self.target_schema.model_validate(normalized)
         except (ValidationError, ValueError, TypeError) as exc:
             raise OutputParserException(f"JSON 파싱 실패: {exc}") from exc
 
@@ -68,3 +73,76 @@ def _extract_json_like_text(text: str) -> str:
     if fenced:
         return fenced.group(1)
     return text.strip()
+
+
+def _normalize_value_for_annotation(value: Any, annotation: Any) -> Any:
+    normalized_annotation = _unwrap_optional_annotation(annotation)
+    nested_model = _extract_base_model(normalized_annotation)
+    if nested_model is not None:
+        return _normalize_model_payload(value, nested_model)
+
+    origin = get_origin(normalized_annotation)
+    args = get_args(normalized_annotation)
+
+    if origin is list and args:
+        item_annotation = _unwrap_optional_annotation(args[0])
+        if isinstance(value, str):
+            return [_normalize_value_for_annotation(value, item_annotation)]
+        if not isinstance(value, list):
+            return value
+        return [
+            _normalize_value_for_annotation(item, item_annotation) for item in value
+        ]
+
+    if origin is dict and len(args) == 2 and isinstance(value, dict):
+        key_annotation = _unwrap_optional_annotation(args[0])
+        value_annotation = _unwrap_optional_annotation(args[1])
+        return {
+            _normalize_value_for_annotation(key, key_annotation): (
+                _normalize_value_for_annotation(item, value_annotation)
+            )
+            for key, item in value.items()
+        }
+
+    if normalized_annotation is str and isinstance(value, list):
+        compact_items = [str(item).strip() for item in value if str(item).strip()]
+        if len(compact_items) == 1:
+            return compact_items[0]
+    return value
+
+
+def _normalize_model_payload(
+    value: Any,
+    schema: type[BaseModel],
+) -> Any:
+    if not isinstance(value, dict):
+        return value
+
+    normalized = dict(value)
+    for field_name, field in schema.model_fields.items():
+        if field_name not in normalized:
+            continue
+        normalized[field_name] = _normalize_value_for_annotation(
+            normalized[field_name],
+            field.annotation,
+        )
+    return normalized
+
+
+def _unwrap_optional_annotation(annotation: Any) -> Any:
+    origin = get_origin(annotation)
+    if origin is None:
+        return annotation
+    if origin not in (UnionType, Union):
+        return annotation
+
+    args = tuple(arg for arg in get_args(annotation) if arg is not type(None))
+    if len(args) == 1:
+        return args[0]
+    return annotation
+
+
+def _extract_base_model(annotation: Any) -> type[BaseModel] | None:
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return annotation
+    return None

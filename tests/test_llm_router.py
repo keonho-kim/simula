@@ -200,9 +200,9 @@ async def test_service_warns_when_default_payload_is_used(caplog, monkeypatch) -
     model = FakeModel("not json")
     fixer_model = FakeModel(["still bad", "still bad", "still bad", "still bad"])
     service = _build_service(model, fixer_model=fixer_model)
-    sleep_calls: list[int] = []
+    sleep_calls: list[float] = []
 
-    async def fake_sleep(seconds: int) -> None:
+    async def fake_sleep(seconds: float) -> None:
         sleep_calls.append(seconds)
 
     monkeypatch.setattr(asyncio, "sleep", fake_sleep)
@@ -218,7 +218,7 @@ async def test_service_warns_when_default_payload_is_used(caplog, monkeypatch) -
     assert parsed.start == "기본 시작"
     assert meta.forced_default is True
     assert "기본값으로 강등합니다" in caplog.text
-    assert sleep_calls == [60, 60, 60]
+    assert sleep_calls == [0.25, 0.5, 0.75]
 
 
 @pytest.mark.anyio
@@ -243,9 +243,9 @@ async def test_service_retries_fixer_until_it_returns_valid_json(monkeypatch) ->
     model = FakeModel(["not json", "still not json"])
     fixer_model = FakeModel(["broken", "broken again", _time_scope_json()])
     service = _build_service(model, fixer_model=fixer_model)
-    sleep_calls: list[int] = []
+    sleep_calls: list[float] = []
 
-    async def fake_sleep(seconds: int) -> None:
+    async def fake_sleep(seconds: float) -> None:
         sleep_calls.append(seconds)
 
     monkeypatch.setattr(asyncio, "sleep", fake_sleep)
@@ -257,7 +257,31 @@ async def test_service_retries_fixer_until_it_returns_valid_json(monkeypatch) ->
     )
     assert result.end == "핵심 선택 직전"
     assert meta.parse_failure_count == 4
-    assert sleep_calls == [60, 60]
+    assert sleep_calls == [0.25, 0.5]
+
+
+@pytest.mark.anyio
+async def test_service_uses_fixer_after_semantic_validation_failure() -> None:
+    model = FakeModel(
+        '{"start":"같은 시점","end":"같은 시점"}'
+    )
+    fixer_model = FakeModel(_time_scope_json())
+    service = _build_service(model, fixer_model=fixer_model)
+
+    result, meta = await service.ainvoke_structured_with_meta(
+        "planner",
+        "prompt",
+        ScenarioTimeScope,
+        semantic_validator=lambda parsed: (
+            ["start and end must differ."] if parsed.start == parsed.end else []
+        ),
+        repair_context={"rule": "start and end must differ"},
+    )
+
+    assert result.start == "초기 대면 직후"
+    assert meta.forced_default is False
+    assert meta.parse_failure_count == 2
+    assert fixer_model.astream_called is True
 
 
 def test_fixer_prompt_includes_compact_schema_summary() -> None:

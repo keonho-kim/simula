@@ -15,11 +15,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol, TypeVar
+from typing import Callable, Protocol, TypeVar
 
 from pydantic import BaseModel
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
+type SemanticValidator[SchemaT: BaseModel] = Callable[[SchemaT], list[str]]
 
 
 @dataclass(slots=True)
@@ -53,6 +54,8 @@ class StructuredLLM(Protocol):
         allow_default_on_failure: bool = False,
         default_payload: dict[str, object] | None = None,
         log_context: dict[str, object] | None = None,
+        semantic_validator: SemanticValidator[SchemaT] | None = None,
+        repair_context: dict[str, object] | None = None,
     ) -> tuple[SchemaT, StructuredCallMeta]:
         """비동기 LLM 구조화 응답과 메타데이터를 함께 반환한다."""
 

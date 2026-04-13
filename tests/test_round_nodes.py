@@ -271,3 +271,133 @@ def test_resolve_round_persists_round_artifacts() -> None:
 
     assert saved["run_id"] == "run-1"
     assert result["observer_reports"][0]["round_index"] == 2
+
+
+def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
+    class FakeRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            return (
+                RoundResolution(
+                    adopted_actor_ids=["a"],
+                    updated_intent_states=[
+                        {
+                            "actor_id": "a",
+                            "current_intent": "b에게 비공개 고백을 시도한다.",
+                            "target_actor_ids": ["b"],
+                            "supporting_action_type": "private_confide",
+                            "confidence": 0.8,
+                            "changed_from_previous": True,
+                        }
+                    ],
+                    round_time_advance={
+                        "elapsed_unit": "minute",
+                        "elapsed_amount": 30,
+                        "selection_reason": "짧은 압박과 즉시 반응이 중심이다.",
+                        "signals": ["직접 압박"],
+                    },
+                    observer_report={
+                        "round_index": 2,
+                        "summary": "잘못된 제안은 채택 직전에 제외됐다.",
+                        "notable_events": ["invalid proposal dropped"],
+                        "atmosphere": "긴장",
+                        "momentum": "medium",
+                        "world_state_summary": "직접 행동은 보류됐다.",
+                    },
+                    world_state_summary="직접 행동은 보류됐다.",
+                    stop_reason="",
+                ),
+                SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+            )
+
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(
+            llms=FakeRouter(),
+            logger=logging.getLogger("simula.test.round"),
+            settings=SimpleNamespace(
+                runtime=SimpleNamespace(max_recipients_per_message=2)
+            ),
+            store=SimpleNamespace(save_round_artifacts=lambda *args, **kwargs: None),
+        )
+    )
+    state = {
+        "run_id": "run-1",
+        "round_index": 2,
+        "max_rounds": 4,
+        "actors": [
+            {"actor_id": "a", "private_goal": "고백한다."},
+            {"actor_id": "b", "private_goal": "관망한다."},
+        ],
+        "activity_feeds": initialize_activity_feeds([{"actor_id": "a"}, {"actor_id": "b"}]),
+        "activities": [],
+        "latest_round_activities": [],
+        "round_focus_plan": {"selected_actor_ids": ["a"]},
+        "latest_background_updates": [],
+        "selected_actor_ids": ["a"],
+        "actor_intent_states": [],
+        "world_state_summary": "기존 상태",
+        "plan": {
+            "progression_plan": {
+                "max_rounds": 4,
+                "allowed_elapsed_units": ["minute", "hour"],
+                "default_elapsed_unit": "hour",
+                "pacing_guidance": ["짧게 본다."],
+                "selection_reason": "짧은 상호작용 중심",
+            },
+            "action_catalog": {
+                "actions": [
+                    {
+                        "action_type": "private_confide",
+                        "label": "비공개 고백",
+                        "description": "상대에게 비공개로 감정을 털어놓는다.",
+                        "supported_visibility": ["private"],
+                        "requires_target": True,
+                        "supports_utterance": True,
+                    }
+                ],
+                "selection_guidance": [],
+            },
+        },
+        "pending_actor_proposals": [
+            {
+                "actor_id": "a",
+                "unread_activity_ids": [],
+                "proposal": {
+                    "action_type": "private_confide",
+                    "intent": "b에게 감정을 털어놓는다.",
+                    "intent_target_actor_ids": ["b"],
+                    "action_summary": "a가 비공개 고백을 시도한다.",
+                    "action_detail": "하지만 대상 actor를 비워 둔 잘못된 제안이다.",
+                    "utterance": "사실 마음이 갑니다.",
+                    "visibility": "private",
+                    "target_actor_ids": [],
+                    "thread_id": "",
+                },
+                "forced_idle": False,
+                "parse_failure_count": 0,
+                "latency_seconds": 0.01,
+            }
+        ],
+        "simulation_clock": {
+            "total_elapsed_minutes": 0,
+            "total_elapsed_label": "0분",
+            "last_elapsed_minutes": 0,
+            "last_elapsed_label": "0분",
+            "last_advanced_round_index": 0,
+        },
+        "observer_reports": [],
+        "round_time_history": [],
+        "intent_history": [],
+        "forced_idles": 0,
+        "parse_failures": 0,
+        "stagnation_rounds": 0,
+        "stop_requested": False,
+        "stop_reason": "",
+        "current_round_started_at": 0.0,
+        "errors": [],
+    }
+
+    result = asyncio.run(resolve_round(state, runtime))
+
+    assert result["latest_round_activities"] == []
+    assert any("dropped" in error for error in result["errors"])

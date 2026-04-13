@@ -21,7 +21,7 @@ from typing import Any, TypeVar, cast
 from langchain_core.exceptions import OutputParserException
 from pydantic import BaseModel, ValidationError
 
-from simula.application.ports.llm import StructuredCallMeta
+from simula.application.ports.llm import SemanticValidator, StructuredCallMeta
 from simula.infrastructure.config.models import AppSettings
 from simula.infrastructure.llm.fixer import repair_structured_json
 from simula.infrastructure.llm.output_parsers import build_output_parser
@@ -67,6 +67,8 @@ class AsyncStructuredLLMService:
         allow_default_on_failure: bool = False,
         default_payload: dict[str, object] | None = None,
         log_context: dict[str, object] | None = None,
+        semantic_validator: SemanticValidator[SchemaT] | None = None,
+        repair_context: dict[str, object] | None = None,
     ) -> tuple[SchemaT, StructuredCallMeta]:
         """비동기 structured 호출과 fixer fallback을 수행한다."""
 
@@ -105,6 +107,15 @@ class AsyncStructuredLLMService:
                 if not content:
                     raise ValueError("응답이 비어 있습니다.")
                 parsed = cast(SchemaT, parser.parse(content))
+                semantic_issues = _run_semantic_validator(
+                    parsed,
+                    semantic_validator=semantic_validator,
+                )
+                if semantic_issues:
+                    raise ValueError(
+                        "Semantic validation failed: "
+                        + "; ".join(semantic_issues)
+                    )
                 self.router._log_structured_response(
                     role=role,
                     content=content,
@@ -149,6 +160,9 @@ class AsyncStructuredLLMService:
             router=self.router,
             content=last_content,
             parser=parser,
+            semantic_validator=semantic_validator,
+            repair_context=repair_context,
+            failure_feedback=[str(last_error)] if last_error is not None else None,
         )
         last_content = fixer_outcome.content or last_content
         last_error = fixer_outcome.parse_error or last_error
@@ -160,31 +174,41 @@ class AsyncStructuredLLMService:
 
         if fixer_outcome.succeeded:
             parsed = cast(SchemaT, parser.parse(last_content))
-            self.router._log_structured_response(
-                role=role,
-                content=last_content,
-                parsed=parsed,
-                duration_seconds=time.perf_counter() - started_at,
-                ttft_seconds=ttft_seconds,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                total_tokens=total_tokens,
-                log_context=log_context,
+            semantic_issues = _run_semantic_validator(
+                parsed,
+                semantic_validator=semantic_validator,
             )
-            self.router.usage_tracker.record_structured_outcome(
-                parse_failures=parse_failure_count,
-                forced_default=False,
-            )
-            return parsed, StructuredCallMeta(
-                parse_failure_count=parse_failure_count,
-                forced_default=False,
-                duration_seconds=time.perf_counter() - started_at,
-                last_content=last_content,
-                ttft_seconds=ttft_seconds,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                total_tokens=total_tokens,
-            )
+            if semantic_issues:
+                last_error = ValueError(
+                    "Semantic validation failed after fixer: "
+                    + "; ".join(semantic_issues)
+                )
+            else:
+                self.router._log_structured_response(
+                    role=role,
+                    content=last_content,
+                    parsed=parsed,
+                    duration_seconds=time.perf_counter() - started_at,
+                    ttft_seconds=ttft_seconds,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    total_tokens=total_tokens,
+                    log_context=log_context,
+                )
+                self.router.usage_tracker.record_structured_outcome(
+                    parse_failures=parse_failure_count,
+                    forced_default=False,
+                )
+                return parsed, StructuredCallMeta(
+                    parse_failure_count=parse_failure_count,
+                    forced_default=False,
+                    duration_seconds=time.perf_counter() - started_at,
+                    last_content=last_content,
+                    ttft_seconds=ttft_seconds,
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    total_tokens=total_tokens,
+                )
 
         if allow_default_on_failure and default_payload is not None:
             self.router._log_structured_response(
@@ -312,3 +336,14 @@ def _log_primary_parse_failure(
         last_error,
         last_content,
     )
+
+
+def _run_semantic_validator(
+    parsed: SchemaT,
+    *,
+    semantic_validator: SemanticValidator[SchemaT] | None,
+) -> list[str]:
+    if semantic_validator is None:
+        return []
+    issues = semantic_validator(parsed)
+    return [issue.strip() for issue in issues if issue.strip()]

@@ -16,11 +16,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass
 from types import UnionType
 from typing import Any, Literal, Union, get_args, get_origin
 
 from pydantic import BaseModel
+
+from simula.application.ports.llm import SemanticValidator
 from simula.infrastructure.llm.router import (
     StructuredLLMRouter,
     _merge_token_count,
@@ -44,6 +47,10 @@ Rewrite the provided content into exactly one valid JSON object that satisfies t
 
 # Target schema summary
 {schema_summary}
+
+{failure_feedback}
+
+{repair_context}
 
 # Input
 Malformed content:
@@ -87,6 +94,9 @@ async def repair_structured_json(
     router: StructuredLLMRouter,
     parser: Any,
     content: str,
+    semantic_validator: SemanticValidator[Any] | None = None,
+    repair_context: dict[str, object] | None = None,
+    failure_feedback: list[str] | None = None,
 ) -> FixerOutcome:
     """fixer role로 malformed JSON 응답을 복구한다."""
 
@@ -116,6 +126,8 @@ async def repair_structured_json(
             _build_fix_json_prompt(
                 parser=parser,
                 failed_content=current_content,
+                failure_feedback=failure_feedback,
+                repair_context=repair_context,
             ),
             log_context={
                 "scope": "json-fix",
@@ -127,7 +139,13 @@ async def repair_structured_json(
         output_tokens = _merge_token_count(output_tokens, meta.output_tokens)
         total_tokens = _merge_token_count(total_tokens, meta.total_tokens)
         try:
-            parser.parse(fixed_content)
+            parsed = parser.parse(fixed_content)
+            semantic_issues = _run_semantic_validator(
+                parsed,
+                semantic_validator=semantic_validator,
+            )
+            if semantic_issues:
+                raise ValueError("; ".join(semantic_issues))
             return FixerOutcome(
                 succeeded=True,
                 content=fixed_content,
@@ -142,6 +160,7 @@ async def repair_structured_json(
             parse_failure_count += 1
             current_content = fixed_content
             last_error = ValueError(f"json fixer failed: {exc}")
+            failure_feedback = [str(exc)]
             if attempt < 3:
                 router.logger.warning(
                     "json fixer 재시도 대기 | attempt=%s/%s | error=%s",
@@ -149,7 +168,7 @@ async def repair_structured_json(
                     4,
                     exc,
                 )
-                await asyncio.sleep(60)
+                await asyncio.sleep(0.25 * (attempt + 1))
 
     return FixerOutcome(
         succeeded=False,
@@ -163,9 +182,17 @@ async def repair_structured_json(
     )
 
 
-def _build_fix_json_prompt(*, parser: Any, failed_content: str) -> str:
+def _build_fix_json_prompt(
+    *,
+    parser: Any,
+    failed_content: str,
+    failure_feedback: list[str] | None = None,
+    repair_context: dict[str, object] | None = None,
+) -> str:
     return FIX_JSON_PROMPT.format(
         schema_summary=_render_compact_schema_summary(parser),
+        failure_feedback=_render_failure_feedback(failure_feedback),
+        repair_context=_render_repair_context(repair_context),
         failed_content=failed_content,
     )
 
@@ -230,6 +257,25 @@ def _collect_validation_rules(schema: type[BaseModel]) -> list[str]:
     return lines
 
 
+def _render_failure_feedback(failure_feedback: list[str] | None) -> str:
+    if not failure_feedback:
+        return "Validation issues:\n- None provided."
+
+    lines = ["Validation issues:"]
+    lines.extend(f"- {item}" for item in failure_feedback if item.strip())
+    return "\n".join(lines)
+
+
+def _render_repair_context(repair_context: dict[str, object] | None) -> str:
+    if not repair_context:
+        return "Repair context:\n- None provided."
+    return "Repair context:\n" + json.dumps(
+        repair_context,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+
+
 def _describe_annotation(annotation: Any) -> str:
     origin = get_origin(annotation)
     args = get_args(annotation)
@@ -278,3 +324,14 @@ def _extract_base_model(annotation: Any) -> type[BaseModel] | None:
     if not issubclass(annotation, BaseModel):
         return None
     return annotation
+
+
+def _run_semantic_validator(
+    parsed: BaseModel,
+    *,
+    semantic_validator: SemanticValidator[Any] | None,
+) -> list[str]:
+    if semantic_validator is None:
+        return []
+    issues = semantic_validator(parsed)
+    return [issue.strip() for issue in issues if issue.strip()]

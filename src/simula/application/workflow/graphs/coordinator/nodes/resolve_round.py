@@ -10,6 +10,7 @@ from typing import cast
 
 from langgraph.runtime import Runtime
 from langgraph.types import Overwrite
+from pydantic import ValidationError
 
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.coordinator.output_schema.bundles import (
@@ -17,6 +18,9 @@ from simula.application.workflow.graphs.coordinator.output_schema.bundles import
 )
 from simula.application.workflow.graphs.coordinator.prompts.round_resolution_prompt import (
     PROMPT as STEP_RESOLUTION_PROMPT,
+)
+from simula.application.workflow.graphs.runtime.proposal_contract import (
+    validate_actor_action_proposal_semantics,
 )
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
@@ -30,7 +34,12 @@ from simula.application.workflow.utils.prompt_projections import (
     build_visible_action_context,
     truncate_text,
 )
-from simula.domain.contracts import RoundResolution, RuntimeProgressionPlan
+from simula.domain.contracts import (
+    ActionCatalog,
+    ActorActionProposal,
+    RoundResolution,
+    RuntimeProgressionPlan,
+)
 from simula.domain.reporting import evaluate_stop
 from simula.domain.runtime_policy import next_stagnation_steps
 from simula.domain.runtime_actions import (
@@ -121,6 +130,16 @@ async def resolve_round(
             "round_index": int(state["round_index"]),
         },
     )
+    valid_adopted_actor_ids, invalid_adoption_errors = _filter_invalid_adopted_actor_ids(
+        adopted_actor_ids=list(resolution.adopted_actor_ids),
+        pending_actor_proposals=cast(
+            list[ActorProposalPayload],
+            list(state["pending_actor_proposals"]),
+        ),
+        actors=list(state["actors"]),
+        action_catalog=cast(dict[str, object], state["plan"]["action_catalog"]),
+        max_targets_per_activity=runtime.context.settings.runtime.max_recipients_per_message,
+    )
     applied = apply_adopted_actor_proposals(
         run_id=state["run_id"],
         round_index=int(state["round_index"]),
@@ -132,7 +151,7 @@ async def resolve_round(
             list[ActorProposalPayload],
             list(state["pending_actor_proposals"]),
         ),
-        adopted_actor_ids=list(resolution.adopted_actor_ids),
+        adopted_actor_ids=valid_adopted_actor_ids,
         max_targets_per_activity=runtime.context.settings.runtime.max_recipients_per_message,
     )
     clock = _build_updated_clock(
@@ -166,7 +185,7 @@ async def resolve_round(
         activities=list(applied["latest_round_activities"]),
         observer_report=report_payload,
     )
-    errors = list(state["errors"])
+    errors = list(state["errors"]) + invalid_adoption_errors
     if meta.forced_default:
         errors.append(f"round {state['round_index']} resolution defaulted")
     return {
@@ -204,6 +223,59 @@ async def resolve_round(
         - float(state["current_round_started_at"]),
         "errors": errors,
     }
+
+
+def _filter_invalid_adopted_actor_ids(
+    *,
+    adopted_actor_ids: list[str],
+    pending_actor_proposals: list[ActorProposalPayload],
+    actors: list[dict[str, object]],
+    action_catalog: dict[str, object],
+    max_targets_per_activity: int,
+) -> tuple[list[str], list[str]]:
+    catalog = ActionCatalog.model_validate(action_catalog)
+    available_actions = [item.model_dump(mode="json") for item in catalog.actions]
+    valid_actor_ids = [
+        str(actor.get("actor_id", ""))
+        for actor in actors
+        if str(actor.get("actor_id", "")).strip()
+    ]
+    proposal_by_actor_id = {
+        str(item["actor_id"]): item for item in pending_actor_proposals
+    }
+    valid_adopted_actor_ids: list[str] = []
+    errors: list[str] = []
+
+    for actor_id in adopted_actor_ids:
+        proposal_result = proposal_by_actor_id.get(str(actor_id))
+        if proposal_result is None or bool(proposal_result.get("forced_idle")):
+            errors.append(
+                f"round adopted proposal dropped: actor `{actor_id}` has no usable proposal"
+            )
+            continue
+        try:
+            proposal = ActorActionProposal.model_validate(proposal_result["proposal"])
+        except (ValidationError, ValueError, TypeError) as exc:
+            errors.append(
+                f"round adopted proposal dropped: actor `{actor_id}` parse failed: {exc}"
+            )
+            continue
+
+        issues = validate_actor_action_proposal_semantics(
+            proposal=proposal,
+            actor_id=str(actor_id),
+            available_actions=available_actions,
+            valid_target_actor_ids=valid_actor_ids,
+            max_target_count=max_targets_per_activity,
+        )
+        if issues:
+            errors.append(
+                f"round adopted proposal dropped: actor `{actor_id}` invalid: {'; '.join(issues)}"
+            )
+            continue
+        valid_adopted_actor_ids.append(str(actor_id))
+
+    return valid_adopted_actor_ids, errors
 
 
 def _build_default_round_resolution_payload(
