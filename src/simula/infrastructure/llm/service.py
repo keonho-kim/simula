@@ -129,6 +129,13 @@ class AsyncStructuredLLMService:
                 last_error = exc
                 parse_failure_count += 1
 
+        _log_primary_parse_failure(
+            logger=self.logger,
+            role=role,
+            last_error=last_error,
+            last_content=last_content,
+            log_context=log_context,
+        )
         fixer_outcome = await repair_structured_json(
             router=self.router,
             content=last_content,
@@ -231,6 +238,7 @@ class AsyncStructuredLLMService:
             log_context=log_context,
         )
 
+
 def build_model_router(settings: AppSettings) -> AsyncStructuredLLMService:
     """앱이 사용할 structured LLM service를 생성한다."""
 
@@ -261,3 +269,23 @@ def _content_to_text(content: Any) -> str:
         return "\n".join(chunks)
 
     return str(content)
+
+
+def _log_primary_parse_failure(
+    *,
+    logger: Any,
+    role: str,
+    last_error: Exception | None,
+    last_content: str,
+    log_context: dict[str, object] | None,
+) -> None:
+    if last_error is None:
+        return
+
+    logger.debug(
+        "\n%s primary structured parse failed\ncontext: %s\nparse_error: %s\nfull_response:\n%s\n",
+        role,
+        log_context or {},
+        last_error,
+        last_content,
+    )

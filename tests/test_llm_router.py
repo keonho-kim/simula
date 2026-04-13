@@ -19,7 +19,9 @@ import logging
 
 import pytest
 
-from simula.domain.contracts import ScenarioTimeScope
+from simula.domain.contracts import PlanningAnalysis, ScenarioTimeScope
+from simula.infrastructure.llm.fixer import _build_fix_json_prompt
+from simula.infrastructure.llm.output_parsers import build_output_parser
 from simula.infrastructure.llm.router import StructuredLLMRouter
 from simula.infrastructure.llm.service import AsyncStructuredLLMService
 
@@ -50,6 +52,7 @@ class FakeModel:
     def __init__(self, content: str | list[str]) -> None:
         self._contents = [content] if isinstance(content, str) else list(content)
         self._index = 0
+        self.prompts: list[str] = []
         self.invoke_called = False
         self.ainvoke_called = False
         self.stream_called = False
@@ -61,22 +64,22 @@ class FakeModel:
         return self._contents[index]
 
     def invoke(self, prompt: str):  # noqa: ANN001
-        del prompt
+        self.prompts.append(prompt)
         self.invoke_called = True
         return FakeChunk(self._next_content())
 
     async def ainvoke(self, prompt: str):  # noqa: ANN001
-        del prompt
+        self.prompts.append(prompt)
         self.ainvoke_called = True
         return FakeChunk(self._next_content())
 
     def stream(self, prompt: str):  # noqa: ANN001
-        del prompt
+        self.prompts.append(prompt)
         self.stream_called = True
         yield FakeChunk(self._next_content())
 
     async def astream(self, prompt: str):  # noqa: ANN001
-        del prompt
+        self.prompts.append(prompt)
         self.astream_called = True
         yield FakeChunk(self._next_content())
 
@@ -252,3 +255,35 @@ async def test_service_retries_fixer_until_it_returns_valid_json(monkeypatch) ->
     assert result.end == "핵심 선택 직전"
     assert meta.parse_failure_count == 4
     assert sleep_calls == [60, 60]
+
+
+def test_fixer_prompt_includes_compact_schema_summary() -> None:
+    parser = build_output_parser(PlanningAnalysis)
+
+    prompt = _build_fix_json_prompt(
+        parser=parser,
+        failed_content="not json",
+    )
+
+    assert "Target schema: PlanningAnalysis" in prompt
+    assert "progression_plan.allowed_units: array[enum[minute, hour, day, week]]" in prompt
+    assert "progression_plan.selection_reason: string (required)" in prompt
+    assert "allowed_units values must be unique." in prompt
+
+
+@pytest.mark.anyio
+async def test_service_logs_primary_parse_failure_with_full_response(caplog) -> None:
+    model = FakeModel(["bad raw response", "still invalid full response"])
+    fixer_model = FakeModel(_time_scope_json())
+    service = _build_service(model, fixer_model=fixer_model)
+
+    with caplog.at_level(logging.DEBUG, logger="simula.test.llm_router"):
+        await service.ainvoke_structured_with_meta(
+            "planner",
+            "prompt",
+            ScenarioTimeScope,
+        )
+
+    assert "planner primary structured parse failed" in caplog.text
+    assert "full_response:\nstill invalid full response" in caplog.text
+    assert "parse_error: JSON 파싱 실패" in caplog.text
