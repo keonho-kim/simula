@@ -20,6 +20,9 @@ Turn the planning analysis into the minimum execution plan bundle.
 - Do not omit any required keys from the output schema.
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
+- Keep the execution plan realistic for the scenario. The action catalog, tensions, and cast tensions must describe moves that could plausibly happen in-world.
+- Do not introduce formal documents, legal frameworks, military doctrines, or institutional processes unless they are already grounded in the scenario text.
+- Prefer concrete human or organizational behavior over abstract analysis labels.
 
 # Input
 Scenario text:

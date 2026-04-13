@@ -22,6 +22,8 @@ Choose the direct focus for this round and summarize deferred motion in the same
 - Do not omit any required keys from the output schema.
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
+- Keep the directive realistic for the scenario and the current moment. Select slices that could plausibly become the next visible beat.
+- Do not introduce new institutions, written artifacts, or escalation frames unless they are already grounded in the scenario or previous rounds.
 
 # Inputs
 Round index:

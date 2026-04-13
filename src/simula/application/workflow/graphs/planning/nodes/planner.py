@@ -45,6 +45,7 @@ async def build_planning_analysis(
     )
     return {
         "planning_analysis": analysis.model_dump(mode="json"),
+        "max_rounds": analysis.progression_plan.max_rounds,
         "planning_latency_seconds": float(state["planning_latency_seconds"])
         + meta.duration_seconds,
     }
@@ -110,11 +111,14 @@ def finalize_plan(
     action_catalog = cast(dict[str, object], plan.get("action_catalog", {}))
     raw_actions = action_catalog.get("actions", [])
     action_count = len(raw_actions) if isinstance(raw_actions, list) else 0
+    progression_plan = cast(dict[str, object], plan.get("progression_plan", {}))
     runtime.context.store.save_plan(state["run_id"], plan)
     runtime.context.logger.info(
-        "계획 정리 완료 | cast=%s action_types=%s",
+        "계획 정리 완료 | cast=%s action_types=%s recommended_rounds=%s default_elapsed_unit=%s",
         len(cast_roster),
         action_count,
+        progression_plan.get("max_rounds", "-"),
+        progression_plan.get("default_elapsed_unit", "-"),
     )
     return {"plan": plan}
 

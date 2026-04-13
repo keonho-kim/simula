@@ -61,6 +61,9 @@ def render_structured_response(
             f"요약: {parsed.brief_summary}\n"
             f"전제: {parsed.premise}\n"
             f"시간 범위: {parsed.time_scope.start} -> {parsed.time_scope.end}\n"
+            f"추천 round 수: {parsed.progression_plan.max_rounds}\n"
+            f"기본 시간 단위: {parsed.progression_plan.default_elapsed_unit}\n"
+            f"허용 시간 단위: {', '.join(parsed.progression_plan.allowed_elapsed_units)}\n"
             f"공개 맥락 {len(parsed.public_context)}개 / 비공개 맥락 {len(parsed.private_context)}개\n"
             f"중요 변수: {pressures}"
         )
@@ -73,7 +76,7 @@ def render_structured_response(
             "실행 시간 진행 계획을 정했습니다.\n"
             f"허용 시간 단위: {', '.join(parsed.allowed_elapsed_units)}\n"
             f"기본 시간 단위: {parsed.default_elapsed_unit}\n"
-            f"최대 round 수: {parsed.max_rounds}\n"
+            f"추천 round 수: {parsed.max_rounds}\n"
             f"이유: {parsed.selection_reason}"
         )
 
@@ -101,10 +104,15 @@ def render_structured_response(
         )
 
     if isinstance(parsed, ExecutionPlanBundle):
+        action_types = ", ".join(
+            item.action_type for item in parsed.action_catalog.actions[:5]
+        ) or "-"
         return (
             "실행 계획 번들을 만들었습니다.\n"
             f"action 수: {len(parsed.action_catalog.actions)}\n"
-            f"cast 수: {len(parsed.cast_roster.items)}"
+            f"cast 수: {len(parsed.cast_roster.items)}\n"
+            f"대표 action_type: {action_types}\n"
+            f"세계 요약: {_truncate(parsed.situation.world_summary, 140)}"
         )
 
     if isinstance(parsed, CoordinationFrame):
@@ -138,10 +146,15 @@ def render_structured_response(
         )
 
     if isinstance(parsed, RoundDirective):
+        slice_titles = ", ".join(
+            focus_slice.title for focus_slice in parsed.focus_slices[:2]
+        ) or "-"
         return (
             "round 지시를 정했습니다.\n"
             f"선택 actor: {len(parsed.selected_actor_ids)}명 / slice: {len(parsed.focus_slices)}개\n"
-            f"요약: {_truncate(parsed.focus_summary, 140)}"
+            f"요약: {_truncate(parsed.focus_summary, 140)}\n"
+            f"slice 제목: {slice_titles}\n"
+            f"선택 이유: {_truncate(parsed.selection_reason, 140)}"
         )
 
     if isinstance(parsed, BackgroundUpdateBatch):
@@ -153,6 +166,22 @@ def render_structured_response(
     if isinstance(parsed, ActorActionProposal):
         actor_name = _actor_name(log_context)
         targets = _target_description(parsed.target_actor_ids)
+        thought = _actor_thought(log_context)
+        talking_points = _actor_talking_points(log_context)
+        recommended_tone = _actor_recommended_tone(log_context)
+        thought_line = (
+            f"\n판단 이유: {_truncate(thought, 140)}" if thought.strip() else ""
+        )
+        talking_points_line = (
+            f"\n말 포인트 참고: {_list_preview(talking_points, limit=2)}"
+            if talking_points
+            else ""
+        )
+        tone_line = (
+            f"\n권장 톤: {_truncate(recommended_tone, 80)}"
+            if recommended_tone.strip()
+            else ""
+        )
         utterance_line = (
             f"\n발화: {_truncate(parsed.utterance, 120)}"
             if parsed.utterance.strip()
@@ -165,6 +194,9 @@ def render_structured_response(
             f"대상: {targets}\n"
             f"액션: {parsed.action_summary}\n"
             f"내용: {_truncate(parsed.action_detail, 180)}"
+            f"{thought_line}"
+            f"{talking_points_line}"
+            f"{tone_line}"
             f"{utterance_line}"
         )
 
@@ -172,10 +204,14 @@ def render_structured_response(
         changed = sum(
             1 for item in parsed.actor_intent_states if item.changed_from_previous
         )
+        thought_preview = ", ".join(
+            _truncate(item.thought, 40) for item in parsed.actor_intent_states[:2]
+        ) or "-"
         return (
             "actor intent 상태를 갱신했습니다.\n"
             f"actor 수: {len(parsed.actor_intent_states)}\n"
-            f"변경된 intent: {changed}명"
+            f"변경된 intent: {changed}명\n"
+            f"판단 이유 예시: {thought_preview}"
         )
 
     if isinstance(parsed, ActorFacingScenarioDigest):
@@ -183,7 +219,9 @@ def render_structured_response(
             "다음 round용 actor-facing digest를 정리했습니다.\n"
             f"관계 판도: {_truncate(parsed.relationship_map_summary, 120)}\n"
             f"현재 압력: {_list_preview(parsed.current_pressures, limit=2)}\n"
-            f"말 포인트: {_list_preview(parsed.talking_points, limit=2)}"
+            f"말 포인트: {_list_preview(parsed.talking_points, limit=2)}\n"
+            f"반복 금지: {_list_preview(parsed.avoid_repetition_notes, limit=2)}\n"
+            f"권장 톤: {_truncate(parsed.recommended_tone, 80)}"
         )
 
     if isinstance(parsed, ObserverReport):
@@ -199,12 +237,19 @@ def render_structured_response(
 
     if isinstance(parsed, RoundResolution):
         digest = parsed.actor_facing_scenario_digest
+        thought_preview = ", ".join(
+            _truncate(item.thought, 50) for item in parsed.updated_intent_states[:2]
+        ) or "-"
         return (
             "round 해소 결과를 정리했습니다.\n"
             f"채택 actor: {len(parsed.adopted_actor_ids)}명\n"
             f"세계 상태: {_truncate(parsed.world_state_summary, 140)}\n"
             f"관계 판도: {_truncate(digest.relationship_map_summary, 120)}\n"
-            f"말 포인트: {_list_preview(digest.talking_points, limit=2)}"
+            f"현재 압력: {_list_preview(digest.current_pressures, limit=2)}\n"
+            f"말 포인트: {_list_preview(digest.talking_points, limit=2)}\n"
+            f"반복 금지: {_list_preview(digest.avoid_repetition_notes, limit=2)}\n"
+            f"권장 톤: {_truncate(digest.recommended_tone, 80)}\n"
+            f"판단 이유 예시: {thought_preview}"
         )
 
     if isinstance(parsed, FinalReportSections):
@@ -255,6 +300,33 @@ def _actor_name(log_context: dict[str, object] | None) -> str:
     if actor_id is not None:
         return str(actor_id)
     return "actor"
+
+
+def _actor_thought(log_context: dict[str, object] | None) -> str:
+    if not log_context:
+        return ""
+    thought = log_context.get("actor_thought")
+    if thought is None:
+        return ""
+    return str(thought)
+
+
+def _actor_talking_points(log_context: dict[str, object] | None) -> list[str]:
+    if not log_context:
+        return []
+    value = log_context.get("actor_talking_points")
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]
+
+
+def _actor_recommended_tone(log_context: dict[str, object] | None) -> str:
+    if not log_context:
+        return ""
+    tone = log_context.get("actor_recommended_tone")
+    if tone is None:
+        return ""
+    return str(tone)
 
 
 def _truncate(text: str, limit: int) -> str:

@@ -178,12 +178,16 @@ async def resolve_round(
     )
     stop_reason = resolution.stop_reason.strip() or (policy_reason or "")
     stop_requested = bool(stop_reason) or should_stop
+    digest = resolution.actor_facing_scenario_digest
     runtime.context.logger.info(
-        "round %s 해소 완료 | adopted=%s background=%s stop=%s",
+        "round %s 해소 완료 | adopted=%s background=%s stop=%s | world=%s | pressures=%s | talking_points=%s",
         state["round_index"],
         len(list(resolution.adopted_actor_ids)),
         len(latest_background_updates),
         stop_reason or "-",
+        truncate_text(resolution.world_state_summary, 90),
+        ", ".join(digest.current_pressures[:2]) or "-",
+        ", ".join(digest.talking_points[:2]) or "-",
     )
     runtime.context.store.save_round_artifacts(
         state["run_id"],

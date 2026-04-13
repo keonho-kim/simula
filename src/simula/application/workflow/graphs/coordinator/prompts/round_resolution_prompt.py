@@ -24,6 +24,8 @@ Resolve this round in one object: adoption, updated intents, elapsed-time advanc
 - Each `updated_intent_states` item must keep `current_intent` concrete and add `thought` that explains why this actor chose that direction now.
 - `actor_facing_scenario_digest` must describe the next round for actors, including relationship map, current pressures, talking points, repetition to avoid, and recommended tone.
 - `actor_facing_scenario_digest.world_state_summary` must match the top-level `world_state_summary`.
+- Keep the observer summary, world-state summary, and digest realistic for the scenario. They should sound like plausible next-step pressure, not abstract genre drift.
+- Do not introduce new contracts, formal plans, legal clauses, or institutional machinery unless they are grounded in the scenario or the accepted actions.
 
 # Inputs
 Round index:

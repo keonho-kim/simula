@@ -154,7 +154,7 @@ class ModelConfig(BaseModel):
 class RuntimeConfig(BaseModel):
     """핵심 루프 실행 한계를 정의한다."""
 
-    max_rounds: int = Field(default=16, ge=1)
+    max_rounds: int = Field(default=20, ge=1)
     max_actor_calls_per_step: int = Field(default=6, ge=1)
     max_focus_slices_per_step: int = Field(default=3, ge=1)
     max_recipients_per_message: int = 2

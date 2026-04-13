@@ -57,7 +57,7 @@ def build_settings_from_values(values: dict[str, str]) -> AppSettings:
     return AppSettings(
         log_level=env_str(values, "SIM_LOG_LEVEL", "INFO").upper(),
         runtime=RuntimeConfig(
-            max_rounds=env_int(values, "SIM_MAX_ROUNDS", 16),
+            max_rounds=env_int(values, "SIM_MAX_ROUNDS", 20),
             max_actor_calls_per_step=env_int(
                 values,
                 "SIM_MAX_ACTOR_CALLS_PER_STEP",

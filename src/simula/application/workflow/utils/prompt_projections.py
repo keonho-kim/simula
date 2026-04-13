@@ -163,6 +163,8 @@ def build_visible_action_context(
 def build_actor_runtime_guidance_view(
     *,
     simulation_objective: object,
+    scenario_premise: object,
+    key_pressures: object,
     world_state_summary: object,
     previous_observer_summary: object,
     previous_observer_momentum: object,
@@ -178,6 +180,12 @@ def build_actor_runtime_guidance_view(
 
     return {
         "simulation_objective": truncate_text(simulation_objective, 160),
+        "scenario_premise": truncate_text(scenario_premise, 160),
+        "key_pressures": _truncate_string_list(
+            key_pressures,
+            limit=3,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
         "world_state_summary": truncate_text(
             world_state_summary,
             WORLD_STATE_SUMMARY_LIMIT,

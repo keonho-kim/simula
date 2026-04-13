@@ -47,7 +47,7 @@ _PLANNING_ANALYSIS_EXAMPLE: dict[str, Any] = {
     "private_context": ["<one private coordination or hidden-pressure pattern>"],
     "key_pressures": ["<one key pressure stated or strongly implied by the scenario>"],
     "progression_plan": {
-        "max_rounds": "<copy the runtime round budget exactly as an integer>",
+        "max_rounds": "<choose an integer between 1 and the provided round cap based on scenario pacing>",
         "allowed_elapsed_units": [
             "<choose one or more of minute, hour, day, week>",
         ],

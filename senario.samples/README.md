@@ -25,3 +25,5 @@ Sample scenario seeds for local runs.
 - When `allow_additional_cast: false`, the planner must return exactly `num_cast` cast entries.
 - When `allow_additional_cast: true`, the planner must return at least `num_cast` cast entries.
 - Samples should describe actors, pressures, channels, turning points, and stop conditions without adding viewer-style observation questions.
+- Samples should include enough concrete personality, incentives, and behavioral guardrails that actors can stay realistic without inventing off-screen artifacts.
+- When useful, add sections such as `주요 인물 성향`, `행동 현실성 기준`, `즉시 행동 단위`, or other scenario-grounded guardrails.

@@ -314,6 +314,11 @@ def _actor_log_context(
     state: SimulationWorkflowState,
     actor: dict[str, Any],
 ) -> dict[str, object]:
+    runtime_guidance = state.get("actor_proposal_task", {}).get("runtime_guidance", {})
+    digest = cast(
+        dict[str, object],
+        runtime_guidance.get("actor_facing_scenario_digest", {}),
+    )
     return {
         "round_index": int(state["round_index"]),
         "simulation_clock_label": str(
@@ -324,6 +329,12 @@ def _actor_log_context(
         ),
         "actor_id": str(actor["actor_id"]),
         "actor_display_name": actor.get("display_name"),
+        "actor_thought": cast(
+            dict[str, object],
+            runtime_guidance.get("current_intent_snapshot", {}),
+        ).get("thought", ""),
+        "actor_talking_points": digest.get("talking_points", []),
+        "actor_recommended_tone": digest.get("recommended_tone", ""),
     }
 
 
@@ -337,6 +348,10 @@ def _build_runtime_guidance(
     """actor prompt에 넘길 compact 실행 맥락을 만든다."""
 
     situation = cast(dict[str, object], state.get("plan", {}).get("situation", {}))
+    interpretation = cast(
+        dict[str, object],
+        state.get("plan", {}).get("interpretation", {}),
+    )
     previous_report = cast(
         dict[str, object],
         list(state.get("observer_reports", []))[-1]
@@ -350,6 +365,8 @@ def _build_runtime_guidance(
     )
     return build_actor_runtime_guidance_view(
         simulation_objective=situation.get("simulation_objective", ""),
+        scenario_premise=interpretation.get("premise", ""),
+        key_pressures=interpretation.get("key_pressures", []),
         world_state_summary=state.get("world_state_summary", ""),
         previous_observer_summary=latest_observer_summary(
             list(state.get("observer_reports", []))
@@ -636,7 +653,7 @@ def _log_actor_proposal_completed(
     actor_name = str(actor.get("display_name") or actor.get("actor_id") or "actor")
     if forced_default:
         logger.info(
-            "%s action 정리 완료 | step %s | 기본 대기 적용 | 소요 %.2fs",
+            "%s action 정리 완료 | round %s | 기본 대기 적용 | 소요 %.2fs",
             actor_name,
             round_index,
             duration_seconds,
@@ -644,7 +661,7 @@ def _log_actor_proposal_completed(
         return
 
     logger.info(
-        "%s action 정리 완료 | step %s | %s | %s | 대상 %s | %s | 소요 %.2fs",
+        "%s action 정리 완료 | round %s | %s | %s | 대상 %s | %s | 소요 %.2fs",
         actor_name,
         round_index,
         proposal.action_type,

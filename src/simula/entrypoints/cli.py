@@ -43,7 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--max-rounds",
         type=int,
-        help="최대 round 수 override",
+        help="planner가 추천할 round 수의 상한 override",
     )
 
     parser.add_argument(
