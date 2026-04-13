@@ -133,7 +133,7 @@ def test_validate_conclusion_section_requires_two_subheadings() -> None:
     error = validate_conclusion_section(
         "### 최종 상태\n"
         "- 최종 선택 결과가 나왔다.\n"
-        "### 핵심 이유\n"
+        "### 핵심 판단 근거\n"
         "- 마지막 단계에서 선택이 분명해졌다."
     )
 

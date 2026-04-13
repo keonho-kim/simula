@@ -130,7 +130,7 @@ def validate_conclusion_section(section_body: str) -> str | None:
 
     return validate_subheaded_bullet_section(
         section_body,
-        headings=["### 최종 상태", "### 핵심 이유"],
+        headings=["### 최종 상태", "### 핵심 판단 근거"],
         min_items=2,
     )
 

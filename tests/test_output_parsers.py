@@ -107,7 +107,7 @@ def test_final_report_sections_requires_all_fields() -> None:
     with pytest.raises(ValueError):
         FinalReportSections.model_validate(
             {
-                "conclusion_section": "### 최종 상태\n- 유지\n### 핵심 이유\n- 유지",
+                "conclusion_section": "### 최종 상태\n- 유지\n### 핵심 판단 근거\n- 유지",
                 "actor_results_rows": "",
                 "timeline_section": "- 2027-06-18 03:20 | 시작 단계 | 사건 | 결과",
                 "actor_dynamics_section": "### 현재 구도\nA\n### 관계 변화\nB",

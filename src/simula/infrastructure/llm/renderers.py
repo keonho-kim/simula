@@ -61,7 +61,7 @@ def render_structured_response(
             f"요약: {parsed.brief_summary}\n"
             f"전제: {parsed.premise}\n"
             f"시간 범위: {parsed.time_scope.start} -> {parsed.time_scope.end}\n"
-            f"추천 round 수: {parsed.progression_plan.max_rounds}\n"
+            f"라운드 수: {parsed.progression_plan.max_rounds}\n"
             f"기본 시간 단위: {parsed.progression_plan.default_elapsed_unit}\n"
             f"허용 시간 단위: {', '.join(parsed.progression_plan.allowed_elapsed_units)}\n"
             f"공개 맥락 {len(parsed.public_context)}개 / 비공개 맥락 {len(parsed.private_context)}개\n"
@@ -76,15 +76,15 @@ def render_structured_response(
             "실행 시간 진행 계획을 정했습니다.\n"
             f"허용 시간 단위: {', '.join(parsed.allowed_elapsed_units)}\n"
             f"기본 시간 단위: {parsed.default_elapsed_unit}\n"
-            f"추천 round 수: {parsed.max_rounds}\n"
-            f"이유: {parsed.selection_reason}"
+            f"라운드 수: {parsed.max_rounds}\n"
+            f"판단 근거: {parsed.selection_reason}"
         )
 
     if isinstance(parsed, RoundTimeAdvanceProposal):
         return (
             "round 경과 시간을 추정했습니다.\n"
             f"이번 round 경과: {duration_label(time_unit=parsed.elapsed_unit, amount=parsed.elapsed_amount)}\n"
-            f"이유: {parsed.selection_reason}"
+            f"판단 근거: {parsed.selection_reason}"
         )
 
     if isinstance(parsed, SimulationClockSnapshot):
@@ -154,7 +154,7 @@ def render_structured_response(
             f"선택 actor: {len(parsed.selected_actor_ids)}명 / slice: {len(parsed.focus_slices)}개\n"
             f"요약: {_truncate(parsed.focus_summary, 140)}\n"
             f"slice 제목: {slice_titles}\n"
-            f"선택 이유: {_truncate(parsed.selection_reason, 140)}"
+            f"선택 판단 근거: {_truncate(parsed.selection_reason, 140)}"
         )
 
     if isinstance(parsed, BackgroundUpdateBatch):
@@ -170,7 +170,7 @@ def render_structured_response(
         talking_points = _actor_talking_points(log_context)
         recommended_tone = _actor_recommended_tone(log_context)
         thought_line = (
-            f"\n판단 이유: {_truncate(thought, 140)}" if thought.strip() else ""
+            f"\n판단 판단 근거: {_truncate(thought, 140)}" if thought.strip() else ""
         )
         talking_points_line = (
             f"\n말 포인트 참고: {_list_preview(talking_points, limit=2)}"
@@ -211,7 +211,7 @@ def render_structured_response(
             "actor intent 상태를 갱신했습니다.\n"
             f"actor 수: {len(parsed.actor_intent_states)}\n"
             f"변경된 intent: {changed}명\n"
-            f"판단 이유 예시: {thought_preview}"
+            f"판단 판단 근거 예시: {thought_preview}"
         )
 
     if isinstance(parsed, ActorFacingScenarioDigest):
@@ -249,7 +249,7 @@ def render_structured_response(
             f"말 포인트: {_list_preview(digest.talking_points, limit=2)}\n"
             f"반복 금지: {_list_preview(digest.avoid_repetition_notes, limit=2)}\n"
             f"권장 톤: {_truncate(digest.recommended_tone, 80)}\n"
-            f"판단 이유 예시: {thought_preview}"
+            f"판단 판단 근거 예시: {thought_preview}"
         )
 
     if isinstance(parsed, FinalReportSections):

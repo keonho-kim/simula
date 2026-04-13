@@ -277,7 +277,7 @@ class FakeRouter:
         if schema is FinalReportSections:
             return (
                 FinalReportSections(
-                    conclusion_section="### 최종 상태\n- Alpha의 직접 압박이 결정을 늦췄다.\n### 핵심 이유\n- 마지막 비공개 조율이 흐름을 지배했다.",
+                    conclusion_section="### 최종 상태\n- Alpha의 직접 압박이 결정을 늦췄다.\n### 핵심 판단 근거\n- 마지막 비공개 조율이 흐름을 지배했다.",
                     actor_results_rows="| Alpha | 재검토 관철 | Beta | 우세 | 마지막 압박을 주도했다 |\n| Beta | 판단 유보 | Alpha | 열세 | 즉시 결론을 내지 못했다 |",
                     timeline_section="- 2027-06-18 03:50 | 마무리 단계 | Alpha가 재검토를 요구했다 | Beta의 즉시 결정을 늦췄다.",
                     actor_dynamics_section="### 현재 구도\nAlpha가 직접 압박을 주도하고 Beta가 방어적으로 반응한다.\n### 관계 변화\n후반으로 갈수록 비공개 조율이 공개 신호보다 중요해졌다.",

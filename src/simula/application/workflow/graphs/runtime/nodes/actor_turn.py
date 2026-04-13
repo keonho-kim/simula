@@ -503,7 +503,7 @@ def _build_default_action_proposal(
         "intent": current_intent,
         "intent_target_actor_ids": intent_target_actor_ids,
         "action_summary": action_summary,
-        "action_detail": f"{action_detail} 판단 이유는 {current_thought}",
+        "action_detail": f"{action_detail} 판단 판단 근거는 {current_thought}",
         "utterance": "",
         "visibility": visibility,
         "target_actor_ids": target_actor_ids,

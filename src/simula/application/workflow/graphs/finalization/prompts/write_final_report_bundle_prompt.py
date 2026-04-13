@@ -20,7 +20,7 @@ Write the complete report bundle in one required JSON object.
 - If a field is an array, return a JSON array even when it has only one item.
 - `conclusion_section` must use:
   - `### 최종 상태`
-  - `### 핵심 이유`
+  - `### 핵심 판단 근거`
 - `actor_results_rows` must contain markdown table body rows only, without a header.
 - `timeline_section` must use one bullet per line:
   - `- YYYY-MM-DD HH:MM | phase | event | impact`
