@@ -415,7 +415,7 @@ def _format_call_start_message(
             return "planner 호출 시작"
         return _planner_scope_label(scope, suffix="시작")
     if role == "generator":
-        return "주체 카드 생성 시작"
+        return "인물 카드 생성 시작"
     if role == "actor":
         return "행동 제안 시작"
     if role == "observer":
@@ -434,7 +434,7 @@ def _format_response_header(
     if role == "planner":
         return _planner_scope_label(scope)
     if role == "generator":
-        return "주체 카드 생성"
+        return "인물 카드 생성"
     if role == "actor":
         return "행동 제안"
     if role == "observer":

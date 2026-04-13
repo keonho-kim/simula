@@ -45,7 +45,7 @@ def finalize_generated_actors(
 
     latency = time.perf_counter() - float(state.get("generation_started_at", 0.0))
     parse_failures = sum(int(item["parse_failure_count"]) for item in sorted_results)
-    runtime.context.logger.info("등장 주체 생성 완료")
+    runtime.context.logger.info("등장 인물 생성 완료")
     runtime.context.store.save_actors(state["run_id"], actors)
 
     return {

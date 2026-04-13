@@ -15,7 +15,7 @@ from simula.application.workflow.utils.finalization_sections import (
     render_markdown_table,
 )
 
-_HEADERS = ["주체", "최종 결론", "상대/대상", "유불리/상태", "근거 요약"]
+_HEADERS = ["인물", "최종 결론", "상대/대상", "유불리/상태", "근거 요약"]
 
 
 def render_and_persist_final_report(

@@ -133,7 +133,7 @@ def render_structured_response(
     if isinstance(parsed, CastRoster):
         names = ", ".join(item.display_name for item in parsed.items[:6]) or "-"
         return (
-            f"등장 주체 {len(parsed.items)}명을 확정했습니다.\n"
+            f"등장 인물 {len(parsed.items)}명을 확정했습니다.\n"
             f"인물: {names}"
         )
 
@@ -282,7 +282,7 @@ def render_text_response(
     if role == "planner" and scope == "cast_roster":
         names = _extract_ndjson_names(stripped)
         return (
-            f"등장 주체 {len(names)}명을 확정했습니다.\n"
+            f"등장 인물 {len(names)}명을 확정했습니다.\n"
             f"인물: {', '.join(names[:6]) if names else '-'}"
         )
     if role == "fixer" and scope == "json-fix":
