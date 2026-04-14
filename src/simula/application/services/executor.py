@@ -233,34 +233,47 @@ class SimulationExecutor:
             )
 
 
-def _unwrap_graph_output(result: Any) -> dict[str, Any]:
-    """LangGraph v2 workflow 출력 래퍼를 dict state로 벗긴다."""
-
-    if hasattr(result, "value"):
-        return cast(dict[str, Any], result.value)
-    return cast(dict[str, Any], result)
-
-
 def _consume_stream_chunk(
     *,
     chunk: object,
     final_state: dict[str, Any] | None,
     appender: RunJsonlAppender | None,
 ) -> dict[str, Any] | None:
+    if isinstance(chunk, dict):
+        chunk_dict = cast(dict[str, object], chunk)
+        chunk_type = str(chunk_dict.get("type", "")).strip()
+        if chunk_type == "values":
+            payload = chunk_dict.get("data")
+            if isinstance(payload, dict):
+                return cast(dict[str, Any], payload)
+            return final_state
+        if chunk_type == "custom":
+            _append_stream_entry(chunk_dict.get("data"), appender)
+            return final_state
+        return cast(dict[str, Any], chunk_dict)
+
     if not isinstance(chunk, tuple) or len(chunk) != 2:
-        if isinstance(chunk, dict):
-            return cast(dict[str, Any], chunk)
         return final_state
 
     mode, payload = chunk
     if mode == "values" and isinstance(payload, dict):
         return cast(dict[str, Any], payload)
 
-    if mode == "custom" and isinstance(payload, dict):
-        payload_dict = cast(dict[str, object], payload)
-        entry = payload_dict.get("entry")
-        if isinstance(entry, dict) and appender is not None:
-            appender.append(cast(dict[str, object], entry))
+    if mode == "custom":
+        _append_stream_entry(payload, appender)
         return final_state
 
     return final_state
+
+
+def _append_stream_entry(
+    payload: object,
+    appender: RunJsonlAppender | None,
+) -> None:
+    if appender is None or not isinstance(payload, dict):
+        return
+
+    payload_dict = cast(dict[str, object], payload)
+    entry = payload_dict.get("entry")
+    if isinstance(entry, dict):
+        appender.append(cast(dict[str, object], entry))
