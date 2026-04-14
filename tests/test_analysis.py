@@ -9,11 +9,13 @@ import tempfile
 from pathlib import Path
 
 import pytest
+import simula.application.analysis.metrics.network_algorithms as network_algorithms
 
 from simula.application.analysis.loader import load_run_analysis
 from simula.application.analysis.metrics.distributions import build_distribution_report
 from simula.application.analysis.metrics.fixer import build_fixer_report
 from simula.application.analysis.metrics.network import build_network_report
+from simula.application.analysis.models import ActorRecord, AdoptedActivityRecord
 from simula.application.services import analysis_runner
 from simula.infrastructure.config.loader import LoadedSettingsBundle
 from simula.infrastructure.config.models import (
@@ -118,6 +120,98 @@ def test_network_report_counts_targets_and_intent_only_edges() -> None:
     assert alpha_gamma.intent_only_count == 1
     assert beta_alpha.intent_only_count == 1
     assert beta_alpha.public_count == 1
+    assert report.summary.participating_actor_count == 3
+    assert report.summary.isolated_actor_count == 0
+
+
+def test_network_report_builds_complexity_rankings() -> None:
+    report, _ = build_network_report(
+        actors_by_id=_actors("alpha", "beta", "gamma", "delta", "epsilon", "zeta"),
+        activities=_activities(
+            ("alpha", "delta"),
+            ("alpha", "epsilon"),
+            ("beta", "delta"),
+            ("gamma", "delta"),
+            ("delta", "epsilon"),
+        ),
+    )
+
+    assert report.summary.participating_actor_count == 5
+    assert report.summary.participating_actor_ratio == pytest.approx(5 / 6)
+    assert report.summary.isolated_actor_count == 1
+    assert report.summary.isolated_actor_ratio == pytest.approx(1 / 6)
+    assert report.summary.density == pytest.approx(5 / 30)
+    assert report.summary.weak_component_count == 2
+    assert report.summary.strong_component_count == 6
+    assert report.summary.largest_weak_component_ratio == pytest.approx(5 / 6)
+    assert report.leaderboards["hubs"][0].cast_id == "alpha"
+    assert report.leaderboards["authorities"][0].cast_id == "delta"
+    assert report.leaderboards["brokers"][0].cast_id == "delta"
+    assert report.leaderboards["influence"][0].cast_id == "epsilon"
+
+
+def test_network_report_tracks_clustering_core_and_communities() -> None:
+    report, _ = build_network_report(
+        actors_by_id=_actors("alpha", "beta", "gamma", "delta", "epsilon", "zeta"),
+        activities=_activities(
+            ("alpha", "beta"),
+            ("beta", "alpha"),
+            ("beta", "gamma"),
+            ("gamma", "beta"),
+            ("gamma", "alpha"),
+            ("alpha", "gamma"),
+            ("delta", "epsilon"),
+            ("epsilon", "delta"),
+        ),
+    )
+
+    assert report.summary.reciprocity == pytest.approx(1.0)
+    assert report.summary.average_clustering == pytest.approx(0.5)
+    assert report.summary.transitivity == pytest.approx(1.0)
+    assert report.summary.max_core_number == 2
+    assert report.summary.community_count == 2
+    assert report.communities[0].member_cast_ids == ["alpha", "beta", "gamma"]
+    assert report.communities[1].member_cast_ids == ["delta", "epsilon"]
+
+
+def test_network_report_marks_skipped_metrics_for_edge_free_graph() -> None:
+    report, _ = build_network_report(
+        actors_by_id=_actors("alpha", "beta", "gamma"),
+        activities=[],
+    )
+
+    assert report.summary.edge_count == 0
+    assert report.summary.participating_actor_count == 0
+    assert report.summary.isolated_actor_count == 3
+    assert report.summary.empty_reason == "채택된 행위자 상호작용이 없습니다."
+    assert report.summary.skipped_metrics["hub_score"] == "관계 엣지가 없어 계산할 수 없습니다."
+    assert report.summary.skipped_metrics["core_number"] == "관계 엣지가 없어 계산할 수 없습니다."
+    assert report.leaderboards["hubs"] == []
+    assert all(node.hub_score is None for node in report.nodes)
+    assert all(node.in_degree_centrality == 0.0 for node in report.nodes)
+
+
+def test_network_report_records_algorithm_failures(monkeypatch) -> None:
+    def _boom(*args, **kwargs):  # noqa: ANN002, ANN003
+        del args, kwargs
+        raise RuntimeError("forced failure")
+
+    monkeypatch.setattr(network_algorithms.nx, "hits", _boom)
+    monkeypatch.setattr(network_algorithms.nx, "pagerank", _boom)
+
+    report, _ = build_network_report(
+        actors_by_id=_actors("alpha", "beta", "gamma"),
+        activities=_activities(("alpha", "beta"), ("beta", "gamma")),
+    )
+
+    assert report.summary.skipped_metrics["hub_score"] == "RuntimeError: forced failure"
+    assert (
+        report.summary.skipped_metrics["authority_score"]
+        == "RuntimeError: forced failure"
+    )
+    assert report.summary.skipped_metrics["pagerank"] == "RuntimeError: forced failure"
+    assert all(node.hub_score is None for node in report.nodes)
+    assert all(node.pagerank is None for node in report.nodes)
 
 
 def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
@@ -156,6 +250,8 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
     assert (tmp_path / "analysis" / run_id / "fixer" / "summary.csv").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "nodes.csv").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "edges.csv").exists()
+    assert (tmp_path / "analysis" / run_id / "network" / "summary.json").exists()
+    assert (tmp_path / "analysis" / run_id / "network" / "summary.md").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "graph.graphml").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "graph.png").exists()
 
@@ -166,6 +262,8 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
     assert manifest["roles_display"] == ["actor (행위자)", "fixer (JSON 복구)", "planner (계획)"]
     assert "llm_calls.csv" in manifest["artifact_paths"]
     assert manifest["network_summary"]["edge_count"] == 3
+    assert "network/summary.json" in manifest["artifact_paths"]
+    assert "network/summary.md" in manifest["artifact_paths"]
     llm_calls_csv = (
         tmp_path / "analysis" / run_id / "llm_calls.csv"
     ).read_text(encoding="utf-8")
@@ -182,6 +280,22 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
         ).read_text(encoding="utf-8")
     )
     assert distribution_json["metric_label"] == "입력 토큰"
+    network_summary_json = json.loads(
+        (
+            tmp_path
+            / "analysis"
+            / run_id
+            / "network"
+            / "summary.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert network_summary_json["summary"]["edge_count"] == 3
+    assert "hubs" in network_summary_json["leaderboards"]
+    network_summary_md = (
+        tmp_path / "analysis" / run_id / "network" / "summary.md"
+    ).read_text(encoding="utf-8")
+    assert "## 개요" in network_summary_md
+    assert "## 연결성" in network_summary_md
 
 
 def test_korean_font_install_script_exists() -> None:
@@ -355,3 +469,27 @@ def _build_settings(*, output_dir: Path) -> AppSettings:
             fixer=model,
         ),
     )
+
+
+def _actors(*cast_ids: str) -> dict[str, ActorRecord]:
+    return {
+        cast_id: ActorRecord(
+            cast_id=cast_id,
+            display_name=cast_id.title(),
+        )
+        for cast_id in cast_ids
+    }
+
+
+def _activities(*edges: tuple[str, str]) -> list[AdoptedActivityRecord]:
+    return [
+        AdoptedActivityRecord(
+            round_index=index,
+            source_cast_id=source_cast_id,
+            target_cast_ids=[target_cast_id],
+            intent_target_cast_ids=[target_cast_id],
+            visibility="private",
+            thread_id=f"thread-{index}",
+        )
+        for index, (source_cast_id, target_cast_id) in enumerate(edges, start=1)
+    ]

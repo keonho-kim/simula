@@ -11,13 +11,18 @@
 from __future__ import annotations
 
 from datetime import datetime
+from types import SimpleNamespace
 
 from simula.application.workflow.graphs.finalization.nodes.build_report_projection import (
     build_report_projection,
     cluster_round_activities,
     format_report_time_label,
 )
+from simula.application.workflow.graphs.finalization.nodes.render_and_persist_final_report import (
+    render_and_persist_final_report,
+)
 from simula.application.workflow.utils.finalization_sections import (
+    build_report_prompt_inputs,
     normalize_conclusion_section,
     normalize_final_report_sections,
     render_markdown_table,
@@ -144,6 +149,14 @@ def test_validate_timeline_section_requires_fixed_timestamp_pattern() -> None:
     assert error is None
 
 
+def test_validate_timeline_section_allows_single_line_minimum() -> None:
+    error = validate_timeline_section(
+        "- 2027-06-18 03:20 | 시작 단계 | 사건 발생 | 판세 변화"
+    )
+
+    assert error is None
+
+
 def test_validate_conclusion_section_requires_two_subheadings() -> None:
     error = validate_conclusion_section(
         "### 최종 상태\n"
@@ -151,6 +164,12 @@ def test_validate_conclusion_section_requires_two_subheadings() -> None:
         "### 핵심 판단 근거\n"
         "- 마지막 단계에서 선택이 분명해졌다."
     )
+
+    assert error is None
+
+
+def test_validate_bullet_section_allows_single_item_minimum_when_configured() -> None:
+    error = validate_bullet_section("- 사건", min_items=1, max_items=5)
 
     assert error is None
 
@@ -217,7 +236,7 @@ def test_render_markdown_table_keeps_header_when_body_is_empty() -> None:
     )
 
 
-def test_build_report_projection_includes_major_event_history() -> None:
+def test_build_report_projection_returns_compact_context() -> None:
     projection = build_report_projection(
         {
             "activities": [],
@@ -278,5 +297,77 @@ def test_build_report_projection_includes_major_event_history() -> None:
         }
     )
 
-    assert '"major_event_history"' in projection["report_projection_json"]
-    assert '"time_label": "2027-06-18 04:20"' in projection["report_projection_json"]
+    assert '"timeline_highlights"' in projection["report_projection_json"]
+    assert '"major_event_outcomes"' in projection["report_projection_json"]
+    assert '"major_event_history"' not in projection["report_projection_json"]
+    assert '"timeline_anchor":{"anchor_iso":"2027-06-18T03:20:00"}' in projection[
+        "report_projection_json"
+    ]
+
+
+def test_build_report_prompt_inputs_compacts_long_scenario_and_summary() -> None:
+    prompt_inputs = build_report_prompt_inputs(
+        {
+            "scenario": "A" * 2_000,
+            "final_report": {
+                "objective": "긴장 추적",
+                "world_summary": "B" * 400,
+                "world_state_summary": "C" * 400,
+                "elapsed_simulation_label": "1시간",
+                "rounds_completed": 4,
+                "total_activities": 12,
+                "last_observer_summary": "D" * 400,
+                "notable_events": ["사건 1", "사건 2"],
+                "errors": ["오류 없음"],
+            },
+            "report_projection_json": '{"summary_context":{}}',
+        }
+    )
+
+    assert len(prompt_inputs["scenario_text"]) < 2_000
+    assert '"objective":"긴장 추적"' in prompt_inputs["final_report_json"]
+    assert '"rounds_completed":4' in prompt_inputs["final_report_json"]
+
+
+def test_render_and_persist_final_report_omits_actor_results_section() -> None:
+    saved: list[dict[str, object]] = []
+
+    class FakeStore:
+        def save_final_report(
+            self,
+            run_id: str,
+            final_report: dict[str, object],
+        ) -> None:
+            saved.append({"run_id": run_id, "final_report": final_report})
+
+    result = render_and_persist_final_report(
+        {
+            "run_id": "run-1",
+            "final_report": {"run_id": "run-1"},
+            "llm_usage_summary": {
+                "total_calls": 1,
+                "structured_calls": 0,
+                "text_calls": 1,
+                "calls_by_role": {"observer": 1},
+                "parse_failures": 0,
+                "forced_defaults": 0,
+                "input_tokens": 10,
+                "output_tokens": 20,
+                "total_tokens": 30,
+            },
+            "report_conclusion_section": "### 최종 상태\n- 유지\n### 핵심 판단 근거\n- 근거",
+            "report_timeline_section": "- 2027-06-18 03:20 | 시작 단계 | 사건 | 결과",
+            "report_actor_dynamics_section": "### 현재 구도\n- A\n### 관계 변화\n- B",
+            "report_major_events_section": "- 사건",
+        },
+        SimpleNamespace(
+            context=SimpleNamespace(
+                store=FakeStore(),
+                logger=SimpleNamespace(info=lambda *args, **kwargs: None),
+            )
+        ),  # type: ignore[arg-type]
+    )
+
+    assert "## 행위자 별 최종 결과" not in result["final_report_markdown"]
+    assert result["final_report_sections"]["actor_results_rows"] == ""
+    assert saved == [{"run_id": "run-1", "final_report": {"run_id": "run-1"}}]

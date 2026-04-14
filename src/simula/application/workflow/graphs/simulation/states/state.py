@@ -95,6 +95,10 @@ class SimulationWorkflowState(TypedDict):
     simulation_log_jsonl: str
     report_projection_json: str
     report_timeline_anchor_json: dict[str, Any]
+    report_conclusion_section: str
+    report_timeline_section: str
+    report_actor_dynamics_section: str
+    report_major_events_section: str
     final_report_sections: dict[str, Any]
     final_report_markdown: str
     errors: Annotated[list[str], extend_str_list]

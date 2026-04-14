@@ -12,6 +12,9 @@ from __future__ import annotations
 
 from langgraph.types import Overwrite
 
+from simula.application.workflow.graphs.runtime.states.state import (
+    empty_actor_proposal_task,
+)
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
@@ -51,22 +54,14 @@ def initialize_runtime_state(state: SimulationWorkflowState) -> dict[str, object
         "round_time_advance": {},
         "actor_facing_scenario_digest": initial_digest,
         "pending_actor_proposals": Overwrite(value=[]),
-        "actor_proposal_task": {
-            "actor": {},
-            "unread_activity_ids": [],
-            "visible_action_context": [],
-            "unread_backlog_digest": {},
-            "visible_actors": [],
-            "focus_slice": {},
-            "runtime_guidance": {},
-        },
+        "actor_proposal_task": empty_actor_proposal_task(),
         "round_index": 0,
         "stop_requested": False,
         "stop_reason": "",
         "final_report": {},
-        "errors": [],
-        "parse_failures": 0,
-        "forced_idles": 0,
+        "errors": list(state.get("errors", [])),
+        "parse_failures": int(state.get("parse_failures", 0)),
+        "forced_idles": int(state.get("forced_idles", 0)),
         "stagnation_rounds": 0,
         "world_state_summary": str(
             initial_digest.get("world_state_summary", "")

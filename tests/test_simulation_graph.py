@@ -22,7 +22,6 @@ from simula.domain.contracts import (
     ActorActionProposal,
     ActorCard,
     ExecutionPlanBundle,
-    FinalReportSections,
     PlanningAnalysis,
     RoundContinuationDecision,
     RoundDirective,
@@ -274,18 +273,36 @@ class FakeRouter:
                 ),
                 FakeMeta(),
             )
-        if schema is FinalReportSections:
+        raise AssertionError(f"unexpected schema: {schema}")
+
+    async def ainvoke_text_with_meta(self, role, prompt, **kwargs):  # noqa: ANN001
+        del role, prompt
+        log_context = kwargs.get("log_context", {})
+        section = str(log_context.get("section", ""))
+        if section == "conclusion":
             return (
-                FinalReportSections(
-                    conclusion_section="### 최종 상태\n- Alpha의 직접 압박이 결정을 늦췄다.\n### 핵심 판단 근거\n- 마지막 비공개 조율이 흐름을 지배했다.",
-                    actor_results_rows="| Alpha | 재검토 관철 | Beta | 우세 | 마지막 압박을 주도했다 |\n| Beta | 판단 유보 | Alpha | 열세 | 즉시 결론을 내지 못했다 |",
-                    timeline_section="- 2027-06-18 03:50 | 마무리 단계 | Alpha가 재검토를 요구했다 | Beta의 즉시 결정을 늦췄다.",
-                    actor_dynamics_section="### 현재 구도\n- Alpha가 직접 압박을 주도하고 Beta가 방어적으로 반응한다.\n### 관계 변화\n- 후반으로 갈수록 비공개 조율이 공개 신호보다 중요해졌다.",
-                    major_events_section="- Alpha가 비공개 재검토를 강하게 요구했다.\n- Beta가 즉시 결정을 미뤘다.",
-                ),
+                "### 최종 상태\n- Alpha의 직접 압박이 결정을 늦췄다.\n### 핵심 판단 근거\n- 마지막 비공개 조율이 흐름을 지배했다.",
                 FakeMeta(),
             )
-        raise AssertionError(f"unexpected schema: {schema}")
+        if section == "timeline":
+            return (
+                "- 2027-06-18 03:20 | 시작 단계 | 긴장이 형성됐다 | 이후 직접 압박이 쉬워졌다.\n"
+                "- 2027-06-18 03:50 | 마무리 단계 | Alpha가 재검토를 요구했다 | Beta의 즉시 결정을 늦췄다.",
+                FakeMeta(),
+            )
+        if section == "actor-dynamics":
+            return (
+                "### 현재 구도\n- Alpha가 직접 압박을 주도하고 Beta가 방어적으로 반응한다.\n"
+                "### 관계 변화\n- 후반으로 갈수록 비공개 조율이 공개 신호보다 중요해졌다.",
+                FakeMeta(),
+            )
+        if section == "major-events":
+            return (
+                "- Alpha가 비공개 재검토를 강하게 요구했다.\n"
+                "- Beta가 즉시 결정을 미뤘다.",
+                FakeMeta(),
+            )
+        raise AssertionError(f"unexpected text section: {section}")
 
 
 class FakeStore:

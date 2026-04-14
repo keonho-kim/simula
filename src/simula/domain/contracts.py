@@ -729,25 +729,3 @@ class TimelineAnchorDecision(BaseModel):
         if not self.selection_reason.strip():
             raise ValueError("selection_reason must not be empty.")
         return self
-
-
-class FinalReportSections(BaseModel):
-    """Single final-report writing bundle."""
-
-    conclusion_section: str
-    actor_results_rows: str
-    timeline_section: str
-    actor_dynamics_section: str
-    major_events_section: str
-
-    @model_validator(mode="after")
-    def validate_final_report_sections(self) -> "FinalReportSections":
-        for field_name in (
-            "conclusion_section",
-            "timeline_section",
-            "actor_dynamics_section",
-            "major_events_section",
-        ):
-            if not getattr(self, field_name).strip():
-                raise ValueError(f"{field_name} must not be empty.")
-        return self

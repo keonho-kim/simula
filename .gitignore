@@ -39,3 +39,5 @@ runtime.db
 data/db/*.sqlite
 data/db/*.sqlite-*
 output/*/
+analysis/*
+!analysis/.gitkeep

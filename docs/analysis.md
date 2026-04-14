@@ -46,9 +46,13 @@ The implementation is split across `src/simula/application/analysis/`:
 | `loader.py` | JSONL loading, event validation, and normalization |
 | `metrics/distributions.py` | role-aware token and latency distributions |
 | `metrics/fixer.py` | fixer attribution, retry grouping, and summaries |
-| `metrics/network.py` | actor relationship node and edge aggregation |
+| `metrics/network.py` | public orchestration entrypoint for network analysis |
+| `metrics/network_aggregation.py` | actor relationship node and edge aggregation |
+| `metrics/network_algorithms.py` | NetworkX metric computation, communities, and leaderboards |
+| `metrics/network_graph.py` | directed export graph and undirected projection building |
 | `plotting/distributions.py` | histogram + KDE rendering |
 | `plotting/network.py` | NetworkX-based graph rendering |
+| `network_reporting.py` | deterministic Markdown summary rendering |
 | `artifacts.py` | deterministic JSON, CSV, PNG, and GraphML writing |
 
 `src/simula/application/services/analysis_runner.py` owns orchestration only: settings
@@ -65,7 +69,11 @@ The current analyzer performs four passes on the loaded run:
 3. Attribute `fixer` calls back to the original role by parsing the fixer prompt's
    `Target schema:` line, then aggregate call counts, sessions, retries, TTFT, and duration.
 4. Build a directed actor interaction graph from adopted activities using `source_cast_id`,
-   `target_cast_ids`, `intent_target_cast_ids`, `visibility`, `thread_id`, and `round_index`.
+   `target_cast_ids`, `intent_target_cast_ids`, `visibility`, `thread_id`, and `round_index`,
+   then derive global connectivity, hub, authority, influence, brokerage, cohesion, and
+   community summaries from NetworkX algorithms.
+5. Persist deterministic network summary artifacts in both JSON and Markdown form so the
+   metrics and their interpretation stay inspectable without rerunning analysis.
 
 KDE curves are computed directly with `numpy`. If a series has fewer than two valid values or is
 constant, the analyzer records the skip reason instead of silently inventing a curve.
@@ -92,16 +100,22 @@ analysis/<run_id>/
   network/
     nodes.csv
     edges.csv
+    summary.json
+    summary.md
     graph.graphml
     graph.png
 ```
 
+`network/summary.json` contains the global network metrics, skipped-metric reasons, top actor
+leaderboards, and meaningful community groups. `network/summary.md` renders the same results as
+a deterministic Korean narrative for quick inspection.
+
 `manifest.json` records the analyzed input path, output directory, run metadata, produced files,
-fixer summary, and network summary.
+fixer summary, and the top-level network summary.
 
 ## Failure Policy
 
 - `--run-id` is required. The analyzer does not auto-pick the latest run.
 - Missing input files, invalid JSONL rows, or logs without any `llm_call` events fail fast.
-- Empty actor interaction data still produces explicit empty network artifacts instead of
-  skipping output generation.
+- Empty actor interaction data still produces explicit empty network artifacts, including summary
+  JSON and Markdown, instead of skipping output generation.

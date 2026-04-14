@@ -28,3 +28,17 @@ class ActorProposalResult(TypedDict):
     forced_idle: bool
     parse_failure_count: int
     latency_seconds: float
+
+
+def empty_actor_proposal_task() -> ActorProposalTask:
+    """Return a shape-valid empty actor proposal task sentinel."""
+
+    return {
+        "actor": {},
+        "unread_activity_ids": [],
+        "visible_action_context": [],
+        "unread_backlog_digest": {},
+        "visible_actors": [],
+        "focus_slice": {},
+        "runtime_guidance": {},
+    }

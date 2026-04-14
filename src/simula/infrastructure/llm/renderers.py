@@ -30,7 +30,6 @@ from simula.domain.contracts import (
     CoordinationFrame,
     ObserverReport,
     ExecutionPlanBundle,
-    FinalReportSections,
     PlanningAnalysis,
     RuntimeProgressionPlan,
     ScenarioTimeScope,
@@ -184,12 +183,6 @@ def render_structured_response(
     if isinstance(parsed, RoundResolution):
         return _render_model_block(
             subject="coordinator | ROUND 결과",
-            model=parsed,
-        )
-
-    if isinstance(parsed, FinalReportSections):
-        return _render_model_block(
-            subject="finalizer | 최종 보고서",
             model=parsed,
         )
 

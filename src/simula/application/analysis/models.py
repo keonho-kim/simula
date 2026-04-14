@@ -309,6 +309,14 @@ class ActorNodeMetrics:
     received_relations: int
     total_weight: int
     counterpart_count: int
+    in_degree_centrality: float | None = None
+    out_degree_centrality: float | None = None
+    betweenness_centrality: float | None = None
+    hub_score: float | None = None
+    authority_score: float | None = None
+    pagerank: float | None = None
+    core_number: int | None = None
+    effective_size: float | None = None
 
     def to_row(self) -> dict[str, object]:
         return {
@@ -320,6 +328,14 @@ class ActorNodeMetrics:
             "received_relations": self.received_relations,
             "total_weight": self.total_weight,
             "counterpart_count": self.counterpart_count,
+            "in_degree_centrality": self.in_degree_centrality,
+            "out_degree_centrality": self.out_degree_centrality,
+            "betweenness_centrality": self.betweenness_centrality,
+            "hub_score": self.hub_score,
+            "authority_score": self.authority_score,
+            "pagerank": self.pagerank,
+            "core_number": self.core_number,
+            "effective_size": self.effective_size,
         }
 
 
@@ -366,18 +382,88 @@ class NetworkSummary:
     node_count: int
     edge_count: int
     activity_count: int
+    total_actor_count: int
+    participating_actor_count: int
+    participating_actor_ratio: float | None
     isolated_actor_count: int
+    isolated_actor_ratio: float | None
     max_edge_weight: int
-    empty_reason: str | None
+    density: float | None
+    weak_component_count: int
+    strong_component_count: int
+    largest_weak_component_size: int
+    largest_weak_component_ratio: float | None
+    largest_strong_component_size: int
+    largest_strong_component_ratio: float | None
+    reciprocity: float | None
+    average_clustering: float | None
+    transitivity: float | None
+    max_core_number: int | None
+    community_count: int
+    skipped_metrics: dict[str, str] = field(default_factory=dict)
+    empty_reason: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
             "node_count": self.node_count,
             "edge_count": self.edge_count,
             "activity_count": self.activity_count,
+            "total_actor_count": self.total_actor_count,
+            "participating_actor_count": self.participating_actor_count,
+            "participating_actor_ratio": self.participating_actor_ratio,
             "isolated_actor_count": self.isolated_actor_count,
+            "isolated_actor_ratio": self.isolated_actor_ratio,
             "max_edge_weight": self.max_edge_weight,
+            "density": self.density,
+            "weak_component_count": self.weak_component_count,
+            "strong_component_count": self.strong_component_count,
+            "largest_weak_component_size": self.largest_weak_component_size,
+            "largest_weak_component_ratio": self.largest_weak_component_ratio,
+            "largest_strong_component_size": self.largest_strong_component_size,
+            "largest_strong_component_ratio": self.largest_strong_component_ratio,
+            "reciprocity": self.reciprocity,
+            "average_clustering": self.average_clustering,
+            "transitivity": self.transitivity,
+            "max_core_number": self.max_core_number,
+            "community_count": self.community_count,
+            "skipped_metrics": dict(sorted(self.skipped_metrics.items())),
             "empty_reason": self.empty_reason,
+        }
+
+
+@dataclass(slots=True)
+class NetworkLeaderboardEntry:
+    """One leaderboard row for a network metric."""
+
+    cast_id: str
+    display_name: str
+    score: float
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "cast_id": self.cast_id,
+            "display_name": self.display_name,
+            "score": self.score,
+        }
+
+
+@dataclass(slots=True)
+class NetworkCommunitySummary:
+    """Serializable community summary for the undirected projection."""
+
+    community_index: int
+    actor_count: int
+    internal_weight: float
+    member_cast_ids: list[str]
+    member_display_names: list[str]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "community_index": self.community_index,
+            "actor_count": self.actor_count,
+            "internal_weight": self.internal_weight,
+            "member_cast_ids": self.member_cast_ids,
+            "member_display_names": self.member_display_names,
         }
 
 
@@ -388,6 +474,18 @@ class NetworkReport:
     nodes: list[ActorNodeMetrics]
     edges: list[ActorEdgeMetrics]
     summary: NetworkSummary
+    leaderboards: dict[str, list[NetworkLeaderboardEntry]] = field(default_factory=dict)
+    communities: list[NetworkCommunitySummary] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "summary": self.summary.to_dict(),
+            "leaderboards": {
+                key: [entry.to_dict() for entry in entries]
+                for key, entries in sorted(self.leaderboards.items())
+            },
+            "communities": [community.to_dict() for community in self.communities],
+        }
 
 
 @dataclass(slots=True)

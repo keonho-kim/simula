@@ -21,6 +21,7 @@ from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
+from simula.application.workflow.utils.prompt_projections import truncate_text
 from simula.prompts.shared.user_facing_language import (
     find_forbidden_user_facing_term,
 )
@@ -28,30 +29,18 @@ from simula.prompts.shared.user_facing_language import (
 
 def build_report_prompt_inputs(
     state: SimulationWorkflowState,
-    *,
-    include_body_sections: bool,
-    include_actor_final_results: bool = False,
 ) -> dict[str, str]:
     """최종 보고서 프롬프트 공통 입력을 만든다."""
 
-    inputs = {
-        "scenario_text": str(state["scenario"]),
+    return {
+        "scenario_text": truncate_text(state["scenario"], 1_600),
         "final_report_json": json.dumps(
-            state["final_report"],
+            _build_compact_final_report_summary(state),
             ensure_ascii=False,
-            indent=2,
+            separators=(",", ":"),
         ),
         "report_projection_json": str(state.get("report_projection_json", "{}")),
     }
-    if include_body_sections:
-        inputs["body_sections_markdown"] = str(
-            state.get("report_body_sections_markdown", "")
-        )
-    if include_actor_final_results:
-        inputs["actor_final_results_markdown"] = str(
-            state.get("report_actor_final_results_section", "")
-        )
-    return inputs
 
 
 def normalize_final_report_sections(sections: dict[str, object]) -> dict[str, object]:
@@ -83,6 +72,7 @@ async def write_report_section(
     prompt_inputs: dict[str, str],
     section_title: str,
     validator: Callable[[str], str | None] | None = None,
+    normalizer: Callable[[str], str] | None = None,
 ) -> str:
     """observer를 호출해 보고서 섹션 본문을 작성한다."""
 
@@ -105,6 +95,8 @@ async def write_report_section(
             },
         )
         normalized_body = section_body.strip()
+        if normalizer is not None:
+            normalized_body = normalizer(normalized_body)
         if validator is None:
             feedback = None
         else:
@@ -225,6 +217,8 @@ def validate_conclusion_section(section_body: str) -> str | None:
 def validate_timeline_section(section_body: str) -> str | None:
     """타임라인 bullet 형식을 검증한다."""
 
+    # Prompt line-count ranges are quality guidance. Validation only enforces the
+    # minimum safe shape needed for downstream rendering and report consistency.
     error = validate_bullet_section(section_body, min_items=1)
     if error is not None:
         return error
@@ -303,6 +297,48 @@ def prepend_subheading(*, subheading: str, body: str) -> str:
     """고정 소제목과 본문을 결합한다."""
 
     return f"### {subheading}\n\n{body.strip()}".strip()
+
+
+def _build_compact_final_report_summary(
+    state: SimulationWorkflowState,
+) -> dict[str, object]:
+    final_report = state.get("final_report", {})
+    if not isinstance(final_report, dict):
+        return {}
+
+    def _safe_int(value: object) -> int:
+        try:
+            return int(str(value))
+        except (TypeError, ValueError):
+            return 0
+
+    return {
+        "objective": truncate_text(final_report.get("objective", ""), 180),
+        "world_summary": truncate_text(final_report.get("world_summary", ""), 220),
+        "world_state_summary": truncate_text(
+            final_report.get("world_state_summary", ""),
+            220,
+        ),
+        "elapsed_simulation_label": str(
+            final_report.get("elapsed_simulation_label", "")
+        ),
+        "rounds_completed": _safe_int(final_report.get("rounds_completed", 0)),
+        "total_activities": _safe_int(final_report.get("total_activities", 0)),
+        "last_observer_summary": truncate_text(
+            final_report.get("last_observer_summary", ""),
+            220,
+        ),
+        "notable_events": [
+            truncate_text(item, 120)
+            for item in final_report.get("notable_events", [])
+            if str(item).strip()
+        ][:5],
+        "errors": [
+            truncate_text(item, 120)
+            for item in final_report.get("errors", [])
+            if str(item).strip()
+        ][:4],
+    }
 
 
 def validate_subheaded_bullet_section(

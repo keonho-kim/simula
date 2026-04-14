@@ -26,3 +26,15 @@ class GeneratedActorResult(TypedDict):
     actor: dict[str, Any]
     latency_seconds: float
     parse_failure_count: int
+
+
+def empty_cast_slot_spec() -> CastSlotSpec:
+    """Return a shape-valid empty generation slot sentinel."""
+
+    return {
+        "slot_index": 0,
+        "cast_item": {},
+        "cast_id": "",
+        "display_name": "",
+        "group_name": "",
+    }

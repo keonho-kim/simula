@@ -63,6 +63,12 @@ class ArtifactWriter:
         self.record_output(relative_path)
         return path
 
+    def write_text(self, relative_path: str, content: str) -> Path:
+        path = self.path_for(relative_path)
+        path.write_text(content, encoding="utf-8")
+        self.record_output(relative_path)
+        return path
+
     def write_graphml(self, relative_path: str, graph: nx.DiGraph) -> Path:
         path = self.path_for(relative_path)
         nx.write_graphml(graph, path)

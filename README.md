@@ -71,6 +71,12 @@ analysis/
     distributions/
     fixer/
     network/
+      nodes.csv
+      edges.csv
+      summary.json
+      summary.md
+      graph.graphml
+      graph.png
 ```
 
 ## One End-to-End Flow

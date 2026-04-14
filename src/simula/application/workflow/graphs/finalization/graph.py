@@ -18,8 +18,11 @@ from simula.application.workflow.graphs.finalization.nodes.render_and_persist_fi
 from simula.application.workflow.graphs.finalization.nodes.resolve_timeline_anchor import (
     resolve_timeline_anchor,
 )
-from simula.application.workflow.graphs.finalization.nodes.write_final_report_bundle import (
-    write_final_report_bundle,
+from simula.application.workflow.graphs.finalization.nodes.write_final_report_sections import (
+    write_actor_dynamics_section,
+    write_conclusion_section,
+    write_major_events_section,
+    write_timeline_section,
 )
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
@@ -31,12 +34,26 @@ _graph = StateGraph(
 )
 _graph.add_node("resolve_timeline_anchor", resolve_timeline_anchor)
 _graph.add_node("build_report_artifacts", build_report_artifacts)
-_graph.add_node("write_final_report_bundle", write_final_report_bundle)
+_graph.add_node("write_conclusion_section", write_conclusion_section)
+_graph.add_node("write_timeline_section", write_timeline_section)
+_graph.add_node("write_actor_dynamics_section", write_actor_dynamics_section)
+_graph.add_node("write_major_events_section", write_major_events_section)
 _graph.add_node("render_and_persist_final_report", render_and_persist_final_report)
 _graph.add_edge(START, "resolve_timeline_anchor")
 _graph.add_edge("resolve_timeline_anchor", "build_report_artifacts")
-_graph.add_edge("build_report_artifacts", "write_final_report_bundle")
-_graph.add_edge("write_final_report_bundle", "render_and_persist_final_report")
+_graph.add_edge("build_report_artifacts", "write_conclusion_section")
+_graph.add_edge("build_report_artifacts", "write_timeline_section")
+_graph.add_edge("build_report_artifacts", "write_actor_dynamics_section")
+_graph.add_edge("build_report_artifacts", "write_major_events_section")
+_graph.add_edge(
+    [
+        "write_conclusion_section",
+        "write_timeline_section",
+        "write_actor_dynamics_section",
+        "write_major_events_section",
+    ],
+    "render_and_persist_final_report",
+)
 _graph.add_edge("render_and_persist_final_report", END)
 
 FINALIZATION_SUBGRAPH = _graph.compile(name="finalization")

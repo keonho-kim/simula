@@ -76,6 +76,14 @@ NETWORK_NODE_COLUMN_LABELS = {
     "received_relations": "수신 관계 수",
     "total_weight": "총 관계 가중치",
     "counterpart_count": "상대 수",
+    "in_degree_centrality": "내향 중심성",
+    "out_degree_centrality": "외향 중심성",
+    "betweenness_centrality": "중개 중심성",
+    "hub_score": "허브 점수",
+    "authority_score": "권위 점수",
+    "pagerank": "페이지랭크",
+    "core_number": "코어 번호",
+    "effective_size": "유효 크기",
 }
 
 NETWORK_EDGE_COLUMN_LABELS = {

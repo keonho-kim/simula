@@ -23,6 +23,12 @@ from simula.application.workflow.graphs.coordinator.nodes.prepare_focus_candidat
 from simula.application.workflow.graphs.coordinator.nodes.resolve_round import (
     resolve_round,
 )
+from simula.application.workflow.graphs.runtime.nodes.lifecycle import (
+    initialize_runtime_state,
+)
+from simula.application.workflow.graphs.runtime.states.state import (
+    empty_actor_proposal_task,
+)
 from simula.domain.activity_feeds import initialize_activity_feeds
 from simula.domain.contracts import (
     RoundContinuationDecision,
@@ -68,6 +74,7 @@ def test_prepare_focus_candidates_advances_round_and_builds_candidates() -> None
 
     assert result["round_index"] == 1
     assert result["focus_candidates"]
+    assert result["actor_proposal_task"] == empty_actor_proposal_task()
 
 
 def test_prepare_focus_candidates_prioritizes_due_required_event_participants() -> None:
@@ -192,6 +199,36 @@ def test_assess_round_continuation_skips_llm_on_first_entry() -> None:
 
     assert result["stop_requested"] is False
     assert result["stop_reason"] == ""
+
+
+def test_initialize_runtime_state_preserves_run_level_error_counters() -> None:
+    state = {
+        "actors": [
+            {
+                "cast_id": "a",
+                "display_name": "A",
+            },
+            {
+                "cast_id": "b",
+                "display_name": "B",
+            },
+        ],
+        "plan": {
+            "major_events": [],
+            "coordination_frame": {},
+            "situation": {},
+        },
+        "errors": ["generation warning"],
+        "parse_failures": 2,
+        "forced_idles": 1,
+    }
+
+    result = initialize_runtime_state(state)
+
+    assert result["errors"] == ["generation warning"]
+    assert result["parse_failures"] == 2
+    assert result["forced_idles"] == 1
+    assert result["actor_proposal_task"] == empty_actor_proposal_task()
 
 
 def test_assess_round_continuation_stops_on_max_rounds_without_llm() -> None:

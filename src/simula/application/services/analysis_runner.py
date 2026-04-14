@@ -15,6 +15,7 @@ from simula.application.analysis import (
     build_fixer_report,
     build_network_report,
     load_run_analysis,
+    render_network_summary_markdown,
     render_distribution_plot,
     render_network_plot,
 )
@@ -151,6 +152,14 @@ def run_analysis(
             for item in network_report.edges
         ],
         fieldnames=list(NETWORK_EDGE_COLUMN_LABELS.values()),
+    )
+    writer.write_json("network/summary.json", network_report.to_dict())
+    writer.write_text(
+        "network/summary.md",
+        render_network_summary_markdown(
+            run_id=normalized_run_id,
+            report=network_report,
+        ),
     )
     writer.write_graphml("network/graph.graphml", graph)
     render_network_plot(

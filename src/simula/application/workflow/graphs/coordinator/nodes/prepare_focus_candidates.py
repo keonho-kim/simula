@@ -16,6 +16,9 @@ from langgraph.runtime import Runtime
 from langgraph.types import Overwrite
 
 from simula.application.workflow.context import WorkflowRuntimeContext
+from simula.application.workflow.graphs.runtime.states.state import (
+    empty_actor_proposal_task,
+)
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
@@ -63,7 +66,7 @@ def prepare_focus_candidates(
         "pending_actor_proposals": Overwrite(value=[]),
         "round_time_advance": {},
         "latest_round_activities": [],
-        "actor_proposal_task": {},
+        "actor_proposal_task": empty_actor_proposal_task(),
         "stop_requested": False,
         "stop_reason": "",
         "current_round_started_at": time.perf_counter(),

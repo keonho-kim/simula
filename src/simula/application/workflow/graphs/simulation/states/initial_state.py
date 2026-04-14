@@ -10,6 +10,12 @@ from simula.application.workflow.graphs.simulation.states.state import (
     SimulationInputState,
     SimulationWorkflowState,
 )
+from simula.application.workflow.graphs.generation.states.state import (
+    empty_cast_slot_spec,
+)
+from simula.application.workflow.graphs.runtime.states.state import (
+    empty_actor_proposal_task,
+)
 from simula.domain.runtime_policy import derive_rng_seed
 from simula.domain.scenario_controls import ScenarioControls
 from simula.infrastructure.config.models import AppSettings
@@ -89,17 +95,9 @@ def expand_input_state_to_workflow_state(
             "round_time_history": [],
             "actor_facing_scenario_digest": {},
             "pending_cast_slots": [],
-            "cast_slot": {"slot_index": 0, "cast_item": {}},
+            "cast_slot": empty_cast_slot_spec(),
             "generated_actor_results": [],
-            "actor_proposal_task": {
-                "actor": {},
-                "unread_activity_ids": [],
-                "visible_action_context": [],
-                "unread_backlog_digest": {},
-                "visible_actors": [],
-                "focus_slice": {},
-                "runtime_guidance": {},
-            },
+            "actor_proposal_task": empty_actor_proposal_task(),
             "pending_actor_proposals": [],
             "parse_failures": 0,
             "forced_idles": 0,
@@ -118,6 +116,10 @@ def expand_input_state_to_workflow_state(
             "simulation_log_jsonl": "",
             "report_projection_json": "",
             "report_timeline_anchor_json": {},
+            "report_conclusion_section": "",
+            "report_timeline_section": "",
+            "report_actor_dynamics_section": "",
+            "report_major_events_section": "",
             "final_report_sections": {},
             "final_report_markdown": "",
             "errors": [],

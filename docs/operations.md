@@ -57,6 +57,12 @@ analysis/<run_id>/
   distributions/
   fixer/
   network/
+    nodes.csv
+    edges.csv
+    summary.json
+    summary.md
+    graph.graphml
+    graph.png
 ```
 
 ## Validation Commands

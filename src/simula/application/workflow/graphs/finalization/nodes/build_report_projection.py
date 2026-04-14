@@ -18,6 +18,7 @@ from typing import cast
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
+from simula.application.workflow.utils.prompt_projections import truncate_text
 
 
 def build_report_projection(
@@ -114,101 +115,125 @@ def build_report_projection(
         timeline_packets=timeline_packets,
         total_rounds=total_rounds,
     )
-    final_state_digest = {
-        "rounds_completed": total_rounds,
-        "total_actions": len(activities),
-        "visibility_action_counts": dict(
-            Counter(str(activity.get("visibility", "")) for activity in activities)
-        ),
-        "last_observer_summary": str(
-            _dict_value(state.get("final_report")).get("last_observer_summary", "")
-        ),
-        "world_state_summary": str(state.get("world_state_summary", "")),
-        "notable_events": _string_list(
-            _dict_value(state.get("final_report")).get("notable_events")
-        ),
-        "elapsed_simulation_minutes": _int_value(
-            _dict_value(state.get("simulation_clock", {})).get(
-                "total_elapsed_minutes", 0
-            )
-        ),
-        "elapsed_simulation_label": str(
-            _dict_value(state.get("simulation_clock", {})).get(
-                "total_elapsed_label",
-                "0분",
-            )
-        ),
-        "current_intent_states": list(state.get("actor_intent_states", [])),
-        "actor_facing_scenario_digest": _dict_value(
-            state.get("actor_facing_scenario_digest", {})
-        ),
-        "event_memory": _dict_value(state.get("event_memory", {})),
-        "active_lead_candidates": [
-            {
-                "display_name": digest["display_name"],
-                "interaction_count": digest["interaction_count"],
-            }
-            for digest in actor_digests[:5]
-        ],
-    }
+    final_report = _dict_value(state.get("final_report"))
     projection = {
-        "timeline_anchor": _dict_value(state.get("report_timeline_anchor_json")),
-        "timeline_packets": timeline_packets,
-        "endgame_packets": endgame_packets,
-        "actor_digests": actor_digests,
-        "intent_arc_packets": build_intent_arc_packets(
-            intent_history=list(state.get("intent_history", [])),
-            actors_by_id=actors_by_id,
-        ),
-        "final_actor_snapshots": final_actor_snapshots,
-        "major_event_snapshots": [
+        "summary_context": {
+            "timeline_anchor": _dict_value(state.get("report_timeline_anchor_json")),
+            "objective": truncate_text(final_report.get("objective", ""), 180),
+            "world_state_summary": truncate_text(
+                state.get("world_state_summary", ""),
+                220,
+            ),
+            "elapsed_simulation_label": str(
+                _dict_value(state.get("simulation_clock", {})).get(
+                    "total_elapsed_label",
+                    "0분",
+                )
+            ),
+            "rounds_completed": total_rounds,
+            "total_actions": len(activities),
+            "last_observer_summary": truncate_text(
+                final_report.get("last_observer_summary", ""),
+                220,
+            ),
+            "notable_events": [
+                truncate_text(item, 120)
+                for item in _string_list(final_report.get("notable_events"))
+            ][:5],
+            "visibility_action_counts": dict(
+                Counter(str(activity.get("visibility", "")) for activity in activities)
+            ),
+        },
+        "timeline_highlights": [
+            {
+                "round_index": _int_value(packet.get("round_index", 0)),
+                "time_label": str(packet.get("time_label", "")),
+                "phase_hint": str(packet.get("phase_hint", "")),
+                "focus_summary": truncate_text(packet.get("focus_summary", ""), 90),
+                "observer_summary": truncate_text(
+                    packet.get("observer_summary", ""),
+                    160,
+                ),
+                "notable_events": [
+                    truncate_text(item, 100)
+                    for item in _string_list(packet.get("notable_events"))
+                ][:2],
+                "action_highlights": [
+                    truncate_text(item.get("summary", ""), 100)
+                    for item in _dict_list(packet.get("action_clusters", []))[:2]
+                ],
+            }
+            for packet in timeline_packets[-6:]
+        ],
+        "relationship_outcomes": [
+            {
+                "display_name": str(snapshot.get("display_name", "")),
+                "last_seen_time_label": str(snapshot.get("last_seen_time_label", "")),
+                "strongest_endgame_counterparty": str(
+                    snapshot.get("strongest_endgame_counterparty", "")
+                ),
+                "endgame_sent_to": _string_list(snapshot.get("endgame_sent_to"))[:2],
+                "endgame_received_from": _string_list(
+                    snapshot.get("endgame_received_from")
+                )[:2],
+                "latest_action_summary": truncate_text(
+                    snapshot.get("latest_action_summary", ""),
+                    100,
+                ),
+                "latest_received_summary": truncate_text(
+                    snapshot.get("latest_received_summary", ""),
+                    100,
+                ),
+            }
+            for snapshot in sorted(
+                final_actor_snapshots,
+                key=lambda item: (
+                    0
+                    if str(item.get("strongest_endgame_counterparty", "")).strip()
+                    else 1,
+                    str(item.get("display_name", "")),
+                ),
+            )[:5]
+        ],
+        "major_event_outcomes": [
             {
                 "event_id": str(item.get("event_id", "")),
-                "title": str(item.get("title", "")),
+                "title": truncate_text(item.get("title", ""), 80),
                 "status": str(item.get("status", "")),
                 "required_before_end": bool(item.get("required_before_end", False)),
-                "progress_summary": str(item.get("progress_summary", "")),
+                "progress_summary": truncate_text(
+                    item.get("progress_summary", ""),
+                    120,
+                ),
                 "completed_round": _int_value(item.get("completed_round", 0)),
             }
             for item in _dict_list(
                 _dict_value(state.get("event_memory", {})).get("events", [])
-            )
+            )[:5]
         ],
-        "major_event_history": [
+        "final_outcome_clues": [
+            truncate_text(item, 120)
+            for item in build_final_outcome_clues(
+                endgame_packets=endgame_packets,
+                final_actor_snapshots=final_actor_snapshots,
+            )[:8]
+        ],
+        "active_lead_candidates": [
             {
-                "round_index": _int_value(item.get("round_index", 0)),
-                "time_label": format_report_time_label(
-                    anchor=anchor,
-                    total_elapsed_minutes=_int_value(
-                        round_time_history.get(
-                            _int_value(item.get("round_index", 0)), {}
-                        ).get("total_elapsed_minutes", 0)
-                    ),
+                "display_name": str(digest.get("display_name", "")),
+                "interaction_count": _int_value(digest.get("interaction_count", 0)),
+                "strongest_counterparty": str(
+                    digest.get("strongest_counterparty", "")
                 ),
-                "phase_hint": phase_hint(
-                    round_index=_int_value(item.get("round_index", 0)),
-                    total_rounds=total_rounds,
-                ),
-                "source": str(item.get("source", "")),
-                "event_updates": _dict_list(item.get("event_updates", [])),
-                "event_memory_summary": _dict_value(
-                    item.get("event_memory_summary", {})
-                ),
-                "stop_context": _dict_value(item.get("stop_context", {})),
             }
-            for item in _dict_list(state.get("event_memory_history", []))
+            for digest in actor_digests[:4]
         ],
-        "final_outcome_clues": build_final_outcome_clues(
-            endgame_packets=endgame_packets,
-            final_actor_snapshots=final_actor_snapshots,
-        ),
-        "final_state_digest": final_state_digest,
     }
     return {
         "report_projection_json": json.dumps(
             projection,
             ensure_ascii=False,
-            indent=2,
+            separators=(",", ":"),
         )
     }
 
