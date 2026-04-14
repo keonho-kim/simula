@@ -28,6 +28,7 @@ Write the complete report bundle in one required JSON object.
 - `actor_dynamics_section` must use:
   - `### 현재 구도`
   - `### 관계 변화`
+  - Every non-empty line under both subheadings must begin with `- `
 - `major_events_section` must use bullet lines only.
 - Keep the language concrete and readable.
 

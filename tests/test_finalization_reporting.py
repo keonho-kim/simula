@@ -168,15 +168,16 @@ def test_normalize_final_report_sections_drops_table_header_rows() -> None:
 
     assert normalized["actor_results_rows"] == "| A | 결과 | B | 우세 | 근거 |"
     assert normalized["timeline_section"].startswith("- ")
+    assert normalized["actor_dynamics_section"] == "### 현재 구도\n- A\n### 관계 변화\n- B"
     assert normalized["major_events_section"].startswith("- ")
 
 
 def test_validate_actor_dynamics_section_requires_fixed_subheadings() -> None:
     error = validate_actor_dynamics_section(
         "### 현재 구도\n"
-        "Alpha가 Beta에게 가장 큰 영향을 주고 있다.\n\n"
+        "- Alpha가 Beta에게 가장 큰 영향을 주고 있다.\n\n"
         "### 관계 변화\n"
-        "처음에는 떨어져 있었지만 마지막 단계에서 두 사람의 연결이 강해졌다."
+        "- 처음에는 떨어져 있었지만 마지막 단계에서 두 사람의 연결이 강해졌다."
     )
 
     assert error is None

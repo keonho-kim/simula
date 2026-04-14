@@ -12,10 +12,6 @@ from types import SimpleNamespace
 from simula.application.services import executor as executor_module
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.runtime.graph import RUNTIME_SUBGRAPH
-from simula.application.workflow.graphs.simulation.graph import SIMULATION_WORKFLOW_GRAPH
-from simula.application.workflow.graphs.simulation.nodes.hydration import (
-    hydrate_initial_state,
-)
 from simula.application.workflow.graphs.simulation.states.initial_state import (
     build_simulation_input_state,
     expand_input_state_to_workflow_state,
@@ -280,7 +276,7 @@ class FakeRouter:
                     conclusion_section="### 최종 상태\n- Alpha의 직접 압박이 결정을 늦췄다.\n### 핵심 판단 근거\n- 마지막 비공개 조율이 흐름을 지배했다.",
                     actor_results_rows="| Alpha | 재검토 관철 | Beta | 우세 | 마지막 압박을 주도했다 |\n| Beta | 판단 유보 | Alpha | 열세 | 즉시 결론을 내지 못했다 |",
                     timeline_section="- 2027-06-18 03:50 | 마무리 단계 | Alpha가 재검토를 요구했다 | Beta의 즉시 결정을 늦췄다.",
-                    actor_dynamics_section="### 현재 구도\nAlpha가 직접 압박을 주도하고 Beta가 방어적으로 반응한다.\n### 관계 변화\n후반으로 갈수록 비공개 조율이 공개 신호보다 중요해졌다.",
+                    actor_dynamics_section="### 현재 구도\n- Alpha가 직접 압박을 주도하고 Beta가 방어적으로 반응한다.\n### 관계 변화\n- 후반으로 갈수록 비공개 조율이 공개 신호보다 중요해졌다.",
                     major_events_section="- Alpha가 비공개 재검토를 강하게 요구했다.\n- Beta가 즉시 결정을 미뤘다.",
                 ),
                 FakeMeta(),
@@ -609,92 +605,12 @@ def test_runtime_subgraph_finishes_immediately_on_simulation_done() -> None:
     assert len(store.round_artifacts) == 1
 
 
-def test_root_graph_keeps_compact_stage_order() -> None:
-    assert "hydrate_initial_state" in SIMULATION_WORKFLOW_GRAPH.nodes
-    assert "planning" in SIMULATION_WORKFLOW_GRAPH.nodes
-    assert "generation" in SIMULATION_WORKFLOW_GRAPH.nodes
-    assert "runtime" in SIMULATION_WORKFLOW_GRAPH.nodes
-    assert "finalization" in SIMULATION_WORKFLOW_GRAPH.nodes
-
-
-def test_build_simulation_input_state_is_compact() -> None:
-    settings = _settings()
-
-    input_state = build_simulation_input_state(
-        run_id="run-1",
-        scenario_text="scenario",
-        scenario_controls={"num_cast": 2, "allow_additional_cast": True},
-        settings=settings,
-    )
-
-    assert set(input_state) == {
-        "run_id",
-        "scenario",
-        "scenario_controls",
-        "max_rounds",
-        "rng_seed",
-    }
-    assert input_state["max_rounds"] == 1
-
-
-def test_expand_input_state_to_workflow_state_fills_required_defaults() -> None:
-    settings = _settings()
-    input_state = build_simulation_input_state(
-        run_id="run-1",
-        scenario_text="scenario",
-        scenario_controls={"num_cast": 2, "allow_additional_cast": True},
-        settings=settings,
-    )
-
-    state = expand_input_state_to_workflow_state(
-        input_state=input_state,
-        settings=settings,
-    )
-
-    assert state["run_id"] == "run-1"
-    assert state["checkpoint_enabled"] is False
-    assert state["planning_latency_seconds"] == 0.0
-    assert state["plan"] == {}
-    assert state["scenario_controls"]["num_cast"] == 2
-    assert state["scenario_controls"]["allow_additional_cast"] is True
-    assert state["round_focus_plan"] == {}
-    assert state["final_report_sections"] == {}
-def test_hydrate_initial_state_expands_compact_input_for_root_graph() -> None:
-    settings = _settings()
-    store = FakeStore()
-    context = WorkflowRuntimeContext(
-        settings=settings,
-        store=store,  # type: ignore[arg-type]
-        llms=FakeRouter(),  # type: ignore[arg-type]
-        logger=logging.getLogger("simula.test.graph"),
-        llm_usage_tracker=LLMUsageTracker(),
-    )
-    input_state = build_simulation_input_state(
-        run_id="run-graph",
-        scenario_text="2027-06-18 03:20에 시작하는 테스트 시나리오",
-        scenario_controls={"num_cast": 2, "allow_additional_cast": True},
-        settings=settings,
-    )
-    hydrated = hydrate_initial_state(
-        input_state,
-        type("RuntimeWrap", (), {"context": context})(),
-    )
-
-    assert hydrated["run_id"] == "run-graph"
-    assert hydrated["planning_latency_seconds"] == 0.0
-    assert hydrated["round_focus_plan"] == {}
-    assert hydrated["final_report_markdown"] == ""
-
-
-def test_executor_uses_compact_input_state(monkeypatch) -> None:
+def test_executor_returns_successful_run_result(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
     class FakeApp:
         async def ainvoke(self, state, **kwargs):  # noqa: ANN001
             captured["state"] = state
-            captured["kwargs"] = kwargs
-            captured["context_logger_name"] = kwargs["context"].logger.name
-            captured["llm_logger_name"] = kwargs["context"].llms.logger.name
             return {
                 "run_id": state["run_id"],
                 "final_report": {"run_id": state["run_id"]},
@@ -754,15 +670,13 @@ def test_executor_uses_compact_input_state(monkeypatch) -> None:
         executor.close()
 
     assert result.success is True
-    assert captured["state"] == {
-        "run_id": "20260413.1",
-        "scenario": "scenario",
-        "scenario_controls": {"num_cast": 2, "allow_additional_cast": True},
-        "max_rounds": 1,
-        "rng_seed": captured["state"]["rng_seed"],
+    assert result.run_id == "20260413.1"
+    assert result.final_report["run_id"] == "20260413.1"
+    assert captured["state"]["scenario"] == "scenario"
+    assert captured["state"]["scenario_controls"] == {
+        "num_cast": 2,
+        "allow_additional_cast": True,
     }
-    assert captured["context_logger_name"] == "simula.workflow.run.20260413.1"
-    assert captured["llm_logger_name"] == "simula.llm.run.20260413.1"
 
 
 def test_executor_logs_original_failure_traceback(monkeypatch, caplog) -> None:

@@ -67,6 +67,9 @@ def normalize_final_report_sections(sections: dict[str, object]) -> dict[str, ob
     normalized["timeline_section"] = normalize_timeline_section(
         str(sections.get("timeline_section", ""))
     )
+    normalized["actor_dynamics_section"] = normalize_actor_dynamics_section(
+        str(sections.get("actor_dynamics_section", ""))
+    )
     normalized["actor_results_rows"] = normalize_markdown_table_rows(
         str(sections.get("actor_results_rows", ""))
     )
@@ -182,6 +185,24 @@ def normalize_timeline_section(section_body: str) -> str:
     return "\n".join(normalized).strip()
 
 
+def normalize_actor_dynamics_section(section_body: str) -> str:
+    """Normalize actor dynamics subheadings so each body line becomes a bullet."""
+
+    parsed = _parse_subheaded_sections(
+        section_body,
+        ["### 현재 구도", "### 관계 변화"],
+    )
+    if isinstance(parsed, str):
+        return section_body.strip()
+
+    blocks: list[str] = []
+    for heading in ("### 현재 구도", "### 관계 변화"):
+        lines = _normalize_bullet_lines(parsed.get(heading, []))
+        blocks.append(heading)
+        blocks.extend(lines)
+    return "\n".join(blocks).strip()
+
+
 def normalize_markdown_table_rows(section_body: str) -> str:
     """Drop accidental markdown table headers and keep only body rows."""
 
@@ -221,9 +242,10 @@ def validate_timeline_section(section_body: str) -> str | None:
 def validate_actor_dynamics_section(section_body: str) -> str | None:
     """행위자 역학 관계 섹션의 소제목 구조를 검증한다."""
 
-    return validate_subheaded_text_section(
+    return validate_subheaded_bullet_section(
         section_body,
         headings=["### 현재 구도", "### 관계 변화"],
+        min_items=2,
     )
 
 

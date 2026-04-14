@@ -56,11 +56,11 @@ def render_structured_response(
     if parsed is None:
         if not content.strip():
             return _render_block(
-                subject=f"{role} | empty response",
+                subject=f"{role} | 빈 응답",
                 body="content: ",
             )
         return _render_block(
-            subject=f"{role} | unparsed response",
+            subject=f"{role} | RAW RESPONSE",
             body=f"content:\n{_indent_block(content.strip())}",
         )
 
@@ -72,7 +72,7 @@ def render_structured_response(
 
     if isinstance(parsed, ScenarioTimeScope):
         return _render_model_block(
-            subject="planner | 시간 범위 해석",
+            subject="planner | 시나리오 시간 단위",
             model=parsed,
         )
 
@@ -89,13 +89,13 @@ def render_structured_response(
             amount=parsed.elapsed_amount,
         )
         return _render_block(
-            subject="coordinator | round 경과 시간",
+            subject="coordinator | ROUND 경과 시간",
             body=_render_mapping(payload),
         )
 
     if isinstance(parsed, SimulationClockSnapshot):
         return _render_model_block(
-            subject="runtime | simulation clock",
+            subject="runtime | 시뮬레이션 시간 스냅샷",
             model=parsed,
         )
 
@@ -107,25 +107,25 @@ def render_structured_response(
 
     if isinstance(parsed, ExecutionPlanBundle):
         return _render_model_block(
-            subject="planner | 실행 계획 번들",
+            subject="planner | 실행 계획",
             model=parsed,
         )
 
     if isinstance(parsed, CoordinationFrame):
         return _render_model_block(
-            subject="planner | 조율 기준 프레임",
+            subject="planner | 상황 조율 기준",
             model=parsed,
         )
 
     if isinstance(parsed, ActionCatalog):
         return _render_model_block(
-            subject="planner | action catalog",
+            subject="planner | ACTION CATALOG",
             model=parsed,
         )
 
     if isinstance(parsed, CastRoster):
         return _render_model_block(
-            subject="planner | cast roster",
+            subject="planner | CAST ROASTER",
             model=parsed,
         )
 
@@ -137,13 +137,13 @@ def render_structured_response(
 
     if isinstance(parsed, RoundDirective):
         return _render_model_block(
-            subject="coordinator | round 지시",
+            subject="coordinator | ROUND 가이드 ",
             model=parsed,
         )
 
     if isinstance(parsed, RoundContinuationDecision):
         return _render_model_block(
-            subject="coordinator | round continuation",
+            subject="coordinator | ROUND 지속",
             model=parsed,
         )
 
@@ -162,13 +162,13 @@ def render_structured_response(
 
     if isinstance(parsed, ActorIntentStateBatch):
         return _render_model_block(
-            subject="coordinator | actor intent 상태",
+            subject="coordinator | 등장인물 의향 상태",
             model=parsed,
         )
 
     if isinstance(parsed, ActorFacingScenarioDigest):
         return _render_model_block(
-            subject="coordinator | actor-facing digest",
+            subject="coordinator | 등장인물 상황 전파",
             model=parsed,
         )
 
@@ -183,23 +183,23 @@ def render_structured_response(
 
     if isinstance(parsed, RoundResolution):
         return _render_model_block(
-            subject="coordinator | round 해소 결과",
+            subject="coordinator | ROUND 결과",
             model=parsed,
         )
 
     if isinstance(parsed, FinalReportSections):
         return _render_model_block(
-            subject="finalizer | 최종 보고서 번들",
+            subject="finalizer | 최종 보고서",
             model=parsed,
         )
 
     if isinstance(parsed, BaseModel):
         return _render_model_block(
-            subject=f"{role} | structured response",
+            subject=f"{role} | STRUCTURED",
             model=parsed,
         )
     return _render_block(
-        subject=f"{role} | structured response",
+        subject=f"{role} | STRUCTURED",
         body="content: ",
     )
 
@@ -216,12 +216,12 @@ def render_text_response(
     scope = str(log_context.get("scope")) if log_context else ""
     if role == "planner" and scope == "interpretation-core":
         return _render_block(
-            subject="planner | 시나리오 핵심 전제",
+            subject="planner | 시나리오 핵심",
             body=f"content:\n{_indent_block(stripped)}",
         )
     if role == "planner" and scope == "cast_roster":
         return _render_block(
-            subject="planner | cast roster 원문",
+            subject="planner | CAST ROASTER",
             body=f"content:\n{_indent_block(stripped)}",
         )
     if role == "fixer" and scope == "json-fix":
@@ -230,7 +230,7 @@ def render_text_response(
             body=f"content:\n{_indent_block(stripped)}",
         )
     return _render_block(
-        subject=f"{role} | text response",
+        subject=f"{role} | TEXT RESPONSE",
         body=f"content:\n{_indent_block(stripped)}",
     )
 
@@ -303,9 +303,9 @@ def _subject_particle(text: str) -> str:
 
 def _visibility_label(visibility: str) -> str:
     labels = {
-        "public": "공개 행동",
-        "private": "비공개 행동",
-        "group": "일부 공개 행동",
+        "public": "공개 상황 행동",
+        "private": "사적 상황 행동",
+        "group": "그룹 내 행동",
     }
     return labels.get(visibility, "행동")
 

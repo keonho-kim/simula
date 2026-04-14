@@ -38,6 +38,6 @@ _FINAL_REPORT_SECTIONS_EXAMPLE: dict[str, Any] = {
     "conclusion_section": "### 최종 상태\n- <one final-state bullet>\n### 핵심 판단 근거\n- <one reasoning bullet>",
     "actor_results_rows": "| <actor> | <result> | <counterparty> | <edge> | <reason> |",
     "timeline_section": "- <YYYY-MM-DD HH:MM | phase | event | impact>",
-    "actor_dynamics_section": "<Markdown section using ### 현재 구도 and ### 관계 변화>",
+    "actor_dynamics_section": "### 현재 구도\n- <one bullet describing the current relationship map>\n### 관계 변화\n- <one bullet describing how relationships changed>",
     "major_events_section": "- <one bullet summarizing a major event>",
 }

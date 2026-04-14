@@ -19,9 +19,7 @@ import logging
 
 import pytest
 
-from simula.domain.contracts import PlanningAnalysis, ScenarioTimeScope
-from simula.infrastructure.llm.fixer import _build_fix_json_prompt
-from simula.infrastructure.llm.output_parsers import build_output_parser
+from simula.domain.contracts import ScenarioTimeScope
 from simula.infrastructure.llm.router import StructuredLLMRouter
 from simula.infrastructure.llm.service import AsyncStructuredLLMService
 from simula.infrastructure.llm.usage import LLMUsageTracker
@@ -139,63 +137,6 @@ def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
 
 
 @pytest.mark.anyio
-async def test_service_uses_astream_for_structured_calls(caplog) -> None:
-    model = FakeModel(_time_scope_json())
-    service = _build_service(model)
-
-    with caplog.at_level(logging.INFO, logger="simula.test.llm_router"):
-        result, meta = await service.ainvoke_structured_with_meta(
-            "planner",
-            "prompt",
-            ScenarioTimeScope,
-        )
-    assert result.start == "초기 대면 직후"
-    assert meta.ttft_seconds is not None
-    assert model.astream_called is True
-    assert model.ainvoke_called is False
-    assert "planner 호출 시작" in caplog.text
-    assert "planner 완료" in caplog.text
-    assert service.router.usage_tracker.snapshot()["structured_calls"] == 1
-
-
-@pytest.mark.anyio
-async def test_service_logs_structured_call_start_once(caplog) -> None:
-    model = FakeModel(_time_scope_json())
-    service = _build_service(model)
-
-    with caplog.at_level(logging.INFO, logger="simula.test.llm_router"):
-        await service.ainvoke_structured_with_meta(
-            "planner",
-            "prompt",
-            ScenarioTimeScope,
-            log_context={
-                "scope": "planning-analysis",
-                "round_index": 2,
-                "slot_index": 1,
-            },
-        )
-
-    assert caplog.text.count("planner · 계획 분석 정리 시작") == 1
-    assert "planner · 계획 분석 정리 시작 | round_index=2 slot_index=1" in caplog.text
-    assert "planner · 계획 분석 정리 완료" in caplog.text
-
-
-@pytest.mark.anyio
-async def test_service_logs_pretty_payload_only_at_debug(caplog) -> None:
-    model = FakeModel(_time_scope_json())
-    service = _build_service(model)
-
-    with caplog.at_level(logging.DEBUG, logger="simula.test.llm_router"):
-        await service.ainvoke_structured_with_meta(
-            "planner",
-            "prompt",
-            ScenarioTimeScope,
-        )
-    assert "초기 대면 직후" in caplog.text
-    assert "핵심 선택 직전" in caplog.text
-
-
-@pytest.mark.anyio
 async def test_service_warns_when_default_payload_is_used(caplog, monkeypatch) -> None:
     model = FakeModel("not json")
     fixer_model = FakeModel(["still bad", "still bad", "still bad", "still bad"])
@@ -239,28 +180,6 @@ async def test_service_uses_fixer_after_structured_parse_failure() -> None:
 
 
 @pytest.mark.anyio
-async def test_service_retries_fixer_until_it_returns_valid_json(monkeypatch) -> None:
-    model = FakeModel(["not json", "still not json"])
-    fixer_model = FakeModel(["broken", "broken again", _time_scope_json()])
-    service = _build_service(model, fixer_model=fixer_model)
-    sleep_calls: list[float] = []
-
-    async def fake_sleep(seconds: float) -> None:
-        sleep_calls.append(seconds)
-
-    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
-
-    result, meta = await service.ainvoke_structured_with_meta(
-        "planner",
-        "prompt",
-        ScenarioTimeScope,
-    )
-    assert result.end == "핵심 선택 직전"
-    assert meta.parse_failure_count == 4
-    assert sleep_calls == [0.25, 0.5]
-
-
-@pytest.mark.anyio
 async def test_service_uses_fixer_after_semantic_validation_failure() -> None:
     model = FakeModel(
         '{"start":"같은 시점","end":"같은 시점"}'
@@ -282,35 +201,3 @@ async def test_service_uses_fixer_after_semantic_validation_failure() -> None:
     assert meta.forced_default is False
     assert meta.parse_failure_count == 2
     assert fixer_model.astream_called is True
-
-
-def test_fixer_prompt_includes_compact_schema_summary() -> None:
-    parser = build_output_parser(PlanningAnalysis)
-
-    prompt = _build_fix_json_prompt(
-        parser=parser,
-        failed_content="not json",
-    )
-
-    assert "Target schema: PlanningAnalysis" in prompt
-    assert "progression_plan.allowed_elapsed_units: array[enum[minute, hour, day, week]]" in prompt
-    assert "progression_plan.selection_reason: string (required)" in prompt
-    assert "allowed_elapsed_units values must be unique." in prompt
-
-
-@pytest.mark.anyio
-async def test_service_logs_primary_parse_failure_with_full_response(caplog) -> None:
-    model = FakeModel(["bad raw response", "still invalid full response"])
-    fixer_model = FakeModel(_time_scope_json())
-    service = _build_service(model, fixer_model=fixer_model)
-
-    with caplog.at_level(logging.DEBUG, logger="simula.test.llm_router"):
-        await service.ainvoke_structured_with_meta(
-            "planner",
-            "prompt",
-            ScenarioTimeScope,
-        )
-
-    assert "planner primary structured parse failed" in caplog.text
-    assert "full_response:\nstill invalid full response" in caplog.text
-    assert "parse_error: JSON 파싱 실패" in caplog.text

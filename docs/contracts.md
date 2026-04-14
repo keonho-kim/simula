@@ -141,7 +141,7 @@ Intermediate structured bundle used to render the final Markdown report. It cont
 - `conclusion_section`
 - `actor_results_rows`
 - `timeline_section`
-- `actor_dynamics_section`
+- `actor_dynamics_section` using `### 현재 구도` and `### 관계 변화`, with bullet lines under each subheading
 - `major_events_section`
 
 ## Failure Policy

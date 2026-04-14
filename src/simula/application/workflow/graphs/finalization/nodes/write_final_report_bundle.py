@@ -139,6 +139,16 @@ def _build_retry_guidance(feedback: str) -> str:
             "- `timeline_section` must use bullet rows like:\n"
             "  - 2027-06-18 03:20 | 시작 단계 | 사건 | 결과"
         )
+    if "### 현재 구도" in feedback or "### 관계 변화" in feedback:
+        return (
+            "- Use this exact shape for `actor_dynamics_section`:\n"
+            "  ### 현재 구도\n"
+            "  - 첫 번째 현재 구도 bullet\n"
+            "  - 두 번째 현재 구도 bullet\n"
+            "  ### 관계 변화\n"
+            "  - 첫 번째 관계 변화 bullet\n"
+            "  - 두 번째 관계 변화 bullet"
+        )
     if "bullet" in feedback or "'- '" in feedback:
         return (
             "- Every non-empty line in the affected field must begin with '- '."
