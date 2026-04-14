@@ -139,7 +139,7 @@ or `simulation_done`.
 Intermediate structured bundle used to render the final Markdown report. It contains:
 
 - `conclusion_section`
-- `actor_results_rows`
+- `actor_results_rows` (may be an empty string when there are no body rows)
 - `timeline_section`
 - `actor_dynamics_section` using `### 현재 구도` and `### 관계 변화`, with bullet lines under each subheading
 - `major_events_section`

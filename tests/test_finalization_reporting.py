@@ -19,6 +19,7 @@ from simula.application.workflow.graphs.finalization.nodes.build_report_projecti
 from simula.application.workflow.utils.finalization_sections import (
     normalize_conclusion_section,
     normalize_final_report_sections,
+    render_markdown_table,
     validate_actor_dynamics_section,
     validate_bullet_section,
     validate_conclusion_section,
@@ -115,11 +116,22 @@ def test_validate_bullet_section_rejects_plain_paragraph() -> None:
 def test_validate_markdown_table_rows_accepts_body_rows_only() -> None:
     error = validate_markdown_table_rows(
         "| A | 결과 | B | 우세 | 근거 |\n| B | 관망 | A | 열세 | 근거 |",
-        min_rows=1,
-        max_rows=3,
     )
 
     assert error is None
+
+
+def test_validate_markdown_table_rows_allows_empty_body() -> None:
+    assert validate_markdown_table_rows("") is None
+
+
+def test_validate_markdown_table_rows_allows_more_than_fourteen_rows() -> None:
+    rows = "\n".join(
+        f"| A{i} | 결과{i} | B{i} | 우세 | 근거{i} |"
+        for i in range(15)
+    )
+
+    assert validate_markdown_table_rows(rows) is None
 
 
 def test_validate_timeline_section_requires_fixed_timestamp_pattern() -> None:
@@ -190,3 +202,15 @@ def test_validate_forbidden_report_terms_rejects_abstract_jargon() -> None:
     )
 
     assert error is not None
+
+
+def test_render_markdown_table_keeps_header_when_body_is_empty() -> None:
+    rendered = render_markdown_table(
+        headers=["인물", "최종 결론", "상대/대상", "유불리/상태", "근거 요약"],
+        section_body="",
+    )
+
+    assert rendered == (
+        "| 인물 | 최종 결론 | 상대/대상 | 유불리/상태 | 근거 요약 |\n"
+        "| --- | --- | --- | --- | --- |"
+    )

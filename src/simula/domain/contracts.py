@@ -613,7 +613,6 @@ class FinalReportSections(BaseModel):
     def validate_final_report_sections(self) -> "FinalReportSections":
         for field_name in (
             "conclusion_section",
-            "actor_results_rows",
             "timeline_section",
             "actor_dynamics_section",
             "major_events_section",

@@ -267,15 +267,12 @@ def validate_forbidden_report_terms(
 
 def validate_markdown_table_rows(
     section_body: str,
-    *,
-    min_rows: int,
-    max_rows: int,
 ) -> str | None:
     """헤더 없는 markdown 표 본문 행 형식을 검증한다."""
 
     lines = [line.strip() for line in section_body.splitlines() if line.strip()]
-    if len(lines) < min_rows or len(lines) > max_rows:
-        return f"표 본문 행 수는 {min_rows}~{max_rows}개여야 합니다."
+    if not lines:
+        return None
     if any(not line.startswith("|") or not line.endswith("|") for line in lines):
         return "표 본문은 각 줄이 '|'로 시작하고 끝나야 합니다."
     for line in lines:

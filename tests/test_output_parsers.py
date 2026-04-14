@@ -102,12 +102,25 @@ def test_json_repair_parser_normalizes_single_item_list_into_string_field() -> N
     assert parsed.progression_plan.selection_reason == "시나리오가 일 단위 일정으로 보인다."
 
 
-def test_final_report_sections_requires_all_fields() -> None:
+def test_final_report_sections_allows_empty_actor_results_rows() -> None:
+    parsed = FinalReportSections.model_validate(
+        {
+            "conclusion_section": "### 최종 상태\n- 유지\n### 핵심 판단 근거\n- 유지",
+            "actor_results_rows": "",
+            "timeline_section": "- 2027-06-18 03:20 | 시작 단계 | 사건 | 결과",
+            "actor_dynamics_section": "### 현재 구도\nA\n### 관계 변화\nB",
+            "major_events_section": "- 사건",
+        }
+    )
+
+    assert parsed.actor_results_rows == ""
+
+
+def test_final_report_sections_requires_actor_results_rows_key() -> None:
     with pytest.raises(ValueError):
         FinalReportSections.model_validate(
             {
                 "conclusion_section": "### 최종 상태\n- 유지\n### 핵심 판단 근거\n- 유지",
-                "actor_results_rows": "",
                 "timeline_section": "- 2027-06-18 03:20 | 시작 단계 | 사건 | 결과",
                 "actor_dynamics_section": "### 현재 구도\nA\n### 관계 변화\nB",
                 "major_events_section": "- 사건",

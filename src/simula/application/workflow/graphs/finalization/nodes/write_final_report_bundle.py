@@ -38,8 +38,6 @@ async def write_final_report_bundle(
 
     feedback = ""
     errors = list(state["errors"])
-    actor_count = len(list(state["actors"]))
-    row_max = max(1, actor_count if actor_count <= 16 else 11)
     for attempt in range(2):
         prompt = PROMPT.format(
             scenario_text=state["scenario"],
@@ -72,7 +70,6 @@ async def write_final_report_bundle(
         feedback = _validate_sections(
             sections=dumped,
             scenario_text=state["scenario"],
-            row_max=row_max,
         )
         if feedback == "":
             if meta.forced_default:
@@ -86,15 +83,10 @@ def _validate_sections(
     *,
     sections: dict[str, object],
     scenario_text: str,
-    row_max: int,
 ) -> str:
     validators = [
         validate_conclusion_section(str(sections.get("conclusion_section", ""))),
-        validate_markdown_table_rows(
-            str(sections.get("actor_results_rows", "")),
-            min_rows=1,
-            max_rows=row_max,
-        ),
+        validate_markdown_table_rows(str(sections.get("actor_results_rows", ""))),
         validate_timeline_section(str(sections.get("timeline_section", ""))),
         validate_actor_dynamics_section(str(sections.get("actor_dynamics_section", ""))),
         validate_bullet_section(str(sections.get("major_events_section", "")), min_items=1),
