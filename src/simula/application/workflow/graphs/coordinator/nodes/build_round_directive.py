@@ -18,6 +18,7 @@ from simula.application.workflow.graphs.coordinator.prompts.round_directive_prom
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
+from simula.application.workflow.utils.streaming import emit_custom_event
 from simula.application.workflow.utils.coercion import as_dict_list, as_string_list
 from simula.application.workflow.utils.prompt_projections import (
     PREVIOUS_SUMMARY_LIMIT,
@@ -28,6 +29,10 @@ from simula.application.workflow.utils.prompt_projections import (
     truncate_text,
 )
 from simula.domain.contracts import RoundDirective
+from simula.domain.log_events import (
+    build_round_background_updated_event,
+    build_round_focus_selected_event,
+)
 from simula.domain.reporting import latest_observer_summary
 
 
@@ -112,16 +117,30 @@ async def build_round_directive(
     errors = list(state["errors"])
     if meta.forced_default:
         errors.append(f"round {state['round_index']} directive defaulted")
+    emit_custom_event(
+        build_round_focus_selected_event(
+            run_id=str(state["run_id"]),
+            round_index=int(state["round_index"]),
+            round_focus_plan=normalized,
+        )
+    )
+    background_updates = as_dict_list(normalized.get("background_updates", []))
+    if background_updates:
+        emit_custom_event(
+            build_round_background_updated_event(
+                run_id=str(state["run_id"]),
+                round_index=int(state["round_index"]),
+                background_updates=background_updates,
+            )
+        )
     return {
         "round_focus_plan": normalized,
         "round_focus_history": list(state["round_focus_history"]) + [normalized],
         "selected_cast_ids": as_string_list(normalized.get("selected_cast_ids", [])),
         "deferred_cast_ids": as_string_list(normalized.get("deferred_cast_ids", [])),
-        "latest_background_updates": as_dict_list(
-            normalized.get("background_updates", [])
-        ),
+        "latest_background_updates": background_updates,
         "background_updates": list(state["background_updates"])
-        + as_dict_list(normalized.get("background_updates", [])),
+        + background_updates,
         "errors": errors,
     }
 

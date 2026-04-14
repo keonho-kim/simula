@@ -25,6 +25,7 @@ from simula.application.workflow.graphs.runtime.proposal_contract import (
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
+from simula.application.workflow.utils.streaming import emit_custom_event
 from simula.application.workflow.utils.prompt_projections import (
     WORLD_STATE_SUMMARY_LIMIT,
     build_compact_background_updates,
@@ -44,6 +45,11 @@ from simula.domain.runtime_policy import next_stagnation_steps
 from simula.domain.runtime_actions import (
     ActorProposalPayload,
     apply_adopted_actor_proposals,
+)
+from simula.domain.log_events import (
+    build_round_actions_adopted_event,
+    build_round_observer_report_event,
+    build_round_time_advanced_event,
 )
 
 
@@ -187,6 +193,28 @@ async def resolve_round(
         state["run_id"],
         activities=list(applied["latest_round_activities"]),
         observer_report=report_payload,
+    )
+    emit_custom_event(
+        build_round_time_advanced_event(
+            run_id=str(state["run_id"]),
+            round_index=int(state["round_index"]),
+            time_advance=clock["round_time_advance"],
+        )
+    )
+    if list(applied["latest_round_activities"]):
+        emit_custom_event(
+            build_round_actions_adopted_event(
+                run_id=str(state["run_id"]),
+                round_index=int(state["round_index"]),
+                activities=list(applied["latest_round_activities"]),
+            )
+        )
+    emit_custom_event(
+        build_round_observer_report_event(
+            run_id=str(state["run_id"]),
+            round_index=int(state["round_index"]),
+            observer_report=report_payload,
+        )
     )
     errors = list(state["errors"]) + invalid_adoption_errors
     if meta.forced_default:

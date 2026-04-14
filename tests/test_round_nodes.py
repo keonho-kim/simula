@@ -270,6 +270,7 @@ def test_build_round_directive_sets_selected_cast_ids() -> None:
         )
     )
     state = {
+        "run_id": "run-1",
         "round_index": 2,
         "actors": [{"cast_id": "c", "display_name": "C"}],
         "focus_candidates": [{"cast_id": "a"}, {"cast_id": "b"}, {"cast_id": "c"}],
@@ -331,6 +332,7 @@ def test_build_round_directive_backfills_more_related_casts_when_pool_is_rich() 
         )
     )
     state = {
+        "run_id": "run-1",
         "round_index": 3,
         "actors": [{"cast_id": cast_id, "display_name": cast_id.upper()} for cast_id in ["a", "b", "c", "d", "e"]],
         "focus_candidates": [{"cast_id": cast_id} for cast_id in ["a", "b", "c", "d", "e"]],

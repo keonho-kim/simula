@@ -22,6 +22,7 @@ from typing import Any, cast
 
 from simula.application.ports.storage import StorageSchemaError
 from simula.application.services.logging_setup import build_run_logger_name
+from simula.application.services.run_jsonl import RunJsonlAppender
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.simulation.graph import (
     SIMULATION_WORKFLOW,
@@ -29,6 +30,10 @@ from simula.application.workflow.graphs.simulation.graph import (
 )
 from simula.application.workflow.graphs.simulation.states.initial_state import (
     build_simulation_input_state,
+)
+from simula.domain.log_events import (
+    build_llm_usage_summary_event,
+    build_simulation_started_event,
 )
 from simula.domain.scenario_controls import ScenarioControls
 from simula.infrastructure.config.models import AppSettings
@@ -136,6 +141,10 @@ class SimulationExecutor:
             llms=self.llms,
             logger=run_logger,
             llm_usage_tracker=self.llm_usage_tracker,
+            run_jsonl_appender=RunJsonlAppender(
+                output_dir=self.settings.storage.output_dir,
+                run_id=run_id,
+            ),
         )
         input_state = build_simulation_input_state(
             run_id=run_id,
@@ -144,6 +153,15 @@ class SimulationExecutor:
             settings=self.settings,
         )
         started_at = time.perf_counter()
+        if context.run_jsonl_appender is not None:
+            context.run_jsonl_appender.append(
+                build_simulation_started_event(
+                    run_id=run_id,
+                    scenario=scenario_text,
+                    max_rounds=input_state["max_rounds"],
+                    rng_seed=input_state["rng_seed"],
+                )
+            )
 
         try:
             async with create_async_checkpointer_context(self.settings) as checkpointer:
@@ -155,13 +173,29 @@ class SimulationExecutor:
                     if checkpointer is not None
                     else SIMULATION_WORKFLOW
                 )
-                raw_result = await app.ainvoke(
+                final_state: dict[str, Any] | None = None
+                async for chunk in app.astream(
                     input_state,
                     config={"configurable": {"thread_id": run_id}},
                     context=context,
+                    stream_mode=["custom", "values"],
                     version="v2",
+                ):
+                    final_state = _consume_stream_chunk(
+                        chunk=chunk,
+                        final_state=final_state,
+                        appender=context.run_jsonl_appender,
+                    )
+            if final_state is None:
+                raise RuntimeError("workflow did not produce a final state.")
+            llm_usage_summary = self.llm_usage_tracker.snapshot()
+            if context.run_jsonl_appender is not None:
+                context.run_jsonl_appender.append(
+                    build_llm_usage_summary_event(
+                        run_id=run_id,
+                        llm_usage_summary=llm_usage_summary,
+                    )
                 )
-            final_state = _unwrap_graph_output(raw_result)
             wall_clock = time.perf_counter() - started_at
             self.store.mark_run_status(run_id, "completed")
             run_logger.info("run 완료 | wall_clock=%.2fs", wall_clock)
@@ -193,3 +227,28 @@ def _unwrap_graph_output(result: Any) -> dict[str, Any]:
     if hasattr(result, "value"):
         return cast(dict[str, Any], result.value)
     return cast(dict[str, Any], result)
+
+
+def _consume_stream_chunk(
+    *,
+    chunk: object,
+    final_state: dict[str, Any] | None,
+    appender: RunJsonlAppender | None,
+) -> dict[str, Any] | None:
+    if not isinstance(chunk, tuple) or len(chunk) != 2:
+        if isinstance(chunk, dict):
+            return cast(dict[str, Any], chunk)
+        return final_state
+
+    mode, payload = chunk
+    if mode == "values" and isinstance(payload, dict):
+        return cast(dict[str, Any], payload)
+
+    if mode == "custom" and isinstance(payload, dict):
+        payload_dict = cast(dict[str, object], payload)
+        entry = payload_dict.get("entry")
+        if isinstance(entry, dict) and appender is not None:
+            appender.append(cast(dict[str, object], entry))
+        return final_state
+
+    return final_state

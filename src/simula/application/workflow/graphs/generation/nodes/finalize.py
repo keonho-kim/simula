@@ -19,7 +19,9 @@ from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
+from simula.application.workflow.utils.streaming import emit_custom_event
 from simula.domain.actors import finalize_actor_registry
+from simula.domain.log_events import build_actors_finalized_event
 
 
 def finalize_generated_actors(
@@ -47,6 +49,12 @@ def finalize_generated_actors(
     parse_failures = sum(int(item["parse_failure_count"]) for item in sorted_results)
     runtime.context.logger.info("등장 인물 생성 완료")
     runtime.context.store.save_actors(state["run_id"], actors)
+    emit_custom_event(
+        build_actors_finalized_event(
+            run_id=str(state["run_id"]),
+            actors=actors,
+        )
+    )
 
     return {
         "actors": actors,

@@ -16,6 +16,8 @@ from simula.application.workflow.graphs.finalization.nodes.build_report_projecti
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
+from simula.application.workflow.utils.streaming import emit_custom_event
+from simula.domain.log_events import build_final_report_event
 from simula.domain.reporting import build_final_report, build_simulation_log_entries
 
 
@@ -44,6 +46,13 @@ def build_report_artifacts(
                 **cast(dict[str, object], state),
                 "final_report": final_report,
             },
+        )
+    )
+    emit_custom_event(
+        build_final_report_event(
+            run_id=str(state["run_id"]),
+            final_report=final_report,
+            stop_reason=state.get("stop_reason"),
         )
     )
     return {

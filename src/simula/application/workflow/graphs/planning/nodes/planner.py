@@ -23,7 +23,9 @@ from simula.application.workflow.graphs.planning.prompts.build_planning_analysis
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
+from simula.application.workflow.utils.streaming import emit_custom_event
 from simula.domain.contracts import ExecutionPlanBundle, PlanningAnalysis
+from simula.domain.log_events import build_plan_finalized_event
 
 
 async def build_planning_analysis(
@@ -113,6 +115,12 @@ def finalize_plan(
     action_count = len(raw_actions) if isinstance(raw_actions, list) else 0
     progression_plan = cast(dict[str, object], plan.get("progression_plan", {}))
     runtime.context.store.save_plan(state["run_id"], plan)
+    emit_custom_event(
+        build_plan_finalized_event(
+            run_id=str(state["run_id"]),
+            plan=plan,
+        )
+    )
     runtime.context.logger.info(
         "계획 정리 완료 | cast=%s action_types=%s recommended_rounds=%s default_elapsed_unit=%s",
         len(cast_roster),

@@ -132,8 +132,8 @@ def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
     assert result.startswith('{"cast_id":"a"')
     assert meta.ttft_seconds is not None
     assert model.stream_called is True
-    assert "planner · 실행 계획 번들 정리 시작" in caplog.text
-    assert "planner · 실행 계획 번들 정리 완료" in caplog.text
+    assert "planner · 실행 계획 정리 시작" in caplog.text
+    assert "planner · 실행 계획 정리 완료" in caplog.text
 
 
 @pytest.mark.anyio

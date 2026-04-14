@@ -23,7 +23,7 @@ from pydantic import BaseModel, ValidationError
 
 from simula.application.ports.llm import SemanticValidator, StructuredCallMeta
 from simula.infrastructure.config.models import AppSettings
-from simula.infrastructure.llm.fixer import repair_structured_json
+from simula.application.workflow.helper.fixer import repair_structured_json
 from simula.infrastructure.llm.output_parsers import build_output_parser
 from simula.infrastructure.llm.router import (
     StructuredLLMRouter,

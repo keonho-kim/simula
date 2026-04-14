@@ -7,6 +7,18 @@ from __future__ import annotations
 from collections import Counter
 from typing import cast
 
+from simula.domain.log_events import (
+    build_actors_finalized_event,
+    build_final_report_event,
+    build_llm_usage_summary_event,
+    build_plan_finalized_event,
+    build_round_actions_adopted_event,
+    build_round_background_updated_event,
+    build_round_focus_selected_event,
+    build_round_observer_report_event,
+    build_round_time_advanced_event,
+    build_simulation_started_event,
+)
 from simula.domain.contracts import (
     FinalReport,
     LLMUsageSummary,
@@ -120,30 +132,27 @@ def build_simulation_log_entries(
         background_updates_by_round.setdefault(round_index, []).append(item)
 
     entries: list[dict[str, object]] = [
-        {
-            "event": "simulation_started",
-            "run_id": run_id,
-            "scenario": str(state.get("scenario", "")),
-            "max_rounds": _int_value(state.get("max_rounds", 0)),
-            "rng_seed": _optional_int_value(state.get("rng_seed")),
-        }
+        build_simulation_started_event(
+            run_id=run_id,
+            scenario=state.get("scenario", ""),
+            max_rounds=state.get("max_rounds", 0),
+            rng_seed=state.get("rng_seed"),
+        )
     ]
     plan = _dict_value(state.get("plan", {}))
     if plan:
         entries.append(
-            {
-                "event": "plan_finalized",
-                "run_id": run_id,
-                "plan": plan,
-            }
+            build_plan_finalized_event(
+                run_id=run_id,
+                plan=plan,
+            )
         )
     if actors:
         entries.append(
-            {
-                "event": "actors_finalized",
-                "run_id": run_id,
-                "actors": actors,
-            }
+            build_actors_finalized_event(
+                run_id=run_id,
+                actors=actors,
+            )
         )
 
     reports_by_round = {
@@ -157,30 +166,27 @@ def build_simulation_log_entries(
     for round_index in round_indexes:
         if round_index in round_focus_history:
             entries.append(
-                {
-                    "event": "round_focus_selected",
-                    "run_id": run_id,
-                    "round_index": round_index,
-                    "round_focus_plan": round_focus_history[round_index],
-                }
+                build_round_focus_selected_event(
+                    run_id=run_id,
+                    round_index=round_index,
+                    round_focus_plan=round_focus_history[round_index],
+                )
             )
         if round_index in round_time_history:
             entries.append(
-                {
-                    "event": "round_time_advanced",
-                    "run_id": run_id,
-                    "round_index": round_index,
-                    "time_advance": round_time_history[round_index],
-                }
+                build_round_time_advanced_event(
+                    run_id=run_id,
+                    round_index=round_index,
+                    time_advance=round_time_history[round_index],
+                )
             )
         if round_index in background_updates_by_round:
             entries.append(
-                {
-                    "event": "round_background_updated",
-                    "run_id": run_id,
-                    "round_index": round_index,
-                    "background_updates": background_updates_by_round[round_index],
-                }
+                build_round_background_updated_event(
+                    run_id=run_id,
+                    round_index=round_index,
+                    background_updates=background_updates_by_round[round_index],
+                )
             )
         round_activities = [
             activity
@@ -189,38 +195,34 @@ def build_simulation_log_entries(
         ]
         if round_activities:
             entries.append(
-                {
-                    "event": "round_actions_adopted",
-                    "run_id": run_id,
-                    "round_index": round_index,
-                    "activities": round_activities,
-                }
+                build_round_actions_adopted_event(
+                    run_id=run_id,
+                    round_index=round_index,
+                    activities=round_activities,
+                )
             )
         if round_index in reports_by_round:
             entries.append(
-                {
-                    "event": "round_observer_report",
-                    "run_id": run_id,
-                    "round_index": round_index,
-                    "observer_report": reports_by_round[round_index],
-                }
+                build_round_observer_report_event(
+                    run_id=run_id,
+                    round_index=round_index,
+                    observer_report=reports_by_round[round_index],
+                )
             )
 
     if final_report:
         entries.append(
-            {
-                "event": "final_report",
-                "run_id": run_id,
-                "final_report": final_report,
-                "stop_reason": state.get("stop_reason"),
-            }
+            build_final_report_event(
+                run_id=run_id,
+                final_report=final_report,
+                stop_reason=state.get("stop_reason"),
+            )
         )
     entries.append(
-        {
-            "event": "llm_usage_summary",
-            "run_id": run_id,
-            "llm_usage_summary": llm_usage_summary,
-        }
+        build_llm_usage_summary_event(
+            run_id=run_id,
+            llm_usage_summary=llm_usage_summary,
+        )
     )
 
     return [{"index": index, **entry} for index, entry in enumerate(entries, start=1)]

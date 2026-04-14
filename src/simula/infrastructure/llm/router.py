@@ -454,8 +454,8 @@ def _format_response_title(
 
 def _planner_scope_label(scope: str, *, suffix: str = "") -> str:
     labels = {
-        "planning-analysis": "planner · 계획 분석 정리",
-        "execution-plan": "planner · 실행 계획 번들 정리",
+        "planning-analysis": "planner · 계획 분석",
+        "execution-plan": "planner · 실행 계획 정리",
     }
     base = labels.get(scope, "planner")
     if suffix:

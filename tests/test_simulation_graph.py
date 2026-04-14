@@ -5,8 +5,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from types import SimpleNamespace
 
 from simula.application.services import executor as executor_module
@@ -609,20 +611,81 @@ def test_executor_returns_successful_run_result(monkeypatch) -> None:
     captured: dict[str, object] = {}
 
     class FakeApp:
-        async def ainvoke(self, state, **kwargs):  # noqa: ANN001
+        async def astream(self, state, **kwargs):  # noqa: ANN001
             captured["state"] = state
-            return {
-                "run_id": state["run_id"],
-                "final_report": {"run_id": state["run_id"]},
-                "final_report_markdown": "# 시뮬레이션 결과",
-                "simulation_log_jsonl": "{}",
-                "stop_reason": "",
-                "errors": [],
-            }
+            yield (
+                "custom",
+                {
+                    "stream": "simulation_log",
+                    "entry": {
+                        "event": "plan_finalized",
+                        "event_key": "plan_finalized",
+                        "run_id": state["run_id"],
+                        "plan": {"hello": "world"},
+                    },
+                },
+            )
+            yield (
+                "values",
+                {
+                    "run_id": state["run_id"],
+                    "final_report": {"run_id": state["run_id"]},
+                    "final_report_markdown": "# 시뮬레이션 결과",
+                    "simulation_log_jsonl": "\n".join(
+                        [
+                            json.dumps(
+                                {
+                                    "index": 1,
+                                    "event": "simulation_started",
+                                    "event_key": "simulation_started",
+                                    "run_id": state["run_id"],
+                                    "scenario": state["scenario"],
+                                    "max_rounds": state["max_rounds"],
+                                    "rng_seed": state["rng_seed"],
+                                },
+                                ensure_ascii=False,
+                            ),
+                            json.dumps(
+                                {
+                                    "index": 2,
+                                    "event": "plan_finalized",
+                                    "event_key": "plan_finalized",
+                                    "run_id": state["run_id"],
+                                    "plan": {"hello": "world"},
+                                },
+                                ensure_ascii=False,
+                            ),
+                            json.dumps(
+                                {
+                                    "index": 3,
+                                    "event": "llm_usage_summary",
+                                    "event_key": "llm_usage_summary",
+                                    "run_id": state["run_id"],
+                                    "llm_usage_summary": {
+                                        "total_calls": 0,
+                                        "calls_by_role": {},
+                                        "structured_calls": 0,
+                                        "text_calls": 0,
+                                        "parse_failures": 0,
+                                        "forced_defaults": 0,
+                                        "input_tokens": None,
+                                        "output_tokens": None,
+                                        "total_tokens": None,
+                                    },
+                                },
+                                ensure_ascii=False,
+                            ),
+                        ]
+                    ),
+                    "stop_reason": "",
+                    "errors": [],
+                },
+            )
 
     class FakeStore:
         def __init__(self) -> None:
             self._run_id = "20260413.1"
+            self.statuses: list[tuple[str, str, str | None]] = []
 
         def next_run_id(self) -> str:
             return self._run_id
@@ -630,13 +693,14 @@ def test_executor_returns_successful_run_result(monkeypatch) -> None:
         def save_run_started(self, **kwargs):  # noqa: ANN003
             return None
 
-        def mark_run_status(self, *args, **kwargs):  # noqa: ANN002, ANN003
-            return None
+        def mark_run_status(self, run_id, status, error_text=None):  # noqa: ANN001
+            self.statuses.append((run_id, status, error_text))
 
         def close(self) -> None:
             return None
 
-    monkeypatch.setattr(executor_module, "create_app_store", lambda *args, **kwargs: FakeStore())
+    fake_store = FakeStore()
+    monkeypatch.setattr(executor_module, "create_app_store", lambda *args, **kwargs: fake_store)
     monkeypatch.setattr(
         executor_module,
         "build_model_router",
@@ -677,17 +741,38 @@ def test_executor_returns_successful_run_result(monkeypatch) -> None:
         "num_cast": 2,
         "allow_additional_cast": True,
     }
+    log_path = Path(settings.storage.output_dir) / result.run_id / "simulation.log.jsonl"
+    assert log_path.exists()
+    lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line]
+    assert len(lines) == 3
+    assert json.loads(lines[0])["event"] == "simulation_started"
+    assert json.loads(lines[1])["event"] == "plan_finalized"
+    assert json.loads(lines[2])["event"] == "llm_usage_summary"
+    assert fake_store.statuses[-1] == ("20260413.1", "completed", None)
 
 
 def test_executor_logs_original_failure_traceback(monkeypatch, caplog) -> None:
     class FakeApp:
-        async def ainvoke(self, state, **kwargs):  # noqa: ANN001
-            del state, kwargs
+        async def astream(self, state, **kwargs):  # noqa: ANN001
+            del kwargs
+            yield (
+                "custom",
+                {
+                    "stream": "simulation_log",
+                    "entry": {
+                        "event": "plan_finalized",
+                        "event_key": "plan_finalized",
+                        "run_id": state["run_id"],
+                        "plan": {"hello": "world"},
+                    },
+                },
+            )
             raise RuntimeError("boom")
 
     class FakeStore:
         def __init__(self) -> None:
             self._run_id = "20260413.2"
+            self.statuses: list[tuple[str, str, str | None]] = []
 
         def next_run_id(self) -> str:
             return self._run_id
@@ -695,13 +780,14 @@ def test_executor_logs_original_failure_traceback(monkeypatch, caplog) -> None:
         def save_run_started(self, **kwargs):  # noqa: ANN003
             return None
 
-        def mark_run_status(self, *args, **kwargs):  # noqa: ANN002, ANN003
-            return None
+        def mark_run_status(self, run_id, status, error_text=None):  # noqa: ANN001
+            self.statuses.append((run_id, status, error_text))
 
         def close(self) -> None:
             return None
 
-    monkeypatch.setattr(executor_module, "create_app_store", lambda *args, **kwargs: FakeStore())
+    fake_store = FakeStore()
+    monkeypatch.setattr(executor_module, "create_app_store", lambda *args, **kwargs: fake_store)
     monkeypatch.setattr(
         executor_module,
         "build_model_router",
@@ -739,3 +825,11 @@ def test_executor_logs_original_failure_traceback(monkeypatch, caplog) -> None:
     assert result.error == "boom"
     assert "run 실패" in caplog.text
     assert "RuntimeError: boom" in caplog.text
+    log_path = Path(settings.storage.output_dir) / result.run_id / "simulation.log.jsonl"
+    assert log_path.exists()
+    lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line]
+    assert len(lines) == 2
+    assert json.loads(lines[0])["event"] == "simulation_started"
+    assert json.loads(lines[1])["event"] == "plan_finalized"
+    assert fake_store.statuses[-1][0] == "20260413.2"
+    assert fake_store.statuses[-1][1] == "failed"

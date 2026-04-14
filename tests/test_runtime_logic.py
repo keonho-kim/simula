@@ -308,7 +308,10 @@ def test_build_simulation_log_entries_appends_llm_usage_summary() -> None:
         },
     )
 
+    assert entries[0]["event"] == "simulation_started"
+    assert entries[0]["event_key"] == "simulation_started"
     assert entries[-1]["event"] == "llm_usage_summary"
+    assert entries[-1]["event_key"] == "llm_usage_summary"
     assert entries[-1]["llm_usage_summary"]["calls_by_role"]["actor"] == 2
 
 
