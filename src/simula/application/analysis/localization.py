@@ -112,6 +112,8 @@ NETWORK_EDGE_COLUMN_LABELS = {
     "first_round": "첫 라운드",
     "last_round": "마지막 라운드",
     "total_weight": "총 연결 가중치",
+    "label_preview": "엣지 라벨 요약",
+    "label_variant_count": "엣지 라벨 변형 수",
 }
 
 

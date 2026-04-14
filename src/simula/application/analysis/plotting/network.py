@@ -18,27 +18,26 @@ import numpy as np
 from simula.application.analysis.plotting.fonts import configure_korean_font
 
 _LAYOUT_SEED = 42
-_LAYOUT_SCALE = 2.6
+_LAYOUT_SCALE = 1.0
 _LAYOUT_ITERATIONS = 300
 _LAYOUT_THRESHOLD = 1e-5
-_LAYOUT_K_MULTIPLIER = 1.8
-_LAYOUT_MIN_K = 0.55
+_LAYOUT_K_MULTIPLIER = 2.4
+_LAYOUT_MIN_K = 0.9
 
 _NODE_BASE_SIZE = 1_100.0
 _NODE_SIZE_RANGE = 2_400.0
 _NODE_BASE_BORDER_WIDTH = 1.0
 _NODE_BORDER_WIDTH_RANGE = 1.6
 
-_EDGE_BASE_WIDTH = 1.2
-_EDGE_WIDTH_RANGE = 3.2
+_EDGE_BASE_WIDTH = 1.0
+_EDGE_WIDTH_RANGE = 3.0
 
-_NODE_CMAP = plt.colormaps["YlOrRd"]
-_EDGE_CMAP = plt.colormaps["PuBuGn"]
-_LABEL_BBOX = {
-    "boxstyle": "round,pad=0.22",
-    "facecolor": "white",
+_NODE_CMAP = plt.colormaps["Blues"]
+_EDGE_CMAP = plt.colormaps["viridis"]
+_TRANSPARENT_LABEL_BBOX = {
+    "facecolor": "none",
     "edgecolor": "none",
-    "alpha": 0.74,
+    "alpha": 0.0,
 }
 
 
@@ -110,8 +109,9 @@ def render_network_plot(
                 positions,
                 labels=labels,
                 font_size=10,
+                font_color="#102A43",
                 font_family=label_font,
-                bbox=_LABEL_BBOX,
+                bbox=_TRANSPARENT_LABEL_BBOX,
                 ax=axis,
             )
 
@@ -127,6 +127,7 @@ def render_network_plot(
                 )
             else:
                 edge_style = _build_edge_visual_style(graph)
+                edge_labels = _build_edge_label_text(graph)
                 nx.draw_networkx_edges(
                     graph,
                     positions,
@@ -146,6 +147,21 @@ def render_network_plot(
                     nodelist=node_order,
                     ax=axis,
                 )
+                nx.draw_networkx_edge_labels(
+                    graph,
+                    positions,
+                    edge_labels=edge_labels,
+                    label_pos=0.52,
+                    font_size=8,
+                    font_color="#243B53",
+                    font_family=label_font,
+                    rotate=False,
+                    bbox=_TRANSPARENT_LABEL_BBOX,
+                    node_size=node_style.sizes,
+                    nodelist=node_order,
+                    connectionstyle="arc3,rad=0.12",
+                    ax=axis,
+                )
 
             axis.margins(0.18)
             axis.set_axis_off()
@@ -160,11 +176,14 @@ def render_network_plot(
 def _build_layout_kwargs(graph: nx.DiGraph) -> dict[str, object]:
     """Return tuned spring-layout settings for a less crowded graph."""
 
-    node_count = max(graph.number_of_nodes(), 1)
+    active_node_count = max(
+        sum(1 for node in graph.nodes() if graph.degree(node) > 0),
+        1,
+    )
     return {
         "seed": _LAYOUT_SEED,
         "weight": "total_weight" if graph.number_of_edges() > 0 else None,
-        "k": max(_LAYOUT_K_MULTIPLIER / np.sqrt(node_count), _LAYOUT_MIN_K),
+        "k": max(_LAYOUT_K_MULTIPLIER / np.sqrt(active_node_count), _LAYOUT_MIN_K),
         "iterations": _LAYOUT_ITERATIONS,
         "threshold": _LAYOUT_THRESHOLD,
         "scale": _LAYOUT_SCALE,
@@ -230,7 +249,7 @@ def _build_node_visual_style(graph: nx.DiGraph) -> NodeVisualStyle:
 
     return NodeVisualStyle(
         sizes=(_NODE_BASE_SIZE + _NODE_SIZE_RANGE * emphasis).tolist(),
-        colors=(0.16 + 0.84 * color_strength).tolist(),
+        colors=(0.24 + 0.58 * color_strength).tolist(),
         border_widths=(
             _NODE_BASE_BORDER_WIDTH + _NODE_BORDER_WIDTH_RANGE * brokerage_norm
         ).tolist(),
@@ -248,8 +267,29 @@ def _build_edge_visual_style(graph: nx.DiGraph) -> EdgeVisualStyle:
 
     return EdgeVisualStyle(
         widths=(_EDGE_BASE_WIDTH + _EDGE_WIDTH_RANGE * weight_norm).tolist(),
-        colors=(0.18 + 0.82 * weight_norm).tolist(),
+        colors=(0.20 + 0.75 * weight_norm).tolist(),
     )
+
+
+def _build_edge_label_text(graph: nx.DiGraph) -> dict[tuple[str, str], str]:
+    """Build concise edge labels from aggregated activity summaries."""
+
+    labels: dict[tuple[str, str], str] = {}
+    for source, target, attrs in graph.edges(data=True):
+        total_weight = int(max(_metric_value(attrs, "total_weight"), 0.0))
+        preview = str(attrs.get("label_preview", "")).strip()
+        variant_count = int(max(_metric_value(attrs, "label_variant_count"), 0.0))
+
+        if preview:
+            if variant_count > 1:
+                labels[(source, target)] = (
+                    f"{total_weight}회 · {preview} 외 {variant_count - 1}"
+                )
+            else:
+                labels[(source, target)] = f"{total_weight}회 · {preview}"
+        else:
+            labels[(source, target)] = f"{total_weight}회"
+    return labels
 
 
 def _metric_value(attrs: dict[str, object], *keys: str) -> float:

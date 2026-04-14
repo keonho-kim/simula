@@ -6,8 +6,11 @@ from __future__ import annotations
 
 import networkx as nx
 import numpy as np
+import pytest
 
 from simula.application.analysis.plotting.network import (
+    _build_edge_label_text,
+    _build_edge_visual_style,
     _build_layout_kwargs,
     _build_node_visual_style,
 )
@@ -54,11 +57,40 @@ def test_layout_kwargs_increase_spacing_and_iterations() -> None:
     graph.add_edge("alpha", "beta", total_weight=3)
     graph.add_edge("beta", "gamma", total_weight=2)
     graph.add_edge("gamma", "delta", total_weight=1)
+    graph.add_node("isolated-a")
+    graph.add_node("isolated-b")
 
     kwargs = _build_layout_kwargs(graph)
 
     assert kwargs["weight"] == "total_weight"
     assert kwargs["iterations"] == 300
-    assert kwargs["scale"] == 2.6
+    assert kwargs["scale"] == 1.0
     assert kwargs["method"] == "force"
-    assert float(kwargs["k"]) > 1.0 / np.sqrt(graph.number_of_nodes())
+    assert float(kwargs["k"]) == pytest.approx(2.4 / np.sqrt(4))
+
+
+def test_edge_visual_style_normalizes_weight_with_minimum_width_one() -> None:
+    graph = nx.DiGraph()
+    graph.add_edge("alpha", "beta", total_weight=1)
+    graph.add_edge("beta", "gamma", total_weight=9)
+
+    style = _build_edge_visual_style(graph)
+
+    assert style.widths[0] == pytest.approx(1.0)
+    assert style.widths[1] > style.widths[0]
+    assert style.colors[1] > style.colors[0]
+
+
+def test_edge_label_text_includes_count_and_preview() -> None:
+    graph = nx.DiGraph()
+    graph.add_edge(
+        "alpha",
+        "beta",
+        total_weight=3,
+        label_preview="데이트를 제안한다.",
+        label_variant_count=2,
+    )
+
+    labels = _build_edge_label_text(graph)
+
+    assert labels[("alpha", "beta")] == "3회 · 데이트를 제안한다. 외 1"

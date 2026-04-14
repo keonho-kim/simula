@@ -170,6 +170,11 @@ def _parse_adopted_activities(
                 ),
                 visibility=str(activity_dict.get("visibility", "")).strip(),
                 thread_id=str(activity_dict.get("thread_id", "")).strip(),
+                action_type=str(activity_dict.get("action_type", "")).strip(),
+                intent=str(activity_dict.get("intent", "")).strip(),
+                action_summary=str(activity_dict.get("action_summary", "")).strip(),
+                action_detail=str(activity_dict.get("action_detail", "")).strip(),
+                utterance=str(activity_dict.get("utterance", "")).strip(),
             )
         )
     return records

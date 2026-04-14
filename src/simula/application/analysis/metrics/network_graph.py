@@ -100,6 +100,8 @@ def build_network_graph(
             first_round=edge.first_round,
             last_round=edge.last_round,
             total_weight=edge.total_weight,
+            label_preview=edge.label_preview,
+            label_variant_count=edge.label_variant_count,
         )
     return graph
 

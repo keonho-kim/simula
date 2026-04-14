@@ -73,6 +73,11 @@ class AdoptedActivityRecord:
     intent_target_cast_ids: list[str]
     visibility: str
     thread_id: str
+    action_type: str = ""
+    intent: str = ""
+    action_summary: str = ""
+    action_detail: str = ""
+    utterance: str = ""
 
 
 @dataclass(slots=True)
@@ -410,6 +415,8 @@ class ActorEdgeMetrics:
     first_round: int
     last_round: int
     total_weight: int
+    label_preview: str = ""
+    label_variant_count: int = 0
 
     def to_row(self) -> dict[str, object]:
         return {
@@ -426,6 +433,8 @@ class ActorEdgeMetrics:
             "first_round": self.first_round,
             "last_round": self.last_round,
             "total_weight": self.total_weight,
+            "label_preview": self.label_preview,
+            "label_variant_count": self.label_variant_count,
         }
 
 

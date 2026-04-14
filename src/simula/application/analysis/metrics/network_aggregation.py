@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from simula.application.analysis.models import (
     ActorEdgeMetrics,
@@ -38,6 +38,7 @@ class _MutableEdgeState:
     thread_event_count: int = 0
     first_round: int = 0
     last_round: int = 0
+    label_samples: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -127,6 +128,8 @@ def aggregate_relationship_network(
                 first_round=item.first_round,
                 last_round=item.last_round,
                 total_weight=item.action_count + item.intent_only_count,
+                label_preview=_build_edge_label_preview(item.label_samples),
+                label_variant_count=len(item.label_samples),
             )
             for item in edge_state.values()
         ),
@@ -187,6 +190,9 @@ def _update_edge(
         edge.private_count += 1
     if activity.thread_id:
         edge.thread_event_count += 1
+    label_candidate = _activity_label_of(activity)
+    if label_candidate and label_candidate not in edge.label_samples:
+        edge.label_samples.append(label_candidate)
     if edge.first_round == 0 or activity.round_index < edge.first_round:
         edge.first_round = activity.round_index
     if activity.round_index > edge.last_round:
@@ -209,3 +215,29 @@ def _dedupe_ids(values: list[str]) -> list[str]:
         if value and value not in deduped:
             deduped.append(value)
     return deduped
+
+
+def _activity_label_of(activity: AdoptedActivityRecord) -> str:
+    for value in (
+        activity.action_summary,
+        activity.utterance,
+        activity.intent,
+        activity.action_type,
+    ):
+        text = value.strip()
+        if text:
+            return _truncate_label(text)
+    return ""
+
+
+def _build_edge_label_preview(samples: list[str]) -> str:
+    if not samples:
+        return ""
+    return samples[0]
+
+
+def _truncate_label(text: str, *, limit: int = 36) -> str:
+    compact = " ".join(text.split())
+    if len(compact) <= limit:
+        return compact
+    return compact[: limit - 1].rstrip() + "…"
