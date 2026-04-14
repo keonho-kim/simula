@@ -139,14 +139,14 @@ def test_network_report_counts_targets_and_intent_only_edges() -> None:
     assert alpha_beta.intent_only_count == 0
     assert alpha_beta.private_count == 1
     assert alpha_beta.thread_event_count == 1
-    assert alpha_beta.label_preview == "Alpha가 Beta에게 비공개로 확인을 요청한다."
+    assert alpha_beta.label_preview == "private_check_in"
     assert alpha_beta.label_variant_count == 1
     assert alpha_gamma.action_count == 0
     assert alpha_gamma.intent_only_count == 1
-    assert alpha_gamma.label_preview == "Alpha가 Beta에게 비공개로 확인을 요청한다."
+    assert alpha_gamma.label_preview == "private_check_in"
     assert beta_alpha.intent_only_count == 1
     assert beta_alpha.public_count == 1
-    assert beta_alpha.label_preview == "Beta가 Alpha를 공개적으로 의식한다."
+    assert beta_alpha.label_preview == "public_signal"
     assert report.summary.participating_actor_count == 3
     assert report.summary.isolated_actor_count == 0
 

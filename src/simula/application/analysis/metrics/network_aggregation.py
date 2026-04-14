@@ -219,10 +219,10 @@ def _dedupe_ids(values: list[str]) -> list[str]:
 
 def _activity_label_of(activity: AdoptedActivityRecord) -> str:
     for value in (
+        activity.action_type,
         activity.action_summary,
         activity.utterance,
         activity.intent,
-        activity.action_type,
     ):
         text = value.strip()
         if text:

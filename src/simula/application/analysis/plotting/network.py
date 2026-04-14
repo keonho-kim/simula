@@ -283,10 +283,10 @@ def _build_edge_label_text(graph: nx.DiGraph) -> dict[tuple[str, str], str]:
         if preview:
             if variant_count > 1:
                 labels[(source, target)] = (
-                    f"{total_weight}회 · {preview} 외 {variant_count - 1}"
+                    f"{total_weight}회: {preview} 외 {variant_count - 1}가지 행동"
                 )
             else:
-                labels[(source, target)] = f"{total_weight}회 · {preview}"
+                labels[(source, target)] = f"{total_weight}회: {preview}"
         else:
             labels[(source, target)] = f"{total_weight}회"
     return labels
