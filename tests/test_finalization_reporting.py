@@ -17,6 +17,8 @@ from simula.application.workflow.graphs.finalization.nodes.build_report_projecti
     format_report_time_label,
 )
 from simula.application.workflow.utils.finalization_sections import (
+    normalize_conclusion_section,
+    normalize_final_report_sections,
     validate_actor_dynamics_section,
     validate_bullet_section,
     validate_conclusion_section,
@@ -138,6 +140,35 @@ def test_validate_conclusion_section_requires_two_subheadings() -> None:
     )
 
     assert error is None
+
+
+def test_normalize_conclusion_section_promotes_plain_lines_to_bullets() -> None:
+    normalized = normalize_conclusion_section(
+        "### 최종 상태\n"
+        "최종 선택 결과가 나왔다.\n"
+        "### 핵심 판단 근거\n"
+        "마지막 단계에서 선택이 분명해졌다."
+    )
+
+    assert "### 최종 상태\n- 최종 선택 결과가 나왔다." in normalized
+    assert "### 핵심 판단 근거\n- 마지막 단계에서 선택이 분명해졌다." in normalized
+    assert validate_conclusion_section(normalized) is None
+
+
+def test_normalize_final_report_sections_drops_table_header_rows() -> None:
+    normalized = normalize_final_report_sections(
+        {
+            "conclusion_section": "### 최종 상태\n유지\n### 핵심 판단 근거\n유지",
+            "actor_results_rows": "| 행위자 | 결과 | 상대 | 우세 | 근거 |\n| --- | --- | --- | --- | --- |\n| A | 결과 | B | 우세 | 근거 |",
+            "timeline_section": "2027-06-18 03:20 | 시작 단계 | 사건 | 결과",
+            "actor_dynamics_section": "### 현재 구도\nA\n### 관계 변화\nB",
+            "major_events_section": "사건",
+        }
+    )
+
+    assert normalized["actor_results_rows"] == "| A | 결과 | B | 우세 | 근거 |"
+    assert normalized["timeline_section"].startswith("- ")
+    assert normalized["major_events_section"].startswith("- ")
 
 
 def test_validate_actor_dynamics_section_requires_fixed_subheadings() -> None:

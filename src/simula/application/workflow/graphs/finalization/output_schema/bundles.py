@@ -35,9 +35,9 @@ _TIMELINE_ANCHOR_DECISION_EXAMPLE: dict[str, Any] = {
 }
 
 _FINAL_REPORT_SECTIONS_EXAMPLE: dict[str, Any] = {
-    "conclusion_section": "<Markdown section starting with ### 최종 상태 and ### 핵심 판단 근거>",
-    "actor_results_rows": "<Markdown table body rows only, without the header row>",
-    "timeline_section": "<bullet lines only, each in '- YYYY-MM-DD HH:MM | phase | event | impact' format>",
+    "conclusion_section": "### 최종 상태\n- <one final-state bullet>\n### 핵심 판단 근거\n- <one reasoning bullet>",
+    "actor_results_rows": "| <actor> | <result> | <counterparty> | <edge> | <reason> |",
+    "timeline_section": "- <YYYY-MM-DD HH:MM | phase | event | impact>",
     "actor_dynamics_section": "<Markdown section using ### 현재 구도 and ### 관계 변화>",
-    "major_events_section": "<bullet lines only summarizing the major events>",
+    "major_events_section": "- <one bullet summarizing a major event>",
 }

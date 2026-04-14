@@ -8,6 +8,9 @@ Description:
 
 from __future__ import annotations
 
+from simula.application.workflow.graphs.runtime.proposal_semantics import (
+    infer_target_cast_ids,
+)
 from simula.domain.contracts import ActorActionProposal
 
 
@@ -17,6 +20,8 @@ def validate_actor_action_proposal_semantics(
     cast_id: str,
     available_actions: list[dict[str, object]],
     valid_target_cast_ids: list[str],
+    visible_actors: list[dict[str, object]],
+    current_intent_snapshot: dict[str, object],
     max_target_count: int,
 ) -> list[str]:
     """Return semantic contract violations for one actor proposal."""
@@ -37,16 +42,25 @@ def validate_actor_action_proposal_semantics(
     valid_target_set = {
         target_id for target_id in valid_target_cast_ids if target_id != cast_id
     }
+    effective_target_cast_ids = proposal.target_cast_ids or infer_target_cast_ids(
+        proposal=proposal,
+        source_cast_id=cast_id,
+        visible_actors=visible_actors,
+        current_intent_snapshot=current_intent_snapshot,
+    )
+    effective_intent_target_cast_ids = (
+        proposal.intent_target_cast_ids or list(effective_target_cast_ids)
+    )
 
     if proposal.visibility not in supported_visibility:
         issues.append(
             f"visibility `{proposal.visibility}` 는 action_type `{proposal.action_type}` 에서 지원되지 않습니다."
         )
-    if requires_target and not proposal.target_cast_ids:
+    if requires_target and not effective_target_cast_ids:
         issues.append(
             f"action_type `{proposal.action_type}` 는 target_cast_ids가 필요합니다."
         )
-    if proposal.visibility in {"private", "group"} and not proposal.target_cast_ids:
+    if proposal.visibility in {"private", "group"} and not effective_target_cast_ids:
         issues.append(
             f"visibility `{proposal.visibility}` 는 target_cast_ids가 비어 있으면 안 됩니다."
         )
@@ -54,16 +68,16 @@ def validate_actor_action_proposal_semantics(
         issues.append(
             f"action_type `{proposal.action_type}` 는 utterance를 지원하지 않습니다."
         )
-    if len(proposal.target_cast_ids) > max_target_count:
+    if len(effective_target_cast_ids) > max_target_count:
         issues.append(
             f"target_cast_ids 는 최대 {max_target_count}명까지만 허용됩니다."
         )
-    if len(set(proposal.target_cast_ids)) != len(proposal.target_cast_ids):
+    if len(set(effective_target_cast_ids)) != len(effective_target_cast_ids):
         issues.append("target_cast_ids 는 중복 없이 구성해야 합니다.")
 
     invalid_targets = [
         target_id
-        for target_id in proposal.target_cast_ids
+        for target_id in effective_target_cast_ids
         if target_id not in valid_target_set
     ]
     if invalid_targets:
@@ -74,7 +88,7 @@ def validate_actor_action_proposal_semantics(
 
     invalid_intent_targets = [
         target_id
-        for target_id in proposal.intent_target_cast_ids
+        for target_id in effective_intent_target_cast_ids
         if target_id not in valid_target_set
     ]
     if invalid_intent_targets:
@@ -89,16 +103,30 @@ def validate_actor_action_proposal_semantics(
 def build_actor_proposal_repair_context(
     *,
     cast_id: str,
+    actor_display_name: str,
     available_actions: list[dict[str, object]],
     valid_target_cast_ids: list[str],
+    visible_actors: list[dict[str, object]],
+    current_intent_target_cast_ids: list[str],
+    recent_visible_actions: list[dict[str, object]],
     max_target_count: int,
 ) -> dict[str, object]:
     """Build compact repair context for fixer retries."""
 
     return {
         "cast_id": cast_id,
+        "actor_display_name": actor_display_name,
         "available_actions": available_actions,
         "valid_target_cast_ids": valid_target_cast_ids,
+        "visible_actors": visible_actors,
+        "current_intent_target_cast_ids": current_intent_target_cast_ids,
+        "recent_visible_actions": recent_visible_actions,
+        "thread_family_guidance": {
+            "date_selection": "same pair/group date line",
+            "private_confession": "same confession or private emotional line",
+            "choice_pressure": "same choice or commitment pressure line",
+            "public_conversation": "same ongoing public conversation line",
+        },
         "max_target_count": max_target_count,
     }
 

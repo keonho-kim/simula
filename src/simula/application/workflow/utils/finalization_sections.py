@@ -54,6 +54,25 @@ def build_report_prompt_inputs(
     return inputs
 
 
+def normalize_final_report_sections(sections: dict[str, object]) -> dict[str, object]:
+    """Normalize final report sections to the validator's exact shape."""
+
+    normalized = dict(sections)
+    normalized["conclusion_section"] = normalize_conclusion_section(
+        str(sections.get("conclusion_section", ""))
+    )
+    normalized["major_events_section"] = normalize_bullet_only_section(
+        str(sections.get("major_events_section", ""))
+    )
+    normalized["timeline_section"] = normalize_timeline_section(
+        str(sections.get("timeline_section", ""))
+    )
+    normalized["actor_results_rows"] = normalize_markdown_table_rows(
+        str(sections.get("actor_results_rows", ""))
+    )
+    return normalized
+
+
 async def write_report_section(
     *,
     runtime: Runtime[WorkflowRuntimeContext],
@@ -123,6 +142,53 @@ def validate_bullet_section(
     if any(not line.startswith("- ") for line in lines):
         return "모든 줄은 '- '로 시작하는 bullet이어야 합니다."
     return None
+
+
+def normalize_conclusion_section(section_body: str) -> str:
+    """Normalize conclusion headings and bullet lines without changing meaning."""
+
+    parsed = _parse_subheaded_sections(
+        section_body,
+        ["### 최종 상태", "### 핵심 판단 근거"],
+    )
+    if isinstance(parsed, str):
+        return section_body.strip()
+
+    blocks: list[str] = []
+    for heading in ("### 최종 상태", "### 핵심 판단 근거"):
+        lines = _normalize_bullet_lines(parsed.get(heading, []))
+        blocks.append(heading)
+        blocks.extend(lines)
+    return "\n".join(blocks).strip()
+
+
+def normalize_bullet_only_section(section_body: str) -> str:
+    """Normalize a section so every non-empty line is a bullet."""
+
+    lines = [line.strip() for line in section_body.splitlines() if line.strip()]
+    return "\n".join(_normalize_bullet_lines(lines)).strip()
+
+
+def normalize_timeline_section(section_body: str) -> str:
+    """Normalize timeline lines to bullet-prefixed rows."""
+
+    lines = [line.strip() for line in section_body.splitlines() if line.strip()]
+    normalized: list[str] = []
+    for line in lines:
+        if line.startswith("- "):
+            normalized.append(line)
+            continue
+        normalized.append(f"- {line}")
+    return "\n".join(normalized).strip()
+
+
+def normalize_markdown_table_rows(section_body: str) -> str:
+    """Drop accidental markdown table headers and keep only body rows."""
+
+    lines = [line.strip() for line in section_body.splitlines() if line.strip()]
+    if len(lines) >= 2 and _is_markdown_table_separator(lines[1]):
+        lines = lines[2:]
+    return "\n".join(lines).strip()
 
 
 def validate_conclusion_section(section_body: str) -> str | None:
@@ -297,3 +363,26 @@ def _parse_subheaded_sections(
     if expected_index != len(headings):
         return f"소제목은 {' -> '.join(headings)} 모두 포함해야 합니다."
     return sections
+
+
+def _normalize_bullet_lines(lines: list[str]) -> list[str]:
+    normalized: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("- "):
+            normalized.append(stripped)
+            continue
+        normalized.append(f"- {stripped.lstrip('-* ').strip()}")
+    return normalized
+
+
+def _is_markdown_table_separator(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped.startswith("|") or not stripped.endswith("|"):
+        return False
+    cells = [cell.strip() for cell in stripped.split("|")[1:-1]]
+    if not cells:
+        return False
+    return all(cell.replace("-", "").replace(":", "") == "" for cell in cells)

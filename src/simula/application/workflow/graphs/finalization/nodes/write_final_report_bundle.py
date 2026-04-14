@@ -19,6 +19,7 @@ from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
 from simula.application.workflow.utils.finalization_sections import (
+    normalize_final_report_sections,
     validate_actor_dynamics_section,
     validate_bullet_section,
     validate_conclusion_section,
@@ -54,6 +55,7 @@ async def write_final_report_bundle(
             prompt += (
                 "\n\n# Retry Notice\n"
                 f"- The previous output failed validation: {feedback}\n"
+                f"{_build_retry_guidance(feedback)}\n"
                 "- Rewrite the entire JSON object from scratch.\n"
             )
         sections, meta = await runtime.context.llms.ainvoke_structured_with_meta(
@@ -66,7 +68,7 @@ async def write_final_report_bundle(
                 "attempt": attempt + 1,
             },
         )
-        dumped = sections.model_dump(mode="json")
+        dumped = normalize_final_report_sections(sections.model_dump(mode="json"))
         feedback = _validate_sections(
             sections=dumped,
             scenario_text=state["scenario"],
@@ -114,3 +116,31 @@ def _validate_sections(
         if violation is not None:
             return violation
     return ""
+
+
+def _build_retry_guidance(feedback: str) -> str:
+    if "### 최종 상태" in feedback or "### 핵심 판단 근거" in feedback:
+        return (
+            "- Use this exact shape for `conclusion_section`:\n"
+            "  ### 최종 상태\n"
+            "  - 첫 번째 상태 요약\n"
+            "  - 두 번째 상태 요약\n"
+            "  ### 핵심 판단 근거\n"
+            "  - 첫 번째 근거\n"
+            "  - 두 번째 근거"
+        )
+    if "표 본문" in feedback:
+        return (
+            "- `actor_results_rows` must contain body rows only, for example:\n"
+            "  | A | 결과 | B | 우세 | 근거 |"
+        )
+    if "타임라인" in feedback:
+        return (
+            "- `timeline_section` must use bullet rows like:\n"
+            "  - 2027-06-18 03:20 | 시작 단계 | 사건 | 결과"
+        )
+    if "bullet" in feedback or "'- '" in feedback:
+        return (
+            "- Every non-empty line in the affected field must begin with '- '."
+        )
+    return "- Rewrite every field to match the schema and the exact markdown format rules."

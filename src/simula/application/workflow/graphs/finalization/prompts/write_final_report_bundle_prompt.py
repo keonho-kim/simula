@@ -21,6 +21,7 @@ Write the complete report bundle in one required JSON object.
 - `conclusion_section` must use:
   - `### 최종 상태`
   - `### 핵심 판단 근거`
+  - Every non-empty line under both subheadings must begin with `- `
 - `actor_results_rows` must contain markdown table body rows only, without a header.
 - `timeline_section` must use one bullet per line:
   - `- YYYY-MM-DD HH:MM | phase | event | impact`

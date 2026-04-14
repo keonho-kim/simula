@@ -25,6 +25,9 @@ from simula.application.workflow.graphs.runtime.proposal_contract import (
     build_actor_proposal_repair_context,
     validate_actor_action_proposal_semantics,
 )
+from simula.application.workflow.graphs.runtime.proposal_semantics import (
+    normalize_actor_action_proposal,
+)
 from simula.application.workflow.graphs.runtime.prompts.actor_turn_prompt import (
     PROMPT as ACTOR_PROPOSAL_PROMPT,
 )
@@ -158,6 +161,7 @@ async def generate_actor_proposal(
         ),
         repair_context=build_actor_proposal_repair_context(
             cast_id=cast_id,
+            actor_display_name=str(actor.get("display_name", cast_id)),
             available_actions=[
                 cast(dict[str, object], item)
                 for item in _object_list(runtime_guidance.get("available_actions", []))
@@ -168,9 +172,43 @@ async def generate_actor_proposal(
                 for item in list(actor_task.get("visible_actors", []))
                 if str(item.get("cast_id", "")).strip()
             ],
+            visible_actors=[
+                item
+                for item in list(actor_task.get("visible_actors", []))
+                if isinstance(item, dict)
+            ],
+            current_intent_target_cast_ids=_string_list(
+                cast(
+                    dict[str, object],
+                    runtime_guidance.get("current_intent_snapshot", {}),
+                ).get("target_cast_ids", [])
+            ),
+            recent_visible_actions=[
+                item
+                for item in list(actor_task.get("visible_action_context", []))
+                if isinstance(item, dict)
+            ],
             max_target_count=runtime.context.settings.runtime.max_recipients_per_message,
         ),
         log_context=_actor_log_context(state, actor),
+    )
+    proposal = normalize_actor_action_proposal(
+        proposal=proposal,
+        source_cast_id=cast_id,
+        visible_actors=[
+            item
+            for item in list(actor_task.get("visible_actors", []))
+            if isinstance(item, dict)
+        ],
+        visible_action_context=[
+            item
+            for item in list(actor_task.get("visible_action_context", []))
+            if isinstance(item, dict)
+        ],
+        current_intent_snapshot=cast(
+            dict[str, object],
+            runtime_guidance.get("current_intent_snapshot", {}),
+        ),
     )
     _log_actor_proposal_completed(
         logger=runtime.context.logger,
@@ -536,6 +574,11 @@ def _build_actor_proposal_semantic_validator(
             cast_id=cast_id,
             available_actions=available_actions,
             valid_target_cast_ids=valid_target_cast_ids,
+            visible_actors=visible_actors,
+            current_intent_snapshot=cast(
+                dict[str, object],
+                runtime_guidance.get("current_intent_snapshot", {}),
+            ),
             max_target_count=max_recipients_per_message,
         )
 

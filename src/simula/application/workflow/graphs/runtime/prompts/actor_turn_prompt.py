@@ -37,8 +37,12 @@ _PROMPT = textwrap.dedent(
     - Choose `action_type` from `runtime_guidance.available_actions`.
     - `public` visibility may leave `target_cast_ids` empty.
     - `private` and `group` visibility must include real `cast_id` values in `target_cast_ids`.
+    - If a `public` action is clearly aimed at one or more specific visible people, include those real `cast_id` values in `target_cast_ids` even though the visibility stays `public`.
     - If there is no spoken line, set `utterance` to an empty string.
     - If there is no stable thread identifier, set `thread_id` to an empty string.
+    - If this action continues an existing conversation, confession, date line, or choice-pressure line with the same participant set, reuse or continue the stable `thread_id`.
+    - Only leave `thread_id` empty when the action is truly standalone and not part of an ongoing interaction line.
+    - Only leave both `target_cast_ids` and `thread_id` empty when the action is genuinely broadcast to the room rather than directed at a specific visible person.
     - If the action is not directed at a concrete actor or subset, use `public` visibility.
     - Use `runtime_guidance.current_intent_snapshot.current_intent` for what to do and `runtime_guidance.current_intent_snapshot.thought` for why this actor is choosing it now.
     - Use `runtime_guidance.actor_facing_scenario_digest.talking_points` to decide what should be pushed verbally.

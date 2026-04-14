@@ -142,6 +142,7 @@ async def resolve_round(
             list(state["pending_actor_proposals"]),
         ),
         actors=list(state["actors"]),
+        actor_intent_states=list(state.get("actor_intent_states", [])),
         action_catalog=cast(dict[str, object], state["plan"]["action_catalog"]),
         max_targets_per_activity=runtime.context.settings.runtime.max_recipients_per_message,
     )
@@ -242,6 +243,7 @@ def _filter_invalid_adopted_cast_ids(
     adopted_cast_ids: list[str],
     pending_actor_proposals: list[ActorProposalPayload],
     actors: list[dict[str, object]],
+    actor_intent_states: list[dict[str, object]],
     action_catalog: dict[str, object],
     max_targets_per_activity: int,
 ) -> tuple[list[str], list[str]]:
@@ -278,6 +280,14 @@ def _filter_invalid_adopted_cast_ids(
             cast_id=str(cast_id),
             available_actions=available_actions,
             valid_target_cast_ids=valid_cast_ids,
+            visible_actors=actors,
+            current_intent_snapshot=next(
+                (
+                    item for item in actor_intent_states
+                    if str(item.get("cast_id", "")) == str(cast_id)
+                ),
+                {},
+            ),
             max_target_count=max_targets_per_activity,
         )
         if issues:

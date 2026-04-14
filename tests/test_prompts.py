@@ -130,4 +130,4 @@ def test_final_report_bundle_prompt_smoke() -> None:
     )
 
     assert "timeline_section" in prompt
-    assert "<bullet lines only" in prompt
+    assert '"major_events_section":"- <one bullet summarizing a major event>"' in prompt
