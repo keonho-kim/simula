@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
 from langchain_core.exceptions import OutputParserException
@@ -49,6 +50,19 @@ class AsyncStructuredLLMService:
     @logger.setter
     def logger(self, value) -> None:  # noqa: ANN001
         self.router.logger = value
+
+    def configure_run_logging(
+        self,
+        *,
+        run_id: str,
+        stream_event_sink: Callable[[dict[str, object]], object] | None,
+    ) -> None:
+        """Attach per-run JSONL logging for raw LLM calls."""
+
+        self.router.configure_run_logging(
+            run_id=run_id,
+            stream_event_sink=stream_event_sink,
+        )
 
     async def ainvoke_structured(
         self, role: str, prompt: str, schema: type[SchemaT]
@@ -92,10 +106,26 @@ class AsyncStructuredLLMService:
                 attempt_input,
                 attempt_output,
                 attempt_total,
+                attempt_raw_response,
+                attempt_raw_chunks,
+                attempt_duration,
             ) = await self.router._ainvoke_with_metrics(
                 role,
                 candidate,
                 call_kind="structured",
+            )
+            self.router._emit_llm_call_event(
+                role=role,
+                call_kind="structured",
+                prompt=candidate,
+                raw_response=attempt_raw_response,
+                raw_chunks=attempt_raw_chunks,
+                log_context=log_context,
+                duration_seconds=attempt_duration,
+                ttft_seconds=attempt_ttft,
+                input_tokens=attempt_input,
+                output_tokens=attempt_output,
+                total_tokens=attempt_total,
             )
             ttft_seconds = _merge_ttft(ttft_seconds, attempt_ttft)
             input_tokens = _merge_token_count(input_tokens, attempt_input)

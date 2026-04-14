@@ -121,6 +121,7 @@ count, activity totals, visibility counts, notable events, explicit errors, and 
 Ordered event stream containing:
 
 - simulation start
+- raw LLM calls including prompt text, merged raw response text, and streamed chunks
 - finalized plan
 - finalized actors
 - round focus selection

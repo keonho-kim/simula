@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -26,6 +27,7 @@ from pydantic import BaseModel
 
 from simula.application.ports.llm import StructuredCallMeta
 from simula.infrastructure.config.models import AppSettings
+from simula.domain.log_events import build_llm_call_event
 from simula.infrastructure.llm.providers import build_provider_chat_model
 from simula.infrastructure.llm.renderers import (
     render_structured_response,
@@ -46,6 +48,21 @@ class StructuredLLMRouter:
     observer: BaseChatModel
     fixer: BaseChatModel
     usage_tracker: LLMUsageTracker
+    run_id: str = ""
+    stream_event_sink: Callable[[dict[str, object]], object] | None = None
+    llm_call_sequence: int = 0
+
+    def configure_run_logging(
+        self,
+        *,
+        run_id: str,
+        stream_event_sink: Callable[[dict[str, object]], object] | None,
+    ) -> None:
+        """Attach a per-run JSONL sink for raw LLM call logging."""
+
+        self.run_id = run_id
+        self.stream_event_sink = stream_event_sink
+        self.llm_call_sequence = 0
 
     def for_role(self, role: str) -> BaseChatModel:
         """역할 이름으로 모델을 반환한다."""
@@ -64,18 +81,39 @@ class StructuredLLMRouter:
     ) -> tuple[str, StructuredCallMeta]:
         """LLM 원문 응답과 메타데이터를 함께 반환한다."""
 
-        started_at = time.perf_counter()
         self._log_structured_call_start(role=role, log_context=log_context)
-        response, ttft_seconds, input_tokens, output_tokens, total_tokens = (
+        (
+            response,
+            ttft_seconds,
+            input_tokens,
+            output_tokens,
+            total_tokens,
+            raw_response,
+            raw_chunks,
+            duration_seconds,
+        ) = (
             self._invoke_with_metrics(role, prompt, call_kind="text")
         )
         content = _content_to_text(response.content).strip()
         if not content:
             raise ValueError("응답이 비어 있습니다.")
+        self._emit_llm_call_event(
+            role=role,
+            call_kind="text",
+            prompt=prompt,
+            raw_response=raw_response,
+            raw_chunks=raw_chunks,
+            log_context=log_context,
+            duration_seconds=duration_seconds,
+            ttft_seconds=ttft_seconds,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+        )
         self._log_text_response(
             role=role,
             content=content,
-            duration_seconds=time.perf_counter() - started_at,
+            duration_seconds=duration_seconds,
             ttft_seconds=ttft_seconds,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
@@ -85,7 +123,7 @@ class StructuredLLMRouter:
         return content, StructuredCallMeta(
             parse_failure_count=0,
             forced_default=False,
-            duration_seconds=time.perf_counter() - started_at,
+            duration_seconds=duration_seconds,
             last_content=content,
             ttft_seconds=ttft_seconds,
             input_tokens=input_tokens,
@@ -102,7 +140,6 @@ class StructuredLLMRouter:
     ) -> tuple[str, StructuredCallMeta]:
         """비동기 LLM 원문 응답과 메타데이터를 함께 반환한다."""
 
-        started_at = time.perf_counter()
         self._log_structured_call_start(role=role, log_context=log_context)
         (
             response,
@@ -110,14 +147,30 @@ class StructuredLLMRouter:
             input_tokens,
             output_tokens,
             total_tokens,
+            raw_response,
+            raw_chunks,
+            duration_seconds,
         ) = await self._ainvoke_with_metrics(role, prompt, call_kind="text")
         content = _content_to_text(response.content).strip()
         if not content:
             raise ValueError("응답이 비어 있습니다.")
+        self._emit_llm_call_event(
+            role=role,
+            call_kind="text",
+            prompt=prompt,
+            raw_response=raw_response,
+            raw_chunks=raw_chunks,
+            log_context=log_context,
+            duration_seconds=duration_seconds,
+            ttft_seconds=ttft_seconds,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+        )
         self._log_text_response(
             role=role,
             content=content,
-            duration_seconds=time.perf_counter() - started_at,
+            duration_seconds=duration_seconds,
             ttft_seconds=ttft_seconds,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
@@ -127,7 +180,7 @@ class StructuredLLMRouter:
         return content, StructuredCallMeta(
             parse_failure_count=0,
             forced_default=False,
-            duration_seconds=time.perf_counter() - started_at,
+            duration_seconds=duration_seconds,
             last_content=content,
             ttft_seconds=ttft_seconds,
             input_tokens=input_tokens,
@@ -141,16 +194,29 @@ class StructuredLLMRouter:
         prompt: str,
         *,
         call_kind: CallKind,
-    ) -> tuple[Any, float | None, int | None, int | None, int | None]:
+    ) -> tuple[
+        Any,
+        float | None,
+        int | None,
+        int | None,
+        int | None,
+        str,
+        list[str],
+        float,
+    ]:
         """응답과 벤치마크용 메타데이터를 함께 수집한다."""
 
         model = self.for_role(role)
         started_at = time.perf_counter()
         first_chunk_at: float | None = None
         merged_chunk: Any | None = None
+        raw_chunks: list[str] = []
         for chunk in model.stream(prompt):
             if first_chunk_at is None:
                 first_chunk_at = time.perf_counter()
+            chunk_text = _content_to_text(getattr(chunk, "content", chunk))
+            if chunk_text:
+                raw_chunks.append(chunk_text)
             merged_chunk = chunk if merged_chunk is None else merged_chunk + chunk
 
         if merged_chunk is None:
@@ -167,12 +233,16 @@ class StructuredLLMRouter:
         ttft_seconds = (
             first_chunk_at - started_at if first_chunk_at is not None else None
         )
+        duration_seconds = time.perf_counter() - started_at
         return (
             merged_chunk,
             ttft_seconds,
             input_tokens,
             output_tokens,
             total_tokens,
+            _content_to_text(getattr(merged_chunk, "content", merged_chunk)).strip(),
+            raw_chunks,
+            duration_seconds,
         )
 
     async def _ainvoke_with_metrics(
@@ -181,16 +251,29 @@ class StructuredLLMRouter:
         prompt: str,
         *,
         call_kind: CallKind,
-    ) -> tuple[Any, float | None, int | None, int | None, int | None]:
+    ) -> tuple[
+        Any,
+        float | None,
+        int | None,
+        int | None,
+        int | None,
+        str,
+        list[str],
+        float,
+    ]:
         """비동기 응답과 메타데이터를 함께 수집한다."""
 
         model = self.for_role(role)
         started_at = time.perf_counter()
         first_chunk_at: float | None = None
         merged_chunk: Any | None = None
+        raw_chunks: list[str] = []
         async for chunk in model.astream(prompt):
             if first_chunk_at is None:
                 first_chunk_at = time.perf_counter()
+            chunk_text = _content_to_text(getattr(chunk, "content", chunk))
+            if chunk_text:
+                raw_chunks.append(chunk_text)
             merged_chunk = chunk if merged_chunk is None else merged_chunk + chunk
 
         if merged_chunk is None:
@@ -207,12 +290,16 @@ class StructuredLLMRouter:
         ttft_seconds = (
             first_chunk_at - started_at if first_chunk_at is not None else None
         )
+        duration_seconds = time.perf_counter() - started_at
         return (
             merged_chunk,
             ttft_seconds,
             input_tokens,
             output_tokens,
             total_tokens,
+            _content_to_text(getattr(merged_chunk, "content", merged_chunk)).strip(),
+            raw_chunks,
+            duration_seconds,
         )
 
     def _log_structured_response(
@@ -299,6 +386,46 @@ class StructuredLLMRouter:
         self.logger.info("%s | %s", title, meta_line)
         if pretty_text.strip():
             self.logger.debug("\n%s\n", pretty_text)
+
+    def _emit_llm_call_event(
+        self,
+        *,
+        role: str,
+        call_kind: CallKind,
+        prompt: str,
+        raw_response: str,
+        raw_chunks: list[str],
+        log_context: dict[str, object] | None,
+        duration_seconds: float,
+        ttft_seconds: float | None,
+        input_tokens: int | None,
+        output_tokens: int | None,
+        total_tokens: int | None,
+    ) -> None:
+        """Append one raw LLM call event to the run JSONL sink when configured."""
+
+        if self.stream_event_sink is None or not self.run_id:
+            return
+        self.llm_call_sequence += 1
+        entry = build_llm_call_event(
+            run_id=self.run_id,
+            sequence=self.llm_call_sequence,
+            role=role,
+            call_kind=call_kind,
+            prompt=prompt,
+            raw_response=raw_response,
+            raw_chunks=raw_chunks,
+            log_context=_json_safe_mapping(log_context),
+            duration_seconds=duration_seconds,
+            ttft_seconds=ttft_seconds,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+        )
+        try:
+            self.stream_event_sink(entry)
+        except Exception as exc:  # noqa: BLE001
+            self.logger.warning("llm call raw log append 실패 | role=%s | error=%s", role, exc)
 
 
 def build_raw_model_router(
@@ -525,6 +652,30 @@ def _content_to_text(content: Any) -> str:
         return "\n".join(chunks)
 
     return str(content)
+
+
+def _json_safe_mapping(
+    mapping: dict[str, object] | None,
+) -> dict[str, object] | None:
+    if mapping is None:
+        return None
+    return {
+        str(key): _json_safe_value(value)
+        for key, value in mapping.items()
+    }
+
+
+def _json_safe_value(value: object) -> object:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, Mapping):
+        return {
+            str(key): _json_safe_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [_json_safe_value(item) for item in value]
+    return str(value)
 
 
 def _pretty_response_text(

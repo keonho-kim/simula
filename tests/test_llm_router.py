@@ -121,6 +121,11 @@ def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
         '{"cast_id":"a","display_name":"A","role_hint":"r","group_name":"g","core_tension":"t"}'
     )
     router = _build_router(model)
+    events: list[dict[str, object]] = []
+    router.configure_run_logging(
+        run_id="20260414.1",
+        stream_event_sink=events.append,
+    )
 
     with caplog.at_level(logging.INFO, logger="simula.test.llm_router"):
         result, meta = router.invoke_text_with_meta(
@@ -134,6 +139,28 @@ def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
     assert model.stream_called is True
     assert "planner · 실행 계획 정리 시작" in caplog.text
     assert "planner · 실행 계획 정리 완료" in caplog.text
+    assert len(events) == 1
+    assert events[0]["event"] == "llm_call"
+    assert events[0]["event_key"] == "llm_call:1"
+    assert events[0]["run_id"] == "20260414.1"
+    assert events[0]["sequence"] == 1
+    assert events[0]["role"] == "planner"
+    assert events[0]["call_kind"] == "text"
+    assert events[0]["log_context"] == {"scope": "execution-plan"}
+    assert events[0]["prompt"] == "prompt"
+    assert events[0]["raw_response"] == (
+        '{"cast_id":"a","display_name":"A","role_hint":"r","group_name":"g","core_tension":"t"}'
+    )
+    assert events[0]["raw_chunks"] == [
+        '{"cast_id":"a","display_name":"A","role_hint":"r","group_name":"g","core_tension":"t"}'
+    ]
+    assert events[0]["duration_seconds"] == pytest.approx(
+        float(events[0]["duration_seconds"])
+    )
+    assert events[0]["ttft_seconds"] == pytest.approx(float(events[0]["ttft_seconds"]))
+    assert events[0]["input_tokens"] == 10
+    assert events[0]["output_tokens"] == 20
+    assert events[0]["total_tokens"] == 30
 
 
 @pytest.mark.anyio

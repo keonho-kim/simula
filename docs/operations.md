@@ -62,5 +62,5 @@ Important runtime controls:
 ## Maintenance Notes
 
 - Keep documentation aligned with the compiled graph, not historical files.
-- Treat `simulation.log.jsonl` as a graph artifact, not a presentation-layer reconstruction.
+- Treat `simulation.log.jsonl` as the runtime-written graph artifact, including raw LLM call events.
 - Remove stale prompt assets and workflow docs when stage structure changes.

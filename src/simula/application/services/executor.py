@@ -146,6 +146,15 @@ class SimulationExecutor:
                 run_id=run_id,
             ),
         )
+        if hasattr(self.llms, "configure_run_logging"):
+            getattr(self.llms, "configure_run_logging")(
+                run_id=run_id,
+                stream_event_sink=(
+                    context.run_jsonl_appender.append
+                    if context.run_jsonl_appender is not None
+                    else None
+                ),
+            )
         input_state = build_simulation_input_state(
             run_id=run_id,
             scenario_text=scenario_text,
@@ -196,6 +205,9 @@ class SimulationExecutor:
                         llm_usage_summary=llm_usage_summary,
                     )
                 )
+                final_state["simulation_log_jsonl"] = context.run_jsonl_appender.path.read_text(
+                    encoding="utf-8"
+                ).rstrip()
             wall_clock = time.perf_counter() - started_at
             self.store.mark_run_status(run_id, "completed")
             run_logger.info("run 완료 | wall_clock=%.2fs", wall_clock)

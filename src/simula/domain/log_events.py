@@ -153,6 +153,41 @@ def build_llm_usage_summary_event(
     }
 
 
+def build_llm_call_event(
+    *,
+    run_id: str,
+    sequence: int,
+    role: str,
+    call_kind: str,
+    prompt: str,
+    raw_response: str,
+    raw_chunks: list[str],
+    log_context: dict[str, object] | None,
+    duration_seconds: float,
+    ttft_seconds: float | None,
+    input_tokens: int | None,
+    output_tokens: int | None,
+    total_tokens: int | None,
+) -> dict[str, object]:
+    return {
+        "event": "llm_call",
+        "event_key": f"llm_call:{sequence}",
+        "run_id": run_id,
+        "sequence": sequence,
+        "role": role,
+        "call_kind": call_kind,
+        "log_context": log_context or {},
+        "prompt": prompt,
+        "raw_response": raw_response,
+        "raw_chunks": raw_chunks,
+        "duration_seconds": round(duration_seconds, 6),
+        "ttft_seconds": _optional_float_value(ttft_seconds),
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+    }
+
+
 def _int_value(value: object) -> int:
     try:
         return int(str(value))
@@ -167,3 +202,12 @@ def _optional_int_value(value: object) -> int | None:
         return int(str(value))
     except (TypeError, ValueError):
         return cast(int | None, None)
+
+
+def _optional_float_value(value: object) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(str(value))
+    except (TypeError, ValueError):
+        return cast(float | None, None)

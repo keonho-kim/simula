@@ -609,10 +609,40 @@ def test_runtime_subgraph_finishes_immediately_on_simulation_done() -> None:
 
 def test_executor_returns_successful_run_result(monkeypatch) -> None:
     captured: dict[str, object] = {}
+    llm_stream_sink = None
+
+    class FakeLLMService:
+        def __init__(self) -> None:
+            self.logger = logging.getLogger("simula.test.llm")
+
+        def configure_run_logging(self, *, run_id, stream_event_sink):  # noqa: ANN001
+            nonlocal llm_stream_sink
+            captured["configured_run_id"] = run_id
+            llm_stream_sink = stream_event_sink
 
     class FakeApp:
         async def astream(self, state, **kwargs):  # noqa: ANN001
             captured["state"] = state
+            if llm_stream_sink is not None:
+                llm_stream_sink(
+                    {
+                        "event": "llm_call",
+                        "event_key": "llm_call:1",
+                        "run_id": state["run_id"],
+                        "sequence": 1,
+                        "role": "planner",
+                        "call_kind": "structured",
+                        "log_context": {"scope": "planning-analysis"},
+                        "prompt": "prompt",
+                        "raw_response": '{"brief_summary":"요약"}',
+                        "raw_chunks": ['{"brief_summary":"요약"}'],
+                        "duration_seconds": 0.12,
+                        "ttft_seconds": 0.03,
+                        "input_tokens": 10,
+                        "output_tokens": 20,
+                        "total_tokens": 30,
+                    }
+                )
             yield (
                 "custom",
                 {
@@ -704,9 +734,7 @@ def test_executor_returns_successful_run_result(monkeypatch) -> None:
     monkeypatch.setattr(
         executor_module,
         "build_model_router",
-        lambda settings, usage_tracker: SimpleNamespace(  # noqa: ARG005
-            logger=logging.getLogger("simula.test.llm")
-        ),
+        lambda settings, usage_tracker: FakeLLMService(),  # noqa: ARG005
     )
     monkeypatch.setattr(executor_module, "SIMULATION_WORKFLOW", FakeApp())
 
@@ -741,13 +769,18 @@ def test_executor_returns_successful_run_result(monkeypatch) -> None:
         "num_cast": 2,
         "allow_additional_cast": True,
     }
+    assert captured["configured_run_id"] == "20260413.1"
     log_path = Path(settings.storage.output_dir) / result.run_id / "simulation.log.jsonl"
     assert log_path.exists()
     lines = [line for line in log_path.read_text(encoding="utf-8").splitlines() if line]
-    assert len(lines) == 3
+    assert len(lines) == 4
     assert json.loads(lines[0])["event"] == "simulation_started"
-    assert json.loads(lines[1])["event"] == "plan_finalized"
-    assert json.loads(lines[2])["event"] == "llm_usage_summary"
+    assert json.loads(lines[1])["event"] == "llm_call"
+    assert json.loads(lines[2])["event"] == "plan_finalized"
+    assert json.loads(lines[3])["event"] == "llm_usage_summary"
+    assert result.final_state["simulation_log_jsonl"] == log_path.read_text(
+        encoding="utf-8"
+    ).rstrip()
     assert fake_store.statuses[-1] == ("20260413.1", "completed", None)
 
 

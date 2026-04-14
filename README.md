@@ -99,6 +99,7 @@ graph shape stays explicit.
 `simulation.log.jsonl` records:
 
 - simulation start
+- raw LLM calls with prompt and streamed response content
 - finalized plan
 - finalized actors
 - round focus selection
