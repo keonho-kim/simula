@@ -26,7 +26,7 @@ def render_network_plot(
     """Render one directed actor relationship graph."""
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    configure_korean_font()
+    label_font = configure_korean_font()
     figure, axis = plt.subplots(figsize=(12, 8))
     try:
         if graph.number_of_nodes() == 0:
@@ -57,7 +57,14 @@ def render_network_plot(
                 alpha=0.9,
                 ax=axis,
             )
-            nx.draw_networkx_labels(graph, positions, labels=labels, font_size=10, ax=axis)
+            nx.draw_networkx_labels(
+                graph,
+                positions,
+                labels=labels,
+                font_size=10,
+                font_family=label_font,
+                ax=axis,
+            )
             axis.text(
                 0.98,
                 0.03,
@@ -95,6 +102,7 @@ def render_network_plot(
                 positions,
                 labels=labels,
                 font_size=10,
+                font_family=label_font,
                 ax=axis,
             )
             nx.draw_networkx_edges(
