@@ -24,11 +24,11 @@ def load_run_analysis(
     """Load one JSONL run log and normalize supported event payloads."""
 
     if not expected_run_id.strip():
-        raise ValueError("run_id must not be empty.")
+        raise ValueError("run_id는 비어 있으면 안 됩니다.")
     if not path.exists():
-        raise ValueError(f"simulation log does not exist: {path}")
+        raise ValueError(f"simulation.log.jsonl 파일이 없습니다: {path}")
     if not path.is_file():
-        raise ValueError(f"simulation log path is not a file: {path}")
+        raise ValueError(f"simulation.log.jsonl 경로가 파일이 아닙니다: {path}")
 
     entries = _read_jsonl_entries(path)
     llm_calls: list[LLMCallRecord] = []
@@ -48,7 +48,7 @@ def load_run_analysis(
             adopted_activities.extend(_parse_adopted_activities(entry))
 
     if not llm_calls:
-        raise ValueError("simulation log does not contain any llm_call events.")
+        raise ValueError("simulation log에 llm_call 이벤트가 없습니다.")
 
     return LoadedRunAnalysis(
         run_id=expected_run_id,
@@ -74,11 +74,11 @@ def _read_jsonl_entries(path: Path) -> list[dict[str, object]]:
                 loaded = json.loads(stripped)
             except json.JSONDecodeError as exc:
                 raise ValueError(
-                    f"invalid JSONL at line {line_number}: {exc}"
+                    f"{line_number}번째 줄의 JSONL 형식이 올바르지 않습니다: {exc}"
                 ) from exc
             if not isinstance(loaded, dict):
                 raise ValueError(
-                    f"JSONL entry at line {line_number} must be an object."
+                    f"{line_number}번째 JSONL 엔트리는 객체여야 합니다."
                 )
             entries.append(cast(dict[str, object], loaded))
     if not entries:
@@ -92,7 +92,7 @@ def _validate_run_id(entry: dict[str, object], *, expected_run_id: str) -> None:
         return
     if run_id != expected_run_id:
         raise ValueError(
-            "simulation log contains a mismatched run_id: "
+            "simulation log 안의 run_id가 요청한 값과 다릅니다: "
             f"expected `{expected_run_id}`, found `{run_id}`."
         )
 
@@ -100,7 +100,7 @@ def _validate_run_id(entry: dict[str, object], *, expected_run_id: str) -> None:
 def _parse_llm_call(entry: dict[str, object]) -> LLMCallRecord:
     role = str(entry.get("role", "")).strip()
     if not role:
-        raise ValueError("llm_call event is missing `role`.")
+        raise ValueError("llm_call 이벤트에 `role` 필드가 없습니다.")
     log_context = entry.get("log_context")
     if isinstance(log_context, dict):
         normalized_log_context = cast(dict[str, object], log_context)

@@ -48,6 +48,7 @@ class SimulationWorkflowState(TypedDict):
     scenario: str
     scenario_controls: ScenarioControls
     max_rounds: int
+    planned_max_rounds: int
     checkpoint_enabled: bool
     rng_seed: int
     planning_analysis: dict[str, Any]
@@ -63,6 +64,8 @@ class SimulationWorkflowState(TypedDict):
     deferred_cast_ids: list[str]
     latest_background_updates: list[dict[str, Any]]
     background_updates: list[dict[str, Any]]
+    event_memory: dict[str, Any]
+    event_memory_history: list[dict[str, Any]]
     actor_intent_states: list[dict[str, Any]]
     intent_history: list[dict[str, Any]]
     round_focus_plan: dict[str, Any]

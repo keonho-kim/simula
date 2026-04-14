@@ -122,16 +122,16 @@ def _build_histogram(values: np.ndarray) -> tuple[list[int], list[float]]:
 
 def _build_kde(values: np.ndarray) -> tuple[list[float], list[float], str | None]:
     if values.size < 2:
-        return [], [], "KDE requires at least two valid values."
+        return [], [], "KDE를 계산하려면 유효한 값이 최소 2개 필요합니다."
     if float(np.max(values)) == float(np.min(values)):
-        return [], [], "KDE requires non-constant values."
+        return [], [], "KDE를 계산하려면 값이 모두 같지 않아야 합니다."
 
     std = float(np.std(values, ddof=1))
     if std <= 0:
-        return [], [], "KDE bandwidth is zero."
+        return [], [], "KDE 대역폭이 0입니다."
     bandwidth = 1.06 * std * (values.size ** (-1.0 / 5.0))
     if bandwidth <= 0:
-        return [], [], "KDE bandwidth is zero."
+        return [], [], "KDE 대역폭이 0입니다."
 
     grid = np.linspace(float(np.min(values)), float(np.max(values)), 200)
     scaled = (grid[:, None] - values[None, :]) / bandwidth

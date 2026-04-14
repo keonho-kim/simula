@@ -15,6 +15,9 @@ Resolve this round in one object: adoption, updated intents, elapsed-time advanc
 - Keep the observer summary grounded in the supplied actions and background updates.
 - `stop_reason` must be `""` when the simulation should continue.
 - `stop_reason` may be `"simulation_done"` only when this round clearly completes the simulation objective.
+- Use `event_match_hints_json` as the code-first baseline for which major events may have advanced this round.
+- `event_updates` may mention only event ids that exist in `event_memory_json`.
+- Do not mark a major event as `completed` unless the round activities plausibly satisfy its participants and completion signals.
 - Every field is required.
 - Return only the JSON object that matches the required output schema.
 - Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
@@ -55,6 +58,12 @@ Simulation clock JSON:
 
 Progression policy JSON:
 {progression_plan_json}
+
+Event memory JSON:
+{event_memory_json}
+
+Event match hints JSON:
+{event_match_hints_json}
 
 World state summary:
 {world_state_summary}

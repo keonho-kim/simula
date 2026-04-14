@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 from hashlib import sha256
+from typing import cast
 
 from pydantic import ValidationError
 
@@ -79,6 +80,29 @@ def build_initial_actor_facing_scenario_digest(
     talking_points = _string_list(situation.get("initial_tensions"))[:3]
     if not talking_points:
         talking_points = ["상대의 반응을 시험할 수 있는 분명한 말부터 꺼낸다."]
+    major_events = [
+        cast(dict[str, object], item)
+        for item in cast(list[object], plan.get("major_events", []))
+        if isinstance(item, dict)
+    ]
+    if major_events:
+        event_titles = [
+            str(item.get("title", "")).strip()
+            for item in major_events[:2]
+            if str(item.get("title", "")).strip()
+        ]
+        if event_titles:
+            current_pressures = [
+                *event_titles,
+                *_string_list(interpretation.get("key_pressures")),
+            ][:3]
+        event_summaries = [
+            str(item.get("summary", "")).strip()
+            for item in major_events[:2]
+            if str(item.get("summary", "")).strip()
+        ]
+        if event_summaries:
+            talking_points = [*event_summaries, *talking_points][:3]
     avoid_repetition_notes = _string_list(situation.get("current_constraints"))[:3]
     if not avoid_repetition_notes:
         avoid_repetition_notes = ["이미 나온 말만 반복하지 말고 관계를 움직일 새 포인트를 만든다."]

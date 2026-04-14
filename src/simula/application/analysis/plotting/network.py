@@ -14,6 +14,8 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 
+from simula.application.analysis.plotting.fonts import configure_korean_font
+
 
 def render_network_plot(
     graph: nx.DiGraph,
@@ -24,13 +26,14 @@ def render_network_plot(
     """Render one directed actor relationship graph."""
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    configure_korean_font()
     figure, axis = plt.subplots(figsize=(12, 8))
     try:
         if graph.number_of_nodes() == 0:
             axis.text(
                 0.5,
                 0.5,
-                "No actor nodes available.",
+                "행위자 노드가 없습니다.",
                 ha="center",
                 va="center",
                 transform=axis.transAxes,
@@ -58,7 +61,7 @@ def render_network_plot(
             axis.text(
                 0.98,
                 0.03,
-                "No relationship edges were produced.",
+                "관계 엣지가 생성되지 않았습니다.",
                 ha="right",
                 va="bottom",
                 transform=axis.transAxes,

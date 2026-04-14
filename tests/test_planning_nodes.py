@@ -129,6 +129,7 @@ def test_build_execution_plan_returns_minimum_plan_payload() -> None:
                             }
                         ]
                     },
+                    major_events=[],
                 ),
                 _FakeMeta(),
             )
@@ -166,11 +167,13 @@ def test_finalize_plan_persists_compact_plan() -> None:
     state = {
         "run_id": "run-1",
         "scenario_controls": {"num_cast": 2, "allow_additional_cast": False},
+        "planned_max_rounds": 4,
         "plan": {
             "cast_roster": [
                 {"cast_id": "a", "display_name": "A"},
                 {"cast_id": "b", "display_name": "B"},
-            ]
+            ],
+            "major_events": [],
         },
     }
 
@@ -185,11 +188,13 @@ def test_finalize_plan_rejects_duplicate_cast_names() -> None:
     state = {
         "run_id": "run-1",
         "scenario_controls": {"num_cast": 2, "allow_additional_cast": False},
+        "planned_max_rounds": 4,
         "plan": {
             "cast_roster": [
                 {"cast_id": "a", "display_name": "A"},
                 {"cast_id": "b", "display_name": "A"},
-            ]
+            ],
+            "major_events": [],
         },
     }
 
@@ -202,11 +207,13 @@ def test_finalize_plan_rejects_cast_count_below_required_minimum() -> None:
     state = {
         "run_id": "run-1",
         "scenario_controls": {"num_cast": 3, "allow_additional_cast": True},
+        "planned_max_rounds": 4,
         "plan": {
             "cast_roster": [
                 {"cast_id": "a", "display_name": "A"},
                 {"cast_id": "b", "display_name": "B"},
-            ]
+            ],
+            "major_events": [],
         },
     }
 
@@ -219,12 +226,45 @@ def test_finalize_plan_rejects_cast_count_when_exact_count_is_required() -> None
     state = {
         "run_id": "run-1",
         "scenario_controls": {"num_cast": 2, "allow_additional_cast": False},
+        "planned_max_rounds": 4,
         "plan": {
             "cast_roster": [
                 {"cast_id": "a", "display_name": "A"},
-            ]
+            ],
+            "major_events": [],
         },
     }
 
     with pytest.raises(ValueError, match="정확히 2명"):
+        finalize_plan(state, runtime)
+
+
+def test_finalize_plan_rejects_major_event_with_unknown_participant() -> None:
+    runtime = _build_runtime(object())
+    state = {
+        "run_id": "run-1",
+        "scenario_controls": {"num_cast": 2, "allow_additional_cast": False},
+        "planned_max_rounds": 4,
+        "plan": {
+            "cast_roster": [
+                {"cast_id": "a", "display_name": "A"},
+                {"cast_id": "b", "display_name": "B"},
+            ],
+            "major_events": [
+                {
+                    "event_id": "final-choice",
+                    "title": "최종 선택",
+                    "summary": "마지막 선택을 직접 확인한다.",
+                    "participant_cast_ids": ["a", "missing"],
+                    "earliest_round": 3,
+                    "latest_round": 4,
+                    "completion_action_types": ["speech"],
+                    "completion_signals": ["최종 선택"],
+                    "required_before_end": True,
+                }
+            ],
+        },
+    }
+
+    with pytest.raises(ValueError, match="participant_cast_ids"):
         finalize_plan(state, runtime)

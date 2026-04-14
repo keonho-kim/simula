@@ -20,6 +20,7 @@ from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
 from simula.domain.coordinator_policy import build_focus_candidates
+from simula.domain.event_memory import refresh_event_memory
 
 
 def prepare_focus_candidates(
@@ -29,12 +30,17 @@ def prepare_focus_candidates(
     """현재 round의 coordinator 후보 pool을 계산한다."""
 
     next_round_index = int(state["round_index"]) + 1
+    refreshed_event_memory = refresh_event_memory(
+        dict(state.get("event_memory", {})),
+        current_round_index=next_round_index,
+    )
     candidates = build_focus_candidates(
         actors=list(state.get("actors", [])),
         activity_feeds=dict(state.get("activity_feeds", {})),
         activities=list(state.get("activities", [])),
         actor_intent_states=list(state.get("actor_intent_states", [])),
         background_updates=list(state.get("background_updates", [])),
+        event_memory=refreshed_event_memory,
         round_focus_history=list(state.get("round_focus_history", [])),
         observer_reports=list(state.get("observer_reports", [])),
         current_round_index=next_round_index,
@@ -53,6 +59,7 @@ def prepare_focus_candidates(
         "deferred_cast_ids": [],
         "round_focus_plan": {},
         "latest_background_updates": [],
+        "event_memory": refreshed_event_memory,
         "pending_actor_proposals": Overwrite(value=[]),
         "round_time_advance": {},
         "latest_round_activities": [],

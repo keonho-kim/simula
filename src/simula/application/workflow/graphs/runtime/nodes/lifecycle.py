@@ -16,6 +16,7 @@ from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
 from simula.domain.activity_feeds import initialize_activity_feeds
+from simula.domain.event_memory import build_event_memory
 from simula.domain.runtime_policy import (
     build_initial_actor_facing_scenario_digest,
     build_initial_intent_snapshots,
@@ -27,6 +28,9 @@ def initialize_runtime_state(state: SimulationWorkflowState) -> dict[str, object
 
     initial_digest = build_initial_actor_facing_scenario_digest(
         dict(state.get("plan", {}))
+    )
+    initial_event_memory = build_event_memory(
+        list(dict(state.get("plan", {})).get("major_events", []))
     )
     return {
         "activity_feeds": initialize_activity_feeds(state["actors"]),
@@ -40,6 +44,8 @@ def initialize_runtime_state(state: SimulationWorkflowState) -> dict[str, object
         "deferred_cast_ids": [],
         "latest_background_updates": [],
         "background_updates": [],
+        "event_memory": initial_event_memory,
+        "event_memory_history": [],
         "actor_intent_states": build_initial_intent_snapshots(list(state["actors"])),
         "intent_history": [],
         "round_time_advance": {},

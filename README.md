@@ -55,6 +55,24 @@ output/
     simulation.log.jsonl
 ```
 
+Analyze one saved run artifact:
+
+```bash
+uv run python analysis.py --run-id 20260413.1
+```
+
+Analyzer outputs land in:
+
+```text
+analysis/
+  <run_id>/
+    manifest.json
+    llm_calls.csv
+    distributions/
+    fixer/
+    network/
+```
+
 ## One End-to-End Flow
 
 ```mermaid
@@ -159,6 +177,7 @@ The repository includes scenario seeds in [`senario.samples/`](./senario.samples
 | [`docs/architecture.md`](./docs/architecture.md) | layers, execution path, and runtime boundaries |
 | [`docs/contracts.md`](./docs/contracts.md) | public state surfaces, internal state groups, and artifacts |
 | [`docs/llm.md`](./docs/llm.md) | role routing, prompt projections, and structured-output policy |
+| [`docs/analysis.md`](./docs/analysis.md) | JSONL analyzer CLI, artifact layout, and analysis pipeline |
 | [`docs/workflows/README.md`](./docs/workflows/README.md) | workflow hub and stage handoffs |
 | [`docs/operations.md`](./docs/operations.md) | local execution, validation, and maintenance |
 

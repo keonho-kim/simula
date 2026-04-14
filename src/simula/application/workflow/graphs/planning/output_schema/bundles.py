@@ -120,6 +120,19 @@ _EXECUTION_PLAN_EXAMPLE: dict[str, Any] = {
             }
         ]
     },
+    "major_events": [
+        {
+            "event_id": "<stable snake_case or kebab-case event identifier>",
+            "title": "<short Korean title for a major scenario event>",
+            "summary": "<one Korean sentence describing what this event means>",
+            "participant_cast_ids": ["<cast_id involved in this event>"],
+            "earliest_round": "<positive integer round number>",
+            "latest_round": "<positive integer round number>",
+            "completion_action_types": ["<action_type that can complete this event>"],
+            "completion_signals": ["<one short Korean phrase that signals completion>"],
+            "required_before_end": "<true or false>",
+        }
+    ],
 }
 
 

@@ -13,6 +13,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from simula.application.workflow.graphs.finalization.nodes.build_report_projection import (
+    build_report_projection,
     cluster_round_activities,
     format_report_time_label,
 )
@@ -214,3 +215,68 @@ def test_render_markdown_table_keeps_header_when_body_is_empty() -> None:
         "| 인물 | 최종 결론 | 상대/대상 | 유불리/상태 | 근거 요약 |\n"
         "| --- | --- | --- | --- | --- |"
     )
+
+
+def test_build_report_projection_includes_major_event_history() -> None:
+    projection = build_report_projection(
+        {
+            "activities": [],
+            "observer_reports": [],
+            "actors": [],
+            "round_index": 2,
+            "round_time_history": [
+                {
+                    "round_index": 1,
+                    "total_elapsed_minutes": 30,
+                    "total_elapsed_label": "30분",
+                },
+                {
+                    "round_index": 2,
+                    "total_elapsed_minutes": 60,
+                    "total_elapsed_label": "1시간",
+                },
+            ],
+            "round_focus_history": [],
+            "background_updates": [],
+            "report_timeline_anchor_json": {
+                "anchor_iso": "2027-06-18T03:20:00",
+            },
+            "final_report": {
+                "last_observer_summary": "",
+                "notable_events": [],
+            },
+            "simulation_clock": {
+                "total_elapsed_minutes": 60,
+                "total_elapsed_label": "1시간",
+            },
+            "actor_intent_states": [],
+            "actor_facing_scenario_digest": {},
+            "event_memory": {"events": []},
+            "event_memory_history": [
+                {
+                    "round_index": 2,
+                    "source": "resolve_round",
+                    "event_updates": [
+                        {
+                            "event_id": "final-choice",
+                            "status": "completed",
+                            "progress_summary": "최종 선택이 실행됐다.",
+                            "matched_activity_ids": [],
+                        }
+                    ],
+                    "event_memory_summary": {
+                        "completed_event_ids": ["final-choice"],
+                    },
+                    "stop_context": {
+                        "requested_stop_reason": "",
+                        "effective_stop_reason": "",
+                    },
+                }
+            ],
+            "world_state_summary": "",
+            "intent_history": [],
+        }
+    )
+
+    assert '"major_event_history"' in projection["report_projection_json"]
+    assert '"time_label": "2027-06-18 04:20"' in projection["report_projection_json"]

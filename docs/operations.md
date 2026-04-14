@@ -16,6 +16,26 @@ To inspect detailed local workflow and LLM logs without changing persisted artif
 uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md --log-level DEBUG
 ```
 
+## Analyze One Saved Run
+
+After a run finishes, inspect its saved JSONL artifact with:
+
+```bash
+uv run python analysis.py --run-id 20260413.1
+```
+
+If the output directory is resolved through a custom env file:
+
+```bash
+uv run python analysis.py --run-id 20260413.1 --env ./env.toml
+```
+
+For Korean plot labels on Ubuntu, install the recommended Noto font set:
+
+```bash
+./scripts/install_noto_sans_kr_ubuntu.sh
+```
+
 ## Output Layout
 
 Each run writes to:
@@ -27,6 +47,17 @@ output/<run_id>/
 ```
 
 The graph returns both artifacts before the presentation layer writes them to disk.
+
+The analyzer writes to:
+
+```text
+analysis/<run_id>/
+  manifest.json
+  llm_calls.csv
+  distributions/
+  fixer/
+  network/
+```
 
 ## Validation Commands
 

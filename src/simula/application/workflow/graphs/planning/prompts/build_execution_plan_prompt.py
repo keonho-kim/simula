@@ -13,6 +13,10 @@ Turn the planning analysis into the minimum execution plan bundle.
 # Rules
 - Keep the action catalog broad and small.
 - Keep the cast roster unique.
+- Generate `major_events` only when the scenario text implies concrete turning points, staged choices, checkpoints, or end conditions worth tracking.
+- `major_events` may be an empty array when the scenario does not imply any specific shared event track.
+- Each `major_events` item must use only cast ids that appear in `cast_roster`.
+- Use round windows for `major_events`. `earliest_round` and `latest_round` should fit within `planning_analysis_json.progression_plan.max_rounds`.
 - Every field is required.
 - Return only the JSON object that matches the required output schema.
 - Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
@@ -23,6 +27,7 @@ Turn the planning analysis into the minimum execution plan bundle.
 - Keep the execution plan realistic for the scenario. The action catalog, tensions, and cast tensions must describe moves that could plausibly happen in-world.
 - Do not introduce formal documents, legal frameworks, military doctrines, or institutional processes unless they are already grounded in the scenario text.
 - Prefer concrete human or organizational behavior over abstract analysis labels.
+- Do not import outside genre knowledge or default show formats. Only create major events that are explicitly stated or strongly implied by the scenario text.
 
 # Input
 Scenario text:

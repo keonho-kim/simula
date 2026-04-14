@@ -38,9 +38,12 @@ cast-count controls. This bundle contains:
 - `action_catalog`
 - `coordination_frame`
 - `cast_roster`
+- `major_events`
 
 `cast_roster` generation is guided by `scenario_controls.num_cast` and
 `scenario_controls.allow_additional_cast`.
+`major_events` is scenario-dependent and may be empty when the scenario does not imply a
+trackable shared event sequence.
 
 ### `finalize_plan`
 
@@ -56,3 +59,7 @@ The final `plan` retained in workflow state contains only the keys used downstre
 - `action_catalog`
 - `coordination_frame`
 - `cast_roster`
+- `major_events`
+
+`build_planning_analysis` also writes `planned_max_rounds` into workflow state. This is the
+planner-recommended target round budget and is distinct from the configured runtime hard ceiling.

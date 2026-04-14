@@ -11,6 +11,7 @@ from simula.domain.log_events import (
     build_actors_finalized_event,
     build_final_report_event,
     build_llm_usage_summary_event,
+    build_round_event_memory_updated_event,
     build_plan_finalized_event,
     build_round_actions_adopted_event,
     build_round_background_updated_event,
@@ -23,20 +24,7 @@ from simula.domain.contracts import (
     FinalReport,
     LLMUsageSummary,
     ObserverReport,
-    StopReason,
 )
-
-
-def evaluate_stop(
-    *,
-    round_index: int,
-    max_rounds: int,
-) -> StopReason:
-    """Return the deterministic terminal stop reason for the runtime loop."""
-
-    if round_index >= max_rounds:
-        return "simulation_done"
-    return ""
 
 
 def build_final_report(
@@ -130,6 +118,10 @@ def build_simulation_log_entries(
     for item in _dict_list(state.get("background_updates", [])):
         round_index = _int_value(item.get("round_index", 0))
         background_updates_by_round.setdefault(round_index, []).append(item)
+    event_memory_history_by_round: dict[int, list[dict[str, object]]] = {}
+    for item in _dict_list(state.get("event_memory_history", [])):
+        round_index = _int_value(item.get("round_index", 0))
+        event_memory_history_by_round.setdefault(round_index, []).append(item)
 
     entries: list[dict[str, object]] = [
         build_simulation_started_event(
@@ -161,6 +153,7 @@ def build_simulation_log_entries(
     round_indexes = sorted(
         {_int_value(activity.get("round_index", 0)) for activity in activities}
         | set(reports_by_round.keys())
+        | set(event_memory_history_by_round.keys())
     )
 
     for round_index in round_indexes:
@@ -209,6 +202,20 @@ def build_simulation_log_entries(
                     observer_report=reports_by_round[round_index],
                 )
             )
+        if round_index in event_memory_history_by_round:
+            for history_entry in event_memory_history_by_round[round_index]:
+                entries.append(
+                    build_round_event_memory_updated_event(
+                        run_id=run_id,
+                        round_index=round_index,
+                        source=str(history_entry.get("source", "resolve_round")),
+                        event_updates=_dict_list(history_entry.get("event_updates", [])),
+                        event_memory_summary=_dict_value(
+                            history_entry.get("event_memory_summary", {})
+                        ),
+                        stop_context=_dict_value(history_entry.get("stop_context", {})),
+                    )
+                )
 
     if final_report:
         entries.append(

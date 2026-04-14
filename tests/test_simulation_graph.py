@@ -128,6 +128,7 @@ class FakeRouter:
                             },
                         ]
                     },
+                    major_events=[],
                 ),
                 FakeMeta(),
             )
@@ -236,6 +237,7 @@ class FakeRouter:
                             "changed_from_previous": False,
                         },
                     ],
+                    event_updates=[],
                     round_time_advance={
                         "elapsed_unit": "minute",
                         "elapsed_amount": 30,
@@ -422,6 +424,7 @@ class RuntimeGraphRouter:
                             "changed_from_previous": False,
                         },
                     ],
+                    event_updates=[],
                     round_time_advance={
                         "elapsed_unit": "minute",
                         "elapsed_amount": 30,
@@ -520,6 +523,7 @@ def _runtime_state(settings: AppSettings) -> dict[str, object]:
             "attention_shift_rules": ["조용했던 actor도 압력이 올라가면 끌어올린다."],
             "budget_guidance": ["한 round에는 소수 actor만 직접 호출한다."],
         },
+        "major_events": [],
         "progression_plan": {
             "max_rounds": settings.runtime.max_rounds,
             "allowed_elapsed_units": ["minute", "hour"],

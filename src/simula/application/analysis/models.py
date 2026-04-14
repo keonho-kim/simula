@@ -7,6 +7,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from simula.application.analysis.localization import (
+    call_kind_label,
+    metric_label,
+    role_label,
+)
+
 
 @dataclass(slots=True)
 class LLMCallRecord:
@@ -34,7 +40,9 @@ class LLMCallRecord:
             "run_id": self.run_id,
             "sequence": self.sequence,
             "role": self.role,
+            "role_label": role_label(self.role),
             "call_kind": self.call_kind,
+            "call_kind_label": call_kind_label(self.call_kind),
             "scope": self.scope,
             "duration_seconds": self.duration_seconds,
             "ttft_seconds": self.ttft_seconds,
@@ -141,6 +149,7 @@ class MetricDistribution:
     def to_dict(self) -> dict[str, object]:
         return {
             "metric": self.metric,
+            "metric_label": metric_label(self.metric),
             "record_count": self.record_count,
             "sample_count": self.sample_count,
             "missing_count": self.missing_count,
@@ -185,6 +194,7 @@ class FixerAttemptRecord:
             "sequence": self.sequence,
             "attempt": self.attempt,
             "attributed_role": self.attributed_role,
+            "attributed_role_label": role_label(self.attributed_role),
             "schema_name": self.schema_name,
             "ttft_seconds": self.ttft_seconds,
             "duration_seconds": self.duration_seconds,
@@ -215,6 +225,7 @@ class FixerSessionRecord:
         return {
             "session_index": self.session_index,
             "attributed_role": self.attributed_role,
+            "attributed_role_label": role_label(self.attributed_role),
             "schema_name": self.schema_name,
             "attempt_count": self.attempt_count,
             "retry_count": self.retry_count,
@@ -242,6 +253,7 @@ class FixerRoleSummary:
     def to_dict(self) -> dict[str, object]:
         return {
             "role": self.role,
+            "role_label": role_label(self.role),
             "fixer_call_count": self.fixer_call_count,
             "session_count": self.session_count,
             "retry_count": self.retry_count,
@@ -252,6 +264,7 @@ class FixerRoleSummary:
     def to_row(self) -> dict[str, object]:
         return {
             "role": self.role,
+            "role_label": role_label(self.role),
             "fixer_call_count": self.fixer_call_count,
             "session_count": self.session_count,
             "retry_count": self.retry_count,
@@ -401,6 +414,7 @@ class ArtifactManifest:
             "total_events": self.total_events,
             "llm_call_count": self.llm_call_count,
             "roles": self.roles,
+            "roles_display": [role_label(item) for item in self.roles],
             "artifact_paths": self.artifact_paths,
             "fixer_summary": self.fixer_summary,
             "network_summary": self.network_summary,

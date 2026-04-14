@@ -16,6 +16,7 @@ from collections import Counter
 from typing import Literal, cast
 
 from simula.domain.contracts import PressureLevel
+from simula.domain.event_memory import build_event_pressure_map
 from simula.domain.runtime_policy import latest_observer_signal
 
 CandidateBucket = Literal["hard_include", "weighted", "wildcard"]
@@ -44,6 +45,7 @@ def build_focus_candidates(
     activities: list[dict[str, object]],
     actor_intent_states: list[dict[str, object]],
     background_updates: list[dict[str, object]],
+    event_memory: dict[str, object],
     round_focus_history: list[dict[str, object]],
     observer_reports: list[dict[str, object]],
     current_round_index: int,
@@ -79,6 +81,10 @@ def build_focus_candidates(
     }
     background_pressure = _background_pressure_by_actor(
         background_updates=background_updates,
+        current_round_index=current_round_index,
+    )
+    event_pressure = build_event_pressure_map(
+        event_memory,
         current_round_index=current_round_index,
     )
     recent_focus_counts = _recent_focus_counts(
@@ -120,6 +126,31 @@ def build_focus_candidates(
         if pressure_level is not None:
             score += _BACKGROUND_PRESSURE[pressure_level]
             reasons.append(f"background pressure {pressure_level}")
+
+        event_pressure_info = event_pressure.get(cast_id, {})
+        required_due_count = _int_value(event_pressure_info.get("required_due_count", 0))
+        required_overdue_count = _int_value(
+            event_pressure_info.get("required_overdue_count", 0)
+        )
+        optional_due_count = _int_value(event_pressure_info.get("optional_due_count", 0))
+        optional_overdue_count = _int_value(
+            event_pressure_info.get("optional_overdue_count", 0)
+        )
+        if required_due_count > 0:
+            score += required_due_count * 1.6
+            reasons.append(f"required due event {required_due_count}건")
+        if required_overdue_count > 0:
+            score += required_overdue_count * 2.2
+            reasons.append(f"required overdue event {required_overdue_count}건")
+        if optional_due_count > 0:
+            score += optional_due_count * 0.8
+            reasons.append(f"due event {optional_due_count}건")
+        if optional_overdue_count > 0:
+            score += optional_overdue_count * 1.1
+            reasons.append(f"overdue event {optional_overdue_count}건")
+        event_titles = cast(list[str], event_pressure_info.get("event_titles", []))
+        if event_titles:
+            reasons.append(f"event focus={', '.join(event_titles[:2])}")
 
         focus_count_last_two = sum(recent_focus_counts.get(cast_id, [])[:2])
         if focus_count_last_two == 0:
@@ -422,3 +453,10 @@ def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item) for item in value]
+
+
+def _int_value(value: object) -> int:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return 0

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+from typing import cast
 
 from langgraph.runtime import Runtime
 
@@ -18,6 +19,8 @@ from simula.application.workflow.graphs.coordinator.prompts.round_continuation_p
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
+from simula.application.workflow.utils.streaming import emit_custom_event
+from simula.application.workflow.utils.prompt_projections import build_event_memory_prompt_view
 from simula.application.workflow.utils.prompt_projections import (
     ACTION_SUMMARY_LIMIT,
     PREVIOUS_SUMMARY_LIMIT,
@@ -25,7 +28,14 @@ from simula.application.workflow.utils.prompt_projections import (
     truncate_text,
 )
 from simula.domain.contracts import RoundContinuationDecision
-from simula.domain.reporting import evaluate_stop
+from simula.domain.event_memory import (
+    apply_event_updates,
+    build_transition_event_updates,
+    hard_stop_round,
+    has_required_unresolved_events,
+    refresh_event_memory,
+)
+from simula.domain.log_events import build_round_event_memory_updated_event
 
 
 async def assess_round_continuation(
@@ -41,19 +51,79 @@ async def assess_round_continuation(
             "stop_reason": "",
         }
 
-    deterministic_stop_reason = evaluate_stop(
-        round_index=round_index,
-        max_rounds=int(state["max_rounds"]),
+    planned_max_rounds = int(state.get("planned_max_rounds", state["max_rounds"]))
+    refreshed_event_memory = refresh_event_memory(
+        dict(state.get("event_memory", {})),
+        current_round_index=round_index,
     )
-    if deterministic_stop_reason:
+    required_unresolved_events = has_required_unresolved_events(refreshed_event_memory)
+    hard_stop = hard_stop_round(
+        configured_max_rounds=int(state["max_rounds"]),
+        planned_max_rounds=planned_max_rounds,
+    )
+    if round_index >= hard_stop:
+        finalized_event_memory = apply_event_updates(
+            refreshed_event_memory,
+            event_updates=[],
+            current_round_index=round_index,
+            finalize_unresolved_as_missed=True,
+        )
+        transition_updates = build_transition_event_updates(
+            refreshed_event_memory,
+            finalized_event_memory,
+        )
+        history_entry = _build_event_memory_history_entry(
+            round_index=round_index,
+            source="continuation_hard_stop",
+            event_updates=transition_updates,
+            event_memory=finalized_event_memory,
+            requested_stop_reason="simulation_done",
+            effective_stop_reason="simulation_done",
+        )
+        emit_custom_event(
+            build_round_event_memory_updated_event(
+                run_id=str(state.get("run_id", "")),
+                round_index=round_index,
+                source=str(history_entry["source"]),
+                event_updates=_dict_list(history_entry.get("event_updates", [])),
+                event_memory_summary=cast(
+                    dict[str, object], history_entry["event_memory_summary"]
+                ),
+                stop_context=cast(dict[str, object], history_entry["stop_context"]),
+            )
+        )
         runtime.context.logger.info(
             "round %s continuation skipped | stop=%s",
             round_index,
-            deterministic_stop_reason,
+            "simulation_done",
         )
         return {
             "stop_requested": True,
-            "stop_reason": deterministic_stop_reason,
+            "stop_reason": "simulation_done",
+            "event_memory": finalized_event_memory,
+            "event_memory_history": list(state.get("event_memory_history", []))
+            + [history_entry],
+        }
+    if round_index >= planned_max_rounds and not required_unresolved_events:
+        runtime.context.logger.info(
+            "round %s continuation skipped | stop=simulation_done | planned_max=%s",
+            round_index,
+            planned_max_rounds,
+        )
+        return {
+            "stop_requested": True,
+            "stop_reason": "simulation_done",
+            "event_memory": refreshed_event_memory,
+        }
+    if round_index >= planned_max_rounds and required_unresolved_events:
+        runtime.context.logger.info(
+            "round %s continuation forced | unresolved required events remain",
+            round_index,
+        )
+        return {
+            "stop_requested": False,
+            "stop_reason": "",
+            "event_memory": refreshed_event_memory,
         }
 
     prompt = ROUND_CONTINUATION_PROMPT.format(
@@ -91,6 +161,11 @@ async def assess_round_continuation(
             ensure_ascii=False,
             separators=(",", ":"),
         ),
+        event_memory_json=json.dumps(
+            build_event_memory_prompt_view(refreshed_event_memory),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
         **build_round_continuation_prompt_bundle(),
     )
     decision, meta = await runtime.context.llms.ainvoke_structured_with_meta(
@@ -105,6 +180,8 @@ async def assess_round_continuation(
         },
     )
     stop_reason = decision.stop_reason
+    if stop_reason == "no_progress" and required_unresolved_events:
+        stop_reason = ""
     runtime.context.logger.info(
         "round %s continuation assessed | stop=%s | stagnation=%s",
         round_index,
@@ -117,6 +194,7 @@ async def assess_round_continuation(
     return {
         "stop_requested": bool(stop_reason),
         "stop_reason": stop_reason,
+        "event_memory": refreshed_event_memory,
         "errors": errors,
     }
 
@@ -193,3 +271,30 @@ def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item).strip() for item in value if str(item).strip()]
+
+
+def _dict_list(value: object) -> list[dict[str, object]]:
+    if not isinstance(value, list):
+        return []
+    return [cast(dict[str, object], item) for item in value if isinstance(item, dict)]
+
+
+def _build_event_memory_history_entry(
+    *,
+    round_index: int,
+    source: str,
+    event_updates: list[dict[str, object]],
+    event_memory: dict[str, object],
+    requested_stop_reason: str,
+    effective_stop_reason: str,
+) -> dict[str, object]:
+    return {
+        "round_index": round_index,
+        "source": source,
+        "event_updates": event_updates,
+        "event_memory_summary": build_event_memory_prompt_view(event_memory, limit=5),
+        "stop_context": {
+            "requested_stop_reason": requested_stop_reason,
+            "effective_stop_reason": effective_stop_reason,
+        },
+    }

@@ -28,19 +28,24 @@ flowchart TD
 
 ### `initialize_runtime_state`
 
-Normalizes runtime counters and ensures the runtime loop starts from a clean state.
+Normalizes runtime counters, initializes `event_memory` from `plan.major_events`, and ensures the
+runtime loop starts from a clean state.
 
 ### `prepare_round`
 
-Advances `round_index`, compresses focus candidates, resets current-round scratch fields, and
-starts round timing.
+Advances `round_index`, refreshes `event_memory`, compresses focus candidates, resets
+current-round scratch fields, and starts round timing.
 
 ### `assess_round_continuation`
 
 Runs before each new round. It can end the runtime loop in two ways:
 
-- deterministic `simulation_done` when `max_rounds` has already been reached
+- deterministic `simulation_done` when the configured hard stop derived from
+  `max_rounds`, `planned_max_rounds`, and the grace buffer has been reached
 - coordinator-produced `no_progress` when another round would not add meaningful movement
+
+Required unresolved major events can prevent both planner-target completion and `no_progress`
+stops until the hard ceiling is reached.
 
 ### `plan_round`
 
@@ -66,15 +71,23 @@ Restores deterministic actor order after fan-in.
 ### `resolve_round`
 
 Generates one `RoundResolution` bundle, applies adopted actions, advances the simulation clock,
-writes observer output, persists round artifacts, and sets stop state.
+writes observer output, updates `event_memory`, appends `event_memory_history`, persists round
+artifacts, and sets stop state.
 
 ## Stop Behavior
 
 The runtime loop ends when either:
 
 - `assess_round_continuation` returns `no_progress`
-- `assess_round_continuation` deterministically returns `simulation_done` after the round budget is exhausted
+- `assess_round_continuation` deterministically returns `simulation_done` at the configured hard stop
 - `resolve_round` returns `simulation_done`
+
+The active stop policy combines:
+
+- configured hard ceiling: `max_rounds`
+- planner target: `planned_max_rounds`
+- grace buffer for unresolved required major events
+- round-level resolver completion signal
 
 Active `stop_reason` values are:
 
@@ -91,5 +104,7 @@ Runtime leaves behind the full execution trace used by finalization:
 - `round_focus_history`
 - `round_time_history`
 - `background_updates`
+- `event_memory`
+- `event_memory_history`
 - `world_state_summary`
 - `stop_reason`

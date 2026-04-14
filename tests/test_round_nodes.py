@@ -29,6 +29,7 @@ from simula.domain.contracts import (
     RoundDirective,
     RoundResolution,
 )
+from simula.domain.event_memory import build_event_memory
 
 
 def test_prepare_focus_candidates_advances_round_and_builds_candidates() -> None:
@@ -69,6 +70,62 @@ def test_prepare_focus_candidates_advances_round_and_builds_candidates() -> None
     assert result["focus_candidates"]
 
 
+def test_prepare_focus_candidates_prioritizes_due_required_event_participants() -> None:
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(logger=logging.getLogger("simula.test.round"))
+    )
+    state = {
+        "actors": [
+            {
+                "cast_id": "a",
+                "display_name": "A",
+                "baseline_attention_tier": "support",
+                "story_function": "관망 축",
+            },
+            {
+                "cast_id": "b",
+                "display_name": "B",
+                "baseline_attention_tier": "support",
+                "story_function": "이벤트 축",
+            },
+        ],
+        "activity_feeds": {
+            "a": {"unseen_activity_ids": [], "seen_activity_ids": []},
+            "b": {"unseen_activity_ids": [], "seen_activity_ids": []},
+        },
+        "activities": [],
+        "background_updates": [],
+        "event_memory": build_event_memory(
+            [
+                {
+                    "event_id": "mid_choice",
+                    "title": "중간 선택",
+                    "summary": "B가 이번 단계의 선택 압력을 직접 받는다.",
+                    "participant_cast_ids": ["b"],
+                    "earliest_round": 1,
+                    "latest_round": 2,
+                    "completion_action_types": ["speech"],
+                    "completion_signals": ["선택"],
+                    "required_before_end": True,
+                }
+            ]
+        ),
+        "round_focus_history": [],
+        "observer_reports": [],
+        "actor_intent_states": [],
+        "rng_seed": 7,
+        "round_index": 0,
+    }
+
+    result = prepare_focus_candidates(state, runtime)
+
+    assert result["focus_candidates"][0]["cast_id"] == "b"
+    assert any(
+        "required due event" in reason
+        for reason in result["focus_candidates"][0]["selection_reasons"]
+    )
+
+
 def test_round_continuation_decision_rejects_simulation_done() -> None:
     with pytest.raises(ValidationError):
         RoundContinuationDecision(stop_reason="simulation_done")
@@ -79,6 +136,7 @@ def test_round_resolution_rejects_no_progress() -> None:
         RoundResolution(
             adopted_cast_ids=[],
             updated_intent_states=[],
+            event_updates=[],
             round_time_advance={
                 "elapsed_unit": "hour",
                 "elapsed_amount": 1,
@@ -163,6 +221,52 @@ def test_assess_round_continuation_stops_on_max_rounds_without_llm() -> None:
 
     assert result["stop_requested"] is True
     assert result["stop_reason"] == "simulation_done"
+    assert result["event_memory_history"][0]["source"] == "continuation_hard_stop"
+
+
+def test_assess_round_continuation_keeps_running_when_required_event_remains() -> None:
+    class FailRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            raise AssertionError("LLM should not be called when required events force continuation")
+
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(
+            llms=FailRouter(),
+            logger=logging.getLogger("simula.test.round"),
+        )
+    )
+    state = {
+        "round_index": 2,
+        "max_rounds": 5,
+        "planned_max_rounds": 2,
+        "stagnation_rounds": 1,
+        "simulation_clock": {"total_elapsed_label": "2시간"},
+        "world_state_summary": "현재 상태",
+        "observer_reports": [],
+        "latest_round_activities": [],
+        "round_focus_history": [],
+        "event_memory": build_event_memory(
+            [
+                {
+                    "event_id": "final_choice",
+                    "title": "최종 선택",
+                    "summary": "아직 최종 선택이 발생하지 않았다.",
+                    "participant_cast_ids": ["a", "b"],
+                    "earliest_round": 2,
+                    "latest_round": 2,
+                    "completion_action_types": ["speech"],
+                    "completion_signals": ["최종 선택"],
+                    "required_before_end": True,
+                }
+            ]
+        ),
+        "errors": [],
+    }
+
+    result = asyncio.run(assess_round_continuation(state, runtime))
+
+    assert result["stop_requested"] is False
+    assert result["stop_reason"] == ""
 
 
 def test_assess_round_continuation_returns_no_progress_from_coordinator() -> None:
@@ -383,6 +487,7 @@ def test_resolve_round_persists_round_artifacts() -> None:
                             "changed_from_previous": False,
                         },
                     ],
+                    event_updates=[],
                     round_time_advance={
                         "elapsed_unit": "minute",
                         "elapsed_amount": 30,
@@ -511,6 +616,175 @@ def test_resolve_round_persists_round_artifacts() -> None:
 
     assert saved["run_id"] == "run-1"
     assert result["observer_reports"][0]["round_index"] == 2
+    assert result["event_memory_history"][0]["source"] == "resolve_round"
+
+
+def test_resolve_round_completes_matching_major_event_from_applied_actions() -> None:
+    class FakeRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            return (
+                RoundResolution(
+                    adopted_cast_ids=["a"],
+                    updated_intent_states=[
+                        {
+                            "cast_id": "a",
+                            "current_intent": "b에게 최종 선택 의사를 직접 묻는다.",
+                            "thought": "이번에는 선택 확인을 분명히 끝내야 한다고 본다.",
+                            "target_cast_ids": ["b"],
+                            "supporting_action_type": "speech",
+                            "confidence": 0.9,
+                            "changed_from_previous": True,
+                        },
+                        {
+                            "cast_id": "b",
+                            "current_intent": "답을 정리한다.",
+                            "thought": "더는 미룰 수 없어 입장을 분명히 해야 한다고 본다.",
+                            "target_cast_ids": ["a"],
+                            "supporting_action_type": "speech",
+                            "confidence": 0.7,
+                            "changed_from_previous": True,
+                        },
+                    ],
+                    event_updates=[],
+                    round_time_advance={
+                        "elapsed_unit": "minute",
+                        "elapsed_amount": 15,
+                        "selection_reason": "이번에는 최종 확인만 짧게 진행됐다.",
+                        "signals": ["선택 확인"],
+                    },
+                    observer_report={
+                        "round_index": 2,
+                        "summary": "최종 선택 관련 대화가 실제 행동으로 이어졌다.",
+                        "notable_events": ["a가 b에게 최종 선택을 직접 물었다."],
+                        "atmosphere": "긴장",
+                        "momentum": "high",
+                        "world_state_summary": "최종 선택 단계가 직접 가시화됐다.",
+                    },
+                    actor_facing_scenario_digest={
+                        "round_index": 2,
+                        "relationship_map_summary": "최종 선택을 둘러싼 직접 확인이 시작됐다.",
+                        "current_pressures": ["이제 선택을 미루기 어렵다."],
+                        "talking_points": ["입장을 분명히 말해 흐름을 닫는다."],
+                        "avoid_repetition_notes": ["애매한 탐색 대화를 다시 반복하지 않는다."],
+                        "recommended_tone": "짧고 분명한 확인 톤",
+                        "world_state_summary": "최종 선택 단계가 직접 가시화됐다.",
+                    },
+                    world_state_summary="최종 선택 단계가 직접 가시화됐다.",
+                    stop_reason="",
+                ),
+                SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+            )
+
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(
+            llms=FakeRouter(),
+            logger=logging.getLogger("simula.test.round"),
+            settings=SimpleNamespace(
+                runtime=SimpleNamespace(max_recipients_per_message=2)
+            ),
+            store=SimpleNamespace(save_round_artifacts=lambda *args, **kwargs: None),
+        )
+    )
+    state = {
+        "run_id": "run-1",
+        "round_index": 2,
+        "max_rounds": 5,
+        "planned_max_rounds": 4,
+        "actors": [
+            {"cast_id": "a", "private_goal": "선택을 확인한다."},
+            {"cast_id": "b", "private_goal": "답을 정리한다."},
+        ],
+        "activity_feeds": initialize_activity_feeds([{"cast_id": "a"}, {"cast_id": "b"}]),
+        "activities": [],
+        "latest_round_activities": [],
+        "round_focus_plan": {"selected_cast_ids": ["a"]},
+        "latest_background_updates": [],
+        "selected_cast_ids": ["a"],
+        "actor_intent_states": [],
+        "actor_facing_scenario_digest": {},
+        "world_state_summary": "기존 상태",
+        "event_memory": build_event_memory(
+            [
+                {
+                    "event_id": "final_choice",
+                    "title": "최종 선택",
+                    "summary": "a와 b가 직접 선택 대화를 마무리한다.",
+                    "participant_cast_ids": ["a", "b"],
+                    "earliest_round": 2,
+                    "latest_round": 3,
+                    "completion_action_types": ["speech"],
+                    "completion_signals": ["최종 선택"],
+                    "required_before_end": True,
+                }
+            ]
+        ),
+        "plan": {
+            "progression_plan": {
+                "max_rounds": 4,
+                "allowed_elapsed_units": ["minute", "hour"],
+                "default_elapsed_unit": "hour",
+                "pacing_guidance": ["짧게 본다."],
+                "selection_reason": "짧은 상호작용 중심",
+            },
+            "action_catalog": {
+                "actions": [
+                    {
+                        "action_type": "speech",
+                        "label": "발화",
+                        "description": "말한다.",
+                        "supported_visibility": ["public", "private", "group"],
+                        "requires_target": False,
+                        "supports_utterance": True,
+                    }
+                ],
+                "selection_guidance": ["상황에 맞게 고른다."],
+            },
+        },
+        "pending_actor_proposals": [
+            {
+                "cast_id": "a",
+                "unread_activity_ids": [],
+                "proposal": {
+                    "action_type": "speech",
+                    "intent": "b에게 최종 선택 의사를 직접 확인한다.",
+                    "intent_target_cast_ids": ["b"],
+                    "action_summary": "a가 b에게 최종 선택 의사를 직접 묻는다.",
+                    "action_detail": "이제 최종 선택을 말해 달라고 분명히 요구한다.",
+                    "utterance": "이제는 최종 선택을 분명히 말해줘.",
+                    "visibility": "private",
+                    "target_cast_ids": ["b"],
+                    "thread_id": "final-choice",
+                },
+                "forced_idle": False,
+                "parse_failure_count": 0,
+                "latency_seconds": 0.01,
+            }
+        ],
+        "simulation_clock": {
+            "total_elapsed_minutes": 0,
+            "total_elapsed_label": "0분",
+            "last_elapsed_minutes": 0,
+            "last_elapsed_label": "0분",
+            "last_advanced_round_index": 0,
+        },
+        "observer_reports": [],
+        "round_time_history": [],
+        "intent_history": [],
+        "forced_idles": 0,
+        "parse_failures": 0,
+        "stagnation_rounds": 0,
+        "stop_requested": False,
+        "stop_reason": "",
+        "current_round_started_at": 0.0,
+        "errors": [],
+    }
+
+    result = asyncio.run(resolve_round(state, runtime))
+
+    assert result["event_memory"]["completed_event_ids"] == ["final_choice"]
+    assert result["event_memory"]["events"][0]["status"] == "completed"
+    assert result["event_memory_history"][0]["event_updates"][0]["status"] == "completed"
 
 
 def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
@@ -531,6 +805,7 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
                             "changed_from_previous": True,
                         }
                     ],
+                    event_updates=[],
                     round_time_advance={
                         "elapsed_unit": "minute",
                         "elapsed_amount": 30,
@@ -672,6 +947,7 @@ def test_resolve_round_marks_simulation_done_stop() -> None:
                             "changed_from_previous": True,
                         }
                     ],
+                    event_updates=[],
                     round_time_advance={
                         "elapsed_unit": "minute",
                         "elapsed_amount": 15,

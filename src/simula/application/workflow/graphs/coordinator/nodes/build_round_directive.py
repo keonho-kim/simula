@@ -23,6 +23,7 @@ from simula.application.workflow.utils.coercion import as_dict_list, as_string_l
 from simula.application.workflow.utils.prompt_projections import (
     PREVIOUS_SUMMARY_LIMIT,
     build_deferred_actor_views,
+    build_event_memory_prompt_view,
     build_focus_candidates_prompt_view,
     build_focus_plan_coordination_frame_view,
     build_focus_plan_situation_view,
@@ -81,6 +82,11 @@ async def build_round_directive(
         ),
         simulation_clock_json=json.dumps(
             state["simulation_clock"],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        event_memory_json=json.dumps(
+            build_event_memory_prompt_view(state.get("event_memory", {})),
             ensure_ascii=False,
             separators=(",", ":"),
         ),

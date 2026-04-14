@@ -14,6 +14,7 @@ Decide whether the simulation should stop before starting the next round because
 - Return `""` when the simulation should continue.
 - Return `"no_progress"` only when the current state suggests the next round would materially repeat the same stalemate or low-information drift.
 - Do not use `"no_progress"` to represent successful completion. Completion is handled elsewhere.
+- If unresolved required events remain in `event_memory_json`, do not return `"no_progress"` just because the pace slowed.
 - Every field is required.
 - Return only the JSON object that matches the required output schema.
 - Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
@@ -48,6 +49,9 @@ Latest round activities JSON:
 
 Latest round focus JSON:
 {latest_round_focus_json}
+
+Event memory JSON:
+{event_memory_json}
 
 # Output
 Format:

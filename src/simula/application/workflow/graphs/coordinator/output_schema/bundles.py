@@ -83,6 +83,14 @@ _STEP_RESOLUTION_EXAMPLE: dict[str, Any] = {
             "changed_from_previous": "<true or false>",
         }
     ],
+    "event_updates": [
+        {
+            "event_id": "<major event id>",
+            "status": "<choose one of pending, in_progress, completed, missed>",
+            "progress_summary": "<one Korean sentence describing the event progress>",
+            "matched_activity_ids": ["<activity_id from this round or an empty list>"],
+        }
+    ],
     "round_time_advance": {
         "elapsed_unit": "<choose exactly one of minute, hour, day, week>",
         "elapsed_amount": "<positive integer greater than or equal to 1>",

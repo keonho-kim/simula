@@ -9,7 +9,7 @@ The root graph accepts a compact `SimulationInputState`.
 | `run_id` | stable identifier for one run |
 | `scenario` | cleaned scenario body without YAML frontmatter |
 | `scenario_controls` | parsed scenario authoring controls (`num_cast`, `allow_additional_cast`) |
-| `max_rounds` | runtime stop ceiling |
+| `max_rounds` | configured runtime hard ceiling |
 | `rng_seed` | deterministic seed derived before graph execution |
 
 `checkpoint_enabled` is not part of the public input. It is injected during hydration from
@@ -24,6 +24,7 @@ and absence is represented with explicit empty values such as `""`, `[]`, or `{}
 
 - `planning_analysis`
 - `plan`
+- `planned_max_rounds`
 - `actors`
 - `pending_cast_slots`
 - `cast_slot`
@@ -42,8 +43,10 @@ and absence is represented with explicit empty values such as `""`, `[]`, or `{}
 
 - `focus_candidates`
 - `round_focus_history`
-- `selected_actor_ids`
-- `deferred_actor_ids`
+- `selected_cast_ids`
+- `deferred_cast_ids`
+- `event_memory`
+- `event_memory_history`
 - `actor_intent_states`
 - `intent_history`
 - `round_focus_plan`
@@ -105,7 +108,7 @@ active prompt-facing contracts.
 | runtime round continuation | `RoundContinuationDecision` |
 | runtime round planning | `RoundDirective` |
 | runtime actor turn | `ActorActionProposal` |
-| runtime round resolution | `RoundResolution` |
+| runtime round resolution | `RoundResolution` including `event_updates` |
 | finalization anchor | `TimelineAnchorDecision` |
 | finalization report bundle | `FinalReportSections` |
 
@@ -115,6 +118,40 @@ active prompt-facing contracts.
 
 Structured summary of the completed run, including scenario, objective, elapsed time, round
 count, activity totals, visibility counts, notable events, explicit errors, and LLM usage summary.
+
+### `plan`
+
+The persisted execution plan contains:
+
+- `interpretation`
+- `situation`
+- `progression_plan`
+- `action_catalog`
+- `coordination_frame`
+- `cast_roster`
+- `major_events`
+
+`progression_plan.max_rounds` is the planner-recommended target round budget, retained separately
+from the configured runtime hard ceiling.
+
+### `event_memory`
+
+Shared runtime memory for planner-generated major events. It tracks:
+
+- per-event status
+- next and overdue event ids
+- completed and missed event ids
+- whether unresolved required events still keep the endgame gate open
+
+### `event_memory_history`
+
+Round-scoped append-only history of event-memory transitions. Each record stores:
+
+- `round_index`
+- `source` (`resolve_round` or `continuation_hard_stop`)
+- `event_updates`
+- `event_memory_summary`
+- `stop_context`
 
 ### `simulation_log_jsonl`
 
@@ -129,6 +166,7 @@ Ordered event stream containing:
 - background updates
 - adopted actions
 - observer reports
+- event-memory updates
 - final report
 - LLM usage summary
 
@@ -151,5 +189,7 @@ Intermediate structured bundle used to render the final Markdown report. It cont
   run fails instead of silently degrading.
 - Runtime actor proposals, round directives, and round resolutions may use explicit default payloads.
   When that happens, the event is recorded through `errors`.
+- Runtime stop behavior is event-aware. Required unresolved major events may keep the runtime alive
+  past the planner target round budget until the hard ceiling is reached.
 - Final report section writing retries once with validation feedback. It does not silently
   substitute a synthetic report bundle.

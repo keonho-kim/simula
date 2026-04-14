@@ -11,6 +11,7 @@ layer of detail so the same concept is not explained in five places.
 | Understand graph boundaries | [`architecture.md`](./architecture.md) | [`contracts.md`](./contracts.md) |
 | Understand stage handoffs | [`workflows/README.md`](./workflows/README.md) | the stage document you need |
 | Change prompts or model routing | [`llm.md`](./llm.md) | the matching workflow doc |
+| Inspect saved JSONL runs | [`analysis.md`](./analysis.md) | [`operations.md`](./operations.md) |
 | Run locally and validate changes | [`operations.md`](./operations.md) | [`contracts.md`](./contracts.md) |
 
 ## Document Roles
@@ -21,6 +22,7 @@ layer of detail so the same concept is not explained in five places.
 | [`architecture.md`](./architecture.md) | layers, execution path, state/runtime boundaries |
 | [`contracts.md`](./contracts.md) | public I/O, internal state groups, structured contracts, artifacts |
 | [`llm.md`](./llm.md) | model roles, prompt projections, structured-output policy |
+| [`analysis.md`](./analysis.md) | analyzer CLI, analysis pipeline, and artifact outputs |
 | [`operations.md`](./operations.md) | commands, validation, outputs, maintenance |
 | [`workflows/README.md`](./workflows/README.md) | workflow hub and stage handoffs |
 | [`workflows/simulation.md`](./workflows/simulation.md) | root graph assembly and hydration |

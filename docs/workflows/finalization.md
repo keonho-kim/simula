@@ -35,6 +35,9 @@ Builds:
 - `simulation_log_jsonl`
 - `report_projection_json`
 
+The projection now includes both the final major-event snapshot and the recorded
+`event_memory_history` needed to explain how those outcomes were reached.
+
 This is a code-only node. It does not call an LLM.
 
 ### `write_final_report_bundle`

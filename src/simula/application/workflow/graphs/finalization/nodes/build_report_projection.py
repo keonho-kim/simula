@@ -142,6 +142,7 @@ def build_report_projection(
         "actor_facing_scenario_digest": _dict_value(
             state.get("actor_facing_scenario_digest", {})
         ),
+        "event_memory": _dict_value(state.get("event_memory", {})),
         "active_lead_candidates": [
             {
                 "display_name": digest["display_name"],
@@ -160,6 +161,43 @@ def build_report_projection(
             actors_by_id=actors_by_id,
         ),
         "final_actor_snapshots": final_actor_snapshots,
+        "major_event_snapshots": [
+            {
+                "event_id": str(item.get("event_id", "")),
+                "title": str(item.get("title", "")),
+                "status": str(item.get("status", "")),
+                "required_before_end": bool(item.get("required_before_end", False)),
+                "progress_summary": str(item.get("progress_summary", "")),
+                "completed_round": _int_value(item.get("completed_round", 0)),
+            }
+            for item in _dict_list(
+                _dict_value(state.get("event_memory", {})).get("events", [])
+            )
+        ],
+        "major_event_history": [
+            {
+                "round_index": _int_value(item.get("round_index", 0)),
+                "time_label": format_report_time_label(
+                    anchor=anchor,
+                    total_elapsed_minutes=_int_value(
+                        round_time_history.get(
+                            _int_value(item.get("round_index", 0)), {}
+                        ).get("total_elapsed_minutes", 0)
+                    ),
+                ),
+                "phase_hint": phase_hint(
+                    round_index=_int_value(item.get("round_index", 0)),
+                    total_rounds=total_rounds,
+                ),
+                "source": str(item.get("source", "")),
+                "event_updates": _dict_list(item.get("event_updates", [])),
+                "event_memory_summary": _dict_value(
+                    item.get("event_memory_summary", {})
+                ),
+                "stop_context": _dict_value(item.get("stop_context", {})),
+            }
+            for item in _dict_list(state.get("event_memory_history", []))
+        ],
         "final_outcome_clues": build_final_outcome_clues(
             endgame_packets=endgame_packets,
             final_actor_snapshots=final_actor_snapshots,

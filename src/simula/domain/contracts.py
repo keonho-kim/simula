@@ -18,6 +18,7 @@ VisibilityType = Literal["public", "private", "group"]
 SimulationMomentum = Literal["high", "medium", "low"]
 AttentionTier = Literal["lead", "driver", "support", "background"]
 PressureLevel = Literal["low", "medium", "high"]
+MajorEventStatusType = Literal["pending", "in_progress", "completed", "missed"]
 StopReason = Literal["", "no_progress", "simulation_done"]
 ContinuationStopReason = Literal["", "no_progress"]
 ResolutionStopReason = Literal["", "simulation_done"]
@@ -249,6 +250,132 @@ class ExecutionPlanBundle(BaseModel):
     action_catalog: ActionCatalog
     coordination_frame: CoordinationFrame
     cast_roster: CastRoster
+    major_events: list["MajorEventPlanItem"]
+
+    @model_validator(mode="after")
+    def validate_execution_plan_bundle(self) -> "ExecutionPlanBundle":
+        event_ids = [item.event_id for item in self.major_events]
+        if len(event_ids) != len(set(event_ids)):
+            raise ValueError("major_events must use unique event_id values.")
+        if len(self.major_events) > 6:
+            raise ValueError("major_events must contain at most 6 items.")
+        return self
+
+
+class MajorEventPlanItem(BaseModel):
+    """Scenario-grounded major event plan item."""
+
+    event_id: str
+    title: str
+    summary: str
+    participant_cast_ids: list[str]
+    earliest_round: int = Field(ge=1)
+    latest_round: int = Field(ge=1)
+    completion_action_types: list[str]
+    completion_signals: list[str]
+    required_before_end: bool
+
+    @model_validator(mode="after")
+    def validate_major_event_plan_item(self) -> "MajorEventPlanItem":
+        for field_name in ("event_id", "title", "summary"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        if not self.participant_cast_ids:
+            raise ValueError("participant_cast_ids must not be empty.")
+        if not self.completion_action_types:
+            raise ValueError("completion_action_types must not be empty.")
+        if not self.completion_signals:
+            raise ValueError("completion_signals must not be empty.")
+        if len(self.participant_cast_ids) != len(set(self.participant_cast_ids)):
+            raise ValueError("participant_cast_ids must be unique.")
+        if len(self.completion_action_types) != len(set(self.completion_action_types)):
+            raise ValueError("completion_action_types must be unique.")
+        if self.earliest_round > self.latest_round:
+            raise ValueError("earliest_round must be less than or equal to latest_round.")
+        return self
+
+
+class MajorEventUpdate(BaseModel):
+    """One event-memory update proposed during round resolution."""
+
+    event_id: str
+    status: MajorEventStatusType
+    progress_summary: str
+    matched_activity_ids: list[str]
+
+    @model_validator(mode="after")
+    def validate_major_event_update(self) -> "MajorEventUpdate":
+        for field_name in ("event_id", "progress_summary"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        if len(self.matched_activity_ids) != len(set(self.matched_activity_ids)):
+            raise ValueError("matched_activity_ids must be unique.")
+        return self
+
+
+class MajorEventState(BaseModel):
+    """Runtime state for one planned major event."""
+
+    event_id: str
+    title: str
+    summary: str
+    participant_cast_ids: list[str]
+    earliest_round: int = Field(ge=1)
+    latest_round: int = Field(ge=1)
+    completion_action_types: list[str]
+    completion_signals: list[str]
+    required_before_end: bool
+    status: MajorEventStatusType
+    progress_summary: str
+    matched_activity_ids: list[str]
+    last_evaluated_round: int = Field(ge=0)
+    completed_round: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_major_event_state(self) -> "MajorEventState":
+        for field_name in ("event_id", "title", "summary", "progress_summary"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        if self.earliest_round > self.latest_round:
+            raise ValueError("earliest_round must be less than or equal to latest_round.")
+        if not self.participant_cast_ids:
+            raise ValueError("participant_cast_ids must not be empty.")
+        if not self.completion_action_types:
+            raise ValueError("completion_action_types must not be empty.")
+        if not self.completion_signals:
+            raise ValueError("completion_signals must not be empty.")
+        if len(self.participant_cast_ids) != len(set(self.participant_cast_ids)):
+            raise ValueError("participant_cast_ids must be unique.")
+        if len(self.matched_activity_ids) != len(set(self.matched_activity_ids)):
+            raise ValueError("matched_activity_ids must be unique.")
+        return self
+
+
+class EventMemory(BaseModel):
+    """Shared runtime memory for major-event tracking."""
+
+    events: list[MajorEventState]
+    next_event_ids: list[str]
+    overdue_event_ids: list[str]
+    completed_event_ids: list[str]
+    missed_event_ids: list[str]
+    endgame_gate_open: bool
+
+    @model_validator(mode="after")
+    def validate_event_memory(self) -> "EventMemory":
+        event_ids = [item.event_id for item in self.events]
+        if len(event_ids) != len(set(event_ids)):
+            raise ValueError("events must use unique event_id values.")
+        for field_name in (
+            "next_event_ids",
+            "overdue_event_ids",
+            "completed_event_ids",
+            "missed_event_ids",
+        ):
+            values = getattr(self, field_name)
+            if len(values) != len(set(values)):
+                raise ValueError(f"{field_name} must be unique.")
+        return self
 
 
 class ActorCard(BaseModel):
@@ -529,6 +656,7 @@ class RoundResolution(BaseModel):
 
     adopted_cast_ids: list[str]
     updated_intent_states: list[ActorIntentSnapshot]
+    event_updates: list[MajorEventUpdate]
     round_time_advance: RoundTimeAdvanceProposal
     observer_report: ObserverReport
     actor_facing_scenario_digest: ActorFacingScenarioDigest
@@ -539,6 +667,9 @@ class RoundResolution(BaseModel):
     def validate_round_resolution(self) -> "RoundResolution":
         if len(self.adopted_cast_ids) != len(set(self.adopted_cast_ids)):
             raise ValueError("adopted_cast_ids must be unique.")
+        event_ids = [item.event_id for item in self.event_updates]
+        if len(event_ids) != len(set(event_ids)):
+            raise ValueError("event_updates must use unique event_id values.")
         if not self.world_state_summary.strip():
             raise ValueError("world_state_summary must not be empty.")
         if (

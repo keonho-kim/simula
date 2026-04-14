@@ -216,6 +216,49 @@ def build_actor_runtime_guidance_view(
     }
 
 
+def build_event_memory_prompt_view(
+    event_memory: object,
+    *,
+    limit: int = 4,
+) -> dict[str, object]:
+    """coordinator prompt용 major-event memory 축약본을 만든다."""
+
+    if not isinstance(event_memory, dict):
+        return {}
+    dumped = cast(dict[str, object], event_memory)
+    events = _dict_list(dumped.get("events", []))
+    ordered = sorted(
+        events,
+        key=lambda item: (
+            1 if str(item.get("status", "")) in {"pending", "in_progress"} else 0,
+            -int(item.get("earliest_round", 0)),
+            str(item.get("event_id", "")),
+        ),
+        reverse=True,
+    )
+    return {
+        "next_event_ids": _string_list(dumped.get("next_event_ids", [])),
+        "overdue_event_ids": _string_list(dumped.get("overdue_event_ids", [])),
+        "completed_event_ids": _string_list(dumped.get("completed_event_ids", [])),
+        "missed_event_ids": _string_list(dumped.get("missed_event_ids", [])),
+        "endgame_gate_open": bool(dumped.get("endgame_gate_open", False)),
+        "events": [
+            {
+                "event_id": str(item.get("event_id", "")),
+                "title": truncate_text(item.get("title", ""), 60),
+                "summary": truncate_text(item.get("summary", ""), 120),
+                "status": str(item.get("status", "")),
+                "participant_cast_ids": _string_list(item.get("participant_cast_ids", [])),
+                "earliest_round": _int_value(item.get("earliest_round", 0)),
+                "latest_round": _int_value(item.get("latest_round", 0)),
+                "required_before_end": bool(item.get("required_before_end", False)),
+                "progress_summary": truncate_text(item.get("progress_summary", ""), 100),
+            }
+            for item in ordered[:limit]
+        ],
+    }
+
+
 def build_actor_available_actions_view(
     *,
     matched_actions: list[dict[str, object]],

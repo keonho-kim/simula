@@ -125,6 +125,27 @@ def build_round_observer_report_event(
     }
 
 
+def build_round_event_memory_updated_event(
+    *,
+    run_id: str,
+    round_index: int,
+    source: str,
+    event_updates: list[dict[str, object]],
+    event_memory_summary: dict[str, object],
+    stop_context: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "event": "round_event_memory_updated",
+        "event_key": f"round_event_memory_updated:{round_index}:{source}",
+        "run_id": run_id,
+        "round_index": round_index,
+        "source": source,
+        "event_updates": event_updates,
+        "event_memory_summary": event_memory_summary,
+        "stop_context": stop_context,
+    }
+
+
 def build_final_report_event(
     *,
     run_id: str,

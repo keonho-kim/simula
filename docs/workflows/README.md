@@ -29,7 +29,7 @@ flowchart LR
 | Stage | Consumes | Produces |
 | --- | --- | --- |
 | simulation root | public input + runtime context | hydrated workflow state |
-| planning | scenario and step budget | compact execution plan |
+| planning | scenario and step budget | compact execution plan + major event track |
 | generation | cast roster and planning views | actor cards |
-| runtime | plan, actors, activity history | completed runtime trace |
+| runtime | plan, actors, activity history | completed runtime trace + event memory history |
 | finalization | completed runtime trace | final report artifacts |

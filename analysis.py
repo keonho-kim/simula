@@ -14,16 +14,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="analysis.py",
-        description="Analyze one simulation.log.jsonl run artifact.",
+        description="하나의 simulation.log.jsonl 실행 결과를 분석합니다.",
     )
     parser.add_argument(
         "--run-id",
         required=True,
-        help="Explicit run identifier to analyze.",
+        help="분석할 run-id를 명시합니다.",
     )
     parser.add_argument(
         "--env",
-        help="Optional env.toml path used only to resolve storage.output_dir.",
+        help="storage.output_dir 해석에만 사용할 선택적 env.toml 경로입니다.",
     )
     return parser
 
@@ -33,11 +33,11 @@ def main() -> int:
 
     args = build_parser().parse_args()
     outcome = run_analysis(run_id=args.run_id, env_file=args.env)
-    print(f"Analyzed run_id: {outcome.run_id}")
-    print(f"Input log: {outcome.input_path}")
-    print(f"Artifacts: {outcome.artifact_count}")
-    print(f"Roles: {', '.join(outcome.roles) if outcome.roles else '-'}")
-    print(f"Output dir: {outcome.output_dir}")
+    print(f"분석 완료 run_id: {outcome.run_id}")
+    print(f"입력 로그: {outcome.input_path}")
+    print(f"생성 아티팩트 수: {outcome.artifact_count}")
+    print(f"역할 목록: {', '.join(outcome.roles) if outcome.roles else '-'}")
+    print(f"출력 디렉터리: {outcome.output_dir}")
     return 0
 
 

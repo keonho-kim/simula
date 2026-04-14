@@ -47,7 +47,7 @@ async def build_planning_analysis(
     )
     return {
         "planning_analysis": analysis.model_dump(mode="json"),
-        "max_rounds": analysis.progression_plan.max_rounds,
+        "planned_max_rounds": analysis.progression_plan.max_rounds,
         "planning_latency_seconds": float(state["planning_latency_seconds"])
         + meta.duration_seconds,
     }
@@ -110,10 +110,26 @@ def finalize_plan(
             state["scenario_controls"]["allow_additional_cast"]
         ),
     )
+    _validate_major_events(
+        major_events=[
+            cast(dict[str, object], item)
+            for item in cast(list[object], plan.get("major_events", []))
+            if isinstance(item, dict)
+        ],
+        cast_roster=cast_roster,
+        planned_max_rounds=int(state["planned_max_rounds"]),
+    )
     action_catalog = cast(dict[str, object], plan.get("action_catalog", {}))
     raw_actions = action_catalog.get("actions", [])
     action_count = len(raw_actions) if isinstance(raw_actions, list) else 0
     progression_plan = cast(dict[str, object], plan.get("progression_plan", {}))
+    major_event_count = len(
+        [
+            item
+            for item in cast(list[object], plan.get("major_events", []))
+            if isinstance(item, dict)
+        ]
+    )
     runtime.context.store.save_plan(state["run_id"], plan)
     emit_custom_event(
         build_plan_finalized_event(
@@ -122,9 +138,10 @@ def finalize_plan(
         )
     )
     runtime.context.logger.info(
-        "계획 정리 완료 | cast=%s action_types=%s recommended_rounds=%s default_elapsed_unit=%s",
+        "계획 정리 완료 | cast=%s action_types=%s major_events=%s planned_rounds=%s default_elapsed_unit=%s",
         len(cast_roster),
         action_count,
+        major_event_count,
         progression_plan.get("max_rounds", "-"),
         progression_plan.get("default_elapsed_unit", "-"),
     )
@@ -148,6 +165,7 @@ def _build_plan_payload(
         dict[str, object],
         execution_plan["cast_roster"],
     )
+    major_events = cast(list[object], execution_plan.get("major_events", []))
     interpretation = {
         "brief_summary": str(planning_analysis.get("brief_summary", "")),
         "premise": str(planning_analysis.get("premise", "")),
@@ -163,6 +181,7 @@ def _build_plan_payload(
         "action_catalog": dict(action_catalog),
         "coordination_frame": dict(coordination_frame),
         "cast_roster": list(cast(list[object], cast_roster.get("items", []))),
+        "major_events": list(major_events),
     }
 
 
@@ -192,3 +211,56 @@ def _validate_cast_roster_count(
         raise ValueError(
             f"cast roster는 정확히 {num_cast}명이어야 합니다. 현재 {cast_count}명입니다."
         )
+
+
+def _validate_major_events(
+    *,
+    major_events: list[dict[str, object]],
+    cast_roster: list[dict[str, object]],
+    planned_max_rounds: int,
+) -> None:
+    cast_ids = {
+        str(item.get("cast_id", "")).strip()
+        for item in cast_roster
+        if str(item.get("cast_id", "")).strip()
+    }
+    event_ids: set[str] = set()
+    for event in major_events:
+        event_id = str(event.get("event_id", "")).strip()
+        if not event_id:
+            raise ValueError("major event에 빈 event_id를 허용하지 않습니다.")
+        if event_id in event_ids:
+            raise ValueError(f"major event_id 중복을 허용하지 않습니다: {event_id}")
+        event_ids.add(event_id)
+        earliest_round = _int_value(event.get("earliest_round", 0))
+        latest_round = _int_value(event.get("latest_round", 0))
+        if earliest_round < 1 or latest_round < 1:
+            raise ValueError("major event round window는 1 이상이어야 합니다.")
+        if earliest_round > latest_round:
+            raise ValueError(
+                f"major event `{event_id}` 는 earliest_round가 latest_round보다 클 수 없습니다."
+            )
+        if latest_round > planned_max_rounds:
+            raise ValueError(
+                f"major event `{event_id}` 는 planned max round {planned_max_rounds} 안에 있어야 합니다."
+            )
+        participant_values = event.get("participant_cast_ids", [])
+        participant_cast_ids = (
+            [str(item).strip() for item in participant_values if str(item).strip()]
+            if isinstance(participant_values, list)
+            else []
+        )
+        invalid_cast_ids = [
+            cast_id for cast_id in participant_cast_ids if cast_id not in cast_ids
+        ]
+        if invalid_cast_ids:
+            raise ValueError(
+                f"major event `{event_id}` 의 participant_cast_ids가 cast roster에 없습니다: {', '.join(invalid_cast_ids)}"
+            )
+
+
+def _int_value(value: object) -> int:
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return 0

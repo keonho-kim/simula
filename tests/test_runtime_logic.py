@@ -28,10 +28,10 @@ from simula.domain.activity_feeds import (
 from simula.domain.reporting import (
     build_final_report,
     build_simulation_log_entries,
-    evaluate_stop,
     latest_observer_summary,
     latest_world_state_summary,
 )
+from simula.domain.event_memory import hard_stop_round
 from simula.domain.runtime_policy import derive_rng_seed
 from simula.domain.runtime_actions import apply_actor_proposals
 
@@ -189,22 +189,12 @@ def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> Non
     assert routed["activities"][0]["activity_id"] == inbound_activity["activity_id"]
 
 
-def test_evaluate_stop_prefers_max_rounds() -> None:
-    reason = evaluate_stop(
-        round_index=4,
-        max_rounds=4,
-    )
-
-    assert reason == "simulation_done"
+def test_hard_stop_round_applies_default_grace_buffer() -> None:
+    assert hard_stop_round(configured_max_rounds=10, planned_max_rounds=6) == 8
 
 
-def test_evaluate_stop_returns_empty_when_round_budget_remains() -> None:
-    reason = evaluate_stop(
-        round_index=2,
-        max_rounds=6,
-    )
-
-    assert reason == ""
+def test_hard_stop_round_never_exceeds_configured_ceiling() -> None:
+    assert hard_stop_round(configured_max_rounds=7, planned_max_rounds=6) == 7
 
 
 def test_derive_rng_seed_prefers_configured_seed() -> None:
@@ -313,6 +303,68 @@ def test_build_simulation_log_entries_appends_llm_usage_summary() -> None:
     assert entries[-1]["event"] == "llm_usage_summary"
     assert entries[-1]["event_key"] == "llm_usage_summary"
     assert entries[-1]["llm_usage_summary"]["calls_by_role"]["actor"] == 2
+
+
+def test_build_simulation_log_entries_includes_event_memory_updates() -> None:
+    entries = build_simulation_log_entries(
+        {
+            "run_id": "run-1",
+            "scenario": "테스트 시나리오",
+            "max_rounds": 2,
+            "rng_seed": 7,
+            "activities": [],
+            "observer_reports": [
+                {
+                    "round_index": 1,
+                    "summary": "요약",
+                    "notable_events": [],
+                    "atmosphere": "긴장",
+                    "momentum": "medium",
+                    "world_state_summary": "상태",
+                }
+            ],
+            "actors": [],
+            "round_time_history": [],
+            "round_focus_history": [],
+            "background_updates": [],
+            "event_memory_history": [
+                {
+                    "round_index": 1,
+                    "source": "resolve_round",
+                    "event_updates": [
+                        {
+                            "event_id": "final-choice",
+                            "status": "completed",
+                            "progress_summary": "최종 선택이 실행됐다.",
+                            "matched_activity_ids": ["act-1"],
+                        }
+                    ],
+                    "event_memory_summary": {
+                        "completed_event_ids": ["final-choice"],
+                    },
+                    "stop_context": {
+                        "requested_stop_reason": "",
+                        "effective_stop_reason": "",
+                    },
+                }
+            ],
+            "final_report": {"run_id": "run-1"},
+            "stop_reason": "simulation_done",
+        },
+        llm_usage_summary={
+            "total_calls": 3,
+            "calls_by_role": {"planner": 1, "actor": 2},
+            "structured_calls": 2,
+            "text_calls": 1,
+            "parse_failures": 1,
+            "forced_defaults": 0,
+            "input_tokens": None,
+            "output_tokens": None,
+            "total_tokens": None,
+        },
+    )
+
+    assert any(entry["event"] == "round_event_memory_updated" for entry in entries)
 
 
 def test_recent_actions_and_latest_summaries_use_latest_values() -> None:

@@ -28,7 +28,7 @@ def test_load_run_analysis_rejects_invalid_jsonl(tmp_path) -> None:
     log_path = tmp_path / "simulation.log.jsonl"
     log_path.write_text("{bad json}\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="invalid JSONL"):
+    with pytest.raises(ValueError, match="JSONL 형식이 올바르지 않습니다"):
         load_run_analysis(log_path, expected_run_id="run-1")
 
 
@@ -47,7 +47,7 @@ def test_load_run_analysis_requires_llm_calls(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError, match="llm_call"):
+    with pytest.raises(ValueError, match="llm_call 이벤트가 없습니다"):
         load_run_analysis(log_path, expected_run_id="run-1")
 
 
@@ -61,7 +61,8 @@ def test_distribution_report_tracks_missing_values_and_kde_skip() -> None:
 
     assert overall_input.record_count == 5
     assert overall_input.sample_count == 5
-    assert overall_input.kde_skipped_reason == "KDE requires non-constant values."
+    assert overall_input.to_dict()["metric_label"] == "입력 토큰"
+    assert overall_input.kde_skipped_reason == "KDE를 계산하려면 값이 모두 같지 않아야 합니다."
     assert planner_output.record_count == 1
     assert planner_output.sample_count == 0
     assert planner_output.missing_count == 1
@@ -162,8 +163,32 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
         (tmp_path / "analysis" / run_id / "manifest.json").read_text(encoding="utf-8")
     )
     assert manifest["run_id"] == run_id
+    assert manifest["roles_display"] == ["actor (행위자)", "fixer (JSON 복구)", "planner (계획)"]
     assert "llm_calls.csv" in manifest["artifact_paths"]
     assert manifest["network_summary"]["edge_count"] == 3
+    llm_calls_csv = (
+        tmp_path / "analysis" / run_id / "llm_calls.csv"
+    ).read_text(encoding="utf-8")
+    assert "실행 ID,호출 순번,역할,역할 표시명" in llm_calls_csv
+
+    distribution_json = json.loads(
+        (
+            tmp_path
+            / "analysis"
+            / run_id
+            / "distributions"
+            / "overall"
+            / "input_tokens.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert distribution_json["metric_label"] == "입력 토큰"
+
+
+def test_korean_font_install_script_exists() -> None:
+    script_path = Path("scripts/install_noto_sans_kr_ubuntu.sh")
+
+    assert script_path.exists()
+    assert "fonts-noto-cjk" in script_path.read_text(encoding="utf-8")
 
 
 def _load_sample_data():

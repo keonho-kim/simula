@@ -18,73 +18,19 @@ from simula.application.analysis import (
     render_distribution_plot,
     render_network_plot,
 )
+from simula.application.analysis.localization import (
+    FIXER_SUMMARY_COLUMN_LABELS,
+    LLM_CALL_COLUMN_LABELS,
+    NETWORK_EDGE_COLUMN_LABELS,
+    NETWORK_NODE_COLUMN_LABELS,
+    overall_distribution_title,
+    role_distribution_title,
+    translate_row,
+    network_title,
+)
 from simula.application.analysis.models import ArtifactManifest
 from simula.infrastructure.config.loader import load_settings_bundle
 from simula.infrastructure.config.models import StorageConfig
-
-_LLM_CALL_FIELDNAMES = [
-    "run_id",
-    "sequence",
-    "role",
-    "call_kind",
-    "scope",
-    "duration_seconds",
-    "ttft_seconds",
-    "input_tokens",
-    "output_tokens",
-    "total_tokens",
-    "log_context",
-    "prompt",
-    "raw_response",
-]
-
-_FIXER_SUMMARY_FIELDNAMES = [
-    "role",
-    "fixer_call_count",
-    "session_count",
-    "retry_count",
-    "ttft_count",
-    "ttft_min",
-    "ttft_max",
-    "ttft_mean",
-    "ttft_median",
-    "ttft_p95",
-    "ttft_p99",
-    "duration_count",
-    "duration_min",
-    "duration_max",
-    "duration_mean",
-    "duration_median",
-    "duration_p95",
-    "duration_p99",
-]
-
-_NETWORK_NODE_FIELDNAMES = [
-    "cast_id",
-    "display_name",
-    "initiated_actions",
-    "received_actions",
-    "sent_relations",
-    "received_relations",
-    "total_weight",
-    "counterpart_count",
-]
-
-_NETWORK_EDGE_FIELDNAMES = [
-    "source_cast_id",
-    "source_display_name",
-    "target_cast_id",
-    "target_display_name",
-    "action_count",
-    "intent_only_count",
-    "public_count",
-    "group_count",
-    "private_count",
-    "thread_event_count",
-    "first_round",
-    "last_round",
-    "total_weight",
-]
 
 
 @dataclass(slots=True)
@@ -108,7 +54,7 @@ def run_analysis(
 
     normalized_run_id = run_id.strip()
     if not normalized_run_id:
-        raise ValueError("`--run-id` must not be empty.")
+        raise ValueError("`--run-id`는 비어 있으면 안 됩니다.")
 
     input_path = (
         _resolve_output_dir(env_file=env_file)
@@ -121,8 +67,14 @@ def run_analysis(
 
     writer.write_csv(
         "llm_calls.csv",
-        rows=[record.to_row() for record in loaded.llm_calls],
-        fieldnames=_LLM_CALL_FIELDNAMES,
+        rows=[
+            translate_row(
+                record.to_row(),
+                column_labels=LLM_CALL_COLUMN_LABELS,
+            )
+            for record in loaded.llm_calls
+        ],
+        fieldnames=list(LLM_CALL_COLUMN_LABELS.values()),
     )
 
     distribution_report = build_distribution_report(loaded.llm_calls)
@@ -134,7 +86,10 @@ def run_analysis(
         )
         render_distribution_plot(
             overall_distribution,
-            title=f"{normalized_run_id} overall {metric}",
+            title=overall_distribution_title(
+                run_id=normalized_run_id,
+                metric=metric,
+            ),
             output_path=writer.path_for(f"distributions/overall/{metric}.png"),
         )
         writer.record_output(f"distributions/overall/{metric}.png")
@@ -148,7 +103,11 @@ def run_analysis(
             )
             render_distribution_plot(
                 distribution,
-                title=f"{normalized_run_id} {role} {metric}",
+                title=role_distribution_title(
+                    run_id=normalized_run_id,
+                    role=role,
+                    metric=metric,
+                ),
                 output_path=writer.path_for(f"distributions/roles/{role}/{metric}.png"),
             )
             writer.record_output(f"distributions/roles/{role}/{metric}.png")
@@ -157,8 +116,14 @@ def run_analysis(
     writer.write_json("fixer/summary.json", fixer_report.to_dict())
     writer.write_csv(
         "fixer/summary.csv",
-        rows=fixer_report.summary_rows(),
-        fieldnames=_FIXER_SUMMARY_FIELDNAMES,
+        rows=[
+            translate_row(
+                row,
+                column_labels=FIXER_SUMMARY_COLUMN_LABELS,
+            )
+            for row in fixer_report.summary_rows()
+        ],
+        fieldnames=list(FIXER_SUMMARY_COLUMN_LABELS.values()),
     )
 
     network_report, graph = build_network_report(
@@ -167,18 +132,30 @@ def run_analysis(
     )
     writer.write_csv(
         "network/nodes.csv",
-        rows=[item.to_row() for item in network_report.nodes],
-        fieldnames=_NETWORK_NODE_FIELDNAMES,
+        rows=[
+            translate_row(
+                item.to_row(),
+                column_labels=NETWORK_NODE_COLUMN_LABELS,
+            )
+            for item in network_report.nodes
+        ],
+        fieldnames=list(NETWORK_NODE_COLUMN_LABELS.values()),
     )
     writer.write_csv(
         "network/edges.csv",
-        rows=[item.to_row() for item in network_report.edges],
-        fieldnames=_NETWORK_EDGE_FIELDNAMES,
+        rows=[
+            translate_row(
+                item.to_row(),
+                column_labels=NETWORK_EDGE_COLUMN_LABELS,
+            )
+            for item in network_report.edges
+        ],
+        fieldnames=list(NETWORK_EDGE_COLUMN_LABELS.values()),
     )
     writer.write_graphml("network/graph.graphml", graph)
     render_network_plot(
         graph,
-        title=f"{normalized_run_id} actor relationship network",
+        title=network_title(run_id=normalized_run_id),
         output_path=writer.path_for("network/graph.png"),
     )
     writer.record_output("network/graph.png")

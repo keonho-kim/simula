@@ -131,9 +131,9 @@ def build_network_report(
         isolated_actor_count=sum(1 for item in nodes if item.total_weight == 0),
         max_edge_weight=max((item.total_weight for item in edges), default=0),
         empty_reason=(
-            "No adopted actor interactions were found."
+            "채택된 행위자 상호작용이 없습니다."
             if not activities
-            else "No actor-to-actor relationship edges were produced."
+            else "행위자 간 관계 엣지가 생성되지 않았습니다."
             if not edges
             else None
         ),

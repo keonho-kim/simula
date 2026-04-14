@@ -26,6 +26,7 @@ Choose the direct focus for this round and summarize deferred motion in the same
 - Do not introduce new institutions, written artifacts, or escalation frames unless they are already grounded in the scenario or previous rounds.
 - Avoid overly narrow two-person loops when the current conflict clearly implicates additional related candidates.
 - If the candidate pool is rich enough and the direct-call budget allows it, prefer selecting 3 to 4 closely related cast members rather than only 1 to 2.
+- If `event_memory_json` shows overdue or due unresolved events, prefer focus slices that can materially advance those events this round.
 
 # Inputs
 Round index:
@@ -45,6 +46,9 @@ Situation JSON:
 
 Simulation clock JSON:
 {simulation_clock_json}
+
+Event memory JSON:
+{event_memory_json}
 
 Previous observer summary:
 {previous_observer_summary}

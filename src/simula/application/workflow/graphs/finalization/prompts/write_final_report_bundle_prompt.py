@@ -30,6 +30,7 @@ Write the complete report bundle in one required JSON object.
   - `### 관계 변화`
   - Every non-empty line under both subheadings must begin with `- `
 - `major_events_section` must use bullet lines only.
+- If `report_projection_json` contains completed or missed major events, reflect them explicitly in `major_events_section`.
 - Keep the language concrete and readable.
 
 # Inputs
