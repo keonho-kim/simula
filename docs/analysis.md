@@ -10,16 +10,16 @@ state, replay the graph, or regenerate LLM outputs. It only reads persisted arti
 
 ## Entry Point
 
-Run the analyzer with an explicit run directory name:
+Run the analyzer with an explicit run directory path:
 
 ```bash
-uv run analysis --run-dir 20260413.1
+uv run analysis --run-dir ./output/2026-04-14.10
 ```
 
-Optional environment file:
+Legacy `run_id` mode is still available when you want resolution through `storage.output_dir`:
 
 ```bash
-uv run analysis --run-dir 20260413.1 --env ./env.toml
+uv run analysis --run-id 2026-04-14.10 --env ./env.toml
 ```
 
 For Korean chart rendering on Ubuntu, install the recommended font set first:
@@ -28,15 +28,19 @@ For Korean chart rendering on Ubuntu, install the recommended font set first:
 ./scripts/install_noto_sans_kr_ubuntu.sh
 ```
 
-When `--run-dir` is a simple directory name, the analyzer resolves the input JSONL file from:
+`--run-dir` reads the input JSONL file directly from:
+
+```text
+<run-dir>/simulation.log.jsonl
+```
+
+`--run-id` keeps the older resolution mode:
 
 ```text
 <storage.output_dir>/<run_id>/simulation.log.jsonl
 ```
 
-When `--run-dir` is a path, the analyzer reads `<run-dir>/simulation.log.jsonl` directly.
-When `--env` is omitted for directory-name resolution, it falls back to the default `./output`
-location.
+When `--env` is omitted for `--run-id`, it falls back to the default `./output` location.
 
 ## Internal Layout
 
@@ -129,7 +133,8 @@ fixer summary, token usage summary, and the top-level network summary.
 
 ## Failure Policy
 
-- `--run-dir` is the primary selector. `--run-id` remains available as a compatibility alias.
+- `--run-dir` expects a real run directory path such as `./output/2026-04-14.10`.
+- `--run-id` remains available as a compatibility alias.
 - The analyzer does not auto-pick the latest run.
 - Missing input files, invalid JSONL rows, or logs without any `llm_call` events fail fast.
 - Missing `actors_finalized` or `round_actions_adopted` events still produce explicit empty

@@ -20,18 +20,15 @@ def build_parser() -> argparse.ArgumentParser:
     selector_group = parser.add_mutually_exclusive_group(required=True)
     selector_group.add_argument(
         "--run-dir",
-        help=(
-            "분석할 run 디렉터리 이름 또는 경로입니다. "
-            "이름만 주면 storage.output_dir 아래에서 찾습니다."
-        ),
+        help="분석할 run 디렉터리 경로입니다. 예: ./output/2026-04-14.10",
     )
     selector_group.add_argument(
         "--run-id",
-        help="기존 호환용 별칭입니다. 저장된 run 디렉터리 이름을 받습니다.",
+        help="기존 호환용 별칭입니다. storage.output_dir 아래의 run_id를 받습니다.",
     )
     parser.add_argument(
         "--env",
-        help="storage.output_dir 해석에만 사용할 선택적 env.toml 경로입니다.",
+        help="`--run-id` 해석에만 사용할 선택적 env.toml 경로입니다.",
     )
     return parser
 

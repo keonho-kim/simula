@@ -58,7 +58,7 @@ output/
 Analyze one saved run artifact:
 
 ```bash
-uv run analysis --run-dir 20260413.1
+uv run analysis --run-dir ./output/2026-04-14.10
 ```
 
 Analyzer outputs land in:

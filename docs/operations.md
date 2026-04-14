@@ -21,13 +21,13 @@ uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md -
 After a run finishes, inspect its saved JSONL artifact with:
 
 ```bash
-uv run analysis --run-dir 20260413.1
+uv run analysis --run-dir ./output/2026-04-14.10
 ```
 
-If the output directory is resolved through a custom env file:
+If you prefer the legacy `run_id` selector resolved through a custom env file:
 
 ```bash
-uv run analysis --run-dir 20260413.1 --env ./env.toml
+uv run analysis --run-id 2026-04-14.10 --env ./env.toml
 ```
 
 For Korean plot labels on Ubuntu, install the recommended Noto font set:

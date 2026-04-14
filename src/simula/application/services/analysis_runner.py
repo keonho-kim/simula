@@ -235,7 +235,7 @@ def _resolve_analysis_input(
     if run_dir is not None and run_id is not None:
         raise ValueError("`--run-dir`와 `--run-id`는 동시에 함께 사용할 수 없습니다.")
     if run_dir is not None:
-        return _resolve_run_dir_input(run_dir=run_dir, env_file=env_file)
+        return _resolve_run_dir_input(run_dir=run_dir)
     if run_id is not None:
         return _resolve_run_id_input(run_id=run_id, env_file=env_file)
     raise ValueError("`--run-dir` 또는 `--run-id` 중 하나를 지정해야 합니다.")
@@ -253,17 +253,12 @@ def _resolve_run_id_input(*, run_id: str, env_file: str | None) -> tuple[str, Pa
     )
 
 
-def _resolve_run_dir_input(*, run_dir: str, env_file: str | None) -> tuple[str, Path]:
+def _resolve_run_dir_input(*, run_dir: str) -> tuple[str, Path]:
     normalized_run_dir = run_dir.strip()
     if not normalized_run_dir:
         raise ValueError("`--run-dir`는 비어 있으면 안 됩니다.")
 
-    candidate = Path(normalized_run_dir).expanduser()
-    if candidate.is_absolute() or len(candidate.parts) > 1:
-        resolved_run_dir = candidate
-    else:
-        resolved_run_dir = _resolve_output_dir(env_file=env_file) / candidate.name
-
+    resolved_run_dir = Path(normalized_run_dir).expanduser()
     normalized_run_id = resolved_run_dir.name.strip()
     if not normalized_run_id:
         raise ValueError("`--run-dir`에서 디렉터리 이름을 해석할 수 없습니다.")
