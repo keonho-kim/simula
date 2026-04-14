@@ -54,6 +54,11 @@ def test_load_run_analysis_requires_llm_calls(tmp_path) -> None:
         load_run_analysis(log_path, expected_run_id="run-1")
 
 
+def test_run_analysis_rejects_empty_run_dir() -> None:
+    with pytest.raises(ValueError, match="`--run-dir`는 비어 있으면 안 됩니다."):
+        analysis_runner.run_analysis(run_dir="   ")
+
+
 def test_distribution_report_tracks_missing_values_and_kde_skip() -> None:
     loaded = _load_sample_data()
 
@@ -352,6 +357,33 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
     ).read_text(encoding="utf-8")
     assert "## 개요" in network_summary_md
     assert "## 연결성" in network_summary_md
+
+
+def test_run_analysis_accepts_run_dir_name(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_dir = tmp_path / "output"
+    run_id = "run-1"
+    run_dir = output_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    log_path = run_dir / "simulation.log.jsonl"
+    log_path.write_text(_sample_log_text(run_id=run_id), encoding="utf-8")
+    settings = _build_settings(output_dir=output_dir)
+
+    def _fake_load_settings_bundle(env_file=None, *, cli_overrides=None):  # noqa: ANN001
+        del env_file, cli_overrides
+        return LoadedSettingsBundle(settings=settings)
+
+    monkeypatch.setattr(
+        analysis_runner,
+        "load_settings_bundle",
+        _fake_load_settings_bundle,
+    )
+
+    outcome = analysis_runner.run_analysis(run_dir=run_id)
+
+    assert outcome.run_id == run_id
+    assert outcome.input_path == log_path
+    assert outcome.output_dir == Path("analysis") / run_id
 
 
 def test_korean_font_install_script_exists() -> None:

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`analysis.py` reads one completed `simulation.log.jsonl` file and writes reproducible analysis
+`analysis` reads one completed `simulation.log.jsonl` file and writes reproducible analysis
 artifacts under `analysis/<run_id>/`.
 
 The analyzer is intentionally separate from the simulation workflow. It does not mutate runtime
@@ -10,16 +10,16 @@ state, replay the graph, or regenerate LLM outputs. It only reads persisted arti
 
 ## Entry Point
 
-Run the analyzer with an explicit run id:
+Run the analyzer with an explicit run directory name:
 
 ```bash
-uv run python analysis.py --run-id 20260413.1
+uv run analysis --run-dir 20260413.1
 ```
 
 Optional environment file:
 
 ```bash
-uv run python analysis.py --run-id 20260413.1 --env ./env.toml
+uv run analysis --run-dir 20260413.1 --env ./env.toml
 ```
 
 For Korean chart rendering on Ubuntu, install the recommended font set first:
@@ -28,13 +28,15 @@ For Korean chart rendering on Ubuntu, install the recommended font set first:
 ./scripts/install_noto_sans_kr_ubuntu.sh
 ```
 
-The analyzer resolves the input JSONL file from:
+When `--run-dir` is a simple directory name, the analyzer resolves the input JSONL file from:
 
 ```text
 <storage.output_dir>/<run_id>/simulation.log.jsonl
 ```
 
-When `--env` is omitted, it falls back to the default `./output` location.
+When `--run-dir` is a path, the analyzer reads `<run-dir>/simulation.log.jsonl` directly.
+When `--env` is omitted for directory-name resolution, it falls back to the default `./output`
+location.
 
 ## Internal Layout
 
@@ -127,7 +129,8 @@ fixer summary, token usage summary, and the top-level network summary.
 
 ## Failure Policy
 
-- `--run-id` is required. The analyzer does not auto-pick the latest run.
+- `--run-dir` is the primary selector. `--run-id` remains available as a compatibility alias.
+- The analyzer does not auto-pick the latest run.
 - Missing input files, invalid JSONL rows, or logs without any `llm_call` events fail fast.
 - Missing `actors_finalized` or `round_actions_adopted` events still produce explicit empty
   network artifacts and record the input gap in the network summary instead of silently skipping

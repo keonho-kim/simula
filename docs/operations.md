@@ -21,13 +21,13 @@ uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md -
 After a run finishes, inspect its saved JSONL artifact with:
 
 ```bash
-uv run python analysis.py --run-id 20260413.1
+uv run analysis --run-dir 20260413.1
 ```
 
 If the output directory is resolved through a custom env file:
 
 ```bash
-uv run python analysis.py --run-id 20260413.1 --env ./env.toml
+uv run analysis --run-dir 20260413.1 --env ./env.toml
 ```
 
 For Korean plot labels on Ubuntu, install the recommended Noto font set:

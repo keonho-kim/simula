@@ -58,7 +58,7 @@ output/
 Analyze one saved run artifact:
 
 ```bash
-uv run python analysis.py --run-id 20260413.1
+uv run analysis --run-dir 20260413.1
 ```
 
 Analyzer outputs land in:
