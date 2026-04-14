@@ -18,6 +18,9 @@ VisibilityType = Literal["public", "private", "group"]
 SimulationMomentum = Literal["high", "medium", "low"]
 AttentionTier = Literal["lead", "driver", "support", "background"]
 PressureLevel = Literal["low", "medium", "high"]
+StopReason = Literal["", "no_progress", "simulation_done"]
+ContinuationStopReason = Literal["", "no_progress"]
+ResolutionStopReason = Literal["", "simulation_done"]
 
 
 class ScenarioTimeScope(BaseModel):
@@ -497,6 +500,12 @@ class RoundDirective(BaseModel):
         return self
 
 
+class RoundContinuationDecision(BaseModel):
+    """Decision about whether to continue into the next round."""
+
+    stop_reason: ContinuationStopReason
+
+
 class ObserverReport(BaseModel):
     """Observer round summary."""
 
@@ -524,7 +533,7 @@ class RoundResolution(BaseModel):
     observer_report: ObserverReport
     actor_facing_scenario_digest: ActorFacingScenarioDigest
     world_state_summary: str
-    stop_reason: str
+    stop_reason: ResolutionStopReason
 
     @model_validator(mode="after")
     def validate_round_resolution(self) -> "RoundResolution":

@@ -4,7 +4,11 @@
 
 from __future__ import annotations
 
-from simula.domain.contracts import ActorCard, RoundResolution
+from simula.domain.contracts import (
+    ActorCard,
+    RoundContinuationDecision,
+    RoundResolution,
+)
 from simula.infrastructure.llm.renderers import (
     render_structured_response,
     render_text_response,
@@ -87,6 +91,18 @@ def test_render_structured_response_formats_nested_values_as_indented_blocks() -
     assert "    - private_confide" in rendered
     assert "action_bias_notes:" in rendered
     assert "    - 직접 묻는다." in rendered
+
+
+def test_render_structured_response_formats_round_continuation() -> None:
+    rendered = render_structured_response(
+        role="coordinator",
+        parsed=RoundContinuationDecision(stop_reason="no_progress"),
+        content="",
+        log_context=None,
+    )
+
+    assert "coordinator | round continuation" in rendered
+    assert "stop_reason: no_progress" in rendered
 
 
 def test_render_structured_response_formats_empty_values_and_stop_reason() -> None:

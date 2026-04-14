@@ -13,7 +13,8 @@ Resolve this round in one object: adoption, updated intents, elapsed-time advanc
 # Rules
 - Adopt only actor ids that appear in the pending proposal set.
 - Keep the observer summary grounded in the supplied actions and background updates.
-- `stop_reason` must be an empty string when the simulation should continue.
+- `stop_reason` must be `""` when the simulation should continue.
+- `stop_reason` may be `"simulation_done"` only when this round clearly completes the simulation objective.
 - Every field is required.
 - Return only the JSON object that matches the required output schema.
 - Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.

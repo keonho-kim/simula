@@ -53,5 +53,5 @@ The finalization stage populates the public output surface used by the root grap
 - `final_report`
 - `final_report_markdown`
 - `simulation_log_jsonl`
-- `stop_reason`
+- `stop_reason` (`""`, `no_progress`, or `simulation_done`)
 - `errors`

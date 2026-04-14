@@ -2,7 +2,7 @@
 - runtime 수명주기 노드를 제공한다.
 
 설명:
-- 런타임 초기화, active actor 선택, 다음 단계 분기를 담당한다.
+- 런타임 초기화와 다음 단계 분기를 담당한다.
 
 사용한 설계 패턴:
 - lifecycle node 패턴
@@ -68,7 +68,17 @@ def initialize_runtime_state(state: SimulationWorkflowState) -> dict[str, object
     }
 
 
-def route_after_stop(state: SimulationWorkflowState) -> str:
-    """다음 단계 재시작 또는 runtime 종료로 분기한다."""
+def route_after_continuation_check(state: SimulationWorkflowState) -> str:
+    """앞단 continuation 판단 이후 다음 단계를 선택한다."""
 
-    return "complete" if state.get("stop_requested") else "coordinator"
+    return "complete" if state.get("stop_requested") else "prepare_round"
+
+
+def route_after_resolution(state: SimulationWorkflowState) -> str:
+    """round 해소 이후 runtime 종료 또는 continuation check로 분기한다."""
+
+    return (
+        "complete"
+        if state.get("stop_reason") == "simulation_done"
+        else "continuation_check"
+    )

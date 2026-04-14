@@ -15,6 +15,7 @@ from simula.application.workflow.graphs.runtime.states.state import (
     ActorProposalTask,
 )
 from simula.application.workflow.reducer.collections import extend_list, extend_str_list
+from simula.domain.contracts import StopReason
 from simula.domain.scenario_controls import ScenarioControls
 
 
@@ -36,7 +37,7 @@ class SimulationOutputState(TypedDict):
     llm_usage_summary: dict[str, Any]
     final_report_markdown: str
     simulation_log_jsonl: str
-    stop_reason: str
+    stop_reason: StopReason
     errors: list[str]
 
 
@@ -84,7 +85,7 @@ class SimulationWorkflowState(TypedDict):
     last_round_latency_seconds: float
     round_index: int
     stop_requested: bool
-    stop_reason: str
+    stop_reason: StopReason
     world_state_summary: str
     final_report: dict[str, Any]
     llm_usage_summary: dict[str, Any]

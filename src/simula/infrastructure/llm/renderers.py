@@ -35,6 +35,7 @@ from simula.domain.contracts import (
     RuntimeProgressionPlan,
     ScenarioTimeScope,
     SimulationClockSnapshot,
+    RoundContinuationDecision,
     RoundDirective,
     RoundResolution,
     RoundTimeAdvanceProposal,
@@ -137,6 +138,12 @@ def render_structured_response(
     if isinstance(parsed, RoundDirective):
         return _render_model_block(
             subject="coordinator | round 지시",
+            model=parsed,
+        )
+
+    if isinstance(parsed, RoundContinuationDecision):
+        return _render_model_block(
+            subject="coordinator | round continuation",
             model=parsed,
         )
 

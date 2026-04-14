@@ -7,24 +7,24 @@ from __future__ import annotations
 from collections import Counter
 from typing import cast
 
-from simula.domain.contracts import FinalReport, LLMUsageSummary, ObserverReport
+from simula.domain.contracts import (
+    FinalReport,
+    LLMUsageSummary,
+    ObserverReport,
+    StopReason,
+)
 
 
 def evaluate_stop(
     *,
     round_index: int,
     max_rounds: int,
-    stagnation_rounds: int = 0,
-    last_momentum: str | None = None,
-) -> tuple[bool, str | None]:
-    """현재 단계에서 중단 여부를 판단한다."""
+) -> StopReason:
+    """Return the deterministic terminal stop reason for the runtime loop."""
 
     if round_index >= max_rounds:
-        return True, "max_rounds 도달"
-    if stagnation_rounds >= 3 and last_momentum == "low":
-        return True, "정체 단계 누적"
-
-    return False, None
+        return "simulation_done"
+    return ""
 
 
 def build_final_report(

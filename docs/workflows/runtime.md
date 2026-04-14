@@ -10,14 +10,16 @@ the round, and decides whether to continue.
 ```mermaid
 flowchart TD
     Start([START]) --> Init["initialize_runtime_state"]
-    Init --> Prepare["prepare_round"]
+    Init --> Continue{"assess_round_continuation"}
+    Continue -->|continue| Prepare["prepare_round"]
+    Continue -->|stop| End([END])
     Prepare --> Plan["plan_round"]
     Plan --> FanOut["generate_actor_proposal*"]
     FanOut --> Reduce["reduce_actor_proposals"]
     Reduce --> Resolve["resolve_round"]
-    Resolve --> Route{"stop?"}
-    Route -->|continue| Prepare
-    Route -->|complete| End([END])
+    Resolve --> Route{"resolved stop?"}
+    Route -->|continue| Continue
+    Route -->|simulation_done| End
 ```
 
 `generate_actor_proposal*` fans out once per selected actor in the current round.
@@ -32,6 +34,13 @@ Normalizes runtime counters and ensures the runtime loop starts from a clean sta
 
 Advances `round_index`, compresses focus candidates, resets current-round scratch fields, and
 starts round timing.
+
+### `assess_round_continuation`
+
+Runs before each new round. It can end the runtime loop in two ways:
+
+- deterministic `simulation_done` when `max_rounds` has already been reached
+- coordinator-produced `no_progress` when another round would not add meaningful movement
 
 ### `plan_round`
 
@@ -63,8 +72,15 @@ writes observer output, persists round artifacts, and sets stop state.
 
 The runtime loop ends when either:
 
-- the resolution explicitly returns a non-empty `stop_reason`
-- the runtime policy decides to stop, such as reaching `max_rounds`
+- `assess_round_continuation` returns `no_progress`
+- `assess_round_continuation` deterministically returns `simulation_done` after the round budget is exhausted
+- `resolve_round` returns `simulation_done`
+
+Active `stop_reason` values are:
+
+- `""` for continue
+- `no_progress` for a front-stop before the next round
+- `simulation_done` for a completed simulation
 
 ## Stage Output
 

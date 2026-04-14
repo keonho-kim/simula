@@ -57,7 +57,7 @@ and absence is represented with explicit empty values such as `""`, `[]`, or `{}
 - `round_index`
 - `simulation_clock`
 - `stop_requested`
-- `stop_reason`
+- `stop_reason` (`""`, `no_progress`, or `simulation_done`)
 - `world_state_summary`
 - `parse_failures`
 - `forced_idles`
@@ -90,7 +90,7 @@ The root graph returns `SimulationOutputState`.
 | `llm_usage_summary` | deterministic LLM usage summary for the completed run |
 | `final_report_markdown` | rendered Markdown report |
 | `simulation_log_jsonl` | newline-delimited event log |
-| `stop_reason` | final stop reason string |
+| `stop_reason` | final stop reason enum (`""`, `no_progress`, or `simulation_done`) |
 | `errors` | accumulated explicit errors/default notices |
 
 ## Structured LLM Contracts
@@ -102,6 +102,7 @@ active prompt-facing contracts.
 | --- | --- |
 | planning | `PlanningAnalysis`, `ExecutionPlanBundle` |
 | generation | `ActorCard` |
+| runtime round continuation | `RoundContinuationDecision` |
 | runtime round planning | `RoundDirective` |
 | runtime actor turn | `ActorActionProposal` |
 | runtime round resolution | `RoundResolution` |
@@ -129,6 +130,9 @@ Ordered event stream containing:
 - observer reports
 - final report
 - LLM usage summary
+
+`stop_reason` remains explicit in the final report event and is limited to `""`, `no_progress`,
+or `simulation_done`.
 
 ### `final_report_sections`
 

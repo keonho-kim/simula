@@ -8,7 +8,7 @@
 | --- | --- |
 | `planner` | scenario analysis and execution plan creation |
 | `generator` | actor card generation |
-| `coordinator` | step directive and step resolution |
+| `coordinator` | step directive, round continuation checks, and step resolution |
 | `actor` | one actor action proposal |
 | `observer` | timeline anchor inference and final report sections |
 | `fixer` | JSON-only repair for failed structured responses |
@@ -42,6 +42,7 @@ projection assembled for the job at hand.
 - compact situation and coordination frame views
 - compact step history summaries
 - compact pending actor proposals and background updates
+- compact continuation-check summaries such as recent observer reports, latest round activities, and the last focus plan
 
 ### Runtime actor
 
@@ -79,6 +80,7 @@ still keep that explicit fallback path, and the fallback remains observable.
 | planning analysis | strict structured call |
 | execution plan | strict structured call |
 | actor generation | strict structured call |
+| round continuation | structured call with explicit default payload |
 | step directive | structured call with explicit default payload |
 | actor proposal | structured call with explicit default payload |
 | step resolution | structured call with explicit default payload |
@@ -92,6 +94,7 @@ still keep that explicit fallback path, and the fallback remains observable.
 - Runtime report sections are additionally checked for section shape and forbidden jargon.
 - Prompt examples show only required fields.
 - Prompt projections intentionally cap list sizes and text lengths to keep token growth bounded.
+- Runtime stop contracts use explicit enum strings instead of free-form stop messages.
 
 ## Practical Guidance
 

@@ -40,7 +40,6 @@ from simula.domain.contracts import (
     RoundResolution,
     RuntimeProgressionPlan,
 )
-from simula.domain.reporting import evaluate_stop
 from simula.domain.runtime_policy import next_stagnation_steps
 from simula.domain.runtime_actions import (
     ActorProposalPayload,
@@ -171,14 +170,8 @@ async def resolve_round(
         latest_activities=list(applied["latest_round_activities"]),
         momentum=resolution.observer_report.momentum,
     )
-    should_stop, policy_reason = evaluate_stop(
-        round_index=int(state["round_index"]),
-        max_rounds=int(state["max_rounds"]),
-        stagnation_rounds=stagnation_rounds,
-        last_momentum=resolution.observer_report.momentum,
-    )
-    stop_reason = resolution.stop_reason.strip() or (policy_reason or "")
-    stop_requested = bool(stop_reason) or should_stop
+    stop_reason = resolution.stop_reason
+    stop_requested = bool(stop_reason)
     digest = resolution.actor_facing_scenario_digest
     runtime.context.logger.info(
         "round %s 해소 완료 | adopted=%s background=%s stop=%s | world=%s | pressures=%s | talking_points=%s",

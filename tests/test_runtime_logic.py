@@ -190,25 +190,21 @@ def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> Non
 
 
 def test_evaluate_stop_prefers_max_rounds() -> None:
-    should_stop, reason = evaluate_stop(
+    reason = evaluate_stop(
         round_index=4,
         max_rounds=4,
     )
 
-    assert should_stop is True
-    assert reason == "max_rounds 도달"
+    assert reason == "simulation_done"
 
 
-def test_evaluate_stop_allows_early_stop_on_stagnation() -> None:
-    should_stop, reason = evaluate_stop(
+def test_evaluate_stop_returns_empty_when_round_budget_remains() -> None:
+    reason = evaluate_stop(
         round_index=2,
         max_rounds=6,
-        stagnation_rounds=3,
-        last_momentum="low",
     )
 
-    assert should_stop is True
-    assert reason == "정체 단계 누적"
+    assert reason == ""
 
 
 def test_derive_rng_seed_prefers_configured_seed() -> None:
@@ -297,7 +293,7 @@ def test_build_simulation_log_entries_appends_llm_usage_summary() -> None:
             "round_focus_history": [],
             "background_updates": [],
             "final_report": {"run_id": "run-1"},
-            "stop_reason": "max_rounds 도달",
+            "stop_reason": "simulation_done",
         },
         llm_usage_summary={
             "total_calls": 3,

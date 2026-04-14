@@ -8,6 +8,12 @@ import asyncio
 import logging
 from types import SimpleNamespace
 
+import pytest
+from pydantic import ValidationError
+
+from simula.application.workflow.graphs.coordinator.nodes.assess_round_continuation import (
+    assess_round_continuation,
+)
 from simula.application.workflow.graphs.coordinator.nodes.build_round_directive import (
     build_round_directive,
 )
@@ -18,7 +24,11 @@ from simula.application.workflow.graphs.coordinator.nodes.resolve_round import (
     resolve_round,
 )
 from simula.domain.activity_feeds import initialize_activity_feeds
-from simula.domain.contracts import RoundDirective, RoundResolution
+from simula.domain.contracts import (
+    RoundContinuationDecision,
+    RoundDirective,
+    RoundResolution,
+)
 
 
 def test_prepare_focus_candidates_advances_round_and_builds_candidates() -> None:
@@ -57,6 +67,158 @@ def test_prepare_focus_candidates_advances_round_and_builds_candidates() -> None
 
     assert result["round_index"] == 1
     assert result["focus_candidates"]
+
+
+def test_round_continuation_decision_rejects_simulation_done() -> None:
+    with pytest.raises(ValidationError):
+        RoundContinuationDecision(stop_reason="simulation_done")
+
+
+def test_round_resolution_rejects_no_progress() -> None:
+    with pytest.raises(ValidationError):
+        RoundResolution(
+            adopted_cast_ids=[],
+            updated_intent_states=[],
+            round_time_advance={
+                "elapsed_unit": "hour",
+                "elapsed_amount": 1,
+                "selection_reason": "기본 진행",
+                "signals": [],
+            },
+            observer_report={
+                "round_index": 1,
+                "summary": "요약",
+                "notable_events": [],
+                "atmosphere": "긴장",
+                "momentum": "medium",
+                "world_state_summary": "상태",
+            },
+            actor_facing_scenario_digest={
+                "round_index": 1,
+                "relationship_map_summary": "관계",
+                "current_pressures": ["압력"],
+                "talking_points": ["포인트"],
+                "avoid_repetition_notes": ["반복 금지"],
+                "recommended_tone": "톤",
+                "world_state_summary": "상태",
+            },
+            world_state_summary="상태",
+            stop_reason="no_progress",
+        )
+
+
+def test_assess_round_continuation_skips_llm_on_first_entry() -> None:
+    class FailRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            raise AssertionError("LLM should not be called on the first runtime entry")
+
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(
+            llms=FailRouter(),
+            logger=logging.getLogger("simula.test.round"),
+        )
+    )
+    state = {
+        "round_index": 0,
+        "max_rounds": 4,
+        "stagnation_rounds": 0,
+        "simulation_clock": {"total_elapsed_label": "0분"},
+        "world_state_summary": "",
+        "observer_reports": [],
+        "latest_round_activities": [],
+        "round_focus_history": [],
+        "errors": [],
+    }
+
+    result = asyncio.run(assess_round_continuation(state, runtime))
+
+    assert result["stop_requested"] is False
+    assert result["stop_reason"] == ""
+
+
+def test_assess_round_continuation_stops_on_max_rounds_without_llm() -> None:
+    class FailRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            raise AssertionError("LLM should not be called when max_rounds is reached")
+
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(
+            llms=FailRouter(),
+            logger=logging.getLogger("simula.test.round"),
+        )
+    )
+    state = {
+        "round_index": 4,
+        "max_rounds": 4,
+        "stagnation_rounds": 2,
+        "simulation_clock": {"total_elapsed_label": "2시간"},
+        "world_state_summary": "현재 상태",
+        "observer_reports": [],
+        "latest_round_activities": [],
+        "round_focus_history": [],
+        "errors": [],
+    }
+
+    result = asyncio.run(assess_round_continuation(state, runtime))
+
+    assert result["stop_requested"] is True
+    assert result["stop_reason"] == "simulation_done"
+
+
+def test_assess_round_continuation_returns_no_progress_from_coordinator() -> None:
+    class FakeRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            return (
+                schema.model_validate(
+                    RoundContinuationDecision(stop_reason="no_progress")
+                ),
+                SimpleNamespace(
+                    duration_seconds=0.2,
+                    parse_failure_count=0,
+                    forced_default=False,
+                ),
+            )
+
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(
+            llms=FakeRouter(),
+            logger=logging.getLogger("simula.test.round"),
+        )
+    )
+    state = {
+        "round_index": 2,
+        "max_rounds": 5,
+        "stagnation_rounds": 3,
+        "simulation_clock": {"total_elapsed_label": "2시간"},
+        "world_state_summary": "현재 상태",
+        "observer_reports": [
+            {
+                "round_index": 2,
+                "summary": "큰 변화 없이 압력만 유지됐다.",
+                "notable_events": [],
+                "atmosphere": "정체",
+                "momentum": "low",
+                "world_state_summary": "현재 상태",
+            }
+        ],
+        "latest_round_activities": [],
+        "round_focus_history": [
+            {
+                "round_index": 2,
+                "focus_summary": "동일한 갈등 축을 반복 추적했다.",
+                "selection_reason": "압력이 유지됐다.",
+                "selected_cast_ids": ["a"],
+                "deferred_cast_ids": ["b"],
+            }
+        ],
+        "errors": [],
+    }
+
+    result = asyncio.run(assess_round_continuation(state, runtime))
+
+    assert result["stop_requested"] is True
+    assert result["stop_reason"] == "no_progress"
 
 
 def test_build_round_directive_sets_selected_cast_ids() -> None:
@@ -488,3 +650,144 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
 
     assert result["latest_round_activities"] == []
     assert any("dropped" in error for error in result["errors"])
+
+
+def test_resolve_round_marks_simulation_done_stop() -> None:
+    class FakeRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            return (
+                RoundResolution(
+                    adopted_cast_ids=["a"],
+                    updated_intent_states=[
+                        {
+                            "cast_id": "a",
+                            "current_intent": "목표를 마무리한다.",
+                            "thought": "이번 행동으로 목적이 사실상 달성됐다고 본다.",
+                            "target_cast_ids": ["b"],
+                            "supporting_action_type": "speech",
+                            "confidence": 0.9,
+                            "changed_from_previous": True,
+                        }
+                    ],
+                    round_time_advance={
+                        "elapsed_unit": "minute",
+                        "elapsed_amount": 15,
+                        "selection_reason": "짧은 마무리 반응이다.",
+                        "signals": ["합의 도달"],
+                    },
+                    observer_report={
+                        "round_index": 2,
+                        "summary": "핵심 목표가 정리됐다.",
+                        "notable_events": ["a가 최종 결론을 이끌었다."],
+                        "atmosphere": "정리",
+                        "momentum": "high",
+                        "world_state_summary": "핵심 목적이 달성됐다.",
+                    },
+                    actor_facing_scenario_digest={
+                        "round_index": 2,
+                        "relationship_map_summary": "핵심 갈등이 정리됐다.",
+                        "current_pressures": ["남은 후속 반응은 크지 않다."],
+                        "talking_points": ["핵심 결론은 이미 정해졌다."],
+                        "avoid_repetition_notes": ["같은 확인을 반복하지 않는다."],
+                        "recommended_tone": "짧고 정리된 톤",
+                        "world_state_summary": "핵심 목적이 달성됐다.",
+                    },
+                    world_state_summary="핵심 목적이 달성됐다.",
+                    stop_reason="simulation_done",
+                ),
+                SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+            )
+
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(
+            llms=FakeRouter(),
+            logger=logging.getLogger("simula.test.round"),
+            settings=SimpleNamespace(
+                runtime=SimpleNamespace(max_recipients_per_message=2)
+            ),
+            store=SimpleNamespace(save_round_artifacts=lambda *args, **kwargs: None),
+        )
+    )
+    state = {
+        "run_id": "run-1",
+        "round_index": 2,
+        "max_rounds": 4,
+        "actors": [
+            {"cast_id": "a", "private_goal": "마무리한다."},
+            {"cast_id": "b", "private_goal": "반응한다."},
+        ],
+        "activity_feeds": initialize_activity_feeds([{"cast_id": "a"}, {"cast_id": "b"}]),
+        "activities": [],
+        "latest_round_activities": [],
+        "round_focus_plan": {"selected_cast_ids": ["a"]},
+        "latest_background_updates": [],
+        "selected_cast_ids": ["a"],
+        "actor_intent_states": [],
+        "actor_facing_scenario_digest": {},
+        "world_state_summary": "기존 상태",
+        "plan": {
+            "progression_plan": {
+                "max_rounds": 4,
+                "allowed_elapsed_units": ["minute", "hour"],
+                "default_elapsed_unit": "hour",
+                "pacing_guidance": ["짧게 본다."],
+                "selection_reason": "짧은 상호작용 중심",
+            },
+            "action_catalog": {
+                "actions": [
+                    {
+                        "action_type": "speech",
+                        "label": "발화",
+                        "description": "말한다.",
+                        "supported_visibility": ["public", "private", "group"],
+                        "requires_target": False,
+                        "supports_utterance": True,
+                    }
+                ],
+                "selection_guidance": ["상황에 맞게 고른다."],
+            },
+        },
+        "pending_actor_proposals": [
+            {
+                "cast_id": "a",
+                "unread_activity_ids": [],
+                "proposal": {
+                    "action_type": "speech",
+                    "intent": "마무리 결론을 낸다.",
+                    "intent_target_cast_ids": ["b"],
+                    "action_summary": "a가 최종 결론을 제안한다.",
+                    "action_detail": "남은 쟁점을 닫는다.",
+                    "utterance": "이제 결론을 내립시다.",
+                    "visibility": "private",
+                    "target_cast_ids": ["b"],
+                    "thread_id": "closure",
+                },
+                "forced_idle": False,
+                "parse_failure_count": 0,
+                "latency_seconds": 0.01,
+            }
+        ],
+        "simulation_clock": {
+            "total_elapsed_minutes": 0,
+            "total_elapsed_label": "0분",
+            "last_elapsed_minutes": 0,
+            "last_elapsed_label": "0분",
+            "last_advanced_round_index": 0,
+        },
+        "observer_reports": [],
+        "round_time_history": [],
+        "intent_history": [],
+        "forced_idles": 0,
+        "parse_failures": 0,
+        "stagnation_rounds": 0,
+        "stop_requested": False,
+        "stop_reason": "",
+        "current_round_started_at": 0.0,
+        "errors": [],
+    }
+
+    result = asyncio.run(resolve_round(state, runtime))
+
+    assert result["stop_requested"] is True
+    assert result["stop_reason"] == "simulation_done"

@@ -19,6 +19,16 @@ def build_round_directive_prompt_bundle(
     )
 
 
+def build_round_continuation_prompt_bundle(
+    *,
+    example_mode: ExampleMode = "minimal",
+) -> dict[str, str]:
+    return build_json_prompt_bundle(
+        example=_ROUND_CONTINUATION_EXAMPLE,
+        example_mode=example_mode,
+    )
+
+
 def build_round_resolution_prompt_bundle(
     *,
     example_mode: ExampleMode = "minimal",
@@ -54,6 +64,10 @@ _STEP_DIRECTIVE_EXAMPLE: dict[str, Any] = {
             "future_hook": "<one Korean sentence describing a plausible next hook>",
         }
     ],
+}
+
+_ROUND_CONTINUATION_EXAMPLE: dict[str, Any] = {
+    "stop_reason": '<return "" to continue, or "no_progress" to stop before the next round>',
 }
 
 _STEP_RESOLUTION_EXAMPLE: dict[str, Any] = {
@@ -93,5 +107,5 @@ _STEP_RESOLUTION_EXAMPLE: dict[str, Any] = {
         "world_state_summary": "<same summary string as the top-level world_state_summary>",
     },
     "world_state_summary": "<one Korean sentence summarizing the global state after resolution>",
-    "stop_reason": "<empty string to continue, or a short Korean stop reason>",
+    "stop_reason": '<return "" to continue, or "simulation_done" when this round completes the simulation>',
 }
