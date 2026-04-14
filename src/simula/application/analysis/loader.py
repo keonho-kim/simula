@@ -34,6 +34,8 @@ def load_run_analysis(
     llm_calls: list[LLMCallRecord] = []
     actors_by_id: dict[str, ActorRecord] = {}
     adopted_activities: list[AdoptedActivityRecord] = []
+    has_actors_finalized_event = False
+    has_round_actions_adopted_event = False
 
     for entry in entries:
         _validate_run_id(entry, expected_run_id=expected_run_id)
@@ -42,9 +44,11 @@ def load_run_analysis(
             llm_calls.append(_parse_llm_call(entry))
             continue
         if event_name == "actors_finalized":
+            has_actors_finalized_event = True
             actors_by_id = _parse_actors(entry)
             continue
         if event_name == "round_actions_adopted":
+            has_round_actions_adopted_event = True
             adopted_activities.extend(_parse_adopted_activities(entry))
 
     if not llm_calls:
@@ -60,6 +64,8 @@ def load_run_analysis(
             adopted_activities,
             key=lambda item: (item.round_index, item.source_cast_id, item.thread_id),
         ),
+        has_actors_finalized_event=has_actors_finalized_event,
+        has_round_actions_adopted_event=has_round_actions_adopted_event,
     )
 
 

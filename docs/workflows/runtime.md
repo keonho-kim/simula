@@ -45,7 +45,9 @@ Runs before each new round. It can end the runtime loop in two ways:
 - coordinator-produced `no_progress` when another round would not add meaningful movement
 
 Required unresolved major events can prevent both planner-target completion and `no_progress`
-stops until the hard ceiling is reached.
+stops until the hard ceiling is reached. There is one code-first exception: once the planner target
+round has been reached, overdue required events with no matched activity evidence and sustained
+stagnation can stop as `no_progress`, and those unresolved events are finalized as `missed`.
 
 ### `plan_round`
 
@@ -58,11 +60,20 @@ Generates one `RoundDirective` bundle:
 - focus slices
 - background updates
 
+The prompt is built from compact focus candidates, deferred actor views, compact situation and
+coordination-frame views, the simulation clock, event memory, and the latest observer summary.
+
 It also appends the directive to `round_focus_history`.
+When stagnation has already accumulated, this step may inject one high-pressure deferred
+background hook so the next round is not forced to recycle the same visible beat.
 
 ### `generate_actor_proposal`
 
 Generates one `ActorActionProposal` for one selected actor from compact runtime inputs.
+
+The prompt combines the selected focus slice, visible action context, unread backlog digest,
+visible actors, and runtime guidance. Runtime guidance includes the current actor-facing digest,
+channel guidance, current constraints, allowed actions, and the current intent snapshot.
 
 ### `reduce_actor_proposals`
 
@@ -73,6 +84,10 @@ Restores deterministic actor order after fan-in.
 Generates one `RoundResolution` bundle, applies adopted actions, advances the simulation clock,
 writes observer output, updates `event_memory`, appends `event_memory_history`, persists round
 artifacts, and sets stop state.
+
+The prompt is built from pending actor proposals, latest background updates, visible activities,
+compact situation and coordination-frame views, relevant intent states, the previous actor-facing
+digest, the simulation clock, `stagnation_rounds`, progression policy, and event memory.
 
 ## Stop Behavior
 
@@ -87,6 +102,7 @@ The active stop policy combines:
 - configured hard ceiling: `max_rounds`
 - planner target: `planned_max_rounds`
 - grace buffer for unresolved required major events
+- stale overdue required events with no evidence after the planner target
 - round-level resolver completion signal
 
 Active `stop_reason` values are:

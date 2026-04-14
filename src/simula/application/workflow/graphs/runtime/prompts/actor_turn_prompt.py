@@ -47,8 +47,11 @@ _PROMPT = textwrap.dedent(
     - Use `runtime_guidance.current_intent_snapshot.current_intent` for what to do and `runtime_guidance.current_intent_snapshot.thought` for why this actor is choosing it now.
     - Use `runtime_guidance.actor_facing_scenario_digest.talking_points` to decide what should be pushed verbally.
     - Use `runtime_guidance.actor_facing_scenario_digest.avoid_repetition_notes` to avoid flat repetition or generic filler.
+    - Treat `runtime_guidance.current_constraints` and `runtime_guidance.channel_guidance` as hard realism rails for this scene.
     - Prefer immediately playable, socially plausible actions over formal plans, written documents, legal frameworks, or institutional procedures unless those are explicitly grounded in the scenario or recent visible actions.
     - Do not suddenly introduce contracts, clause edits, policy documents, legal ratios, or other off-screen artifacts unless they already exist in the scenario or recent context.
+    - Do not jump straight to official couple confirmation, marriage commitment, room-wide approval, or team strategy leadership unless recent visible context clearly supports that intensity.
+    - If the current line feels stuck, change the question, target, vulnerability, or timing instead of repeating the same public declaration with slightly different wording.
     - `utterance` must sound like something a person would actually say aloud in that scene, not like a memo, report, briefing, or scripted narration.
     - Keep the action realistic for the current channel. Public actions should sound like public conversation; private actions should sound like candid one-on-one talk.
 

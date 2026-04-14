@@ -1,10 +1,9 @@
 """Purpose:
-- Build the final report payload, simulation log, and report projection together.
+- Build the final report payload and report projection together.
 """
 
 from __future__ import annotations
 
-import json
 from typing import cast
 
 from langgraph.runtime import Runtime
@@ -16,9 +15,9 @@ from simula.application.workflow.graphs.finalization.nodes.build_report_projecti
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
-from simula.application.workflow.utils.streaming import emit_custom_event
+from simula.application.workflow.utils.streaming import record_simulation_log_event
 from simula.domain.log_events import build_final_report_event
-from simula.domain.reporting import build_final_report, build_simulation_log_entries
+from simula.domain.reporting import build_final_report
 
 
 def build_report_artifacts(
@@ -32,13 +31,6 @@ def build_report_artifacts(
         cast(dict[str, object], state),
         llm_usage_summary=llm_usage_summary,
     )
-    simulation_log_entries = build_simulation_log_entries(
-        {
-            **cast(dict[str, object], state),
-            "final_report": final_report,
-        },
-        llm_usage_summary=llm_usage_summary,
-    )
     projection_update = build_report_projection(
         cast(
             SimulationWorkflowState,
@@ -48,7 +40,8 @@ def build_report_artifacts(
             },
         )
     )
-    emit_custom_event(
+    record_simulation_log_event(
+        runtime.context,
         build_final_report_event(
             run_id=str(state["run_id"]),
             final_report=final_report,
@@ -57,9 +50,6 @@ def build_report_artifacts(
     )
     return {
         "final_report": final_report,
-        "simulation_log_jsonl": "\n".join(
-            json.dumps(entry, ensure_ascii=False) for entry in simulation_log_entries
-        ),
         "report_projection_json": str(projection_update["report_projection_json"]),
         "llm_usage_summary": llm_usage_summary,
     }

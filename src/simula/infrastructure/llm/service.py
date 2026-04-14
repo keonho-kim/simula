@@ -107,7 +107,6 @@ class AsyncStructuredLLMService:
                 attempt_output,
                 attempt_total,
                 attempt_raw_response,
-                attempt_raw_chunks,
                 attempt_duration,
             ) = await self.router._ainvoke_with_metrics(
                 role,
@@ -119,7 +118,6 @@ class AsyncStructuredLLMService:
                 call_kind="structured",
                 prompt=candidate,
                 raw_response=attempt_raw_response,
-                raw_chunks=attempt_raw_chunks,
                 log_context=log_context,
                 duration_seconds=attempt_duration,
                 ttft_seconds=attempt_ttft,

@@ -85,6 +85,8 @@ class LoadedRunAnalysis:
     llm_calls: list[LLMCallRecord]
     actors_by_id: dict[str, ActorRecord]
     adopted_activities: list[AdoptedActivityRecord]
+    has_actors_finalized_event: bool
+    has_round_actions_adopted_event: bool
 
     @property
     def roles(self) -> list[str]:
@@ -454,6 +456,7 @@ class NetworkSummary:
     community_count: int
     skipped_metrics: dict[str, str] = field(default_factory=dict)
     empty_reason: str | None = None
+    input_warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -480,6 +483,7 @@ class NetworkSummary:
             "community_count": self.community_count,
             "skipped_metrics": dict(sorted(self.skipped_metrics.items())),
             "empty_reason": self.empty_reason,
+            "input_warnings": list(self.input_warnings),
         }
 
 

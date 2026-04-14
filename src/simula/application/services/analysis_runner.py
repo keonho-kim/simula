@@ -154,6 +154,8 @@ def run_analysis(
     network_report, graph = build_network_report(
         actors_by_id=loaded.actors_by_id,
         activities=loaded.adopted_activities,
+        has_actors_finalized_event=loaded.has_actors_finalized_event,
+        has_round_actions_adopted_event=loaded.has_round_actions_adopted_event,
     )
     writer.write_csv(
         "network/nodes.csv",

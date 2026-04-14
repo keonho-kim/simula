@@ -46,7 +46,8 @@ output/<run_id>/
   simulation.log.jsonl
 ```
 
-The graph returns both artifacts before the presentation layer writes them to disk.
+The workflow produces the report payloads, while the executor fills `simulation_log_jsonl`
+from the append-driven runtime log before the presentation layer writes files.
 
 The analyzer writes to:
 
@@ -103,5 +104,5 @@ Important runtime controls:
 ## Maintenance Notes
 
 - Keep documentation aligned with the compiled graph, not historical files.
-- Treat `simulation.log.jsonl` as the runtime-written graph artifact, including raw LLM call events.
+- Treat `simulation.log.jsonl` as the append-driven runtime artifact and source of truth for analysis.
 - Remove stale prompt assets and workflow docs when stage structure changes.

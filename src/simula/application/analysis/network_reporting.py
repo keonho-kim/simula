@@ -30,6 +30,8 @@ def render_network_summary_markdown(*, run_id: str, report: NetworkReport) -> st
     )
     if summary.empty_reason:
         lines.append(f"- 참고: {summary.empty_reason}")
+    for warning in summary.input_warnings:
+        lines.append(f"- 입력 경고: {warning}")
 
     lines.extend(
         [

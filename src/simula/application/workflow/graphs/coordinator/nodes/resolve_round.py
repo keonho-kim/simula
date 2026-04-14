@@ -25,12 +25,14 @@ from simula.application.workflow.graphs.runtime.proposal_contract import (
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
-from simula.application.workflow.utils.streaming import emit_custom_event
+from simula.application.workflow.utils.streaming import record_simulation_log_event
 from simula.application.workflow.utils.prompt_projections import (
     WORLD_STATE_SUMMARY_LIMIT,
     build_compact_background_updates,
     build_compact_pending_actor_proposals,
     build_event_memory_prompt_view,
+    build_planning_coordination_frame_view,
+    build_planning_situation_view,
     build_progression_plan_prompt_view,
     build_relevant_intent_states,
     build_visible_action_context,
@@ -73,6 +75,7 @@ async def resolve_round(
         list[dict[str, object]],
         list(state["pending_actor_proposals"]),
     )
+    plan = cast(dict[str, object], state.get("plan", {}))
     latest_background_updates = list(state["latest_background_updates"])
     latest_action_views, _ = build_visible_action_context(
         unread_visible_activities=[],
@@ -116,6 +119,18 @@ async def resolve_round(
             ensure_ascii=False,
             separators=(",", ":"),
         ),
+        situation_json=json.dumps(
+            build_planning_situation_view(cast(dict[str, object], plan.get("situation", {}))),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        coordination_frame_json=json.dumps(
+            build_planning_coordination_frame_view(
+                cast(dict[str, object], plan.get("coordination_frame", {}))
+            ),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
         actor_intent_states_json=json.dumps(
             build_relevant_intent_states(
                 list(state["actor_intent_states"]),
@@ -134,8 +149,11 @@ async def resolve_round(
             ensure_ascii=False,
             separators=(",", ":"),
         ),
+        stagnation_rounds=int(state["stagnation_rounds"]),
         progression_plan_json=json.dumps(
-            build_progression_plan_prompt_view(state["plan"]["progression_plan"]),
+            build_progression_plan_prompt_view(
+                cast(dict[str, object], plan["progression_plan"])
+            ),
             ensure_ascii=False,
             separators=(",", ":"),
         ),
@@ -268,7 +286,8 @@ async def resolve_round(
         activities=list(applied["latest_round_activities"]),
         observer_report=report_payload,
     )
-    emit_custom_event(
+    record_simulation_log_event(
+        runtime.context,
         build_round_time_advanced_event(
             run_id=str(state["run_id"]),
             round_index=int(state["round_index"]),
@@ -276,14 +295,16 @@ async def resolve_round(
         )
     )
     if list(applied["latest_round_activities"]):
-        emit_custom_event(
+        record_simulation_log_event(
+            runtime.context,
             build_round_actions_adopted_event(
                 run_id=str(state["run_id"]),
                 round_index=int(state["round_index"]),
                 activities=list(applied["latest_round_activities"]),
             )
         )
-    emit_custom_event(
+    record_simulation_log_event(
+        runtime.context,
         build_round_observer_report_event(
             run_id=str(state["run_id"]),
             round_index=int(state["round_index"]),
@@ -298,7 +319,8 @@ async def resolve_round(
         requested_stop_reason=resolution.stop_reason,
         effective_stop_reason=stop_reason,
     )
-    emit_custom_event(
+    record_simulation_log_event(
+        runtime.context,
         build_round_event_memory_updated_event(
             run_id=str(state["run_id"]),
             round_index=int(state["round_index"]),

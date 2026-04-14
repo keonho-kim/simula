@@ -30,8 +30,6 @@ _SCHEMA_ROLE_MAP = {
     "RoundContinuationDecision": "coordinator",
     "ActorActionProposal": "actor",
     "TimelineAnchorDecision": "observer",
-    # Legacy structured final-report runs produced one bundled schema.
-    "FinalReportSections": "observer",
 }
 
 

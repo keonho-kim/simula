@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import re
 from typing import TypedDict, cast
 
 from simula.domain.contracts import (
@@ -121,6 +122,34 @@ def has_required_unresolved_events(event_memory: dict[str, object]) -> bool:
     """Return whether any required event remains unresolved."""
 
     return bool(required_event_ids_pending(event_memory))
+
+
+def should_stop_for_stale_required_events(
+    event_memory: dict[str, object],
+    *,
+    current_round_index: int,
+    stagnation_rounds: int,
+) -> bool:
+    """Return whether overdue required events have gone stale enough to stop early."""
+
+    if stagnation_rounds < 2:
+        return False
+
+    refreshed = refresh_event_memory(event_memory, current_round_index=current_round_index)
+    unresolved_required_events = [
+        event
+        for event in _event_list(refreshed.get("events", []))
+        if bool(event.get("required_before_end", False))
+        and str(event.get("status", "")) not in {"completed", "missed"}
+    ]
+    if not unresolved_required_events:
+        return False
+
+    return all(
+        current_round_index > _int_value(event.get("latest_round", 0))
+        and not _string_list(event.get("matched_activity_ids", []))
+        for event in unresolved_required_events
+    )
 
 
 def hard_stop_round(
@@ -466,7 +495,7 @@ def _matching_activities_for_event(
     activities: list[dict[str, object]],
 ) -> list[dict[str, object]]:
     participant_ids = set(_string_list(event.get("participant_cast_ids", [])))
-    action_types = set(_string_list(event.get("completion_action_types", [])))
+    action_types = _string_list(event.get("completion_action_types", []))
     signals = _string_list(event.get("completion_signals", []))
     matched: list[dict[str, object]] = []
     for activity in activities:
@@ -475,17 +504,11 @@ def _matching_activities_for_event(
         participants = {source_cast_id, *target_cast_ids}
         if participant_ids.isdisjoint(participants):
             continue
-        activity_text = " ".join(
-            [
-                str(activity.get("action_summary", "")),
-                str(activity.get("action_detail", "")),
-                str(activity.get("utterance", "")),
-                str(activity.get("intent", "")),
-            ]
-        )
-        if str(activity.get("action_type", "")) in action_types or any(
-            signal and signal in activity_text for signal in signals
-        ):
+        activity_text = _activity_text(activity)
+        if _action_type_matches(
+            activity_action_type=str(activity.get("action_type", "")),
+            completion_action_types=action_types,
+        ) or any(_signal_matches(signal, activity_text) for signal in signals):
             matched.append(activity)
     return matched
 
@@ -495,17 +518,94 @@ def _is_strong_completion(
     activities: list[dict[str, object]],
 ) -> bool:
     participant_ids = set(_string_list(event.get("participant_cast_ids", [])))
-    action_types = set(_string_list(event.get("completion_action_types", [])))
+    action_types = _string_list(event.get("completion_action_types", []))
+    signals = _string_list(event.get("completion_signals", []))
     covered_participants: set[str] = set()
-    action_type_hit = False
+    completion_signal_hit = False
+    matched_action_hit = False
     for activity in activities:
         source_cast_id = str(activity.get("source_cast_id", "")).strip()
         target_cast_ids = set(_string_list(activity.get("target_cast_ids", [])))
         participants = {source_cast_id, *target_cast_ids}
         covered_participants.update(participant_ids.intersection(participants))
-        if str(activity.get("action_type", "")) in action_types:
-            action_type_hit = True
-    return action_type_hit and participant_ids.issubset(covered_participants)
+        if _action_type_matches(
+            activity_action_type=str(activity.get("action_type", "")),
+            completion_action_types=action_types,
+        ):
+            matched_action_hit = True
+        if any(_signal_matches(signal, _activity_text(activity)) for signal in signals):
+            completion_signal_hit = True
+    return (matched_action_hit or completion_signal_hit) and participant_ids.issubset(
+        covered_participants
+    )
+
+
+def _activity_text(activity: dict[str, object]) -> str:
+    return " ".join(
+        [
+            str(activity.get("action_summary", "")),
+            str(activity.get("action_detail", "")),
+            str(activity.get("utterance", "")),
+            str(activity.get("intent", "")),
+        ]
+    )
+
+
+def _signal_matches(signal: str, activity_text: str) -> bool:
+    normalized_signal = _normalize_match_text(signal)
+    normalized_activity_text = _normalize_match_text(activity_text)
+    if not normalized_signal or not normalized_activity_text:
+        return False
+    return normalized_signal in normalized_activity_text
+
+
+def _action_type_matches(
+    *,
+    activity_action_type: str,
+    completion_action_types: list[str],
+) -> bool:
+    normalized_activity_type = _normalize_action_type(activity_action_type)
+    normalized_completion_types = {
+        _normalize_action_type(action_type)
+        for action_type in completion_action_types
+        if _normalize_action_type(action_type)
+    }
+    return normalized_activity_type in normalized_completion_types
+
+
+def _normalize_action_type(action_type: str) -> str:
+    lowered = action_type.strip().lower()
+    if not lowered:
+        return ""
+    if any(token in lowered for token in ("date", "outing", "walk")):
+        return "date"
+    if any(
+        token in lowered
+        for token in ("confide", "confession", "private_confide", "heart_to_heart")
+    ):
+        return "private_confession"
+    if any(token in lowered for token in ("choice", "choose", "selection", "select")):
+        return "choice"
+    if any(
+        token in lowered
+        for token in (
+            "conversation",
+            "dialogue",
+            "discussion",
+            "speech",
+            "statement",
+            "talk",
+            "question",
+            "answer",
+        )
+    ):
+        return "conversation"
+    return lowered
+
+
+def _normalize_match_text(text: str) -> str:
+    collapsed = re.sub(r"\s+", "", text).lower()
+    return re.sub(r"[^\w가-힣]", "", collapsed)
 
 
 def _event_list(value: object) -> list[dict[str, object]]:

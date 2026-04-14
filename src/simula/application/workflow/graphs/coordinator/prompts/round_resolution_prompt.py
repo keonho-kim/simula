@@ -18,6 +18,7 @@ Resolve this round in one object: adoption, updated intents, elapsed-time advanc
 - Use `event_match_hints_json` as the code-first baseline for which major events may have advanced this round.
 - `event_updates` may mention only event ids that exist in `event_memory_json`.
 - Do not mark a major event as `completed` unless the round activities plausibly satisfy its participants and completion signals.
+- Use `situation_json` and `coordination_frame_json` as hard realism rails for the next-step direction.
 - Every field is required.
 - Return only the JSON object that matches the required output schema.
 - Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
@@ -26,9 +27,11 @@ Resolve this round in one object: adoption, updated intents, elapsed-time advanc
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
 - Each `updated_intent_states` item must keep `current_intent` concrete and add `thought` that explains why this actor chose that direction now.
+- Keep each updated intent only one plausible beat ahead of the adopted actions. Do not jump straight to public commitment, marriage confirmation, room-wide approval, or shared-strategy leadership unless the supplied actions already justify that intensity.
 - `actor_facing_scenario_digest` must describe the next round for actors, including relationship map, current pressures, talking points, repetition to avoid, and recommended tone.
 - `actor_facing_scenario_digest.world_state_summary` must match the top-level `world_state_summary`.
 - Keep the observer summary, world-state summary, and digest realistic for the scenario. They should sound like plausible next-step pressure, not abstract genre drift.
+- If `stagnation_rounds` is high or repetition is visible, change the pressure with a new concrete conversational beat, target, or off-screen hook rather than rephrasing the same declaration.
 - Do not introduce new contracts, formal plans, legal clauses, or institutional machinery unless they are grounded in the scenario or the accepted actions.
 
 # Inputs
@@ -47,6 +50,12 @@ Latest background updates JSON:
 Latest activities JSON:
 {latest_activities_json}
 
+Situation JSON:
+{situation_json}
+
+Coordination frame JSON:
+{coordination_frame_json}
+
 Actor intent states JSON:
 {actor_intent_states_json}
 
@@ -55,6 +64,9 @@ Previous actor-facing scenario digest JSON:
 
 Simulation clock JSON:
 {simulation_clock_json}
+
+Stagnation rounds:
+{stagnation_rounds}
 
 Progression policy JSON:
 {progression_plan_json}

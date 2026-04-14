@@ -23,7 +23,7 @@ from simula.application.workflow.graphs.planning.prompts.build_planning_analysis
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
-from simula.application.workflow.utils.streaming import emit_custom_event
+from simula.application.workflow.utils.streaming import record_simulation_log_event
 from simula.domain.contracts import ExecutionPlanBundle, PlanningAnalysis
 from simula.domain.log_events import build_plan_finalized_event
 
@@ -131,7 +131,8 @@ def finalize_plan(
         ]
     )
     runtime.context.store.save_plan(state["run_id"], plan)
-    emit_custom_event(
+    record_simulation_log_event(
+        runtime.context,
         build_plan_finalized_event(
             run_id=str(state["run_id"]),
             plan=plan,

@@ -73,8 +73,9 @@ The runtime stage itself contains the loop. The other stages are straight-line s
 
 ### Workflow state vs. file output
 
-The graph returns structured data such as `final_report`, `final_report_markdown`, and
-`simulation_log_jsonl`. The presentation layer turns those into files.
+The workflow returns structured report data such as `final_report` and
+`final_report_markdown`. The executor reads the append-driven `simulation.log.jsonl` artifact
+back into `simulation_log_jsonl`, and the presentation layer turns those outputs into files.
 
 ### Rich state vs. prompt projections
 

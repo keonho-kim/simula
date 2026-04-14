@@ -35,12 +35,16 @@ from simula.domain.contracts import (
     RoundDirective,
     RoundResolution,
 )
-from simula.domain.event_memory import build_event_memory
+from simula.domain.event_memory import build_event_memory, evaluate_round_event_updates
+
+
+def _test_context(**kwargs: object) -> SimpleNamespace:
+    return SimpleNamespace(run_jsonl_appender=None, **kwargs)
 
 
 def test_prepare_focus_candidates_advances_round_and_builds_candidates() -> None:
     runtime = SimpleNamespace(
-        context=SimpleNamespace(logger=logging.getLogger("simula.test.round"))
+        context=_test_context(logger=logging.getLogger("simula.test.round"))
     )
     state = {
         "actors": [
@@ -79,7 +83,7 @@ def test_prepare_focus_candidates_advances_round_and_builds_candidates() -> None
 
 def test_prepare_focus_candidates_prioritizes_due_required_event_participants() -> None:
     runtime = SimpleNamespace(
-        context=SimpleNamespace(logger=logging.getLogger("simula.test.round"))
+        context=_test_context(logger=logging.getLogger("simula.test.round"))
     )
     state = {
         "actors": [
@@ -178,7 +182,7 @@ def test_assess_round_continuation_skips_llm_on_first_entry() -> None:
             raise AssertionError("LLM should not be called on the first runtime entry")
 
     runtime = SimpleNamespace(
-        context=SimpleNamespace(
+        context=_test_context(
             llms=FailRouter(),
             logger=logging.getLogger("simula.test.round"),
         )
@@ -237,7 +241,7 @@ def test_assess_round_continuation_stops_on_max_rounds_without_llm() -> None:
             raise AssertionError("LLM should not be called when max_rounds is reached")
 
     runtime = SimpleNamespace(
-        context=SimpleNamespace(
+        context=_test_context(
             llms=FailRouter(),
             logger=logging.getLogger("simula.test.round"),
         )
@@ -267,7 +271,7 @@ def test_assess_round_continuation_keeps_running_when_required_event_remains() -
             raise AssertionError("LLM should not be called when required events force continuation")
 
     runtime = SimpleNamespace(
-        context=SimpleNamespace(
+        context=_test_context(
             llms=FailRouter(),
             logger=logging.getLogger("simula.test.round"),
         )
@@ -322,7 +326,7 @@ def test_assess_round_continuation_returns_no_progress_from_coordinator() -> Non
             )
 
     runtime = SimpleNamespace(
-        context=SimpleNamespace(
+        context=_test_context(
             llms=FakeRouter(),
             logger=logging.getLogger("simula.test.round"),
         )
@@ -362,6 +366,55 @@ def test_assess_round_continuation_returns_no_progress_from_coordinator() -> Non
     assert result["stop_reason"] == "no_progress"
 
 
+def test_assess_round_continuation_stops_for_stale_required_event_after_planned_max() -> None:
+    class FailRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            raise AssertionError("LLM should not be called when stale required events stop the run")
+
+    runtime = SimpleNamespace(
+        context=_test_context(
+            llms=FailRouter(),
+            logger=logging.getLogger("simula.test.round"),
+        )
+    )
+    state = {
+        "run_id": "run-1",
+        "round_index": 3,
+        "max_rounds": 5,
+        "planned_max_rounds": 3,
+        "stagnation_rounds": 2,
+        "simulation_clock": {"total_elapsed_label": "3시간"},
+        "world_state_summary": "현재 상태",
+        "observer_reports": [],
+        "latest_round_activities": [],
+        "round_focus_history": [],
+        "event_memory": build_event_memory(
+            [
+                {
+                    "event_id": "final_choice",
+                    "title": "최종 선택",
+                    "summary": "마지막 선택을 정리해야 한다.",
+                    "participant_cast_ids": ["a", "b"],
+                    "earliest_round": 2,
+                    "latest_round": 2,
+                    "completion_action_types": ["speech"],
+                    "completion_signals": ["최종 선택"],
+                    "required_before_end": True,
+                }
+            ]
+        ),
+        "errors": [],
+        "event_memory_history": [],
+    }
+
+    result = asyncio.run(assess_round_continuation(state, runtime))
+
+    assert result["stop_requested"] is True
+    assert result["stop_reason"] == "no_progress"
+    assert result["event_memory"]["events"][0]["status"] == "missed"
+    assert result["event_memory_history"][0]["source"] == "continuation_stale_required_stop"
+
+
 def test_build_round_directive_sets_selected_cast_ids() -> None:
     class FakeRouter:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
@@ -399,7 +452,7 @@ def test_build_round_directive_sets_selected_cast_ids() -> None:
             )
 
     runtime = SimpleNamespace(
-        context=SimpleNamespace(
+        context=_test_context(
             llms=FakeRouter(),
             logger=logging.getLogger("simula.test.round"),
             settings=SimpleNamespace(
@@ -432,6 +485,98 @@ def test_build_round_directive_sets_selected_cast_ids() -> None:
     assert result["latest_background_updates"][0]["cast_id"] == "c"
 
 
+def test_build_round_directive_injects_stagnation_background_hook() -> None:
+    class FakeRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            return (
+                schema.model_validate(
+                    RoundDirective(
+                        round_index=3,
+                        focus_summary="핵심 축을 직접 추적한다.",
+                        selection_reason="직접 반응 압력이 높다.",
+                        selected_cast_ids=["a", "b"],
+                        deferred_cast_ids=["c"],
+                        focus_slices=[
+                            {
+                                "slice_id": "focus-1",
+                                "title": "핵심 축",
+                                "focus_cast_ids": ["a", "b"],
+                                "visibility": "public",
+                                "stakes": "즉시 반응이 필요하다.",
+                                "selection_reason": "핵심 압력이 몰렸다.",
+                            }
+                        ],
+                        background_updates=[],
+                    )
+                ),
+                SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+            )
+
+    runtime = SimpleNamespace(
+        context=_test_context(
+            llms=FakeRouter(),
+            logger=logging.getLogger("simula.test.round"),
+            settings=SimpleNamespace(
+                runtime=SimpleNamespace(
+                    max_focus_slices_per_step=3,
+                    max_actor_calls_per_step=2,
+                )
+            ),
+        )
+    )
+    state = {
+        "run_id": "run-1",
+        "round_index": 3,
+        "stagnation_rounds": 2,
+        "actors": [
+            {"cast_id": "a", "display_name": "A"},
+            {"cast_id": "b", "display_name": "B"},
+            {"cast_id": "c", "display_name": "C", "story_function": "후반 흔들 변수"},
+        ],
+        "focus_candidates": [
+            {"cast_id": "a", "candidate_score": 6.0},
+            {"cast_id": "b", "candidate_score": 5.0},
+            {"cast_id": "c", "candidate_score": 4.0},
+        ],
+        "plan": {
+            "coordination_frame": {"focus_selection_rules": ["규칙"]},
+            "situation": {
+                "simulation_objective": "긴장 추적",
+                "initial_tensions": ["압력"],
+                "current_constraints": ["같은 선언 반복 금지"],
+                "channel_guidance": {"public": "공개 대화"},
+            },
+        },
+        "simulation_clock": {"total_elapsed_label": "3시간"},
+        "event_memory": build_event_memory(
+            [
+                {
+                    "event_id": "final_choice",
+                    "title": "최종 선택",
+                    "summary": "마지막 선택 압력이 남아 있다.",
+                    "participant_cast_ids": ["a", "b", "c"],
+                    "earliest_round": 2,
+                    "latest_round": 3,
+                    "completion_action_types": ["speech"],
+                    "completion_signals": ["최종 선택"],
+                    "required_before_end": True,
+                }
+            ]
+        ),
+        "observer_reports": [{"summary": "반복이 이어졌다."}],
+        "round_focus_history": [],
+        "background_updates": [],
+        "errors": [],
+    }
+
+    result = asyncio.run(build_round_directive(state, runtime))
+
+    assert result["latest_background_updates"]
+    assert result["latest_background_updates"][0]["cast_id"] == "c"
+    assert result["latest_background_updates"][0]["pressure_level"] == "high"
+
+
 def test_build_round_directive_backfills_more_related_casts_when_pool_is_rich() -> None:
     class FakeRouter:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
@@ -461,7 +606,7 @@ def test_build_round_directive_backfills_more_related_casts_when_pool_is_rich() 
             )
 
     runtime = SimpleNamespace(
-        context=SimpleNamespace(
+        context=_test_context(
             llms=FakeRouter(),
             logger=logging.getLogger("simula.test.round"),
             settings=SimpleNamespace(
@@ -562,7 +707,7 @@ def test_resolve_round_persists_round_artifacts() -> None:
         saved["observer_report"] = observer_report
 
     runtime = SimpleNamespace(
-        context=SimpleNamespace(
+        context=_test_context(
             llms=FakeRouter(),
             logger=logging.getLogger("simula.test.round"),
             settings=SimpleNamespace(
@@ -714,7 +859,7 @@ def test_resolve_round_completes_matching_major_event_from_applied_actions() -> 
             )
 
     runtime = SimpleNamespace(
-        context=SimpleNamespace(
+        context=_test_context(
             llms=FakeRouter(),
             logger=logging.getLogger("simula.test.round"),
             settings=SimpleNamespace(
@@ -824,6 +969,55 @@ def test_resolve_round_completes_matching_major_event_from_applied_actions() -> 
     assert result["event_memory_history"][0]["event_updates"][0]["status"] == "completed"
 
 
+def test_evaluate_round_event_updates_matches_public_conversation_to_speech_event() -> None:
+    event_memory = build_event_memory(
+        [
+            {
+                "event_id": "public_selection",
+                "title": "공개 선택",
+                "summary": "두 사람이 공개적으로 선택을 확인한다.",
+                "participant_cast_ids": ["a", "b"],
+                "earliest_round": 1,
+                "latest_round": 2,
+                "completion_action_types": ["speech"],
+                "completion_signals": ["선택 확인"],
+                "required_before_end": True,
+            }
+        ]
+    )
+
+    hints = evaluate_round_event_updates(
+        event_memory,
+        latest_round_activities=[
+            {
+                "activity_id": "act-1",
+                "source_cast_id": "a",
+                "target_cast_ids": ["b"],
+                "action_type": "public_conversation",
+                "action_summary": "A가 B에게 공개적으로 선택 의사를 묻는다.",
+                "action_detail": "공개 자리에서 선택 확인을 요구한다.",
+                "utterance": "이제는 서로 선택을 확인하자.",
+                "intent": "선택 확인",
+            },
+            {
+                "activity_id": "act-2",
+                "source_cast_id": "b",
+                "target_cast_ids": ["a"],
+                "action_type": "public_dialogue",
+                "action_summary": "B가 A에게 공개적으로 답한다.",
+                "action_detail": "공개 자리에서 같은 선택 의사를 밝힌다.",
+                "utterance": "나도 같은 선택이야.",
+                "intent": "선택 확인",
+            },
+        ],
+        current_round_index=1,
+    )
+
+    assert hints["suggested_updates"][0]["event_id"] == "public_selection"
+    assert hints["suggested_updates"][0]["status"] == "completed"
+    assert hints["allowed_completed_event_ids"] == ["public_selection"]
+
+
 def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
     class FakeRouter:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
@@ -873,7 +1067,7 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
             )
 
     runtime = SimpleNamespace(
-        context=SimpleNamespace(
+        context=_test_context(
             llms=FakeRouter(),
             logger=logging.getLogger("simula.test.round"),
             settings=SimpleNamespace(
@@ -1015,7 +1209,7 @@ def test_resolve_round_marks_simulation_done_stop() -> None:
             )
 
     runtime = SimpleNamespace(
-        context=SimpleNamespace(
+        context=_test_context(
             llms=FakeRouter(),
             logger=logging.getLogger("simula.test.round"),
             settings=SimpleNamespace(

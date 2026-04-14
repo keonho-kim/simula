@@ -89,7 +89,6 @@ class StructuredLLMRouter:
             output_tokens,
             total_tokens,
             raw_response,
-            raw_chunks,
             duration_seconds,
         ) = (
             self._invoke_with_metrics(role, prompt, call_kind="text")
@@ -102,7 +101,6 @@ class StructuredLLMRouter:
             call_kind="text",
             prompt=prompt,
             raw_response=raw_response,
-            raw_chunks=raw_chunks,
             log_context=log_context,
             duration_seconds=duration_seconds,
             ttft_seconds=ttft_seconds,
@@ -148,7 +146,6 @@ class StructuredLLMRouter:
             output_tokens,
             total_tokens,
             raw_response,
-            raw_chunks,
             duration_seconds,
         ) = await self._ainvoke_with_metrics(role, prompt, call_kind="text")
         content = _content_to_text(response.content).strip()
@@ -159,7 +156,6 @@ class StructuredLLMRouter:
             call_kind="text",
             prompt=prompt,
             raw_response=raw_response,
-            raw_chunks=raw_chunks,
             log_context=log_context,
             duration_seconds=duration_seconds,
             ttft_seconds=ttft_seconds,
@@ -201,7 +197,6 @@ class StructuredLLMRouter:
         int | None,
         int | None,
         str,
-        list[str],
         float,
     ]:
         """응답과 벤치마크용 메타데이터를 함께 수집한다."""
@@ -210,13 +205,9 @@ class StructuredLLMRouter:
         started_at = time.perf_counter()
         first_chunk_at: float | None = None
         merged_chunk: Any | None = None
-        raw_chunks: list[str] = []
         for chunk in model.stream(prompt):
             if first_chunk_at is None:
                 first_chunk_at = time.perf_counter()
-            chunk_text = _content_to_text(getattr(chunk, "content", chunk))
-            if chunk_text:
-                raw_chunks.append(chunk_text)
             merged_chunk = chunk if merged_chunk is None else merged_chunk + chunk
 
         if merged_chunk is None:
@@ -241,7 +232,6 @@ class StructuredLLMRouter:
             output_tokens,
             total_tokens,
             _content_to_text(getattr(merged_chunk, "content", merged_chunk)).strip(),
-            raw_chunks,
             duration_seconds,
         )
 
@@ -258,7 +248,6 @@ class StructuredLLMRouter:
         int | None,
         int | None,
         str,
-        list[str],
         float,
     ]:
         """비동기 응답과 메타데이터를 함께 수집한다."""
@@ -267,13 +256,9 @@ class StructuredLLMRouter:
         started_at = time.perf_counter()
         first_chunk_at: float | None = None
         merged_chunk: Any | None = None
-        raw_chunks: list[str] = []
         async for chunk in model.astream(prompt):
             if first_chunk_at is None:
                 first_chunk_at = time.perf_counter()
-            chunk_text = _content_to_text(getattr(chunk, "content", chunk))
-            if chunk_text:
-                raw_chunks.append(chunk_text)
             merged_chunk = chunk if merged_chunk is None else merged_chunk + chunk
 
         if merged_chunk is None:
@@ -298,7 +283,6 @@ class StructuredLLMRouter:
             output_tokens,
             total_tokens,
             _content_to_text(getattr(merged_chunk, "content", merged_chunk)).strip(),
-            raw_chunks,
             duration_seconds,
         )
 
@@ -394,7 +378,6 @@ class StructuredLLMRouter:
         call_kind: CallKind,
         prompt: str,
         raw_response: str,
-        raw_chunks: list[str],
         log_context: dict[str, object] | None,
         duration_seconds: float,
         ttft_seconds: float | None,
@@ -414,7 +397,6 @@ class StructuredLLMRouter:
             call_kind=call_kind,
             prompt=prompt,
             raw_response=raw_response,
-            raw_chunks=raw_chunks,
             log_context=_json_safe_mapping(log_context),
             duration_seconds=duration_seconds,
             ttft_seconds=ttft_seconds,

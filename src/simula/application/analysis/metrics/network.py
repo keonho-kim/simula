@@ -31,6 +31,8 @@ def build_network_report(
     *,
     actors_by_id: dict[str, ActorRecord],
     activities: list[AdoptedActivityRecord],
+    has_actors_finalized_event: bool = True,
+    has_round_actions_adopted_event: bool = True,
 ) -> tuple[NetworkReport, nx.DiGraph]:
     """Build node metrics, summary metrics, and a graph for one adopted-activity run."""
 
@@ -75,6 +77,16 @@ def build_network_report(
         key=lambda item: (-item.total_weight, item.display_name, item.cast_id),
     )
 
+    input_warnings: list[str] = []
+    if not has_actors_finalized_event:
+        input_warnings.append(
+            "`actors_finalized` 이벤트가 없어 전체 actor roster를 복원하지 못했습니다."
+        )
+    if not has_round_actions_adopted_event:
+        input_warnings.append(
+            "`round_actions_adopted` 이벤트가 없어 채택된 상호작용을 복원하지 못했습니다."
+        )
+
     summary = NetworkSummary(
         node_count=directed_graph.number_of_nodes(),
         edge_count=directed_graph.number_of_edges(),
@@ -99,12 +111,17 @@ def build_network_report(
         community_count=len(computed.communities),
         skipped_metrics=computed.skipped_metrics,
         empty_reason=(
-            "채택된 행위자 상호작용이 없습니다."
+            "`actors_finalized` 이벤트가 없어 행위자 노드가 비어 있습니다."
+            if not has_actors_finalized_event and not actors_by_id
+            else "`round_actions_adopted` 이벤트가 없어 채택된 상호작용이 비어 있습니다."
+            if not has_round_actions_adopted_event and not activities
+            else "채택된 행위자 상호작용이 없습니다."
             if not activities
             else "행위자 간 관계 엣지가 생성되지 않았습니다."
             if not aggregated.edges
             else None
         ),
+        input_warnings=input_warnings,
     )
     report = NetworkReport(
         nodes=nodes,

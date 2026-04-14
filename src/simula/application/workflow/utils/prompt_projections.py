@@ -501,8 +501,17 @@ def build_focus_plan_situation_view(
             situation.get("simulation_objective", ""),
             160,
         ),
+        "world_summary": truncate_text(situation.get("world_summary", ""), 180),
         "initial_tensions": _truncate_string_list(
             situation.get("initial_tensions", []),
+            limit=3,
+            text_limit=SHORT_DESCRIPTION_LIMIT,
+        ),
+        "channel_guidance": _compact_channel_guidance(
+            situation.get("channel_guidance", {})
+        ),
+        "current_constraints": _truncate_string_list(
+            situation.get("current_constraints", []),
             limit=3,
             text_limit=SHORT_DESCRIPTION_LIMIT,
         ),

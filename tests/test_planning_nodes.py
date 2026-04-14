@@ -34,6 +34,7 @@ def _build_runtime(llms: object) -> SimpleNamespace:
         context=SimpleNamespace(
             llms=llms,
             logger=logging.getLogger("simula.test.planning"),
+            run_jsonl_appender=None,
             store=store,
         )
     )

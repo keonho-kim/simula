@@ -151,9 +151,6 @@ def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
     assert events[0]["raw_response"] == (
         '{"cast_id":"a","display_name":"A","role_hint":"r","group_name":"g","core_tension":"t"}'
     )
-    assert events[0]["raw_chunks"] == [
-        '{"cast_id":"a","display_name":"A","role_hint":"r","group_name":"g","core_tension":"t"}'
-    ]
     assert events[0]["duration_seconds"] == pytest.approx(
         float(events[0]["duration_seconds"])
     )

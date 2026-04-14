@@ -23,10 +23,12 @@ Choose the direct focus for this round and summarize deferred motion in the same
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
 - Keep the directive realistic for the scenario and the current moment. Select slices that could plausibly become the next visible beat.
+- Use `situation_json` as a realism rail, especially its constraints and channel guidance.
 - Do not introduce new institutions, written artifacts, or escalation frames unless they are already grounded in the scenario or previous rounds.
 - Avoid overly narrow two-person loops when the current conflict clearly implicates additional related candidates.
 - If the candidate pool is rich enough and the direct-call budget allows it, prefer selecting 3 to 4 closely related cast members rather than only 1 to 2.
 - If `event_memory_json` shows overdue or due unresolved events, prefer focus slices that can materially advance those events this round.
+- If the previous round felt repetitive, use `background_updates` to create one concrete deferred hook that could visibly change the next round instead of merely restating the same stalemate.
 
 # Inputs
 Round index:

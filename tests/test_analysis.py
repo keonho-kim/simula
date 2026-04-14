@@ -209,6 +209,21 @@ def test_network_report_marks_skipped_metrics_for_edge_free_graph() -> None:
     assert all(node.in_degree_centrality == 0.0 for node in report.nodes)
 
 
+def test_network_report_marks_missing_jsonl_event_inputs() -> None:
+    report, _ = build_network_report(
+        actors_by_id={},
+        activities=[],
+        has_actors_finalized_event=False,
+        has_round_actions_adopted_event=False,
+    )
+
+    assert report.summary.empty_reason == "`actors_finalized` 이벤트가 없어 행위자 노드가 비어 있습니다."
+    assert report.summary.input_warnings == [
+        "`actors_finalized` 이벤트가 없어 전체 actor roster를 복원하지 못했습니다.",
+        "`round_actions_adopted` 이벤트가 없어 채택된 상호작용을 복원하지 못했습니다.",
+    ]
+
+
 def test_network_report_records_algorithm_failures(monkeypatch) -> None:
     def _boom(*args, **kwargs):  # noqa: ANN002, ANN003
         del args, kwargs
@@ -386,7 +401,6 @@ def _sample_log_text(*, run_id: str) -> str:
             "log_context": {"scope": "planning-analysis"},
             "prompt": "planner prompt",
             "raw_response": "{\"brief_summary\":\"ok\"}",
-            "raw_chunks": ["{\"brief_summary\":\"ok\"}"],
             "duration_seconds": 0.3,
             "ttft_seconds": 0.1,
             "input_tokens": 10,
@@ -404,7 +418,6 @@ def _sample_log_text(*, run_id: str) -> str:
             "log_context": {"scope": "actor-turn", "cast_id": "alpha"},
             "prompt": "actor prompt",
             "raw_response": "{\"action_type\":\"talk\"}",
-            "raw_chunks": ["{\"action_type\":\"talk\"}"],
             "duration_seconds": 0.4,
             "ttft_seconds": 0.2,
             "input_tokens": 10,
@@ -422,7 +435,6 @@ def _sample_log_text(*, run_id: str) -> str:
             "log_context": {"scope": "json-fix", "attempt": 1},
             "prompt": "Target schema: ActorActionProposal\nFields:\n- x",
             "raw_response": "{\"fixed\":1}",
-            "raw_chunks": ["{\"fixed\":1}"],
             "duration_seconds": 0.25,
             "ttft_seconds": 0.08,
             "input_tokens": 10,
@@ -440,7 +452,6 @@ def _sample_log_text(*, run_id: str) -> str:
             "log_context": {"scope": "json-fix", "attempt": 2},
             "prompt": "Target schema: ActorActionProposal\nFields:\n- x",
             "raw_response": "{\"fixed\":2}",
-            "raw_chunks": ["{\"fixed\":2}"],
             "duration_seconds": 0.35,
             "ttft_seconds": 0.09,
             "input_tokens": 10,
@@ -456,9 +467,8 @@ def _sample_log_text(*, run_id: str) -> str:
             "role": "fixer",
             "call_kind": "text",
             "log_context": {"scope": "json-fix", "attempt": 1},
-            "prompt": "Target schema: FinalReportSections\nFields:\n- x",
+            "prompt": "Target schema: TimelineAnchorDecision\nFields:\n- x",
             "raw_response": "{\"fixed\":3}",
-            "raw_chunks": ["{\"fixed\":3}"],
             "duration_seconds": 0.45,
             "ttft_seconds": 0.11,
             "input_tokens": 10,

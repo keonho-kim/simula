@@ -129,5 +129,6 @@ fixer summary, token usage summary, and the top-level network summary.
 
 - `--run-id` is required. The analyzer does not auto-pick the latest run.
 - Missing input files, invalid JSONL rows, or logs without any `llm_call` events fail fast.
-- Empty actor interaction data still produces explicit empty network artifacts, including summary
-  JSON and Markdown, instead of skipping output generation.
+- Missing `actors_finalized` or `round_actions_adopted` events still produce explicit empty
+  network artifacts and record the input gap in the network summary instead of silently skipping
+  output generation.

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+from typing import cast
 
 from langgraph.runtime import Runtime
 
@@ -18,7 +19,7 @@ from simula.application.workflow.graphs.coordinator.prompts.round_directive_prom
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
-from simula.application.workflow.utils.streaming import emit_custom_event
+from simula.application.workflow.utils.streaming import record_simulation_log_event
 from simula.application.workflow.utils.coercion import as_dict_list, as_string_list
 from simula.application.workflow.utils.prompt_projections import (
     PREVIOUS_SUMMARY_LIMIT,
@@ -120,10 +121,15 @@ async def build_round_directive(
         max_focus_slices=max_focus_slices,
         max_actor_calls=max_actor_calls,
     )
+    normalized = _inject_stagnation_background_hook(
+        state=state,
+        directive=normalized,
+    )
     errors = list(state["errors"])
     if meta.forced_default:
         errors.append(f"round {state['round_index']} directive defaulted")
-    emit_custom_event(
+    record_simulation_log_event(
+        runtime.context,
         build_round_focus_selected_event(
             run_id=str(state["run_id"]),
             round_index=int(state["round_index"]),
@@ -132,7 +138,8 @@ async def build_round_directive(
     )
     background_updates = as_dict_list(normalized.get("background_updates", []))
     if background_updates:
-        emit_custom_event(
+        record_simulation_log_event(
+            runtime.context,
             build_round_background_updated_event(
                 run_id=str(state["run_id"]),
                 round_index=int(state["round_index"]),
@@ -301,3 +308,74 @@ def _desired_selected_count(*, candidate_count: int, max_actor_calls: int) -> in
     if candidate_count >= 5:
         return min(max_actor_calls, 3)
     return min(max_actor_calls, candidate_count, 2)
+
+
+def _inject_stagnation_background_hook(
+    *,
+    state: SimulationWorkflowState,
+    directive: dict[str, object],
+) -> dict[str, object]:
+    """Add one high-pressure deferred hook when the scene has clearly stalled."""
+
+    if int(state.get("stagnation_rounds", 0)) < 2:
+        return directive
+
+    background_updates = as_dict_list(directive.get("background_updates", []))
+    deferred_cast_ids = as_string_list(directive.get("deferred_cast_ids", []))
+    if not deferred_cast_ids:
+        return directive
+    deferred_cast_id_set = set(deferred_cast_ids)
+    if any(
+        str(item.get("cast_id", "")) in deferred_cast_id_set
+        for item in background_updates
+    ):
+        return directive
+
+    focus_candidates = {
+        str(item.get("cast_id", "")): cast(dict[str, object], item)
+        for item in list(state.get("focus_candidates", []))
+        if isinstance(item, dict)
+    }
+    actors_by_id = {
+        str(actor.get("cast_id", "")): cast(dict[str, object], actor)
+        for actor in list(state.get("actors", []))
+        if isinstance(actor, dict)
+    }
+    unresolved_required_titles = [
+        str(event.get("title", "")).strip()
+        for event in as_dict_list(
+            cast(dict[str, object], state.get("event_memory", {})).get("events", [])
+        )
+        if bool(event.get("required_before_end", False))
+        and str(event.get("status", "")) not in {"completed", "missed"}
+        and int(str(event.get("latest_round", 0) or 0)) <= int(state["round_index"])
+        and str(event.get("title", "")).strip()
+    ]
+
+    chosen_cast_id = max(
+        deferred_cast_ids,
+        key=lambda cast_id: float(
+            str(focus_candidates.get(cast_id, {}).get(
+                "candidate_score",
+                0.0,
+            ))
+        ),
+    )
+    actor = actors_by_id.get(chosen_cast_id, {})
+    actor_name = str(actor.get("display_name", chosen_cast_id)).strip() or chosen_cast_id
+    pressure_topic = unresolved_required_titles[0] if unresolved_required_titles else (
+        str(actor.get("story_function", "")).strip() or "정체된 관계 구도"
+    )
+    synthetic_update = {
+        "round_index": int(str(directive.get("round_index", 0) or 0)),
+        "cast_id": chosen_cast_id,
+        "summary": f"{actor_name} 쪽에서 {pressure_topic} 흐름을 더 이상 미루지 않으려는 압박이 커진다.",
+        "pressure_level": "high",
+        "future_hook": (
+            f"다음 round에서는 {actor_name}가 같은 말 반복 대신 확인 질문이나 선택 요구를 먼저 꺼낼 수 있다."
+        ),
+    }
+    return {
+        **directive,
+        "background_updates": background_updates + [synthetic_update],
+    }

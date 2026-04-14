@@ -10,8 +10,14 @@ Finalization turns the completed runtime trace into stable report artifacts.
 flowchart LR
     Start([START]) --> Anchor["resolve_timeline_anchor"]
     Anchor --> Artifacts["build_report_artifacts"]
-    Artifacts --> Bundle["write_final_report_bundle"]
-    Bundle --> Render["render_and_persist_final_report"]
+    Artifacts --> Conclusion["write_conclusion_section"]
+    Artifacts --> Timeline["write_timeline_section"]
+    Artifacts --> Dynamics["write_actor_dynamics_section"]
+    Artifacts --> Events["write_major_events_section"]
+    Conclusion --> Render["render_and_persist_final_report"]
+    Timeline --> Render
+    Dynamics --> Render
+    Events --> Render
     Render --> End([END])
 ```
 
@@ -27,6 +33,8 @@ Uses a parser-first strategy:
 
 The output is always one required `TimelineAnchorDecision`.
 
+This is the only active structured LLM contract in finalization.
+
 ### `build_report_artifacts`
 
 Builds:
@@ -40,14 +48,14 @@ The projection now includes both the final major-event snapshot and the recorded
 
 This is a code-only node. It does not call an LLM.
 
-### `write_final_report_bundle`
+### `write_conclusion_section`, `write_timeline_section`, `write_actor_dynamics_section`, `write_major_events_section`
 
-Calls the `observer` role to generate one `FinalReportSections` bundle. The bundle is validated
-and retried once if the first attempt violates section rules.
+Call the `observer` role with text prompts built from shared report prompt inputs.
+Each section is validated and retried once if the first attempt violates local section rules.
 
 ### `render_and_persist_final_report`
 
-Renders Markdown from the validated section bundle and stores the final report artifact.
+Renders Markdown from the validated section strings and stores the final report artifact.
 
 ## Final Outputs
 

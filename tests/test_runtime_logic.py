@@ -27,7 +27,6 @@ from simula.domain.activity_feeds import (
 )
 from simula.domain.reporting import (
     build_final_report,
-    build_simulation_log_entries,
     latest_observer_summary,
     latest_world_state_summary,
 )
@@ -267,105 +266,6 @@ def test_build_final_report_counts_visibility() -> None:
     assert report["last_observer_summary"] == "긴장 상승"
     assert report["world_state_summary"] == "실무 정렬이 시작됐다."
     assert report["elapsed_simulation_minutes"] == 30
-
-
-def test_build_simulation_log_entries_appends_llm_usage_summary() -> None:
-    entries = build_simulation_log_entries(
-        {
-            "run_id": "run-1",
-            "scenario": "테스트 시나리오",
-            "max_rounds": 2,
-            "rng_seed": 7,
-            "activities": [],
-            "observer_reports": [],
-            "actors": [],
-            "round_time_history": [],
-            "round_focus_history": [],
-            "background_updates": [],
-            "final_report": {"run_id": "run-1"},
-            "stop_reason": "simulation_done",
-        },
-        llm_usage_summary={
-            "total_calls": 3,
-            "calls_by_role": {"planner": 1, "actor": 2},
-            "structured_calls": 2,
-            "text_calls": 1,
-            "parse_failures": 1,
-            "forced_defaults": 0,
-            "input_tokens": None,
-            "output_tokens": None,
-            "total_tokens": None,
-        },
-    )
-
-    assert entries[0]["event"] == "simulation_started"
-    assert entries[0]["event_key"] == "simulation_started"
-    assert entries[-1]["event"] == "llm_usage_summary"
-    assert entries[-1]["event_key"] == "llm_usage_summary"
-    assert entries[-1]["llm_usage_summary"]["calls_by_role"]["actor"] == 2
-
-
-def test_build_simulation_log_entries_includes_event_memory_updates() -> None:
-    entries = build_simulation_log_entries(
-        {
-            "run_id": "run-1",
-            "scenario": "테스트 시나리오",
-            "max_rounds": 2,
-            "rng_seed": 7,
-            "activities": [],
-            "observer_reports": [
-                {
-                    "round_index": 1,
-                    "summary": "요약",
-                    "notable_events": [],
-                    "atmosphere": "긴장",
-                    "momentum": "medium",
-                    "world_state_summary": "상태",
-                }
-            ],
-            "actors": [],
-            "round_time_history": [],
-            "round_focus_history": [],
-            "background_updates": [],
-            "event_memory_history": [
-                {
-                    "round_index": 1,
-                    "source": "resolve_round",
-                    "event_updates": [
-                        {
-                            "event_id": "final-choice",
-                            "status": "completed",
-                            "progress_summary": "최종 선택이 실행됐다.",
-                            "matched_activity_ids": ["act-1"],
-                        }
-                    ],
-                    "event_memory_summary": {
-                        "completed_event_ids": ["final-choice"],
-                    },
-                    "stop_context": {
-                        "requested_stop_reason": "",
-                        "effective_stop_reason": "",
-                    },
-                }
-            ],
-            "final_report": {"run_id": "run-1"},
-            "stop_reason": "simulation_done",
-        },
-        llm_usage_summary={
-            "total_calls": 3,
-            "calls_by_role": {"planner": 1, "actor": 2},
-            "structured_calls": 2,
-            "text_calls": 1,
-            "parse_failures": 1,
-            "forced_defaults": 0,
-            "input_tokens": None,
-            "output_tokens": None,
-            "total_tokens": None,
-        },
-    )
-
-    assert any(entry["event"] == "round_event_memory_updated" for entry in entries)
-
 
 def test_recent_actions_and_latest_summaries_use_latest_values() -> None:
     activities = [

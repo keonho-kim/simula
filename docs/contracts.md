@@ -52,6 +52,7 @@ and absence is represented with explicit empty values such as `""`, `[]`, or `{}
 - `round_focus_plan`
 - `round_time_advance`
 - `round_time_history`
+- `actor_facing_scenario_digest`
 - `actor_proposal_task`
 - `pending_actor_proposals`
 
@@ -78,6 +79,10 @@ and absence is represented with explicit empty values such as `""`, `[]`, or `{}
 - `simulation_log_jsonl`
 - `report_projection_json`
 - `report_timeline_anchor_json`
+- `report_conclusion_section`
+- `report_timeline_section`
+- `report_actor_dynamics_section`
+- `report_major_events_section`
 - `final_report_sections`
 - `final_report_markdown`
 - `errors`
@@ -104,13 +109,15 @@ active prompt-facing contracts.
 | Stage | Contract |
 | --- | --- |
 | planning | `PlanningAnalysis`, `ExecutionPlanBundle` |
-| generation | `ActorCard` |
+| generation | `GeneratedActorCardDraft` |
 | runtime round continuation | `RoundContinuationDecision` |
 | runtime round planning | `RoundDirective` |
 | runtime actor turn | `ActorActionProposal` |
 | runtime round resolution | `RoundResolution` including `event_updates` |
 | finalization anchor | `TimelineAnchorDecision` |
-| finalization report bundle | `FinalReportSections` |
+
+Finalization report section writers are validated text outputs. They are not active structured
+Pydantic contracts.
 
 ## Artifact Contracts
 
@@ -148,7 +155,7 @@ Shared runtime memory for planner-generated major events. It tracks:
 Round-scoped append-only history of event-memory transitions. Each record stores:
 
 - `round_index`
-- `source` (`resolve_round` or `continuation_hard_stop`)
+- `source` (`resolve_round`, `continuation_hard_stop`, or `continuation_stale_required_stop`)
 - `event_updates`
 - `event_memory_summary`
 - `stop_context`
@@ -158,7 +165,7 @@ Round-scoped append-only history of event-memory transitions. Each record stores
 Ordered event stream containing:
 
 - simulation start
-- raw LLM calls including prompt text, merged raw response text, and streamed chunks
+- raw LLM calls including prompt text and merged raw response text
 - finalized plan
 - finalized actors
 - round focus selection
@@ -183,6 +190,13 @@ Intermediate structured bundle used to render the final Markdown report. It cont
 - `actor_dynamics_section` using `### 현재 구도` and `### 관계 변화`, with bullet lines under each subheading
 - `major_events_section`
 
+The workflow state also stores the rendered section strings separately as:
+
+- `report_conclusion_section`
+- `report_timeline_section`
+- `report_actor_dynamics_section`
+- `report_major_events_section`
+
 ## Failure Policy
 
 - Planning and generation are strict structured calls. If the contract cannot be satisfied, the
@@ -191,5 +205,8 @@ Intermediate structured bundle used to render the final Markdown report. It cont
   When that happens, the event is recorded through `errors`.
 - Runtime stop behavior is event-aware. Required unresolved major events may keep the runtime alive
   past the planner target round budget until the hard ceiling is reached.
+- There is one code-first exception: once the planner target has been reached, overdue required
+  events with no matched activity evidence and sustained stagnation may stop as `no_progress`,
+  and those unresolved events are finalized as `missed`.
 - Final report section writing retries once with validation feedback. It does not silently
-  substitute a synthetic report bundle.
+  substitute synthetic section text.

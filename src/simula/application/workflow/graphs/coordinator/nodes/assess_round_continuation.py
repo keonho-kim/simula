@@ -19,7 +19,7 @@ from simula.application.workflow.graphs.coordinator.prompts.round_continuation_p
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
-from simula.application.workflow.utils.streaming import emit_custom_event
+from simula.application.workflow.utils.streaming import record_simulation_log_event
 from simula.application.workflow.utils.prompt_projections import build_event_memory_prompt_view
 from simula.application.workflow.utils.prompt_projections import (
     ACTION_SUMMARY_LIMIT,
@@ -34,6 +34,7 @@ from simula.domain.event_memory import (
     hard_stop_round,
     has_required_unresolved_events,
     refresh_event_memory,
+    should_stop_for_stale_required_events,
 )
 from simula.domain.log_events import build_round_event_memory_updated_event
 
@@ -80,7 +81,8 @@ async def assess_round_continuation(
             requested_stop_reason="simulation_done",
             effective_stop_reason="simulation_done",
         )
-        emit_custom_event(
+        record_simulation_log_event(
+            runtime.context,
             build_round_event_memory_updated_event(
                 run_id=str(state.get("run_id", "")),
                 round_index=round_index,
@@ -116,6 +118,53 @@ async def assess_round_continuation(
             "event_memory": refreshed_event_memory,
         }
     if round_index >= planned_max_rounds and required_unresolved_events:
+        if should_stop_for_stale_required_events(
+            refreshed_event_memory,
+            current_round_index=round_index,
+            stagnation_rounds=int(state["stagnation_rounds"]),
+        ):
+            finalized_event_memory = apply_event_updates(
+                refreshed_event_memory,
+                event_updates=[],
+                current_round_index=round_index,
+                finalize_unresolved_as_missed=True,
+            )
+            transition_updates = build_transition_event_updates(
+                refreshed_event_memory,
+                finalized_event_memory,
+            )
+            history_entry = _build_event_memory_history_entry(
+                round_index=round_index,
+                source="continuation_stale_required_stop",
+                event_updates=transition_updates,
+                event_memory=finalized_event_memory,
+                requested_stop_reason="no_progress",
+                effective_stop_reason="no_progress",
+            )
+            record_simulation_log_event(
+                runtime.context,
+                build_round_event_memory_updated_event(
+                    run_id=str(state.get("run_id", "")),
+                    round_index=round_index,
+                    source=str(history_entry["source"]),
+                    event_updates=_dict_list(history_entry.get("event_updates", [])),
+                    event_memory_summary=cast(
+                        dict[str, object], history_entry["event_memory_summary"]
+                    ),
+                    stop_context=cast(dict[str, object], history_entry["stop_context"]),
+                )
+            )
+            runtime.context.logger.info(
+                "round %s continuation stopped | stop=no_progress | stale required events after planned max",
+                round_index,
+            )
+            return {
+                "stop_requested": True,
+                "stop_reason": "no_progress",
+                "event_memory": finalized_event_memory,
+                "event_memory_history": list(state.get("event_memory_history", []))
+                + [history_entry],
+            }
         runtime.context.logger.info(
             "round %s continuation forced | unresolved required events remain",
             round_index,
@@ -173,7 +222,7 @@ async def assess_round_continuation(
         prompt,
         RoundContinuationDecision,
         allow_default_on_failure=True,
-        default_payload={"stop_reason": ""},
+        default_payload=_build_default_round_continuation_payload(),
         log_context={
             "scope": "round-continuation",
             "round_index": round_index,
@@ -197,6 +246,10 @@ async def assess_round_continuation(
         "event_memory": refreshed_event_memory,
         "errors": errors,
     }
+
+
+def _build_default_round_continuation_payload() -> dict[str, object]:
+    return {"stop_reason": ""}
 
 
 def _build_latest_observer_report_view(

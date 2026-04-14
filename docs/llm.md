@@ -42,7 +42,8 @@ projection assembled for the job at hand.
 - compact situation and coordination frame views
 - compact step history summaries
 - compact pending actor proposals and background updates
-- compact continuation-check summaries such as recent observer reports, latest round activities, and the last focus plan
+- compact continuation-check summaries such as recent observer reports, latest round activities, the last focus plan, and `event_memory`
+- compact round-resolution inputs including the previous actor-facing digest and `stagnation_rounds`
 
 ### Runtime actor
 
@@ -52,13 +53,12 @@ projection assembled for the job at hand.
 - unread backlog digest
 - visible actors
 - runtime guidance with allowed actions
+- channel guidance and current constraints inside runtime guidance
 
 ### Finalization
 
-- scenario text
-- final report JSON
-- `report_projection_json`
-- timeline hints extracted from the scenario when available
+- timeline anchor inference receives scenario text, parser-extracted date/time/context hints, elapsed-time summary, and max-round context as one structured call
+- final report section writers use text prompts built from shared report prompt inputs and local validators instead of structured schemas
 
 ## Structured Output Policy
 
@@ -81,11 +81,11 @@ still keep that explicit fallback path, and the fallback remains observable.
 | execution plan | strict structured call |
 | actor generation | strict structured call |
 | round continuation | structured call with explicit default payload |
-| step directive | structured call with explicit default payload |
+| round directive | structured call with explicit default payload |
 | actor proposal | structured call with explicit default payload |
-| step resolution | structured call with explicit default payload |
+| round resolution | structured call with explicit default payload |
 | timeline anchor | strict structured call after parser hints |
-| final report bundle | structured call with one validation-driven retry |
+| final report section writers | text call with one validation-driven retry per section |
 | fixer helper | JSON-only repair with up to 3 retries and 60-second wait |
 
 ## Validation Rules
