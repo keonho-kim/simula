@@ -19,7 +19,7 @@ from simula.application.analysis.plotting.fonts import configure_korean_font
 
 _LAYOUT_SEED = 42
 _LAYOUT_SCALE = 0.7
-_LAYOUT_ITERATIONS = 300
+_LAYOUT_ITERATIONS = 100
 _LAYOUT_THRESHOLD = 1e-5
 _LAYOUT_K_MULTIPLIER = 100
 _LAYOUT_MIN_K = 10
