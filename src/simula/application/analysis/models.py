@@ -176,6 +176,58 @@ class DistributionReport:
 
 
 @dataclass(slots=True)
+class TokenUsageRoleSummary:
+    """Aggregated token usage totals for one role."""
+
+    role: str
+    call_count: int
+    input_tokens_total: int
+    output_tokens_total: int
+    total_tokens_total: int
+    input_tokens_missing_count: int
+    output_tokens_missing_count: int
+    total_tokens_missing_count: int
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "role": self.role,
+            "role_label": role_label(self.role),
+            "call_count": self.call_count,
+            "input_tokens_total": self.input_tokens_total,
+            "output_tokens_total": self.output_tokens_total,
+            "total_tokens_total": self.total_tokens_total,
+            "input_tokens_missing_count": self.input_tokens_missing_count,
+            "output_tokens_missing_count": self.output_tokens_missing_count,
+            "total_tokens_missing_count": self.total_tokens_missing_count,
+        }
+
+    def to_row(self) -> dict[str, object]:
+        return self.to_dict()
+
+
+@dataclass(slots=True)
+class TokenUsageReport:
+    """Serializable token usage bundle."""
+
+    overall: TokenUsageRoleSummary
+    by_role: dict[str, TokenUsageRoleSummary]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "overall": self.overall.to_dict(),
+            "by_role": {
+                role: summary.to_dict()
+                for role, summary in sorted(self.by_role.items())
+            },
+        }
+
+    def summary_rows(self) -> list[dict[str, object]]:
+        rows = [self.overall.to_row()]
+        rows.extend(self.by_role[role].to_row() for role in sorted(self.by_role))
+        return rows
+
+
+@dataclass(slots=True)
 class FixerAttemptRecord:
     """One fixer `llm_call` annotated with role attribution."""
 
@@ -501,6 +553,7 @@ class ArtifactManifest:
     roles: list[str]
     artifact_paths: list[str]
     fixer_summary: dict[str, object]
+    token_usage_summary: dict[str, object]
     network_summary: dict[str, object]
 
     def to_dict(self) -> dict[str, object]:
@@ -515,5 +568,6 @@ class ArtifactManifest:
             "roles_display": [role_label(item) for item in self.roles],
             "artifact_paths": self.artifact_paths,
             "fixer_summary": self.fixer_summary,
+            "token_usage_summary": self.token_usage_summary,
             "network_summary": self.network_summary,
         }

@@ -14,16 +14,19 @@ from simula.application.analysis import (
     build_distribution_report,
     build_fixer_report,
     build_network_report,
+    build_token_usage_report,
     load_run_analysis,
     render_network_summary_markdown,
     render_distribution_plot,
     render_network_plot,
+    render_token_usage_summary_markdown,
 )
 from simula.application.analysis.localization import (
     FIXER_SUMMARY_COLUMN_LABELS,
     LLM_CALL_COLUMN_LABELS,
     NETWORK_EDGE_COLUMN_LABELS,
     NETWORK_NODE_COLUMN_LABELS,
+    TOKEN_USAGE_COLUMN_LABELS,
     overall_distribution_title,
     role_distribution_title,
     translate_row,
@@ -127,6 +130,27 @@ def run_analysis(
         fieldnames=list(FIXER_SUMMARY_COLUMN_LABELS.values()),
     )
 
+    token_usage_report = build_token_usage_report(loaded.llm_calls)
+    writer.write_json("token_usage/summary.json", token_usage_report.to_dict())
+    writer.write_csv(
+        "token_usage/summary.csv",
+        rows=[
+            translate_row(
+                row,
+                column_labels=TOKEN_USAGE_COLUMN_LABELS,
+            )
+            for row in token_usage_report.summary_rows()
+        ],
+        fieldnames=list(TOKEN_USAGE_COLUMN_LABELS.values()),
+    )
+    writer.write_text(
+        "token_usage/summary.md",
+        render_token_usage_summary_markdown(
+            run_id=normalized_run_id,
+            report=token_usage_report,
+        ),
+    )
+
     network_report, graph = build_network_report(
         actors_by_id=loaded.actors_by_id,
         activities=loaded.adopted_activities,
@@ -179,6 +203,7 @@ def run_analysis(
         roles=loaded.roles,
         artifact_paths=sorted([*writer.created_files, "manifest.json"]),
         fixer_summary=fixer_report.to_dict(),
+        token_usage_summary=token_usage_report.to_dict(),
         network_summary=network_report.summary.to_dict(),
     )
     writer.write_json("manifest.json", manifest.to_dict())

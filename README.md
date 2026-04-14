@@ -69,6 +69,10 @@ analysis/
     manifest.json
     llm_calls.csv
     distributions/
+    token_usage/
+      summary.json
+      summary.csv
+      summary.md
     fixer/
     network/
       nodes.csv

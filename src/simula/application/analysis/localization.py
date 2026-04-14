@@ -67,6 +67,18 @@ FIXER_SUMMARY_COLUMN_LABELS = {
     "duration_p99": "소요 시간 p99",
 }
 
+TOKEN_USAGE_COLUMN_LABELS = {
+    "role": "역할",
+    "role_label": "역할 표시명",
+    "call_count": "호출 수",
+    "input_tokens_total": "입력 토큰 누적",
+    "output_tokens_total": "출력 토큰 누적",
+    "total_tokens_total": "총 토큰 누적",
+    "input_tokens_missing_count": "입력 토큰 누락 수",
+    "output_tokens_missing_count": "출력 토큰 누락 수",
+    "total_tokens_missing_count": "총 토큰 누락 수",
+}
+
 NETWORK_NODE_COLUMN_LABELS = {
     "cast_id": "행위자 ID",
     "display_name": "행위자 이름",

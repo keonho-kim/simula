@@ -15,6 +15,7 @@ from simula.application.analysis.loader import load_run_analysis
 from simula.application.analysis.metrics.distributions import build_distribution_report
 from simula.application.analysis.metrics.fixer import build_fixer_report
 from simula.application.analysis.metrics.network import build_network_report
+from simula.application.analysis.metrics.token_usage import build_token_usage_report
 from simula.application.analysis.models import ActorRecord, AdoptedActivityRecord
 from simula.application.services import analysis_runner
 from simula.infrastructure.config.loader import LoadedSettingsBundle
@@ -84,6 +85,23 @@ def test_fixer_report_attributes_roles_and_retries() -> None:
     assert report.by_role["observer"].fixer_call_count == 1
     assert report.sessions[0].schema_name == "ActorActionProposal"
     assert report.sessions[0].attempt_count == 2
+
+
+def test_token_usage_report_tracks_overall_and_role_totals() -> None:
+    loaded = _load_sample_data()
+
+    report = build_token_usage_report(loaded.llm_calls)
+
+    assert report.overall.call_count == 5
+    assert report.overall.input_tokens_total == 50
+    assert report.overall.output_tokens_total == 18
+    assert report.overall.total_tokens_total == 68
+    assert report.overall.output_tokens_missing_count == 1
+    assert report.by_role["fixer"].call_count == 3
+    assert report.by_role["fixer"].input_tokens_total == 30
+    assert report.by_role["fixer"].output_tokens_total == 13
+    assert report.by_role["fixer"].total_tokens_total == 43
+    assert report.by_role["planner"].output_tokens_missing_count == 1
 
 
 def test_network_report_counts_targets_and_intent_only_edges() -> None:
@@ -248,6 +266,9 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
         tmp_path / "analysis" / run_id / "distributions" / "roles" / "fixer" / "duration_seconds.json"
     ).exists()
     assert (tmp_path / "analysis" / run_id / "fixer" / "summary.csv").exists()
+    assert (tmp_path / "analysis" / run_id / "token_usage" / "summary.json").exists()
+    assert (tmp_path / "analysis" / run_id / "token_usage" / "summary.csv").exists()
+    assert (tmp_path / "analysis" / run_id / "token_usage" / "summary.md").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "nodes.csv").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "edges.csv").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "summary.json").exists()
@@ -261,6 +282,10 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
     assert manifest["run_id"] == run_id
     assert manifest["roles_display"] == ["actor (행위자)", "fixer (JSON 복구)", "planner (계획)"]
     assert "llm_calls.csv" in manifest["artifact_paths"]
+    assert "token_usage/summary.json" in manifest["artifact_paths"]
+    assert "token_usage/summary.csv" in manifest["artifact_paths"]
+    assert "token_usage/summary.md" in manifest["artifact_paths"]
+    assert manifest["token_usage_summary"]["overall"]["total_tokens_total"] == 68
     assert manifest["network_summary"]["edge_count"] == 3
     assert "network/summary.json" in manifest["artifact_paths"]
     assert "network/summary.md" in manifest["artifact_paths"]
@@ -280,6 +305,22 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
         ).read_text(encoding="utf-8")
     )
     assert distribution_json["metric_label"] == "입력 토큰"
+    token_usage_json = json.loads(
+        (
+            tmp_path
+            / "analysis"
+            / run_id
+            / "token_usage"
+            / "summary.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert token_usage_json["overall"]["input_tokens_total"] == 50
+    assert token_usage_json["by_role"]["fixer"]["total_tokens_total"] == 43
+    token_usage_md = (
+        tmp_path / "analysis" / run_id / "token_usage" / "summary.md"
+    ).read_text(encoding="utf-8")
+    assert "## 개요" in token_usage_md
+    assert "## 역할별 누적 사용량" in token_usage_md
     network_summary_json = json.loads(
         (
             tmp_path
