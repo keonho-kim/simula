@@ -18,11 +18,12 @@ import numpy as np
 from simula.application.analysis.plotting.fonts import configure_korean_font
 
 _LAYOUT_SEED = 42
-_LAYOUT_SCALE = 0.7
-_LAYOUT_ITERATIONS = 100
-_LAYOUT_THRESHOLD = 1e-5
-_LAYOUT_K_MULTIPLIER = 100
-_LAYOUT_MIN_K = 10
+_LAYOUT_MAX_ITER = 300
+_LAYOUT_JITTER_TOLERANCE = 0.7
+_LAYOUT_SCALING_RATIO = 6.5
+_LAYOUT_GRAVITY = 0.2
+_LAYOUT_NODE_SIZE_MIN = 8.0
+_LAYOUT_NODE_SIZE_DIVISOR = 14.0
 
 _NODE_BASE_SIZE = 1_100.0
 _NODE_SIZE_RANGE = 2_400.0
@@ -174,27 +175,66 @@ def render_network_plot(
 
 
 def _build_layout_kwargs(graph: nx.DiGraph) -> dict[str, object]:
-    """Return tuned spring-layout settings for a less crowded graph."""
+    """Return ForceAtlas2 settings for network rendering."""
 
-    active_node_count = max(
-        sum(1 for node in graph.nodes() if graph.degree(node) > 0),
-        1,
-    )
+    node_style = _build_node_visual_style(graph)
+    node_sizes = {
+        node: max(np.sqrt(size) / _LAYOUT_NODE_SIZE_DIVISOR, _LAYOUT_NODE_SIZE_MIN)
+        for node, size in zip(graph.nodes(), node_style.sizes, strict=True)
+    }
     return {
-        "seed": _LAYOUT_SEED,
+        "max_iter": _LAYOUT_MAX_ITER,
+        "jitter_tolerance": _LAYOUT_JITTER_TOLERANCE,
+        "scaling_ratio": _LAYOUT_SCALING_RATIO,
+        "gravity": _LAYOUT_GRAVITY,
+        "distributed_action": True,
+        "strong_gravity": False,
+        "node_size": node_sizes,
         "weight": "total_weight" if graph.number_of_edges() > 0 else None,
-        "k": max(_LAYOUT_K_MULTIPLIER / np.sqrt(active_node_count), _LAYOUT_MIN_K),
-        "iterations": _LAYOUT_ITERATIONS,
-        "threshold": _LAYOUT_THRESHOLD,
-        "scale": _LAYOUT_SCALE,
-        "method": "force",
+        "seed": _LAYOUT_SEED,
     }
 
 
 def _compute_layout_positions(graph: nx.DiGraph) -> dict[str, np.ndarray]:
-    """Compute spring-layout positions with wider node spacing."""
+    """Compute ForceAtlas2 positions and normalize them for Matplotlib rendering."""
 
-    return nx.spring_layout(graph, **_build_layout_kwargs(graph))
+    if graph.number_of_nodes() <= 1:
+        return {
+            node: np.zeros(2, dtype=float)
+            for node in graph.nodes()
+        }
+
+    raw_positions = nx.forceatlas2_layout(
+        graph,
+        **_build_layout_kwargs(graph),
+    )
+    return _normalize_layout_positions(raw_positions)
+
+
+def _normalize_layout_positions(
+    positions: dict[str, tuple[float, float] | np.ndarray],
+) -> dict[str, np.ndarray]:
+    """Scale layout coordinates to a centered Matplotlib-friendly range."""
+
+    if not positions:
+        return {}
+
+    nodes = list(positions)
+    coordinates = np.asarray([positions[node] for node in nodes], dtype=float)
+    minimum = np.min(coordinates, axis=0)
+    maximum = np.max(coordinates, axis=0)
+    center = (minimum + maximum) / 2.0
+    extent = float(np.max(maximum - minimum))
+
+    if np.isclose(extent, 0.0):
+        normalized = np.zeros_like(coordinates)
+    else:
+        normalized = ((coordinates - center) / extent) * 2.0
+
+    return {
+        node: normalized[index]
+        for index, node in enumerate(nodes)
+    }
 
 
 def _build_node_visual_style(graph: nx.DiGraph) -> NodeVisualStyle:

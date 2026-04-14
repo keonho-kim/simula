@@ -12,6 +12,7 @@ import networkx as nx
 import pytest
 
 from simula.application.analysis.plotting import fonts
+from simula.application.analysis.plotting import network as plotting_network
 from simula.application.analysis.plotting.network import render_network_plot
 
 
@@ -73,7 +74,10 @@ def test_configure_korean_font_falls_back_to_dejavu_when_needed(monkeypatch) -> 
     assert plt.rcParams["axes.unicode_minus"] is False
 
 
-def test_render_network_plot_avoids_missing_hangul_glyph_warnings(tmp_path) -> None:
+def test_render_network_plot_avoids_missing_hangul_glyph_warnings(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     selected = fonts.configure_korean_font()
     if selected == "DejaVu Sans":
         pytest.skip("No Korean-capable font is available in this environment.")
@@ -82,6 +86,11 @@ def test_render_network_plot_avoids_missing_hangul_glyph_warnings(tmp_path) -> N
     graph.add_node("alpha", display_name="경수", total_weight=1)
     graph.add_node("beta", display_name="옥순", total_weight=1)
     graph.add_edge("alpha", "beta", total_weight=1)
+    monkeypatch.setattr(
+        plotting_network,
+        "_compute_layout_positions",
+        lambda graph: {"alpha": (-1.0, 0.0), "beta": (1.0, 0.0)},
+    )
 
     with warnings.catch_warnings(record=True) as captured:
         warnings.simplefilter("always")

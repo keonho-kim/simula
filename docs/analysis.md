@@ -22,10 +22,10 @@ Legacy `run_id` mode is still available when you want resolution through `storag
 uv run analysis --run-id 2026-04-14.10 --env ./env.toml
 ```
 
-For Korean chart rendering on Ubuntu, install the recommended font set first:
+For Korean chart rendering on Ubuntu, install the recommended system dependencies first:
 
 ```bash
-./scripts/install_noto_sans_kr_ubuntu.sh
+./scripts/install_deps_ubuntu.sh
 ```
 
 `--run-dir` reads the input JSONL file directly from:

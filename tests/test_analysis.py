@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 import simula.application.analysis.metrics.network_algorithms as network_algorithms
+import simula.application.analysis.plotting.network as plotting_network
 
 from simula.application.analysis.loader import load_run_analysis
 from simula.application.analysis.metrics.distributions import build_distribution_report
@@ -277,6 +278,14 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
         "load_settings_bundle",
         _fake_load_settings_bundle,
     )
+    monkeypatch.setattr(
+        plotting_network,
+        "_compute_layout_positions",
+        lambda graph: {
+            node: (float(index), float(index))
+            for index, node in enumerate(graph.nodes(), start=1)
+        },
+    )
 
     outcome = analysis_runner.run_analysis(run_id=run_id)
 
@@ -371,6 +380,14 @@ def test_run_analysis_accepts_run_dir_path(tmp_path, monkeypatch) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
     log_path = run_dir / "simulation.log.jsonl"
     log_path.write_text(_sample_log_text(run_id=run_id), encoding="utf-8")
+    monkeypatch.setattr(
+        plotting_network,
+        "_compute_layout_positions",
+        lambda graph: {
+            node: (float(index), float(index))
+            for index, node in enumerate(graph.nodes(), start=1)
+        },
+    )
 
     outcome = analysis_runner.run_analysis(run_dir=str(run_dir))
 
@@ -379,8 +396,8 @@ def test_run_analysis_accepts_run_dir_path(tmp_path, monkeypatch) -> None:
     assert outcome.output_dir == Path("analysis") / run_id
 
 
-def test_korean_font_install_script_exists() -> None:
-    script_path = Path("scripts/install_noto_sans_kr_ubuntu.sh")
+def test_install_deps_script_exists() -> None:
+    script_path = Path("scripts/install_deps_ubuntu.sh")
 
     assert script_path.exists()
     assert "fonts-noto-cjk" in script_path.read_text(encoding="utf-8")

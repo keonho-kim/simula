@@ -8,10 +8,12 @@ import networkx as nx
 import numpy as np
 import pytest
 
+import simula.application.analysis.plotting.network as plotting_network
 from simula.application.analysis.plotting.network import (
     _build_edge_label_text,
     _build_edge_visual_style,
     _build_layout_kwargs,
+    _compute_layout_positions,
     _build_node_visual_style,
 )
 
@@ -52,7 +54,7 @@ def test_node_visual_style_falls_back_to_activity_metrics() -> None:
     assert np.isfinite(style.border_widths).all()
 
 
-def test_layout_kwargs_increase_spacing_and_iterations() -> None:
+def test_layout_kwargs_select_forceatlas2_parameters() -> None:
     graph = nx.DiGraph()
     graph.add_edge("alpha", "beta", total_weight=3)
     graph.add_edge("beta", "gamma", total_weight=2)
@@ -62,11 +64,47 @@ def test_layout_kwargs_increase_spacing_and_iterations() -> None:
 
     kwargs = _build_layout_kwargs(graph)
 
+    assert kwargs["max_iter"] == 300
+    assert kwargs["jitter_tolerance"] == pytest.approx(0.7)
+    assert kwargs["scaling_ratio"] == pytest.approx(6.5)
+    assert kwargs["gravity"] == pytest.approx(0.2)
+    assert kwargs["distributed_action"] is True
+    assert kwargs["strong_gravity"] is False
     assert kwargs["weight"] == "total_weight"
-    assert kwargs["iterations"] == 300
-    assert kwargs["scale"] == 1.0
-    assert kwargs["method"] == "force"
-    assert float(kwargs["k"]) > 1.0 / np.sqrt(4)
+    assert kwargs["seed"] == 42
+    assert isinstance(kwargs["node_size"], dict)
+    assert set(kwargs["node_size"]) == set(graph.nodes())
+
+
+def test_compute_layout_positions_uses_forceatlas2_layout(monkeypatch) -> None:
+    graph = nx.DiGraph()
+    graph.add_edge("alpha", "beta", total_weight=3)
+    graph.add_node("gamma")
+    captured: dict[str, object] = {}
+
+    def _fake_forceatlas2_layout(graph_obj, **kwargs):  # noqa: ANN001
+        captured["graph"] = graph_obj
+        captured["kwargs"] = kwargs
+        return {
+            "alpha": (10.0, 30.0),
+            "beta": (30.0, 10.0),
+            "gamma": (20.0, 20.0),
+        }
+
+    monkeypatch.setattr(
+        plotting_network.nx,
+        "forceatlas2_layout",
+        _fake_forceatlas2_layout,
+    )
+
+    positions = _compute_layout_positions(graph)
+
+    assert captured["graph"] is graph
+    assert captured["kwargs"]["max_iter"] == 300
+    assert captured["kwargs"]["weight"] == "total_weight"
+    assert set(positions) == {"alpha", "beta", "gamma"}
+    assert all(isinstance(value, np.ndarray) for value in positions.values())
+    assert np.isfinite(np.asarray(list(positions.values()), dtype=float)).all()
 
 
 def test_edge_visual_style_normalizes_weight_with_minimum_width_one() -> None:
@@ -94,5 +132,5 @@ def test_edge_label_text_includes_count_and_preview() -> None:
     labels = _build_edge_label_text(graph)
 
     assert labels[("alpha", "beta")].startswith("3회")
-    assert "private_one_on_one" in labels[("alpha", "beta")]
+    assert "PRIVATE ONE ON ONE" in labels[("alpha", "beta")]
     assert "외 1" in labels[("alpha", "beta")]

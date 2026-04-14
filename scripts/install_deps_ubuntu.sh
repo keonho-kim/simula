@@ -14,13 +14,13 @@ if ! command -v apt-get >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "[1/4] 패키지 목록을 갱신합니다."
+echo "[1/5] 패키지 목록을 갱신합니다."
 run_cmd apt-get update
 
-echo "[2/4] Google Noto CJK KR 계열 폰트를 설치합니다."
+echo "[2/5] 한글 렌더링용 시스템 패키지를 설치합니다."
 run_cmd apt-get install -y fontconfig fonts-noto-cjk
 
-echo "[3/4] Noto Sans KR 우선 사용을 위한 fontconfig 설정을 추가합니다."
+echo "[3/5] Noto Sans KR 우선 사용을 위한 fontconfig 설정을 추가합니다."
 mkdir -p "${HOME}/.config/fontconfig/conf.d"
 cat > "${HOME}/.config/fontconfig/conf.d/52-simula-noto-sans-kr.conf" <<'EOF'
 <?xml version="1.0"?>
@@ -42,8 +42,10 @@ cat > "${HOME}/.config/fontconfig/conf.d/52-simula-noto-sans-kr.conf" <<'EOF'
 </fontconfig>
 EOF
 
-echo "[4/4] 폰트 캐시를 새로고침합니다."
+echo "[4/5] 폰트 캐시를 새로고침합니다."
 fc-cache -f
+
+echo "[5/5] Python 패키지는 \`uv sync\`로 설치해 주세요."
 
 echo ""
 echo "설치가 완료되었습니다. 확인 예시:"

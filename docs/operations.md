@@ -30,10 +30,10 @@ If you prefer the legacy `run_id` selector resolved through a custom env file:
 uv run analysis --run-id 2026-04-14.10 --env ./env.toml
 ```
 
-For Korean plot labels on Ubuntu, install the recommended Noto font set:
+For Korean plot labels on Ubuntu, install the recommended system dependencies first:
 
 ```bash
-./scripts/install_noto_sans_kr_ubuntu.sh
+./scripts/install_deps_ubuntu.sh
 ```
 
 ## Output Layout
