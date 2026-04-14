@@ -21,7 +21,7 @@ _LAYOUT_SEED = 42
 _LAYOUT_SCALE = 1.0
 _LAYOUT_ITERATIONS = 300
 _LAYOUT_THRESHOLD = 1e-5
-_LAYOUT_K_MULTIPLIER = 50
+_LAYOUT_K_MULTIPLIER = 100
 _LAYOUT_MIN_K = 10
 
 _NODE_BASE_SIZE = 1_100.0
@@ -281,6 +281,7 @@ def _build_edge_label_text(graph: nx.DiGraph) -> dict[tuple[str, str], str]:
         variant_count = int(max(_metric_value(attrs, "label_variant_count"), 0.0))
 
         if preview:
+            preview = preview.replace('_', ' ').upper()
             if variant_count > 1:
                 labels[(source, target)] = (
                     f"{total_weight}회: {preview} 외 {variant_count - 1}가지 행동"
