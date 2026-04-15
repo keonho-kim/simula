@@ -18,6 +18,9 @@ from simula.application.analysis.metrics.fixer import build_fixer_report
 from simula.application.analysis.metrics.network import build_network_report
 from simula.application.analysis.metrics.token_usage import build_token_usage_report
 from simula.application.analysis.models import ActorRecord, AdoptedActivityRecord
+from simula.application.analysis.network_reporting import (
+    render_network_summary_markdown,
+)
 from simula.application.services import analysis_runner
 from simula.infrastructure.config.loader import LoadedSettingsBundle
 from simula.infrastructure.config.models import (
@@ -257,6 +260,41 @@ def test_network_report_records_algorithm_failures(monkeypatch) -> None:
     assert all(node.pagerank is None for node in report.nodes)
 
 
+def test_network_summary_markdown_describes_algorithms_and_lists_all_actor_scores() -> None:
+    report, _ = build_network_report(
+        actors_by_id=_actors("alpha", "beta", "gamma"),
+        activities=_activities(("alpha", "beta"), ("beta", "gamma")),
+    )
+
+    markdown = render_network_summary_markdown(run_id="run-1", report=report)
+
+    assert "`nx.in_degree_centrality(...)`" in markdown
+    assert "`nx.out_degree_centrality(...)`" in markdown
+    assert "`nx.hits(..., normalized=True)`" in markdown
+    assert "`nx.pagerank(weight=\"total_weight\")`" in markdown
+    assert (
+        "`nx.betweenness_centrality(..., weight=\"distance_weight\", "
+        "normalized=True)`" in markdown
+    )
+    assert "`nx.effective_size(weight=\"total_weight\")`" in markdown
+    assert "`nx.core_number(...)`" in markdown
+    assert (
+        "`nx.community.greedy_modularity_communities(weight=\"total_weight\")`"
+        in markdown
+    )
+    assert "### 전체 행위자 연결 점수" in markdown
+    assert "### 전체 행위자 허브/권위/영향력 점수" in markdown
+    assert "### 전체 행위자 브로커/응집 점수" in markdown
+    assert "| 행위자 | 총 관계 가중치 | 상대 수 | 내향 중심성 | 외향 중심성 |" in markdown
+    assert "| 행위자 | 허브 점수 | 권위 점수 | 페이지랭크 |" in markdown
+    assert "| 행위자 | 중개 중심성 | 유효 크기 | 코어 번호 |" in markdown
+    assert "Alpha (`alpha`)" in markdown
+    assert "Beta (`beta`)" in markdown
+    assert "Gamma (`gamma`)" in markdown
+    assert "2 / 1.0000" in markdown
+    assert "0.5000 / 1.0000" in markdown
+
+
 def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     output_dir = tmp_path / "output"
@@ -370,6 +408,8 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
     ).read_text(encoding="utf-8")
     assert "## 개요" in network_summary_md
     assert "## 연결성" in network_summary_md
+    assert "### 전체 행위자 연결 점수" in network_summary_md
+    assert "`nx.hits(..., normalized=True)`" in network_summary_md
 
 
 def test_run_analysis_accepts_run_dir_path(tmp_path, monkeypatch) -> None:

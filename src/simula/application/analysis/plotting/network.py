@@ -299,38 +299,59 @@ def _build_node_visual_style(graph: nx.DiGraph) -> NodeVisualStyle:
 def _build_edge_visual_style(graph: nx.DiGraph) -> EdgeVisualStyle:
     """Map edge weights to line width and color intensity."""
 
-    weights = [
-        max(_metric_value(attrs, "total_weight"), 1.0)
-        for _, _, attrs in graph.edges(data=True)
-    ]
-    weight_norm = _normalize_metric(weights)
+    strengths = _build_edge_strengths(graph)
+    edge_strength_values = np.asarray(
+        [
+            strengths[(source, target)]
+            for source, target in graph.edges()
+        ],
+        dtype=float,
+    )
 
     return EdgeVisualStyle(
-        widths=(_EDGE_BASE_WIDTH + _EDGE_WIDTH_RANGE * weight_norm).tolist(),
-        colors=(0.20 + 0.75 * weight_norm).tolist(),
+        widths=(_EDGE_BASE_WIDTH + _EDGE_WIDTH_RANGE * edge_strength_values).tolist(),
+        colors=(0.20 + 0.75 * edge_strength_values).tolist(),
     )
 
 
 def _build_edge_label_text(graph: nx.DiGraph) -> dict[tuple[str, str], str]:
-    """Build concise edge labels from aggregated activity summaries."""
+    """Build edge labels from weight, scaled strength, and interaction count."""
 
+    strengths = _build_edge_strengths(graph)
     labels: dict[tuple[str, str], str] = {}
     for source, target, attrs in graph.edges(data=True):
+        edge = (source, target)
         total_weight = int(max(_metric_value(attrs, "total_weight"), 0.0))
-        preview = str(attrs.get("label_preview", "")).strip()
-        variant_count = int(max(_metric_value(attrs, "label_variant_count"), 0.0))
-
-        if preview:
-            preview = preview.replace('_', ' ').upper()
-            if variant_count > 1:
-                labels[(source, target)] = (
-                    f"{total_weight}회: {preview} 외 {variant_count - 1}가지 행동"
-                )
-            else:
-                labels[(source, target)] = f"{total_weight}회: {preview}"
-        else:
-            labels[(source, target)] = f"{total_weight}회"
+        interaction_count = int(
+            max(_metric_value(attrs, "action_count", "total_weight"), 0.0)
+        )
+        labels[edge] = (
+            f"total weight {total_weight} {strengths[edge]:.2f} "
+            f"(상호작용 {interaction_count}회)"
+        )
     return labels
+
+
+def _build_edge_strengths(graph: nx.DiGraph) -> dict[tuple[str, str], float]:
+    """Normalize edge weights into 0-1 connection strengths."""
+
+    if graph.number_of_edges() == 0:
+        return {}
+
+    weights = {
+        (source, target): max(_metric_value(attrs, "total_weight"), 0.0)
+        for source, target, attrs in graph.edges(data=True)
+    }
+    maximum_weight = max(weights.values(), default=0.0)
+    if maximum_weight <= 0.0:
+        return {
+            edge: 0.0
+            for edge in weights
+        }
+    return {
+        edge: weight / maximum_weight
+        for edge, weight in weights.items()
+    }
 
 
 def _metric_value(attrs: dict[str, object], *keys: str) -> float:

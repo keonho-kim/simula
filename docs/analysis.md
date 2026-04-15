@@ -125,8 +125,13 @@ and Markdown files make the same totals easy to inspect without manual aggregati
 `llm_calls.csv`.
 
 `network/summary.json` contains the global network metrics, skipped-metric reasons, top actor
-leaderboards, and meaningful community groups. `network/summary.md` renders the same results as
-a deterministic Korean narrative for quick inspection.
+leaderboards, and meaningful community groups. `network/summary.md` expands that data into a
+deterministic Korean narrative with metric explanations, calculation notes, and full-actor
+tables that show both raw scores and per-metric min-max scaled values.
+
+`network/graph.png` renders edge thickness and color from `total_weight`, and each edge label
+shows the raw weight, its min-max scaled strength, and the adopted interaction count used for
+that relationship.
 
 `manifest.json` records the analyzed input path, output directory, run metadata, produced files,
 fixer summary, token usage summary, and the top-level network summary.
