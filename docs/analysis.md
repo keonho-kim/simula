@@ -129,9 +129,10 @@ leaderboards, and meaningful community groups. `network/summary.md` expands that
 deterministic Korean narrative with metric explanations, calculation notes, and full-actor
 tables that show both raw scores and per-metric min-max scaled values.
 
-`network/graph.png` renders edge thickness and color from `total_weight`, and each edge label
-shows the raw weight, its min-max scaled strength, and the adopted interaction count used for
-that relationship.
+`network/graph.png` renders edge thickness and color from `total_weight`. The exported directed
+graph also carries a numeric `weight` edge attribute for weighted-graph compatibility, while edge
+labels appear only for edges with positive adopted interaction counts and render that count as
+`X회`.
 
 `manifest.json` records the analyzed input path, output directory, run metadata, produced files,
 fixer summary, token usage summary, and the top-level network summary.

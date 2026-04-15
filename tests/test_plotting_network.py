@@ -137,21 +137,22 @@ def test_edge_strengths_are_normalized_between_zero_and_one() -> None:
     assert strengths[("beta", "gamma")] == pytest.approx(1.0)
 
 
-def test_edge_label_text_includes_weight_strength_and_interaction_count() -> None:
+def test_edge_label_text_uses_interaction_count_when_present() -> None:
     graph = nx.DiGraph()
-    graph.add_edge("alpha", "beta", total_weight=3, action_count=2)
-    graph.add_edge("beta", "gamma", total_weight=6, action_count=5)
+    graph.add_edge("alpha", "beta", total_weight=3, weight=0.3, action_count=2)
+    graph.add_edge("beta", "gamma", total_weight=6, weight=0.6, action_count=5)
 
     labels = _build_edge_label_text(graph)
 
-    assert labels[("alpha", "beta")] == "total weight 3 0.50 (상호작용 2회)"
-    assert labels[("beta", "gamma")] == "total weight 6 1.00 (상호작용 5회)"
+    assert labels[("alpha", "beta")] == "2회"
+    assert labels[("beta", "gamma")] == "5회"
 
 
-def test_edge_label_text_falls_back_to_total_weight_without_action_count() -> None:
+def test_edge_label_text_hides_edges_without_interactions() -> None:
     graph = nx.DiGraph()
-    graph.add_edge("alpha", "beta", total_weight=4)
+    graph.add_edge("alpha", "beta", total_weight=4, weight=0.4)
+    graph.add_edge("beta", "gamma", total_weight=6, weight=0.6, action_count=0)
 
     labels = _build_edge_label_text(graph)
 
-    assert labels[("alpha", "beta")] == "total weight 4 1.00 (상호작용 4회)"
+    assert labels == {}

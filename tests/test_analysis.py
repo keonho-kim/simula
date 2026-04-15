@@ -116,7 +116,7 @@ def test_token_usage_report_tracks_overall_and_role_totals() -> None:
 def test_network_report_counts_targets_and_intent_only_edges() -> None:
     loaded = _load_sample_data()
 
-    report, _ = build_network_report(
+    report, graph = build_network_report(
         actors_by_id=loaded.actors_by_id,
         activities=loaded.adopted_activities,
     )
@@ -151,6 +151,10 @@ def test_network_report_counts_targets_and_intent_only_edges() -> None:
     assert beta_alpha.intent_only_count == 1
     assert beta_alpha.public_count == 1
     assert beta_alpha.label_preview == "public_signal"
+    assert graph["alpha"]["beta"]["weight"] == 1
+    assert graph["alpha"]["beta"]["action_count"] == 1
+    assert graph["alpha"]["gamma"]["weight"] == 1
+    assert graph["alpha"]["gamma"]["action_count"] == 0
     assert report.summary.participating_actor_count == 3
     assert report.summary.isolated_actor_count == 0
 

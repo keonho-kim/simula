@@ -315,20 +315,14 @@ def _build_edge_visual_style(graph: nx.DiGraph) -> EdgeVisualStyle:
 
 
 def _build_edge_label_text(graph: nx.DiGraph) -> dict[tuple[str, str], str]:
-    """Build edge labels from weight, scaled strength, and interaction count."""
+    """Build edge labels only for edges with adopted interactions."""
 
-    strengths = _build_edge_strengths(graph)
     labels: dict[tuple[str, str], str] = {}
     for source, target, attrs in graph.edges(data=True):
-        edge = (source, target)
-        total_weight = int(max(_metric_value(attrs, "total_weight"), 0.0))
-        interaction_count = int(
-            max(_metric_value(attrs, "action_count", "total_weight"), 0.0)
-        )
-        labels[edge] = (
-            f"total weight {total_weight} {strengths[edge]:.2f} "
-            f"(상호작용 {interaction_count}회)"
-        )
+        interaction_count = int(max(_metric_value(attrs, "action_count"), 0.0))
+        if interaction_count <= 0:
+            continue
+        labels[(source, target)] = f"{interaction_count}회"
     return labels
 
 

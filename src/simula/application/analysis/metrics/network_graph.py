@@ -91,6 +91,7 @@ def build_network_graph(
             edge.target_cast_id,
             source_display_name=edge.source_display_name,
             target_display_name=edge.target_display_name,
+            weight=edge.total_weight,
             action_count=edge.action_count,
             intent_only_count=edge.intent_only_count,
             public_count=edge.public_count,
