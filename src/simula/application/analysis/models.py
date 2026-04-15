@@ -357,6 +357,42 @@ class FixerReport:
 
 
 @dataclass(slots=True)
+class InteractionDigestRecord:
+    """Deterministic grouped interaction summary for one relationship/thread."""
+
+    interaction_key: str
+    grouping_type: str
+    thread_id: str
+    participant_cast_ids: list[str]
+    participant_display_names: list[str]
+    visibility_modes: list[str]
+    action_types: list[str]
+    round_start: int
+    round_end: int
+    activity_count: int
+    representative_interaction: str
+    representative_message: str
+    latest_message: str
+
+    def to_row(self) -> dict[str, object]:
+        return {
+            "interaction_key": self.interaction_key,
+            "grouping_type": self.grouping_type,
+            "thread_id": self.thread_id,
+            "participant_cast_ids": self.participant_cast_ids,
+            "participant_display_names": self.participant_display_names,
+            "visibility_modes": self.visibility_modes,
+            "action_types": self.action_types,
+            "round_start": self.round_start,
+            "round_end": self.round_end,
+            "activity_count": self.activity_count,
+            "representative_interaction": self.representative_interaction,
+            "representative_message": self.representative_message,
+            "latest_message": self.latest_message,
+        }
+
+
+@dataclass(slots=True)
 class ActorNodeMetrics:
     """Per-actor node metrics for the relationship graph."""
 

@@ -12,6 +12,10 @@ import pytest
 import simula.application.analysis.metrics.network_algorithms as network_algorithms
 import simula.application.analysis.plotting.network as plotting_network
 
+from simula.application.analysis.interactions import (
+    build_interaction_digests,
+    select_key_interactions,
+)
 from simula.application.analysis.loader import load_run_analysis
 from simula.application.analysis.metrics.distributions import build_distribution_report
 from simula.application.analysis.metrics.fixer import build_fixer_report
@@ -269,34 +273,82 @@ def test_network_summary_markdown_describes_algorithms_and_lists_all_actor_score
         actors_by_id=_actors("alpha", "beta", "gamma"),
         activities=_activities(("alpha", "beta"), ("beta", "gamma")),
     )
-
-    markdown = render_network_summary_markdown(run_id="run-1", report=report)
-
-    assert "`nx.in_degree_centrality(...)`" in markdown
-    assert "`nx.out_degree_centrality(...)`" in markdown
-    assert "`nx.hits(..., normalized=True)`" in markdown
-    assert "`nx.pagerank(weight=\"total_weight\")`" in markdown
-    assert (
-        "`nx.betweenness_centrality(..., weight=\"distance_weight\", "
-        "normalized=True)`" in markdown
+    interactions = build_interaction_digests(
+        actors_by_id=_actors("alpha", "beta", "gamma"),
+        activities=_activities(("alpha", "beta"), ("beta", "gamma")),
     )
-    assert "`nx.effective_size(weight=\"total_weight\")`" in markdown
-    assert "`nx.core_number(...)`" in markdown
-    assert (
-        "`nx.community.greedy_modularity_communities(weight=\"total_weight\")`"
-        in markdown
+
+    markdown = render_network_summary_markdown(
+        run_id="run-1",
+        report=report,
+        interactions=select_key_interactions(interactions, limit=5),
     )
-    assert "### 전체 행위자 연결 점수" in markdown
-    assert "### 전체 행위자 허브/권위/영향력 점수" in markdown
-    assert "### 전체 행위자 브로커/응집 점수" in markdown
-    assert "| 행위자 | 총 관계 가중치 | 상대 수 | 내향 중심성 | 외향 중심성 |" in markdown
-    assert "| 행위자 | 허브 점수 | 권위 점수 | 페이지랭크 |" in markdown
-    assert "| 행위자 | 중개 중심성 | 유효 크기 | 코어 번호 |" in markdown
-    assert "Alpha (`alpha`)" in markdown
-    assert "Beta (`beta`)" in markdown
-    assert "Gamma (`gamma`)" in markdown
-    assert "2 / 1.0000" in markdown
-    assert "0.5000 / 1.0000" in markdown
+
+    assert "## 먼저 볼 것" in markdown
+    assert "## 누가 중심에 있었나" in markdown
+    assert "## 어떤 관계가 두드러졌나" in markdown
+    assert "## 구조 해석" in markdown
+    assert "## 계산 메모" in markdown
+    assert "Alpha(`alpha`)" in markdown
+    assert "Alpha ↔ Beta" in markdown
+    assert "`nx.density(...)`" in markdown
+    assert "`nx.hits(...)`" in markdown
+    assert "### 전체 행위자 연결 점수" not in markdown
+
+
+def test_interaction_digests_prefer_thread_grouping_and_latest_utterance() -> None:
+    actors_by_id = _actors("alpha", "beta", "gamma")
+    activities = [
+        AdoptedActivityRecord(
+            round_index=1,
+            source_cast_id="alpha",
+            target_cast_ids=["beta"],
+            intent_target_cast_ids=["beta"],
+            visibility="private",
+            thread_id="pair-thread",
+            action_type="private_check_in",
+            action_summary="Alpha가 Beta에게 비공개로 확인을 요청한다.",
+            action_detail="지금 감정선을 비공개로 먼저 확인하려고 한다.",
+            utterance="지금 잠깐 따로 이야기할래?",
+        ),
+        AdoptedActivityRecord(
+            round_index=2,
+            source_cast_id="beta",
+            target_cast_ids=["alpha"],
+            intent_target_cast_ids=["alpha"],
+            visibility="private",
+            thread_id="pair-thread",
+            action_type="private_check_in",
+            action_summary="Beta가 Alpha에게 짧게 답한다.",
+            action_detail="조금 더 생각할 시간이 필요하다고 한다.",
+            utterance="지금은 바로 답하기 어렵네요.",
+        ),
+        AdoptedActivityRecord(
+            round_index=2,
+            source_cast_id="alpha",
+            target_cast_ids=["gamma"],
+            intent_target_cast_ids=["gamma"],
+            visibility="public",
+            thread_id="",
+            action_type="public_signal",
+            action_summary="Alpha가 Gamma를 공개적으로 의식한다.",
+            action_detail="직접 묻지는 않지만 반응을 탐색한다.",
+            utterance="",
+        ),
+    ]
+
+    digests = build_interaction_digests(
+        actors_by_id=actors_by_id,
+        activities=activities,
+    )
+
+    assert digests[0].grouping_type == "thread"
+    assert digests[0].interaction_key == "pair-thread"
+    assert digests[0].activity_count == 2
+    assert digests[0].latest_message == "지금은 바로 답하기 어렵네요."
+    assert digests[0].representative_message == "지금은 바로 답하기 어렵네요."
+    assert digests[1].grouping_type == "participants_action"
+    assert digests[1].interaction_key == "alpha+gamma:public_signal"
 
 
 def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
@@ -333,19 +385,16 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
 
     assert outcome.run_id == run_id
     assert (tmp_path / "analysis" / run_id / "manifest.json").exists()
+    assert (tmp_path / "analysis" / run_id / "summary.md").exists()
     assert (tmp_path / "analysis" / run_id / "llm_calls.csv").exists()
-    assert (
-        tmp_path / "analysis" / run_id / "distributions" / "overall" / "input_tokens.png"
-    ).exists()
-    assert (
-        tmp_path / "analysis" / run_id / "distributions" / "roles" / "fixer" / "duration_seconds.json"
-    ).exists()
+    assert (tmp_path / "analysis" / run_id / "distributions" / "overview.png").exists()
     assert (tmp_path / "analysis" / run_id / "fixer" / "summary.csv").exists()
     assert (tmp_path / "analysis" / run_id / "token_usage" / "summary.json").exists()
     assert (tmp_path / "analysis" / run_id / "token_usage" / "summary.csv").exists()
     assert (tmp_path / "analysis" / run_id / "token_usage" / "summary.md").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "nodes.csv").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "edges.csv").exists()
+    assert (tmp_path / "analysis" / run_id / "network" / "interactions.csv").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "summary.json").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "summary.md").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "graph.graphml").exists()
@@ -356,30 +405,22 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
     )
     assert manifest["run_id"] == run_id
     assert manifest["roles_display"] == ["actor (행위자)", "fixer (JSON 복구)", "planner (계획)"]
+    assert "summary.md" in manifest["artifact_paths"]
     assert "llm_calls.csv" in manifest["artifact_paths"]
     assert "token_usage/summary.json" in manifest["artifact_paths"]
     assert "token_usage/summary.csv" in manifest["artifact_paths"]
     assert "token_usage/summary.md" in manifest["artifact_paths"]
     assert manifest["token_usage_summary"]["overall"]["total_tokens_total"] == 68
     assert manifest["network_summary"]["edge_count"] == 3
+    assert "distributions/overview.png" in manifest["artifact_paths"]
     assert "network/summary.json" in manifest["artifact_paths"]
     assert "network/summary.md" in manifest["artifact_paths"]
+    assert "network/interactions.csv" in manifest["artifact_paths"]
     llm_calls_csv = (
         tmp_path / "analysis" / run_id / "llm_calls.csv"
     ).read_text(encoding="utf-8")
     assert "실행 ID,호출 순번,역할,역할 표시명" in llm_calls_csv
 
-    distribution_json = json.loads(
-        (
-            tmp_path
-            / "analysis"
-            / run_id
-            / "distributions"
-            / "overall"
-            / "input_tokens.json"
-        ).read_text(encoding="utf-8")
-    )
-    assert distribution_json["metric_label"] == "입력 토큰"
     token_usage_json = json.loads(
         (
             tmp_path
@@ -410,10 +451,21 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
     network_summary_md = (
         tmp_path / "analysis" / run_id / "network" / "summary.md"
     ).read_text(encoding="utf-8")
-    assert "## 개요" in network_summary_md
-    assert "## 연결성" in network_summary_md
-    assert "### 전체 행위자 연결 점수" in network_summary_md
-    assert "`nx.hits(..., normalized=True)`" in network_summary_md
+    assert "## 먼저 볼 것" in network_summary_md
+    assert "## 누가 중심에 있었나" in network_summary_md
+    assert "## 계산 메모" in network_summary_md
+    assert "### 전체 행위자 연결 점수" not in network_summary_md
+    summary_md = (
+        tmp_path / "analysis" / run_id / "summary.md"
+    ).read_text(encoding="utf-8")
+    assert "## 한눈에 보기" in summary_md
+    assert "## 관계별 핵심 interaction" in summary_md
+    assert "## 어디를 더 보면 되는가" in summary_md
+    interactions_csv = (
+        tmp_path / "analysis" / run_id / "network" / "interactions.csv"
+    ).read_text(encoding="utf-8")
+    assert "대표 메시지" in interactions_csv
+    assert "마지막 메시지" in interactions_csv
 
 
 def test_run_analysis_accepts_run_dir_path(tmp_path, monkeypatch) -> None:

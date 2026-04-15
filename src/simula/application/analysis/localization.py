@@ -79,6 +79,22 @@ TOKEN_USAGE_COLUMN_LABELS = {
     "total_tokens_missing_count": "총 토큰 누락 수",
 }
 
+INTERACTION_COLUMN_LABELS = {
+    "interaction_key": "상호작용 키",
+    "grouping_type": "묶음 기준",
+    "thread_id": "스레드 ID",
+    "participant_cast_ids": "참여자 ID 목록",
+    "participant_display_names": "참여자 이름 목록",
+    "visibility_modes": "노출 방식 목록",
+    "action_types": "행동 종류 목록",
+    "round_start": "시작 라운드",
+    "round_end": "마지막 라운드",
+    "activity_count": "포함 액션 수",
+    "representative_interaction": "대표 상호작용",
+    "representative_message": "대표 메시지",
+    "latest_message": "마지막 메시지",
+}
+
 NETWORK_NODE_COLUMN_LABELS = {
     "cast_id": "행위자 ID",
     "display_name": "행위자 이름",
@@ -151,6 +167,12 @@ def network_title(*, run_id: str) -> str:
     """Build one Korean chart title for the actor graph."""
 
     return f"{run_id} 행위자 관계도"
+
+
+def distribution_overview_title(*, run_id: str) -> str:
+    """Build one Korean chart title for the combined distribution overview."""
+
+    return f"{run_id} 주요 분포 개요"
 
 
 def translate_row(

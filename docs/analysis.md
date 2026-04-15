@@ -49,6 +49,7 @@ The implementation is split across `src/simula/application/analysis/`:
 | Module area | Responsibility |
 | --- | --- |
 | `models.py` | typed analyzer records and artifact payloads |
+| `interactions.py` | deterministic relationship/thread interaction grouping |
 | `loader.py` | JSONL loading, event validation, and normalization |
 | `metrics/distributions.py` | role-aware token and latency distributions |
 | `metrics/token_usage.py` | cumulative token usage totals overall and by role |
@@ -57,9 +58,10 @@ The implementation is split across `src/simula/application/analysis/`:
 | `metrics/network_aggregation.py` | actor relationship node and edge aggregation |
 | `metrics/network_algorithms.py` | NetworkX metric computation, communities, and leaderboards |
 | `metrics/network_graph.py` | directed export graph and undirected projection building |
-| `plotting/distributions.py` | histogram + KDE rendering |
-| `plotting/network.py` | NetworkX-based graph rendering |
-| `network_reporting.py` | deterministic Markdown summary rendering |
+| `plotting/distributions.py` | combined distribution overview rendering |
+| `plotting/network.py` | ForceAtlas2-based graph rendering |
+| `network_reporting.py` | readable network reference Markdown |
+| `summary_reporting.py` | non-specialist top-level summary rendering |
 | `token_usage_reporting.py` | deterministic Markdown token summary rendering |
 | `artifacts.py` | deterministic JSON, CSV, PNG, and GraphML writing |
 
@@ -68,12 +70,12 @@ resolution, path selection, module ordering, and manifest generation.
 
 ## Analysis Pipeline
 
-The current analyzer performs four passes on the loaded run:
+The current analyzer performs these passes on the loaded run:
 
 1. Load and validate JSONL events, then extract `llm_call`, `actors_finalized`, and
    `round_actions_adopted`.
-2. Build overall and role-level distributions for `input_tokens`, `output_tokens`,
-   `ttft_seconds`, and `duration_seconds`.
+2. Build overall distributions for `input_tokens`, `output_tokens`,
+   `ttft_seconds`, and `duration_seconds`, then render one combined overview plot.
 3. Aggregate cumulative `input_tokens`, `output_tokens`, and `total_tokens` overall and by role,
    then persist the totals as JSON, CSV, and Markdown summaries.
 4. Attribute `fixer` calls back to the original role by parsing the fixer prompt's
@@ -82,11 +84,14 @@ The current analyzer performs four passes on the loaded run:
    `target_cast_ids`, `intent_target_cast_ids`, `visibility`, `thread_id`, and `round_index`,
    then derive global connectivity, hub, authority, influence, brokerage, cohesion, and
    community summaries from NetworkX algorithms.
-6. Persist deterministic network summary artifacts in both JSON and Markdown form so the
-   metrics and their interpretation stay inspectable without rerunning analysis.
+6. Group adopted activities into deterministic relationship/thread interaction digests so the
+   analyzer can surface representative messages without any extra LLM step.
+7. Persist one high-level `summary.md` page plus deeper reference artifacts so the output is
+   readable without opening several folders first.
 
 KDE curves are computed directly with `numpy`. If a series has fewer than two valid values or is
-constant, the analyzer records the skip reason instead of silently inventing a curve.
+constant, the analyzer renders the skip reason inside the combined overview figure instead of
+inventing a curve.
 
 ## Output Layout
 
@@ -94,16 +99,11 @@ Each analyzer run writes:
 
 ```text
 analysis/<run_id>/
+  summary.md
   manifest.json
   llm_calls.csv
   distributions/
-    overall/
-      <metric>.json
-      <metric>.png
-    roles/
-      <role>/
-        <metric>.json
-        <metric>.png
+    overview.png
   token_usage/
     summary.json
     summary.csv
@@ -114,23 +114,29 @@ analysis/<run_id>/
   network/
     nodes.csv
     edges.csv
+    interactions.csv
     summary.json
     summary.md
     graph.graphml
     graph.png
 ```
 
+`summary.md` is the preferred entry point. It combines the main reading path, key interaction
+highlights, token usage summary, and fixer status in one non-specialist document.
+
 `token_usage/summary.json` contains cumulative token totals overall and by role. The matching CSV
 and Markdown files make the same totals easy to inspect without manual aggregation from
 `llm_calls.csv`.
 
 `network/summary.json` contains the global network metrics, skipped-metric reasons, top actor
-leaderboards, and meaningful community groups. `network/summary.md` expands that data into a
-deterministic Korean narrative with metric explanations, calculation notes, and full-actor
-tables that show both raw scores and per-metric min-max scaled values.
+leaderboards, and meaningful community groups. `network/summary.md` is now a readable reference
+note, while `network/interactions.csv` exposes grouped relationship/thread interactions with
+representative and latest messages.
 
-`network/graph.png` renders edge thickness and color from `total_weight`. Edge labels stay compact
-and render only adopted interaction counts as `X회` for edges with positive action counts.
+`network/graph.png` keeps the ForceAtlas2 layout because the exported relationship graph is not a
+tree/forest in general. A Graphviz `twopi` radial tree layout is technically possible, but it is
+not the default because the current interaction graph often contains cycles and cross-links that
+would be misleading in a tree view.
 
 `manifest.json` records the analyzed input path, output directory, run metadata, produced files,
 fixer summary, token usage summary, and the top-level network summary.

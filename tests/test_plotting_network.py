@@ -7,6 +7,7 @@ from __future__ import annotations
 import networkx as nx
 import numpy as np
 import pytest
+from types import SimpleNamespace
 
 import simula.application.analysis.plotting.network as plotting_network
 from simula.application.analysis.plotting.network import (
@@ -107,6 +108,39 @@ def test_compute_layout_positions_uses_forceatlas2_layout(monkeypatch) -> None:
     assert set(positions) == {"alpha", "beta", "gamma"}
     assert all(isinstance(value, np.ndarray) for value in positions.values())
     assert np.isfinite(np.asarray(list(positions.values()), dtype=float)).all()
+
+
+def test_compute_layout_positions_does_not_use_graphviz_layout(monkeypatch) -> None:
+    graph = nx.DiGraph()
+    graph.add_edge("alpha", "beta", total_weight=2)
+
+    monkeypatch.setattr(
+        plotting_network.nx,
+        "nx_agraph",
+        SimpleNamespace(
+            graphviz_layout=lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("graphviz_layout should not be used")
+            )
+        ),
+        raising=False,
+    )
+
+    def _fake_forceatlas2_layout(graph_obj, **kwargs):  # noqa: ANN001
+        del graph_obj, kwargs
+        return {
+            "alpha": (0.0, 0.0),
+            "beta": (1.0, 1.0),
+        }
+
+    monkeypatch.setattr(
+        plotting_network.nx,
+        "forceatlas2_layout",
+        _fake_forceatlas2_layout,
+    )
+
+    positions = _compute_layout_positions(graph)
+
+    assert set(positions) == {"alpha", "beta"}
 
 
 def test_edge_visual_style_normalizes_weight_with_minimum_width_one() -> None:

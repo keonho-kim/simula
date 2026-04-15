@@ -10,25 +10,26 @@ from pathlib import Path
 
 from simula.application.analysis import (
     ArtifactWriter,
-    METRIC_NAMES,
     build_distribution_report,
     build_fixer_report,
+    build_interaction_digests,
     build_network_report,
     build_token_usage_report,
     load_run_analysis,
+    render_analysis_summary_markdown,
+    render_distribution_overview,
     render_network_summary_markdown,
-    render_distribution_plot,
     render_network_plot,
     render_token_usage_summary_markdown,
+    select_key_interactions,
 )
 from simula.application.analysis.localization import (
     FIXER_SUMMARY_COLUMN_LABELS,
+    INTERACTION_COLUMN_LABELS,
     LLM_CALL_COLUMN_LABELS,
     NETWORK_EDGE_COLUMN_LABELS,
     NETWORK_NODE_COLUMN_LABELS,
     TOKEN_USAGE_COLUMN_LABELS,
-    overall_distribution_title,
-    role_distribution_title,
     translate_row,
     network_title,
 )
@@ -79,39 +80,12 @@ def run_analysis(
     )
 
     distribution_report = build_distribution_report(loaded.llm_calls)
-    for metric in METRIC_NAMES:
-        overall_distribution = distribution_report.overall[metric]
-        writer.write_json(
-            f"distributions/overall/{metric}.json",
-            overall_distribution.to_dict(),
-        )
-        render_distribution_plot(
-            overall_distribution,
-            title=overall_distribution_title(
-                run_id=normalized_run_id,
-                metric=metric,
-            ),
-            output_path=writer.path_for(f"distributions/overall/{metric}.png"),
-        )
-        writer.record_output(f"distributions/overall/{metric}.png")
-
-    for role, metrics in sorted(distribution_report.by_role.items()):
-        for metric in METRIC_NAMES:
-            distribution = metrics[metric]
-            writer.write_json(
-                f"distributions/roles/{role}/{metric}.json",
-                distribution.to_dict(),
-            )
-            render_distribution_plot(
-                distribution,
-                title=role_distribution_title(
-                    run_id=normalized_run_id,
-                    role=role,
-                    metric=metric,
-                ),
-                output_path=writer.path_for(f"distributions/roles/{role}/{metric}.png"),
-            )
-            writer.record_output(f"distributions/roles/{role}/{metric}.png")
+    render_distribution_overview(
+        distributions=distribution_report.overall,
+        run_id=normalized_run_id,
+        output_path=writer.path_for("distributions/overview.png"),
+    )
+    writer.record_output("distributions/overview.png")
 
     fixer_report = build_fixer_report(loaded.llm_calls)
     writer.write_json("fixer/summary.json", fixer_report.to_dict())
@@ -154,6 +128,10 @@ def run_analysis(
         has_actors_finalized_event=loaded.has_actors_finalized_event,
         has_round_actions_adopted_event=loaded.has_round_actions_adopted_event,
     )
+    interaction_digests = build_interaction_digests(
+        actors_by_id=loaded.actors_by_id,
+        activities=loaded.adopted_activities,
+    )
     writer.write_csv(
         "network/nodes.csv",
         rows=[
@@ -176,12 +154,24 @@ def run_analysis(
         ],
         fieldnames=list(NETWORK_EDGE_COLUMN_LABELS.values()),
     )
+    writer.write_csv(
+        "network/interactions.csv",
+        rows=[
+            translate_row(
+                item.to_row(),
+                column_labels=INTERACTION_COLUMN_LABELS,
+            )
+            for item in interaction_digests
+        ],
+        fieldnames=list(INTERACTION_COLUMN_LABELS.values()),
+    )
     writer.write_json("network/summary.json", network_report.to_dict())
     writer.write_text(
         "network/summary.md",
         render_network_summary_markdown(
             run_id=normalized_run_id,
             report=network_report,
+            interactions=select_key_interactions(interaction_digests, limit=5),
         ),
     )
     writer.write_graphml("network/graph.graphml", graph)
@@ -191,6 +181,18 @@ def run_analysis(
         output_path=writer.path_for("network/graph.png"),
     )
     writer.record_output("network/graph.png")
+    writer.write_text(
+        "summary.md",
+        render_analysis_summary_markdown(
+            run_id=normalized_run_id,
+            loaded=loaded,
+            distribution_report=distribution_report,
+            token_usage_report=token_usage_report,
+            fixer_report=fixer_report,
+            network_report=network_report,
+            interactions=select_key_interactions(interaction_digests, limit=5),
+        ),
+    )
 
     manifest = ArtifactManifest(
         run_id=normalized_run_id,

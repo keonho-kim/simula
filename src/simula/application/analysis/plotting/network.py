@@ -65,7 +65,7 @@ def render_network_plot(
     title: str,
     output_path: Path,
 ) -> None:
-    """Render one directed actor relationship graph."""
+    """Render one directed actor relationship graph with the default ForceAtlas2 layout."""
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     label_font = configure_korean_font()
@@ -196,7 +196,11 @@ def _build_layout_kwargs(graph: nx.DiGraph) -> dict[str, object]:
 
 
 def _compute_layout_positions(graph: nx.DiGraph) -> dict[str, np.ndarray]:
-    """Compute ForceAtlas2 positions and normalize them for Matplotlib rendering."""
+    """Compute ForceAtlas2 positions and normalize them for Matplotlib rendering.
+
+    The exported interaction graph often contains cycles and cross-links, so a
+    radial tree layout is not the default rendering path.
+    """
 
     if graph.number_of_nodes() <= 1:
         return {

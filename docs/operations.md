@@ -53,17 +53,22 @@ The analyzer writes to:
 
 ```text
 analysis/<run_id>/
+  summary.md
   manifest.json
   llm_calls.csv
   distributions/
+    overview.png
   token_usage/
     summary.json
     summary.csv
     summary.md
   fixer/
+    summary.json
+    summary.csv
   network/
     nodes.csv
     edges.csv
+    interactions.csv
     summary.json
     summary.md
     graph.graphml
@@ -105,4 +110,5 @@ Important runtime controls:
 
 - Keep documentation aligned with the compiled graph, not historical files.
 - Treat `simulation.log.jsonl` as the append-driven runtime artifact and source of truth for analysis.
+- Treat `analysis/<run_id>/summary.md` as the default human-readable entrypoint for analyzer output.
 - Remove stale prompt assets and workflow docs when stage structure changes.
