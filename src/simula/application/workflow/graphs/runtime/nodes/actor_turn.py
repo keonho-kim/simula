@@ -508,14 +508,13 @@ def _build_default_action_proposal(
         dict[str, object],
         runtime_guidance.get("current_intent_snapshot", {}),
     )
-    current_intent = str(
-        intent_snapshot.get("current_intent", "현재 상황을 조금 더 파악한다.")
+    current_intent = _fallback_non_empty_text(
+        intent_snapshot.get("current_intent"),
+        "현재 상황을 조금 더 파악한다.",
     )
-    current_thought = str(
-        intent_snapshot.get(
-            "thought",
-            "아직은 관계 신호와 상대 반응을 더 읽어야 한다고 본다.",
-        )
+    current_thought = _fallback_non_empty_text(
+        intent_snapshot.get("thought"),
+        "아직은 관계 신호와 상대 반응을 더 읽어야 한다고 본다.",
     )
     intent_target_cast_ids = _string_list(intent_snapshot.get("target_cast_ids", []))
     if visibility == "public":
@@ -537,7 +536,10 @@ def _build_default_action_proposal(
     if avoid_notes:
         action_detail += f" 같은 말 반복은 피하고 {avoid_notes[0]}."
     return {
-        "action_type": str(selected_action.get("action_type", "observe")),
+        "action_type": _fallback_non_empty_text(
+            selected_action.get("action_type"),
+            "observe",
+        ),
         "intent": current_intent,
         "intent_target_cast_ids": intent_target_cast_ids,
         "action_summary": action_summary,
@@ -682,6 +684,13 @@ def _string_list(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
     return [str(item) for item in value]
+
+
+def _fallback_non_empty_text(value: object, default: str) -> str:
+    text = str(value or "").strip()
+    if text:
+        return text
+    return default
 
 
 def _log_actor_proposal_completed(

@@ -52,7 +52,10 @@ from simula.domain.event_memory import (
     has_required_unresolved_events,
     sanitize_event_updates,
 )
-from simula.domain.runtime_policy import next_stagnation_steps
+from simula.domain.runtime_policy import (
+    build_initial_intent_snapshots,
+    next_stagnation_steps,
+)
 from simula.domain.runtime_actions import (
     ActorProposalPayload,
     apply_adopted_actor_proposals,
@@ -335,14 +338,19 @@ async def resolve_round(
     errors = list(state["errors"]) + invalid_adoption_errors
     if meta.forced_default:
         errors.append(f"round {state['round_index']} resolution defaulted")
+    next_actor_intent_states = _merge_actor_intent_states(
+        actors=list(state["actors"]),
+        current_actor_intent_states=list(state.get("actor_intent_states", [])),
+        updated_actor_intent_states=[
+            item.model_dump(mode="json") for item in resolution.updated_intent_states
+        ],
+    )
     return {
         "activity_feeds": applied["activity_feeds"],
         "activities": applied["activities"],
         "latest_round_activities": applied["latest_round_activities"],
         "pending_actor_proposals": Overwrite(value=[]),
-        "actor_intent_states": [
-            item.model_dump(mode="json") for item in resolution.updated_intent_states
-        ],
+        "actor_intent_states": next_actor_intent_states,
         "event_memory": next_event_memory,
         "event_memory_history": list(state.get("event_memory_history", []))
         + [event_memory_history_entry],
@@ -350,10 +358,7 @@ async def resolve_round(
         + [
             {
                 "round_index": int(state["round_index"]),
-                "actor_intent_states": [
-                    item.model_dump(mode="json")
-                    for item in resolution.updated_intent_states
-                ],
+                "actor_intent_states": next_actor_intent_states,
             }
         ],
         "round_time_advance": clock["round_time_advance"],
@@ -440,6 +445,37 @@ def _filter_invalid_adopted_cast_ids(
     return valid_adopted_cast_ids, errors
 
 
+def _merge_actor_intent_states(
+    *,
+    actors: list[dict[str, object]],
+    current_actor_intent_states: list[dict[str, object]],
+    updated_actor_intent_states: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Merge partial intent-state updates onto the full actor roster."""
+
+    current_by_cast_id = {
+        cast_id: snapshot
+        for snapshot in current_actor_intent_states
+        if (cast_id := str(snapshot.get("cast_id", "")).strip())
+    }
+    updated_by_cast_id = {
+        cast_id: snapshot
+        for snapshot in updated_actor_intent_states
+        if (cast_id := str(snapshot.get("cast_id", "")).strip())
+    }
+    merged: list[dict[str, object]] = []
+    for actor in actors:
+        cast_id = str(actor.get("cast_id", "")).strip()
+        if not cast_id:
+            continue
+        merged.append(
+            updated_by_cast_id.get(cast_id)
+            or current_by_cast_id.get(cast_id)
+            or build_initial_intent_snapshots([actor])[0]
+        )
+    return merged
+
+
 def _build_default_round_resolution_payload(
     state: SimulationWorkflowState,
     *,
@@ -453,21 +489,11 @@ def _build_default_round_resolution_payload(
         and isinstance(item.get("proposal", {}), dict)
         and item.get("proposal", {})
     ]
-    current_intent_states = list(state["actor_intent_states"])
-    if not current_intent_states:
-        current_intent_states = [
-            {
-                "cast_id": str(actor.get("cast_id", "")),
-                "current_intent": str(actor.get("private_goal", "")).strip()
-                or "현재 상황을 더 관찰한다.",
-                "thought": f"{str(actor.get('display_name', actor.get('cast_id', 'actor')))}는 아직 상대 반응을 더 확인해야 한다고 본다.",
-                "target_cast_ids": [],
-                "supporting_action_type": "initial_state",
-                "confidence": 0.5,
-                "changed_from_previous": False,
-            }
-            for actor in list(state["actors"])
-        ]
+    current_intent_states = _merge_actor_intent_states(
+        actors=list(state["actors"]),
+        current_actor_intent_states=list(state.get("actor_intent_states", [])),
+        updated_actor_intent_states=[],
+    )
     latest_activities = [
         cast(dict[str, object], item.get("proposal", {}))
         for item in list(state["pending_actor_proposals"])

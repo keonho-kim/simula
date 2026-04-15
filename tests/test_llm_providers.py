@@ -16,11 +16,14 @@ from __future__ import annotations
 import sys
 from types import ModuleType
 
+from langchain_core.messages import HumanMessage
+
 from simula.infrastructure.config.models import (
     BedrockProviderConfig,
     GoogleProviderConfig,
     ModelConfig,
     OpenAIProviderConfig,
+    VllmProviderConfig,
 )
 from simula.infrastructure.llm.providers import build_provider_chat_model
 
@@ -38,10 +41,16 @@ def test_openai_gpt5_builder_uses_responses_api_and_reasoning_dict() -> None:
     )
 
     model = build_provider_chat_model(config)
+    payload = model._get_request_payload(
+        [HumanMessage(content="hi")],
+        stream=True,
+    )
 
     assert getattr(model, "use_responses_api") is True
     assert getattr(model, "reasoning") == {"effort": "none"}
     assert getattr(model, "verbosity") == "medium"
+    assert "stream_options" not in getattr(model, "model_kwargs")
+    assert "stream_options" not in payload
 
 
 def test_openai_non_gpt5_builder_keeps_standard_path() -> None:
@@ -56,6 +65,26 @@ def test_openai_non_gpt5_builder_keeps_standard_path() -> None:
     model = build_provider_chat_model(config)
 
     assert getattr(model, "use_responses_api") in {None, False}
+    assert "stream_options" not in getattr(model, "model_kwargs")
+
+
+def test_vllm_builder_uses_langchain_stream_usage_without_raw_stream_options() -> None:
+    config = ModelConfig(
+        provider="vllm",
+        model="meta-llama/Llama-3.1-8B-Instruct",
+        max_tokens=1200,
+        temperature=0.2,
+        vllm=VllmProviderConfig(
+            api_key="x",
+            base_url="http://127.0.0.1:8000/v1",
+        ),
+    )
+
+    model = build_provider_chat_model(config)
+
+    assert getattr(model, "stream_usage") is True
+    assert getattr(model, "extra_body") == {"stream_include_usage": True}
+    assert "stream_options" not in getattr(model, "model_kwargs")
 
 
 def test_google_vertex_builder_passes_project_location_and_credentials(

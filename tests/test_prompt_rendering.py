@@ -460,6 +460,7 @@ def test_generate_actor_proposal_renders_real_prompt() -> None:
             assert "공개 대화" in prompt
             assert "같은 선언 반복 금지" in prompt
             assert "질문을 더 분명하게 던진다." in prompt
+            assert "Never include your own `cast_id`" in prompt
             return (
                 ActorActionProposal(
                     action_type="speech",

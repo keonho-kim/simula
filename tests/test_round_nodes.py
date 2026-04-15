@@ -801,6 +801,177 @@ def test_resolve_round_persists_round_artifacts() -> None:
     assert result["event_memory_history"][0]["source"] == "resolve_round"
 
 
+def test_resolve_round_merges_partial_intent_updates_and_preserves_full_roster() -> None:
+    class FakeRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            return (
+                RoundResolution(
+                    adopted_cast_ids=["a"],
+                    updated_intent_states=[
+                        {
+                            "cast_id": "a",
+                            "current_intent": "b를 다시 압박한다.",
+                            "thought": "지금 한 번 더 밀어야 흐름을 닫을 수 있다고 본다.",
+                            "target_cast_ids": ["b"],
+                            "supporting_action_type": "speech",
+                            "confidence": 0.85,
+                            "changed_from_previous": True,
+                        }
+                    ],
+                    event_updates=[],
+                    round_time_advance={
+                        "elapsed_unit": "minute",
+                        "elapsed_amount": 20,
+                        "selection_reason": "짧은 재압박과 반응 대기만 진행됐다.",
+                        "signals": ["직접 압박"],
+                    },
+                    observer_report={
+                        "round_index": 2,
+                        "summary": "a의 직접 압박만 갱신되고 나머지 관계는 기존 흐름을 유지했다.",
+                        "notable_events": ["a가 b를 다시 압박했다."],
+                        "atmosphere": "긴장",
+                        "momentum": "medium",
+                        "world_state_summary": "핵심 압박선만 더 또렷해지고 다른 축은 유지된다.",
+                    },
+                    actor_facing_scenario_digest={
+                        "round_index": 2,
+                        "relationship_map_summary": "a의 압박은 강해지고 b와 c는 기존 입장을 유지한다.",
+                        "current_pressures": ["지금은 a의 직접 압박이 가장 큰 변수다."],
+                        "talking_points": ["같은 질문이라도 더 분명한 선택 압력으로 바꾼다."],
+                        "avoid_repetition_notes": ["같은 말만 되풀이하지 않는다."],
+                        "recommended_tone": "짧고 분명한 압박 톤",
+                        "world_state_summary": "핵심 압박선만 더 또렷해지고 다른 축은 유지된다.",
+                    },
+                    world_state_summary="핵심 압박선만 더 또렷해지고 다른 축은 유지된다.",
+                    stop_reason="",
+                ),
+                SimpleNamespace(
+                    duration_seconds=0.2,
+                    parse_failure_count=0,
+                    forced_default=False,
+                ),
+            )
+
+    runtime = SimpleNamespace(
+        context=_test_context(
+            llms=FakeRouter(),
+            logger=logging.getLogger("simula.test.round"),
+            settings=SimpleNamespace(
+                runtime=SimpleNamespace(max_recipients_per_message=2)
+            ),
+            store=SimpleNamespace(save_round_artifacts=lambda *args, **kwargs: None),
+        )
+    )
+    state = {
+        "run_id": "run-1",
+        "round_index": 2,
+        "max_rounds": 4,
+        "actors": [
+            {"cast_id": "a", "display_name": "A", "private_goal": "압박한다."},
+            {"cast_id": "b", "display_name": "B", "private_goal": "버틴다."},
+            {"cast_id": "c", "display_name": "C", "private_goal": "관망한다."},
+        ],
+        "activity_feeds": initialize_activity_feeds(
+            [{"cast_id": "a"}, {"cast_id": "b"}, {"cast_id": "c"}]
+        ),
+        "activities": [],
+        "latest_round_activities": [],
+        "round_focus_plan": {"selected_cast_ids": ["a"]},
+        "latest_background_updates": [],
+        "selected_cast_ids": ["a"],
+        "actor_intent_states": [
+            {
+                "cast_id": "a",
+                "current_intent": "b를 압박한다.",
+                "thought": "지금 압박해야 한다고 본다.",
+                "target_cast_ids": ["b"],
+                "supporting_action_type": "speech",
+                "confidence": 0.8,
+                "changed_from_previous": False,
+            },
+            {
+                "cast_id": "b",
+                "current_intent": "답을 늦춘다.",
+                "thought": "조금 더 버텨야 한다고 본다.",
+                "target_cast_ids": ["a"],
+                "supporting_action_type": "initial_state",
+                "confidence": 0.6,
+                "changed_from_previous": False,
+            },
+        ],
+        "actor_facing_scenario_digest": {},
+        "world_state_summary": "기존 상태",
+        "plan": {
+            "progression_plan": {
+                "max_rounds": 4,
+                "allowed_elapsed_units": ["minute", "hour"],
+                "default_elapsed_unit": "hour",
+                "pacing_guidance": ["짧게 본다."],
+                "selection_reason": "짧은 상호작용 중심",
+            },
+            "action_catalog": {
+                "actions": [
+                    {
+                        "action_type": "speech",
+                        "label": "발화",
+                        "description": "말한다.",
+                        "supported_visibility": ["public", "private", "group"],
+                        "requires_target": False,
+                        "supports_utterance": True,
+                    }
+                ],
+                "selection_guidance": ["상황에 맞게 고른다."],
+            },
+        },
+        "pending_actor_proposals": [
+            {
+                "cast_id": "a",
+                "unread_activity_ids": [],
+                "proposal": {
+                    "action_type": "speech",
+                    "intent": "b를 압박해 즉시 반응을 끌어낸다.",
+                    "intent_target_cast_ids": ["b"],
+                    "action_summary": "a가 압박 action을 보낸다.",
+                    "action_detail": "즉시 반응을 요구한다.",
+                    "utterance": "지금 답해야 한다.",
+                    "visibility": "private",
+                    "target_cast_ids": ["b"],
+                    "thread_id": "warning",
+                },
+                "forced_idle": False,
+                "parse_failure_count": 0,
+                "latency_seconds": 0.01,
+            }
+        ],
+        "simulation_clock": {
+            "total_elapsed_minutes": 0,
+            "total_elapsed_label": "0분",
+            "last_elapsed_minutes": 0,
+            "last_elapsed_label": "0분",
+            "last_advanced_round_index": 0,
+        },
+        "observer_reports": [],
+        "round_time_history": [],
+        "intent_history": [],
+        "forced_idles": 0,
+        "parse_failures": 0,
+        "stagnation_rounds": 0,
+        "stop_requested": False,
+        "stop_reason": "",
+        "current_round_started_at": 0.0,
+        "errors": [],
+    }
+
+    result = asyncio.run(resolve_round(state, runtime))
+
+    assert [item["cast_id"] for item in result["actor_intent_states"]] == ["a", "b", "c"]
+    assert result["actor_intent_states"][0]["current_intent"] == "b를 다시 압박한다."
+    assert result["actor_intent_states"][1]["current_intent"] == "답을 늦춘다."
+    assert result["actor_intent_states"][2]["current_intent"] == "관망한다."
+    assert result["intent_history"][0]["actor_intent_states"] == result["actor_intent_states"]
+
+
 def test_resolve_round_completes_matching_major_event_from_applied_actions() -> None:
     class FakeRouter:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001

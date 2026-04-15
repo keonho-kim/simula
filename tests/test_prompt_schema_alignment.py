@@ -100,6 +100,32 @@ def test_actor_action_proposal_default_payload_matches_schema() -> None:
     )
 
 
+def test_actor_action_proposal_default_payload_recovers_from_blank_intent_snapshot() -> None:
+    payload = _build_default_action_proposal(
+        actor={"cast_id": "alpha", "display_name": "Alpha"},
+        visible_actors=[{"cast_id": "beta", "display_name": "Beta"}],
+        runtime_guidance={
+            "available_actions": [
+                {
+                    "action_type": "",
+                    "supported_visibility": ["public"],
+                    "requires_target": False,
+                    "supports_utterance": False,
+                }
+            ],
+            "current_intent_snapshot": {
+                "current_intent": "",
+                "thought": "",
+                "target_cast_ids": [],
+            },
+        },
+    )
+
+    assert payload["action_type"] == "observe"
+    assert payload["intent"] == "현재 상황을 조금 더 파악한다."
+    ActorActionProposal.model_validate(payload)
+
+
 def test_round_resolution_default_payload_matches_schema() -> None:
     RoundResolution.model_validate(
         _build_default_round_resolution_payload(

@@ -38,6 +38,7 @@ _PROMPT = textwrap.dedent(
     - `public` visibility may leave `target_cast_ids` empty.
     - `private` and `group` visibility must include real `cast_id` values in `target_cast_ids`.
     - If a `public` action is clearly aimed at one or more specific visible people, include those real `cast_id` values in `target_cast_ids` even though the visibility stays `public`.
+    - Never include your own `cast_id` in `target_cast_ids` or `intent_target_cast_ids`.
     - If there is no spoken line, set `utterance` to an empty string.
     - If there is no stable thread identifier, set `thread_id` to an empty string.
     - If this action continues an existing conversation, confession, date line, or choice-pressure line with the same participant set, reuse or continue the stable `thread_id`.
