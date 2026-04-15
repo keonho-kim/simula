@@ -40,12 +40,6 @@ _TRANSPARENT_LABEL_BBOX = {
     "edgecolor": "none",
     "alpha": 0.0,
 }
-_EDGE_WEIGHT_LABEL_BBOX = {
-    "facecolor": "#FFFFFF",
-    "edgecolor": "none",
-    "alpha": 0.7,
-    "boxstyle": "round,pad=0.08",
-}
 
 
 @dataclass(frozen=True)
@@ -134,7 +128,6 @@ def render_network_plot(
                 )
             else:
                 edge_style = _build_edge_visual_style(graph)
-                edge_weight_labels = _build_edge_weight_label_text(graph)
                 edge_labels = _build_edge_label_text(graph)
                 nx.draw_networkx_edges(
                     graph,
@@ -153,21 +146,6 @@ def render_network_plot(
                     min_target_margin=10,
                     node_size=node_style.sizes,
                     nodelist=node_order,
-                    ax=axis,
-                )
-                nx.draw_networkx_edge_labels(
-                    graph,
-                    positions,
-                    edge_labels=edge_weight_labels,
-                    label_pos=0.5,
-                    font_size=8,
-                    font_color="#102A43",
-                    font_family=label_font,
-                    rotate=False,
-                    bbox=_EDGE_WEIGHT_LABEL_BBOX,
-                    node_size=node_style.sizes,
-                    nodelist=node_order,
-                    connectionstyle="arc3,rad=0.12",
                     ax=axis,
                 )
                 nx.draw_networkx_edge_labels(
@@ -334,15 +312,6 @@ def _build_edge_visual_style(graph: nx.DiGraph) -> EdgeVisualStyle:
         widths=(_EDGE_BASE_WIDTH + _EDGE_WIDTH_RANGE * edge_strength_values).tolist(),
         colors=(0.20 + 0.75 * edge_strength_values).tolist(),
     )
-
-
-def _build_edge_weight_label_text(graph: nx.DiGraph) -> dict[tuple[str, str], str]:
-    """Build centered edge weight labels from normalized strengths."""
-
-    return {
-        edge: f"{strength:.2f}"
-        for edge, strength in _build_edge_strengths(graph).items()
-    }
 
 
 def _build_edge_label_text(graph: nx.DiGraph) -> dict[tuple[str, str], str]:
