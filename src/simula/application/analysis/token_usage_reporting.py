@@ -40,6 +40,21 @@ def _role_lines(summary: TokenUsageRoleSummary) -> list[str]:
         f"### {role_label(summary.role)}",
         f"- 호출 수: {summary.call_count}",
         f"- 입력 토큰 누적: {summary.input_tokens_total} (누락 {summary.input_tokens_missing_count}건)",
+        f"- 입력 토큰 평균: {_format_stat(summary.input_tokens_stats.mean_value)} / 범위 {_format_range(summary.input_tokens_stats.min_value, summary.input_tokens_stats.max_value)} / p95 {_format_stat(summary.input_tokens_stats.p95_value)}",
         f"- 출력 토큰 누적: {summary.output_tokens_total} (누락 {summary.output_tokens_missing_count}건)",
+        f"- 출력 토큰 평균: {_format_stat(summary.output_tokens_stats.mean_value)} / 범위 {_format_range(summary.output_tokens_stats.min_value, summary.output_tokens_stats.max_value)} / p95 {_format_stat(summary.output_tokens_stats.p95_value)}",
         f"- 전체 토큰 누적: {summary.total_tokens_total} (누락 {summary.total_tokens_missing_count}건)",
+        f"- 전체 토큰 평균: {_format_stat(summary.total_tokens_stats.mean_value)} / 범위 {_format_range(summary.total_tokens_stats.min_value, summary.total_tokens_stats.max_value)} / p95 {_format_stat(summary.total_tokens_stats.p95_value)}",
     ]
+
+
+def _format_stat(value: float | None) -> str:
+    if value is None:
+        return "-"
+    return f"{value:.1f}"
+
+
+def _format_range(min_value: float | None, max_value: float | None) -> str:
+    if min_value is None or max_value is None:
+        return "-"
+    return f"{min_value:.1f} - {max_value:.1f}"

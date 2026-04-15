@@ -14,11 +14,13 @@ import simula.application.analysis.plotting.network as plotting_network
 
 from simula.application.analysis.interactions import (
     build_interaction_digests,
-    select_key_interactions,
 )
 from simula.application.analysis.loader import load_run_analysis
+from simula.application.analysis.metrics.actions import build_action_catalog_report
 from simula.application.analysis.metrics.distributions import build_distribution_report
+from simula.application.analysis.metrics.distributions import build_performance_summary_report
 from simula.application.analysis.metrics.fixer import build_fixer_report
+from simula.application.analysis.metrics.network_growth import build_network_growth_report
 from simula.application.analysis.metrics.network import build_network_report
 from simula.application.analysis.metrics.token_usage import build_token_usage_report
 from simula.application.analysis.models import ActorRecord, AdoptedActivityRecord
@@ -84,6 +86,28 @@ def test_distribution_report_tracks_missing_values_and_kde_skip() -> None:
     assert planner_output.missing_count == 1
 
 
+def test_performance_summary_report_bins_by_input_and_output_tokens() -> None:
+    loaded = _load_sample_data()
+
+    report = build_performance_summary_report(loaded.llm_calls)
+
+    assert len(report.rows) == 1
+    row = report.rows[0]
+    assert row.input_tokens_bin_start == 0
+    assert row.input_tokens_bin_end == 999
+    assert row.output_tokens_bin_start == 0
+    assert row.output_tokens_bin_end == 999
+    assert row.call_count == 4
+    assert row.ttft_sample_count == 4
+    assert row.duration_sample_count == 4
+    assert row.ttft_p90 is not None
+    assert row.ttft_p95 is not None
+    assert row.ttft_p99 is not None
+    assert row.duration_p90 is not None
+    assert row.duration_p95 is not None
+    assert row.duration_p99 is not None
+
+
 def test_fixer_report_attributes_roles_and_retries() -> None:
     loaded = _load_sample_data()
 
@@ -115,6 +139,60 @@ def test_token_usage_report_tracks_overall_and_role_totals() -> None:
     assert report.by_role["fixer"].output_tokens_total == 13
     assert report.by_role["fixer"].total_tokens_total == 43
     assert report.by_role["planner"].output_tokens_missing_count == 1
+    assert report.by_role["fixer"].output_tokens_stats.min_value == pytest.approx(3.0)
+    assert report.by_role["fixer"].output_tokens_stats.max_value == pytest.approx(6.0)
+    assert report.by_role["fixer"].output_tokens_stats.mean_value == pytest.approx(13 / 3)
+    assert report.overall.total_tokens_stats.p95_value is not None
+
+
+def test_load_run_analysis_parses_planned_actions_and_round_cap() -> None:
+    loaded = _load_sample_data()
+
+    assert loaded.has_plan_finalized_event is True
+    assert loaded.planned_max_rounds == 3
+    assert [item.action_type for item in loaded.planned_actions] == [
+        "private_check_in",
+        "public_signal",
+        "unused_action",
+    ]
+
+
+def test_action_catalog_report_counts_adopted_and_unused_actions() -> None:
+    loaded = _load_sample_data()
+
+    report = build_action_catalog_report(
+        planned_actions=loaded.planned_actions,
+        adopted_activities=loaded.adopted_activities,
+        has_plan_finalized_event=loaded.has_plan_finalized_event,
+    )
+
+    assert report.empty_reason is None
+    by_type = {item.action_type: item for item in report.rows}
+    assert by_type["private_check_in"].adopted_count == 1
+    assert by_type["public_signal"].adopted_count == 1
+    assert by_type["unused_action"].adopted_count == 0
+
+
+def test_network_growth_report_tracks_cumulative_round_metrics() -> None:
+    loaded = _load_sample_data()
+
+    report = build_network_growth_report(
+        actors_by_id=loaded.actors_by_id,
+        activities=loaded.adopted_activities,
+        planned_max_rounds=loaded.planned_max_rounds,
+        has_actors_finalized_event=loaded.has_actors_finalized_event,
+        has_round_actions_adopted_event=loaded.has_round_actions_adopted_event,
+    )
+
+    assert [item.round_index for item in report.rows] == [1, 2, 3]
+    assert report.rows[0].participating_actor_count == 3
+    assert report.rows[0].edge_count == 3
+    assert report.rows[0].new_actor_count == 3
+    assert report.rows[0].new_edge_count == 3
+    assert report.rows[0].top_degree_cast_id == "alpha"
+    assert report.rows[0].top_degree_display_name == "Alpha"
+    assert report.rows[1].edge_count == 3
+    assert report.rows[2].edge_count == 3
 
 
 def test_network_report_counts_targets_and_intent_only_edges() -> None:
@@ -223,8 +301,8 @@ def test_network_report_marks_skipped_metrics_for_edge_free_graph() -> None:
     assert report.summary.participating_actor_count == 0
     assert report.summary.isolated_actor_count == 3
     assert report.summary.empty_reason == "채택된 행위자 상호작용이 없습니다."
-    assert report.summary.skipped_metrics["hub_score"] == "관계 엣지가 없어 계산할 수 없습니다."
-    assert report.summary.skipped_metrics["core_number"] == "관계 엣지가 없어 계산할 수 없습니다."
+    assert report.summary.skipped_metrics["hub_score"] == "연결 엣지가 없어 계산할 수 없습니다."
+    assert report.summary.skipped_metrics["core_number"] == "연결 엣지가 없어 계산할 수 없습니다."
     assert report.leaderboards["hubs"] == []
     assert all(node.hub_score is None for node in report.nodes)
     assert all(node.in_degree_centrality == 0.0 for node in report.nodes)
@@ -273,7 +351,7 @@ def test_network_summary_markdown_describes_algorithms_and_lists_all_actor_score
         actors_by_id=_actors("alpha", "beta", "gamma"),
         activities=_activities(("alpha", "beta"), ("beta", "gamma")),
     )
-    interactions = build_interaction_digests(
+    growth_report = build_network_growth_report(
         actors_by_id=_actors("alpha", "beta", "gamma"),
         activities=_activities(("alpha", "beta"), ("beta", "gamma")),
     )
@@ -281,18 +359,19 @@ def test_network_summary_markdown_describes_algorithms_and_lists_all_actor_score
     markdown = render_network_summary_markdown(
         run_id="run-1",
         report=report,
-        interactions=select_key_interactions(interactions, limit=5),
+        growth_report=growth_report,
     )
 
     assert "## 먼저 볼 것" in markdown
     assert "## 누가 중심에 있었나" in markdown
-    assert "## 어떤 관계가 두드러졌나" in markdown
-    assert "## 구조 해석" in markdown
+    assert "## 누가 직접·간접으로 퍼졌나" in markdown
+    assert "## 연결이 어떻게 늘어났나" in markdown
+    assert "## 연결이 어디로 몰렸나" in markdown
     assert "## 계산 메모" in markdown
-    assert "Alpha(`alpha`)" in markdown
-    assert "Alpha ↔ Beta" in markdown
-    assert "`nx.density(...)`" in markdown
-    assert "`nx.hits(...)`" in markdown
+    assert "Alpha(`alpha`): 1명과 연결됨" in markdown
+    assert "발신:" in markdown
+    assert "수신:" in markdown
+    assert "가장 많은 사람과 직접 연결된 사람" in markdown
     assert "### 전체 행위자 연결 점수" not in markdown
 
 
@@ -387,18 +466,26 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
     assert (tmp_path / "analysis" / run_id / "manifest.json").exists()
     assert (tmp_path / "analysis" / run_id / "summary.md").exists()
     assert (tmp_path / "analysis" / run_id / "llm_calls.csv").exists()
-    assert (tmp_path / "analysis" / run_id / "distributions" / "overview.png").exists()
+    assert (tmp_path / "analysis" / run_id / "performance" / "summary.png").exists()
+    assert (tmp_path / "analysis" / run_id / "performance" / "summary.csv").exists()
+    assert (tmp_path / "analysis" / run_id / "actions" / "summary.csv").exists()
     assert (tmp_path / "analysis" / run_id / "fixer" / "summary.csv").exists()
-    assert (tmp_path / "analysis" / run_id / "token_usage" / "summary.json").exists()
     assert (tmp_path / "analysis" / run_id / "token_usage" / "summary.csv").exists()
     assert (tmp_path / "analysis" / run_id / "token_usage" / "summary.md").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "nodes.csv").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "edges.csv").exists()
-    assert (tmp_path / "analysis" / run_id / "network" / "interactions.csv").exists()
+    assert (tmp_path / "analysis" / run_id / "network" / "growth.csv").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "summary.json").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "summary.md").exists()
+    assert (tmp_path / "analysis" / run_id / "network" / "growth_metrics.png").exists()
+    assert (tmp_path / "analysis" / run_id / "network" / "concentration.png").exists()
+    assert (tmp_path / "analysis" / run_id / "network" / "growth.mp4").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "graph.graphml").exists()
     assert (tmp_path / "analysis" / run_id / "network" / "graph.png").exists()
+    assert not (tmp_path / "analysis" / run_id / "distributions" / "overview.png").exists()
+    assert not (tmp_path / "analysis" / run_id / "fixer" / "summary.json").exists()
+    assert not (tmp_path / "analysis" / run_id / "token_usage" / "summary.json").exists()
+    assert not (tmp_path / "analysis" / run_id / "network" / "interactions.csv").exists()
 
     manifest = json.loads(
         (tmp_path / "analysis" / run_id / "manifest.json").read_text(encoding="utf-8")
@@ -407,36 +494,46 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
     assert manifest["roles_display"] == ["actor (행위자)", "fixer (JSON 복구)", "planner (계획)"]
     assert "summary.md" in manifest["artifact_paths"]
     assert "llm_calls.csv" in manifest["artifact_paths"]
-    assert "token_usage/summary.json" in manifest["artifact_paths"]
+    assert "actions/summary.csv" in manifest["artifact_paths"]
+    assert "performance/summary.png" in manifest["artifact_paths"]
+    assert "performance/summary.csv" in manifest["artifact_paths"]
     assert "token_usage/summary.csv" in manifest["artifact_paths"]
     assert "token_usage/summary.md" in manifest["artifact_paths"]
-    assert manifest["token_usage_summary"]["overall"]["total_tokens_total"] == 68
-    assert manifest["network_summary"]["edge_count"] == 3
-    assert "distributions/overview.png" in manifest["artifact_paths"]
+    assert "distributions/overview.png" not in manifest["artifact_paths"]
     assert "network/summary.json" in manifest["artifact_paths"]
     assert "network/summary.md" in manifest["artifact_paths"]
-    assert "network/interactions.csv" in manifest["artifact_paths"]
+    assert "network/growth.csv" in manifest["artifact_paths"]
+    assert "network/growth_metrics.png" in manifest["artifact_paths"]
+    assert "network/concentration.png" in manifest["artifact_paths"]
+    assert "network/growth.mp4" in manifest["artifact_paths"]
+    assert "token_usage_summary" not in manifest
+    assert "network_summary" not in manifest
+    assert "fixer_summary" not in manifest
     llm_calls_csv = (
         tmp_path / "analysis" / run_id / "llm_calls.csv"
     ).read_text(encoding="utf-8")
     assert "실행 ID,호출 순번,역할,역할 표시명" in llm_calls_csv
 
-    token_usage_json = json.loads(
-        (
-            tmp_path
-            / "analysis"
-            / run_id
-            / "token_usage"
-            / "summary.json"
-        ).read_text(encoding="utf-8")
-    )
-    assert token_usage_json["overall"]["input_tokens_total"] == 50
-    assert token_usage_json["by_role"]["fixer"]["total_tokens_total"] == 43
     token_usage_md = (
         tmp_path / "analysis" / run_id / "token_usage" / "summary.md"
     ).read_text(encoding="utf-8")
     assert "## 개요" in token_usage_md
     assert "## 역할별 누적 사용량" in token_usage_md
+    assert "평균" in token_usage_md
+    assert "범위" in token_usage_md
+    assert "p95" in token_usage_md
+    token_usage_csv = (
+        tmp_path / "analysis" / run_id / "token_usage" / "summary.csv"
+    ).read_text(encoding="utf-8")
+    assert "입력 토큰 평균값" in token_usage_csv
+    assert "총 토큰 p95" in token_usage_csv
+    performance_csv = (
+        tmp_path / "analysis" / run_id / "performance" / "summary.csv"
+    ).read_text(encoding="utf-8")
+    assert "입력 토큰 bin 시작" in performance_csv
+    assert "출력 토큰 bin 끝" in performance_csv
+    assert "TTFT p90" in performance_csv
+    assert "소요 시간 p99" in performance_csv
     network_summary_json = json.loads(
         (
             tmp_path
@@ -453,19 +550,41 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
     ).read_text(encoding="utf-8")
     assert "## 먼저 볼 것" in network_summary_md
     assert "## 누가 중심에 있었나" in network_summary_md
+    assert "## 누가 직접·간접으로 퍼졌나" in network_summary_md
+    assert "## 연결이 어떻게 늘어났나" in network_summary_md
+    assert "## 연결이 어디로 몰렸나" in network_summary_md
     assert "## 계산 메모" in network_summary_md
     assert "### 전체 행위자 연결 점수" not in network_summary_md
+    assert "발신:" in network_summary_md
+    assert "수신:" in network_summary_md
+    assert "비공개 확인" in network_summary_md
     summary_md = (
         tmp_path / "analysis" / run_id / "summary.md"
     ).read_text(encoding="utf-8")
     assert "## 한눈에 보기" in summary_md
-    assert "## 관계별 핵심 interaction" in summary_md
+    assert "JSONL 이벤트" not in summary_md
+    assert "총 관계 가중치" not in summary_md
+    assert "## 관계별 핵심 interaction" not in summary_md
+    assert "## 어떤 action이 준비됐고 무엇이 채택됐나" in summary_md
+    assert "## 누가 직접·간접으로 퍼졌나" in summary_md
+    assert "## 연결이 어떻게 늘어났나" in summary_md
     assert "## 어디를 더 보면 되는가" in summary_md
-    interactions_csv = (
-        tmp_path / "analysis" / run_id / "network" / "interactions.csv"
+    assert "실제 연결에 들어온 행위자는" in summary_md
+    assert "발신:" in summary_md
+    assert "수신:" in summary_md
+    assert "비공개 확인" in summary_md
+    actions_csv = (
+        tmp_path / "analysis" / run_id / "actions" / "summary.csv"
     ).read_text(encoding="utf-8")
-    assert "대표 메시지" in interactions_csv
-    assert "마지막 메시지" in interactions_csv
+    assert "행동 이름" in actions_csv
+    assert "unused_action" in actions_csv
+    growth_csv = (
+        tmp_path / "analysis" / run_id / "network" / "growth.csv"
+    ).read_text(encoding="utf-8")
+    assert "라운드" in growth_csv
+    assert "행위자 쏠림 HHI" in growth_csv
+    assert "직접 연결 중심 ID" in growth_csv
+    assert "간접 영향 중심 ID" in growth_csv
 
 
 def test_run_analysis_accepts_run_dir_path(tmp_path, monkeypatch) -> None:
@@ -496,7 +615,9 @@ def test_install_deps_script_exists() -> None:
     script_path = Path("scripts/install_deps_ubuntu.sh")
 
     assert script_path.exists()
-    assert "fonts-noto-cjk" in script_path.read_text(encoding="utf-8")
+    script_text = script_path.read_text(encoding="utf-8")
+    assert "fonts-noto-cjk" in script_text
+    assert "ffmpeg" in script_text
 
 
 def _load_sample_data():
@@ -530,6 +651,43 @@ def _sample_log_text(*, run_id: str) -> str:
         },
         {
             "index": 3,
+            "event": "plan_finalized",
+            "event_key": "plan_finalized",
+            "run_id": run_id,
+            "plan": {
+                "progression_plan": {"max_rounds": 3},
+                "action_catalog": {
+                    "actions": [
+                        {
+                            "action_type": "private_check_in",
+                            "label": "비공개 확인",
+                            "description": "상대의 반응을 제한 채널에서 확인한다.",
+                            "supported_visibility": ["private"],
+                            "requires_target": True,
+                            "supports_utterance": True,
+                        },
+                        {
+                            "action_type": "public_signal",
+                            "label": "공개 신호",
+                            "description": "직접 지목하지 않고 공개적으로 신호를 보낸다.",
+                            "supported_visibility": ["public"],
+                            "requires_target": False,
+                            "supports_utterance": True,
+                        },
+                        {
+                            "action_type": "unused_action",
+                            "label": "미채택 행동",
+                            "description": "후보에는 있었지만 채택되지 않는다.",
+                            "supported_visibility": ["group"],
+                            "requires_target": True,
+                            "supports_utterance": False,
+                        },
+                    ]
+                },
+            },
+        },
+        {
+            "index": 4,
             "event": "llm_call",
             "event_key": "llm_call:1",
             "run_id": run_id,
@@ -546,7 +704,7 @@ def _sample_log_text(*, run_id: str) -> str:
             "total_tokens": 10,
         },
         {
-            "index": 4,
+            "index": 5,
             "event": "llm_call",
             "event_key": "llm_call:2",
             "run_id": run_id,
@@ -563,7 +721,7 @@ def _sample_log_text(*, run_id: str) -> str:
             "total_tokens": 15,
         },
         {
-            "index": 5,
+            "index": 6,
             "event": "llm_call",
             "event_key": "llm_call:3",
             "run_id": run_id,
@@ -580,7 +738,7 @@ def _sample_log_text(*, run_id: str) -> str:
             "total_tokens": 13,
         },
         {
-            "index": 6,
+            "index": 7,
             "event": "llm_call",
             "event_key": "llm_call:4",
             "run_id": run_id,
@@ -597,7 +755,7 @@ def _sample_log_text(*, run_id: str) -> str:
             "total_tokens": 14,
         },
         {
-            "index": 7,
+            "index": 8,
             "event": "llm_call",
             "event_key": "llm_call:5",
             "run_id": run_id,
@@ -614,7 +772,7 @@ def _sample_log_text(*, run_id: str) -> str:
             "total_tokens": 16,
         },
         {
-            "index": 8,
+            "index": 9,
             "event": "round_actions_adopted",
             "event_key": "round_actions_adopted:1",
             "run_id": run_id,

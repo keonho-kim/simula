@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable
 
+from simula.application.analysis.metrics.distributions import summarize_numeric_values
 from simula.application.analysis.models import (
     LLMCallRecord,
     TokenUsageReport,
@@ -50,6 +51,15 @@ def _build_role_summary(
         ),
         total_tokens_missing_count=sum(
             1 for record in calls if record.total_tokens is None
+        ),
+        input_tokens_stats=summarize_numeric_values(
+            [float(record.input_tokens) for record in calls if record.input_tokens is not None]
+        ),
+        output_tokens_stats=summarize_numeric_values(
+            [float(record.output_tokens) for record in calls if record.output_tokens is not None]
+        ),
+        total_tokens_stats=summarize_numeric_values(
+            [float(record.total_tokens) for record in calls if record.total_tokens is not None]
         ),
     )
 

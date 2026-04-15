@@ -11,6 +11,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
+from matplotlib.ticker import MultipleLocator
 
 from simula.application.analysis.localization import (
     distribution_overview_title,
@@ -131,3 +132,26 @@ def _render_distribution_axis(
     axis.set_ylabel("밀도")
     axis.legend(loc="best")
     axis.grid(alpha=0.2)
+    _apply_time_axis_spacing(axis=axis, distribution=distribution)
+
+
+def _apply_time_axis_spacing(
+    *,
+    axis: plt.Axes,
+    distribution: MetricDistribution,
+) -> None:
+    if distribution.metric not in {"ttft_seconds", "duration_seconds"}:
+        return
+    if not distribution.histogram_bin_edges:
+        return
+
+    step = 0.25
+    minimum = float(distribution.histogram_bin_edges[0])
+    maximum = float(distribution.histogram_bin_edges[-1])
+    lower_bound = np.floor(minimum / step) * step
+    upper_bound = np.ceil(maximum / step) * step
+    if np.isclose(lower_bound, upper_bound):
+        upper_bound = lower_bound + step
+
+    axis.set_xlim(lower_bound, upper_bound)
+    axis.xaxis.set_major_locator(MultipleLocator(step))

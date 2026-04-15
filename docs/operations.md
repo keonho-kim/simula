@@ -56,23 +56,27 @@ analysis/<run_id>/
   summary.md
   manifest.json
   llm_calls.csv
-  distributions/
-    overview.png
+  actions/
+    summary.csv
+  performance/
+    summary.png
+    summary.csv
   token_usage/
-    summary.json
     summary.csv
     summary.md
   fixer/
-    summary.json
     summary.csv
   network/
     nodes.csv
     edges.csv
-    interactions.csv
+    growth.csv
     summary.json
     summary.md
     graph.graphml
     graph.png
+    growth_metrics.png
+    concentration.png
+    growth.mp4
 ```
 
 ## Validation Commands

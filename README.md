@@ -172,12 +172,12 @@ Scenario files must declare YAML frontmatter. The active authoring controls are:
 
 The repository includes scenario seeds in [`senario.samples/`](./senario.samples/README.md):
 
-- `01_i-am-solo_31_2026-04-10.md`
+- `01_consumer_marketing_launch.md`
 - `02_wargame_iran_us.md`
 - `03_startup_boardroom_crisis.md`
 - `04_city_hall_disaster_response.md`
-- `05_campus_election_scandal.md`
-- `06_fantasy_court_intrigue.md`
+- `05_korean_enterprise_promo_approval_conflict.md`
+- `06_new_technology_internal_conflict.md`
 
 ## Documentation Map
 

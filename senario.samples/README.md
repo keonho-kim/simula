@@ -4,18 +4,18 @@ Sample scenario seeds for local runs.
 
 ## Files
 
-- `01_i-am-solo_31_2026-04-10.md`
-  - romance reality-show scenario with a closed cast
+- `01_consumer_marketing_launch.md`
+  - consumer marketing simulation focused on target-segment reaction and conversion
 - `02_wargame_iran_us.md`
   - current-affairs war-game focused on the U.S.-Iran standoff
 - `03_startup_boardroom_crisis.md`
   - boardroom conflict and survival decisions
 - `04_city_hall_disaster_response.md`
   - disaster response and early stabilization
-- `05_campus_election_scandal.md`
-  - election legitimacy and deepfake crisis
-- `06_fantasy_court_intrigue.md`
-  - succession conflict and front-line control
+- `05_korean_enterprise_promo_approval_conflict.md`
+  - Korean enterprise approval-line conflict over a major promotional decision
+- `06_new_technology_internal_conflict.md`
+  - new-technology development, internal politics, and organizational adaptation
 
 ## Authoring Rules
 
@@ -28,6 +28,7 @@ Sample scenario seeds for local runs.
 - Use one compact `## 주요 등장 인물` section per sample.
 - Each cast bullet should merge who the actor is, what they publicly introduce about themselves, and how that affects likely behavior.
 - Keep actor blurbs compact and concrete. Prefer low-narrative self-introduction cues over hidden lore.
-- For romance reality-show samples, prefer verified self-introduction lines or close paraphrases grounded in the self-introduction segment.
+- For consumer marketing samples, keep awareness, favorability, trial, purchase, and repeat purchase distinct.
 - For current-affairs war-game samples, pin the setup to an explicit as-of date and real political constraints.
+- For corporate governance or succession samples, keep approval authority, disclosure duty, and stakeholder pressure explicit.
 - When useful, add sections such as `행동 현실성 기준`, `즉시 행동 단위`, or other scenario-grounded guardrails.

@@ -1,5 +1,6 @@
 ---
 num_cast: 8
+allow_additional_cast: true
 ---
 
 # 시나리오 03

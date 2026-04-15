@@ -92,6 +92,9 @@ class LoadedRunAnalysis:
     adopted_activities: list[AdoptedActivityRecord]
     has_actors_finalized_event: bool
     has_round_actions_adopted_event: bool
+    planned_actions: list["PlannedActionRecord"] = field(default_factory=list)
+    planned_max_rounds: int = 0
+    has_plan_finalized_event: bool = False
 
     @property
     def roles(self) -> list[str]:
@@ -107,6 +110,7 @@ class NumericSummary:
     max_value: float | None
     mean_value: float | None
     median_value: float | None
+    p90_value: float | None
     p95_value: float | None
     p99_value: float | None
 
@@ -117,6 +121,7 @@ class NumericSummary:
             "max": self.max_value,
             "mean": self.mean_value,
             "median": self.median_value,
+            "p90": self.p90_value,
             "p95": self.p95_value,
             "p99": self.p99_value,
         }
@@ -128,6 +133,7 @@ class NumericSummary:
             f"{prefix}_max": self.max_value,
             f"{prefix}_mean": self.mean_value,
             f"{prefix}_median": self.median_value,
+            f"{prefix}_p90": self.p90_value,
             f"{prefix}_p95": self.p95_value,
             f"{prefix}_p99": self.p99_value,
         }
@@ -145,6 +151,7 @@ class MetricDistribution:
     max_value: float | None
     mean_value: float | None
     median_value: float | None
+    p90_value: float | None
     p95_value: float | None
     p99_value: float | None
     histogram_bin_edges: list[float] = field(default_factory=list)
@@ -164,6 +171,7 @@ class MetricDistribution:
             "max": self.max_value,
             "mean": self.mean_value,
             "median": self.median_value,
+            "p90": self.p90_value,
             "p95": self.p95_value,
             "p99": self.p99_value,
             "histogram_bin_edges": self.histogram_bin_edges,
@@ -183,6 +191,49 @@ class DistributionReport:
 
 
 @dataclass(slots=True)
+class PerformanceSummaryRow:
+    """One input/output token bin row for performance percentiles."""
+
+    input_tokens_bin_start: int
+    input_tokens_bin_end: int
+    output_tokens_bin_start: int
+    output_tokens_bin_end: int
+    call_count: int
+    ttft_sample_count: int
+    duration_sample_count: int
+    ttft_p90: float | None
+    ttft_p95: float | None
+    ttft_p99: float | None
+    duration_p90: float | None
+    duration_p95: float | None
+    duration_p99: float | None
+
+    def to_row(self) -> dict[str, object]:
+        return {
+            "input_tokens_bin_start": self.input_tokens_bin_start,
+            "input_tokens_bin_end": self.input_tokens_bin_end,
+            "output_tokens_bin_start": self.output_tokens_bin_start,
+            "output_tokens_bin_end": self.output_tokens_bin_end,
+            "call_count": self.call_count,
+            "ttft_sample_count": self.ttft_sample_count,
+            "duration_sample_count": self.duration_sample_count,
+            "ttft_p90": self.ttft_p90,
+            "ttft_p95": self.ttft_p95,
+            "ttft_p99": self.ttft_p99,
+            "duration_p90": self.duration_p90,
+            "duration_p95": self.duration_p95,
+            "duration_p99": self.duration_p99,
+        }
+
+
+@dataclass(slots=True)
+class PerformanceSummaryReport:
+    """2D token-bin performance percentile summary."""
+
+    rows: list[PerformanceSummaryRow]
+
+
+@dataclass(slots=True)
 class TokenUsageRoleSummary:
     """Aggregated token usage totals for one role."""
 
@@ -194,6 +245,9 @@ class TokenUsageRoleSummary:
     input_tokens_missing_count: int
     output_tokens_missing_count: int
     total_tokens_missing_count: int
+    input_tokens_stats: NumericSummary
+    output_tokens_stats: NumericSummary
+    total_tokens_stats: NumericSummary
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -206,10 +260,26 @@ class TokenUsageRoleSummary:
             "input_tokens_missing_count": self.input_tokens_missing_count,
             "output_tokens_missing_count": self.output_tokens_missing_count,
             "total_tokens_missing_count": self.total_tokens_missing_count,
+            "input_tokens_stats": self.input_tokens_stats.to_dict(),
+            "output_tokens_stats": self.output_tokens_stats.to_dict(),
+            "total_tokens_stats": self.total_tokens_stats.to_dict(),
         }
 
     def to_row(self) -> dict[str, object]:
-        return self.to_dict()
+        return {
+            "role": self.role,
+            "role_label": role_label(self.role),
+            "call_count": self.call_count,
+            "input_tokens_total": self.input_tokens_total,
+            "output_tokens_total": self.output_tokens_total,
+            "total_tokens_total": self.total_tokens_total,
+            "input_tokens_missing_count": self.input_tokens_missing_count,
+            "output_tokens_missing_count": self.output_tokens_missing_count,
+            "total_tokens_missing_count": self.total_tokens_missing_count,
+            **self.input_tokens_stats.to_flat_dict(prefix="input_tokens"),
+            **self.output_tokens_stats.to_flat_dict(prefix="output_tokens"),
+            **self.total_tokens_stats.to_flat_dict(prefix="total_tokens"),
+        }
 
 
 @dataclass(slots=True)
@@ -357,6 +427,62 @@ class FixerReport:
 
 
 @dataclass(slots=True)
+class PlannedActionRecord:
+    """One action option recovered from the execution plan."""
+
+    action_type: str
+    label: str
+    description: str
+    supported_visibility: list[str]
+    requires_target: bool
+    supports_utterance: bool
+
+
+@dataclass(slots=True)
+class ActionAdoptionSummaryRecord:
+    """One action catalog row joined with adopted-activity usage."""
+
+    action_type: str
+    label: str
+    description: str
+    supported_visibility: list[str]
+    adopted_count: int
+    adopted_round_count: int
+    first_adopted_round: int | None
+    last_adopted_round: int | None
+    adopted_share: float | None
+
+    def to_row(self) -> dict[str, object]:
+        return {
+            "action_type": self.action_type,
+            "label": self.label,
+            "description": self.description,
+            "supported_visibility": self.supported_visibility,
+            "adopted_count": self.adopted_count,
+            "adopted_round_count": self.adopted_round_count,
+            "first_adopted_round": self.first_adopted_round,
+            "last_adopted_round": self.last_adopted_round,
+            "adopted_share": self.adopted_share,
+        }
+
+
+@dataclass(slots=True)
+class ActionCatalogReport:
+    """Action catalog and adoption summary bundle."""
+
+    rows: list[ActionAdoptionSummaryRecord]
+    empty_reason: str | None = None
+
+    @property
+    def adopted_rows(self) -> list[ActionAdoptionSummaryRecord]:
+        return [item for item in self.rows if item.adopted_count > 0]
+
+    @property
+    def unused_rows(self) -> list[ActionAdoptionSummaryRecord]:
+        return [item for item in self.rows if item.adopted_count == 0]
+
+
+@dataclass(slots=True)
 class InteractionDigestRecord:
     """Deterministic grouped interaction summary for one relationship/thread."""
 
@@ -404,6 +530,8 @@ class ActorNodeMetrics:
     received_relations: int
     total_weight: int
     counterpart_count: int
+    sent_action_counts: dict[str, int] = field(default_factory=dict)
+    received_action_counts: dict[str, int] = field(default_factory=dict)
     in_degree_centrality: float | None = None
     out_degree_centrality: float | None = None
     betweenness_centrality: float | None = None
@@ -590,6 +718,80 @@ class NetworkReport:
 
 
 @dataclass(slots=True)
+class NetworkGrowthRecord:
+    """One cumulative round snapshot for network growth analysis."""
+
+    round_index: int
+    cumulative_activity_count: int
+    participating_actor_count: int
+    edge_count: int
+    largest_component_ratio: float | None
+    density: float | None
+    top1_actor_share: float | None
+    top3_actor_share: float | None
+    actor_weight_hhi: float | None
+    actor_weight_gini: float | None
+    top1_edge_share: float | None
+    top3_edge_share: float | None
+    edge_weight_hhi: float | None
+    edge_weight_gini: float | None
+    new_actor_count: int
+    new_edge_count: int
+    top_degree_cast_id: str = ""
+    top_degree_display_name: str = ""
+    top_degree_score: float | None = None
+    top_broker_cast_id: str = ""
+    top_broker_display_name: str = ""
+    top_broker_score: float | None = None
+    top_influence_cast_id: str = ""
+    top_influence_display_name: str = ""
+    top_influence_score: float | None = None
+
+    def to_row(self) -> dict[str, object]:
+        return {
+            "round_index": self.round_index,
+            "cumulative_activity_count": self.cumulative_activity_count,
+            "participating_actor_count": self.participating_actor_count,
+            "edge_count": self.edge_count,
+            "largest_component_ratio": self.largest_component_ratio,
+            "density": self.density,
+            "top1_actor_share": self.top1_actor_share,
+            "top3_actor_share": self.top3_actor_share,
+            "actor_weight_hhi": self.actor_weight_hhi,
+            "actor_weight_gini": self.actor_weight_gini,
+            "top1_edge_share": self.top1_edge_share,
+            "top3_edge_share": self.top3_edge_share,
+            "edge_weight_hhi": self.edge_weight_hhi,
+            "edge_weight_gini": self.edge_weight_gini,
+            "new_actor_count": self.new_actor_count,
+            "new_edge_count": self.new_edge_count,
+            "top_degree_cast_id": self.top_degree_cast_id,
+            "top_degree_display_name": self.top_degree_display_name,
+            "top_degree_score": self.top_degree_score,
+            "top_broker_cast_id": self.top_broker_cast_id,
+            "top_broker_display_name": self.top_broker_display_name,
+            "top_broker_score": self.top_broker_score,
+            "top_influence_cast_id": self.top_influence_cast_id,
+            "top_influence_display_name": self.top_influence_display_name,
+            "top_influence_score": self.top_influence_score,
+        }
+
+
+@dataclass(slots=True)
+class NetworkGrowthReport:
+    """Cumulative network growth series and reusable summary facts."""
+
+    rows: list[NetworkGrowthRecord]
+    empty_reason: str | None = None
+
+    @property
+    def final_row(self) -> NetworkGrowthRecord | None:
+        if not self.rows:
+            return None
+        return self.rows[-1]
+
+
+@dataclass(slots=True)
 class ArtifactManifest:
     """Manifest describing generated analyzer artifacts."""
 
@@ -601,9 +803,6 @@ class ArtifactManifest:
     llm_call_count: int
     roles: list[str]
     artifact_paths: list[str]
-    fixer_summary: dict[str, object]
-    token_usage_summary: dict[str, object]
-    network_summary: dict[str, object]
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -616,7 +815,4 @@ class ArtifactManifest:
             "roles": self.roles,
             "roles_display": [role_label(item) for item in self.roles],
             "artifact_paths": self.artifact_paths,
-            "fixer_summary": self.fixer_summary,
-            "token_usage_summary": self.token_usage_summary,
-            "network_summary": self.network_summary,
         }

@@ -10,14 +10,17 @@ import pytest
 from types import SimpleNamespace
 
 import simula.application.analysis.plotting.network as plotting_network
+from simula.application.analysis.models import ActorRecord, AdoptedActivityRecord, NetworkGrowthRecord, NetworkGrowthReport
 from simula.application.analysis.plotting.network import (
     _build_edge_label_text,
     _build_edge_strengths,
     _build_edge_visual_style,
     _build_layout_kwargs,
     _compute_layout_positions,
+    _resolve_node_collisions_pixel_space,
     _build_node_visual_style,
-    render_network_plot,
+    compute_render_layout,
+    render_network_growth_video,
 )
 
 
@@ -174,12 +177,12 @@ def test_edge_strengths_are_normalized_between_zero_and_one() -> None:
 
 def test_edge_label_text_uses_interaction_count_when_present() -> None:
     graph = nx.DiGraph()
-    graph.add_edge("alpha", "beta", total_weight=3, weight=0.3, action_count=2)
+    graph.add_edge("alpha", "beta", total_weight=3, weight=0.3, action_count=1)
     graph.add_edge("beta", "gamma", total_weight=6, weight=0.6, action_count=5)
 
     labels = _build_edge_label_text(graph)
 
-    assert labels[("alpha", "beta")] == "2회"
+    assert labels[("alpha", "beta")] == "1회"
     assert labels[("beta", "gamma")] == "5회"
 
 
@@ -193,36 +196,140 @@ def test_edge_label_text_hides_edges_without_interactions() -> None:
     assert labels == {}
 
 
-def test_render_network_plot_draws_interaction_labels_only(
-    monkeypatch,
-    tmp_path,
-) -> None:
+def test_edge_label_text_shows_all_candidates_for_sparse_graph() -> None:
     graph = nx.DiGraph()
-    graph.add_node("alpha", display_name="Alpha", total_weight=4)
-    graph.add_node("beta", display_name="Beta", total_weight=2)
-    graph.add_edge("alpha", "beta", total_weight=4, action_count=2)
-    graph.add_edge("beta", "alpha", total_weight=2, action_count=0)
+    for index in range(10):
+        graph.add_edge(
+            f"source-{index}",
+            f"target-{index}",
+            total_weight=index + 1,
+            action_count=1,
+        )
+
+    labels = _build_edge_label_text(graph)
+
+    assert len(labels) == 10
+    assert ("source-0", "target-0") in labels
+    assert ("source-9", "target-9") in labels
+
+
+def test_edge_label_text_limits_to_top_actionable_edges_for_dense_graph() -> None:
+    graph = nx.DiGraph()
+    for index in range(11):
+        graph.add_edge(
+            f"source-{index}",
+            f"target-{index}",
+            total_weight=index + 1,
+            action_count=index + 1,
+        )
+
+    labels = _build_edge_label_text(graph)
+
+    assert len(labels) == 8
+    assert ("source-10", "target-10") in labels
+    assert ("source-9", "target-9") in labels
+    assert ("source-2", "target-2") not in labels
+    assert ("source-0", "target-0") not in labels
+
+
+def test_resolve_node_collisions_pixel_space_separates_overlapping_nodes() -> None:
+    positions = {
+        "alpha": np.asarray([100.0, 100.0]),
+        "beta": np.asarray([110.0, 100.0]),
+        "gamma": np.asarray([105.0, 108.0]),
+    }
+    radii = {"alpha": 20.0, "beta": 20.0, "gamma": 20.0}
+
+    resolved = _resolve_node_collisions_pixel_space(
+        pixel_positions=positions,
+        radii_px=radii,
+        padding_px=4.0,
+    )
+
+    for left_name, left_position in resolved.items():
+        for right_name, right_position in resolved.items():
+            if left_name >= right_name:
+                continue
+            minimum_distance = radii[left_name] + radii[right_name] + 4.0
+            assert np.linalg.norm(left_position - right_position) >= minimum_distance - 1e-6
+
+
+def test_compute_render_layout_returns_resolved_positions(monkeypatch) -> None:
+    graph = nx.DiGraph()
+    graph.add_node("alpha", display_name="Alpha", total_weight=5)
+    graph.add_node("beta", display_name="Beta", total_weight=4)
+    graph.add_edge("alpha", "beta", total_weight=3, action_count=2)
 
     monkeypatch.setattr(
         plotting_network,
         "_compute_layout_positions",
-        lambda graph: {"alpha": (-1.0, 0.0), "beta": (1.0, 0.0)},
+        lambda graph: {"alpha": np.asarray([0.0, 0.0]), "beta": np.asarray([0.0, 0.0])},
     )
-    captured: list[dict[str, object]] = []
 
-    def _fake_draw_networkx_edge_labels(*args, **kwargs):  # noqa: ANN002, ANN003
-        del args
-        captured.append(dict(kwargs))
-        return {}
+    layout = compute_render_layout(graph)
+
+    assert set(layout.positions) == {"alpha", "beta"}
+    assert layout.x_limits[0] < layout.x_limits[1]
+    assert layout.y_limits[0] < layout.y_limits[1]
+    assert not np.allclose(layout.positions["alpha"], layout.positions["beta"])
+
+
+def test_render_network_growth_video_writes_output(monkeypatch, tmp_path) -> None:
+    graph = nx.DiGraph()
+    graph.add_node("alpha", display_name="Alpha", total_weight=4)
+    graph.add_node("beta", display_name="Beta", total_weight=2)
+    graph.add_edge("alpha", "beta", total_weight=4, action_count=2)
 
     monkeypatch.setattr(
-        plotting_network.nx,
-        "draw_networkx_edge_labels",
-        _fake_draw_networkx_edge_labels,
+        plotting_network,
+        "_compute_layout_positions",
+        lambda graph: {"alpha": np.asarray([-1.0, 0.0]), "beta": np.asarray([1.0, 0.0])},
+    )
+    layout = compute_render_layout(graph)
+    growth_report = NetworkGrowthReport(
+        rows=[
+            NetworkGrowthRecord(
+                round_index=1,
+                cumulative_activity_count=1,
+                participating_actor_count=2,
+                edge_count=1,
+                largest_component_ratio=1.0,
+                density=0.5,
+                top1_actor_share=0.5,
+                top3_actor_share=1.0,
+                actor_weight_hhi=0.5,
+                actor_weight_gini=0.0,
+                top1_edge_share=1.0,
+                top3_edge_share=1.0,
+                edge_weight_hhi=1.0,
+                edge_weight_gini=0.0,
+                new_actor_count=2,
+                new_edge_count=1,
+            )
+        ]
+    )
+    render_network_growth_video(
+        run_id="run-1",
+        title="network",
+        output_path=tmp_path / "growth.mp4",
+        layout=layout,
+        actors_by_id={
+            "alpha": ActorRecord(cast_id="alpha", display_name="Alpha"),
+            "beta": ActorRecord(cast_id="beta", display_name="Beta"),
+        },
+        activities=[
+            AdoptedActivityRecord(
+                round_index=1,
+                source_cast_id="alpha",
+                target_cast_ids=["beta"],
+                intent_target_cast_ids=["beta"],
+                visibility="private",
+                thread_id="thread-1",
+                action_type="private_check_in",
+            )
+        ],
+        growth_report=growth_report,
+        planned_max_rounds=1,
     )
 
-    render_network_plot(graph, title="network", output_path=tmp_path / "graph.png")
-
-    assert len(captured) == 1
-    assert captured[0]["edge_labels"] == {("alpha", "beta"): "2회"}
-    assert captured[0]["label_pos"] == pytest.approx(0.52)
+    assert (tmp_path / "growth.mp4").exists()

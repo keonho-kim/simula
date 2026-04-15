@@ -10,28 +10,35 @@ from pathlib import Path
 
 from simula.application.analysis import (
     ArtifactWriter,
+    build_action_catalog_report,
     build_distribution_report,
     build_fixer_report,
-    build_interaction_digests,
+    build_network_growth_report,
     build_network_report,
+    build_performance_summary_report,
     build_token_usage_report,
+    compute_render_layout,
     load_run_analysis,
     render_analysis_summary_markdown,
     render_distribution_overview,
-    render_network_summary_markdown,
+    render_network_concentration_plot,
+    render_network_growth_video,
+    render_network_growth_metrics_plot,
     render_network_plot,
+    render_network_summary_markdown,
     render_token_usage_summary_markdown,
-    select_key_interactions,
 )
 from simula.application.analysis.localization import (
+    ACTION_SUMMARY_COLUMN_LABELS,
     FIXER_SUMMARY_COLUMN_LABELS,
-    INTERACTION_COLUMN_LABELS,
     LLM_CALL_COLUMN_LABELS,
     NETWORK_EDGE_COLUMN_LABELS,
+    NETWORK_GROWTH_COLUMN_LABELS,
     NETWORK_NODE_COLUMN_LABELS,
+    PERFORMANCE_SUMMARY_COLUMN_LABELS,
     TOKEN_USAGE_COLUMN_LABELS,
-    translate_row,
     network_title,
+    translate_row,
 )
 from simula.application.analysis.models import ArtifactManifest
 from simula.infrastructure.config.loader import load_settings_bundle
@@ -80,15 +87,26 @@ def run_analysis(
     )
 
     distribution_report = build_distribution_report(loaded.llm_calls)
+    performance_report = build_performance_summary_report(loaded.llm_calls)
     render_distribution_overview(
         distributions=distribution_report.overall,
         run_id=normalized_run_id,
-        output_path=writer.path_for("distributions/overview.png"),
+        output_path=writer.path_for("performance/summary.png"),
     )
-    writer.record_output("distributions/overview.png")
+    writer.record_output("performance/summary.png")
+    writer.write_csv(
+        "performance/summary.csv",
+        rows=[
+            translate_row(
+                row.to_row(),
+                column_labels=PERFORMANCE_SUMMARY_COLUMN_LABELS,
+            )
+            for row in performance_report.rows
+        ],
+        fieldnames=list(PERFORMANCE_SUMMARY_COLUMN_LABELS.values()),
+    )
 
     fixer_report = build_fixer_report(loaded.llm_calls)
-    writer.write_json("fixer/summary.json", fixer_report.to_dict())
     writer.write_csv(
         "fixer/summary.csv",
         rows=[
@@ -102,7 +120,6 @@ def run_analysis(
     )
 
     token_usage_report = build_token_usage_report(loaded.llm_calls)
-    writer.write_json("token_usage/summary.json", token_usage_report.to_dict())
     writer.write_csv(
         "token_usage/summary.csv",
         rows=[
@@ -122,16 +139,38 @@ def run_analysis(
         ),
     )
 
+    action_report = build_action_catalog_report(
+        planned_actions=loaded.planned_actions,
+        adopted_activities=loaded.adopted_activities,
+        has_plan_finalized_event=loaded.has_plan_finalized_event,
+    )
+    if action_report.rows:
+        writer.write_csv(
+            "actions/summary.csv",
+            rows=[
+                translate_row(
+                    item.to_row(),
+                    column_labels=ACTION_SUMMARY_COLUMN_LABELS,
+                )
+                for item in action_report.rows
+            ],
+            fieldnames=list(ACTION_SUMMARY_COLUMN_LABELS.values()),
+        )
+
     network_report, graph = build_network_report(
         actors_by_id=loaded.actors_by_id,
         activities=loaded.adopted_activities,
         has_actors_finalized_event=loaded.has_actors_finalized_event,
         has_round_actions_adopted_event=loaded.has_round_actions_adopted_event,
     )
-    interaction_digests = build_interaction_digests(
+    growth_report = build_network_growth_report(
         actors_by_id=loaded.actors_by_id,
         activities=loaded.adopted_activities,
+        planned_max_rounds=loaded.planned_max_rounds,
+        has_actors_finalized_event=loaded.has_actors_finalized_event,
+        has_round_actions_adopted_event=loaded.has_round_actions_adopted_event,
     )
+
     writer.write_csv(
         "network/nodes.csv",
         rows=[
@@ -154,33 +193,69 @@ def run_analysis(
         ],
         fieldnames=list(NETWORK_EDGE_COLUMN_LABELS.values()),
     )
-    writer.write_csv(
-        "network/interactions.csv",
-        rows=[
-            translate_row(
-                item.to_row(),
-                column_labels=INTERACTION_COLUMN_LABELS,
-            )
-            for item in interaction_digests
-        ],
-        fieldnames=list(INTERACTION_COLUMN_LABELS.values()),
-    )
+    if growth_report.rows:
+        writer.write_csv(
+            "network/growth.csv",
+            rows=[
+                translate_row(
+                    item.to_row(),
+                    column_labels=NETWORK_GROWTH_COLUMN_LABELS,
+                )
+                for item in growth_report.rows
+            ],
+            fieldnames=list(NETWORK_GROWTH_COLUMN_LABELS.values()),
+        )
     writer.write_json("network/summary.json", network_report.to_dict())
     writer.write_text(
         "network/summary.md",
         render_network_summary_markdown(
             run_id=normalized_run_id,
             report=network_report,
-            interactions=select_key_interactions(interaction_digests, limit=5),
+            growth_report=growth_report,
+            planned_actions=loaded.planned_actions,
         ),
     )
     writer.write_graphml("network/graph.graphml", graph)
+
+    layout = compute_render_layout(graph)
     render_network_plot(
         graph,
         title=network_title(run_id=normalized_run_id),
         output_path=writer.path_for("network/graph.png"),
+        layout=layout,
     )
     writer.record_output("network/graph.png")
+
+    render_network_growth_metrics_plot(
+        run_id=normalized_run_id,
+        growth_report=growth_report,
+        output_path=writer.path_for("network/growth_metrics.png"),
+    )
+    writer.record_output("network/growth_metrics.png")
+
+    render_network_concentration_plot(
+        run_id=normalized_run_id,
+        report=network_report,
+        output_path=writer.path_for("network/concentration.png"),
+    )
+    writer.record_output("network/concentration.png")
+
+    growth_video_path = writer.path_for("network/growth.mp4")
+    render_network_growth_video(
+        run_id=normalized_run_id,
+        title=network_title(run_id=normalized_run_id),
+        output_path=growth_video_path,
+        layout=layout,
+        actors_by_id=loaded.actors_by_id,
+        activities=loaded.adopted_activities,
+        growth_report=growth_report,
+        planned_max_rounds=loaded.planned_max_rounds,
+        has_actors_finalized_event=loaded.has_actors_finalized_event,
+        has_round_actions_adopted_event=loaded.has_round_actions_adopted_event,
+    )
+    if growth_video_path.exists():
+        writer.record_output("network/growth.mp4")
+
     writer.write_text(
         "summary.md",
         render_analysis_summary_markdown(
@@ -190,7 +265,8 @@ def run_analysis(
             token_usage_report=token_usage_report,
             fixer_report=fixer_report,
             network_report=network_report,
-            interactions=select_key_interactions(interaction_digests, limit=5),
+            action_report=action_report,
+            growth_report=growth_report,
         ),
     )
 
@@ -203,9 +279,6 @@ def run_analysis(
         llm_call_count=len(loaded.llm_calls),
         roles=loaded.roles,
         artifact_paths=sorted([*writer.created_files, "manifest.json"]),
-        fixer_summary=fixer_report.to_dict(),
-        token_usage_summary=token_usage_report.to_dict(),
-        network_summary=network_report.summary.to_dict(),
     )
     writer.write_json("manifest.json", manifest.to_dict())
 

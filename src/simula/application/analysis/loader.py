@@ -13,6 +13,7 @@ from simula.application.analysis.models import (
     AdoptedActivityRecord,
     LLMCallRecord,
     LoadedRunAnalysis,
+    PlannedActionRecord,
 )
 
 
@@ -34,6 +35,9 @@ def load_run_analysis(
     llm_calls: list[LLMCallRecord] = []
     actors_by_id: dict[str, ActorRecord] = {}
     adopted_activities: list[AdoptedActivityRecord] = []
+    planned_actions: list[PlannedActionRecord] = []
+    planned_max_rounds = 0
+    has_plan_finalized_event = False
     has_actors_finalized_event = False
     has_round_actions_adopted_event = False
 
@@ -46,6 +50,11 @@ def load_run_analysis(
         if event_name == "actors_finalized":
             has_actors_finalized_event = True
             actors_by_id = _parse_actors(entry)
+            continue
+        if event_name == "plan_finalized":
+            has_plan_finalized_event = True
+            planned_actions = _parse_planned_actions(entry)
+            planned_max_rounds = _parse_planned_max_rounds(entry)
             continue
         if event_name == "round_actions_adopted":
             has_round_actions_adopted_event = True
@@ -66,6 +75,9 @@ def load_run_analysis(
         ),
         has_actors_finalized_event=has_actors_finalized_event,
         has_round_actions_adopted_event=has_round_actions_adopted_event,
+        planned_actions=planned_actions,
+        planned_max_rounds=planned_max_rounds,
+        has_plan_finalized_event=has_plan_finalized_event,
     )
 
 
@@ -178,6 +190,54 @@ def _parse_adopted_activities(
             )
         )
     return records
+
+
+def _parse_planned_actions(entry: dict[str, object]) -> list[PlannedActionRecord]:
+    plan = entry.get("plan")
+    if not isinstance(plan, dict):
+        return []
+    plan_dict = cast(dict[str, object], plan)
+    action_catalog = plan_dict.get("action_catalog")
+    if not isinstance(action_catalog, dict):
+        return []
+    action_catalog_dict = cast(dict[str, object], action_catalog)
+    raw_actions = action_catalog_dict.get("actions", [])
+    if not isinstance(raw_actions, list):
+        return []
+
+    results: list[PlannedActionRecord] = []
+    for raw_action in raw_actions:
+        if not isinstance(raw_action, dict):
+            continue
+        action_dict = cast(dict[str, object], raw_action)
+        action_type = str(action_dict.get("action_type", "")).strip()
+        if not action_type:
+            continue
+        results.append(
+            PlannedActionRecord(
+                action_type=action_type,
+                label=str(action_dict.get("label", "")).strip(),
+                description=str(action_dict.get("description", "")).strip(),
+                supported_visibility=_string_list(
+                    action_dict.get("supported_visibility", [])
+                ),
+                requires_target=bool(action_dict.get("requires_target", False)),
+                supports_utterance=bool(action_dict.get("supports_utterance", False)),
+            )
+        )
+    return results
+
+
+def _parse_planned_max_rounds(entry: dict[str, object]) -> int:
+    plan = entry.get("plan")
+    if not isinstance(plan, dict):
+        return 0
+    plan_dict = cast(dict[str, object], plan)
+    progression_plan = plan_dict.get("progression_plan")
+    if not isinstance(progression_plan, dict):
+        return 0
+    progression_plan_dict = cast(dict[str, object], progression_plan)
+    return _int_value(progression_plan_dict.get("max_rounds", 0))
 
 
 def _string_list(value: object) -> list[str]:

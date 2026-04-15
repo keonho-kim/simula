@@ -63,6 +63,8 @@ def build_network_report(
                 received_relations=item.received_relations,
                 total_weight=item.sent_relations + item.received_relations,
                 counterpart_count=len(aggregated.counterparties.get(item.cast_id, set())),
+                sent_action_counts=dict(sorted(item.sent_action_counts.items())),
+                received_action_counts=dict(sorted(item.received_action_counts.items())),
                 in_degree_centrality=computed.in_degree_centrality.get(item.cast_id),
                 out_degree_centrality=computed.out_degree_centrality.get(item.cast_id),
                 betweenness_centrality=computed.betweenness_centrality.get(item.cast_id),
@@ -117,7 +119,7 @@ def build_network_report(
             if not has_round_actions_adopted_event and not activities
             else "채택된 행위자 상호작용이 없습니다."
             if not activities
-            else "행위자 간 관계 엣지가 생성되지 않았습니다."
+            else "행위자 간 연결 엣지가 생성되지 않았습니다."
             if not aggregated.edges
             else None
         ),

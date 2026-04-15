@@ -94,7 +94,7 @@ def test_render_network_plot_avoids_missing_hangul_glyph_warnings(
 
     with warnings.catch_warnings(record=True) as captured:
         warnings.simplefilter("always")
-        render_network_plot(graph, title="관계망", output_path=tmp_path / "graph.png")
+        render_network_plot(graph, title="연결망", output_path=tmp_path / "graph.png")
 
     missing_glyph_warnings = [
         warning

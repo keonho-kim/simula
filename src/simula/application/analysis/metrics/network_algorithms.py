@@ -15,7 +15,7 @@ from simula.application.analysis.models import (
     NetworkLeaderboardEntry,
 )
 
-_NO_EDGE_REASON = "관계 엣지가 없어 계산할 수 없습니다."
+_NO_EDGE_REASON = "연결 엣지가 없어 계산할 수 없습니다."
 
 
 @dataclass(slots=True)

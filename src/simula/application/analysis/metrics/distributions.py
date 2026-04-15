@@ -14,6 +14,8 @@ from simula.application.analysis.models import (
     LLMCallRecord,
     MetricDistribution,
     NumericSummary,
+    PerformanceSummaryReport,
+    PerformanceSummaryRow,
 )
 
 METRIC_NAMES = (
@@ -69,6 +71,7 @@ def build_metric_distribution(
         max_value=summary.max_value,
         mean_value=summary.mean_value,
         median_value=summary.median_value,
+        p90_value=summary.p90_value,
         p95_value=summary.p95_value,
         p99_value=summary.p99_value,
         histogram_bin_edges=histogram_edges,
@@ -89,6 +92,7 @@ def summarize_numeric_values(values: list[float]) -> NumericSummary:
             max_value=None,
             mean_value=None,
             median_value=None,
+            p90_value=None,
             p95_value=None,
             p99_value=None,
         )
@@ -100,9 +104,60 @@ def summarize_numeric_values(values: list[float]) -> NumericSummary:
         max_value=float(np.max(numeric_values)),
         mean_value=float(np.mean(numeric_values)),
         median_value=float(np.median(numeric_values)),
+        p90_value=float(np.percentile(numeric_values, 90)),
         p95_value=float(np.percentile(numeric_values, 95)),
         p99_value=float(np.percentile(numeric_values, 99)),
     )
+
+
+def build_performance_summary_report(
+    llm_calls: list[LLMCallRecord],
+    *,
+    input_bin_width: int = 1000,
+    output_bin_width: int = 1000,
+) -> PerformanceSummaryReport:
+    """Group TTFT and duration percentiles by input/output token bins."""
+
+    buckets: dict[tuple[int, int], list[LLMCallRecord]] = defaultdict(list)
+    for record in llm_calls:
+        if record.input_tokens is None or record.output_tokens is None:
+            continue
+        input_start = _bin_start(record.input_tokens, width=input_bin_width)
+        output_start = _bin_start(record.output_tokens, width=output_bin_width)
+        buckets[(input_start, output_start)].append(record)
+
+    rows: list[PerformanceSummaryRow] = []
+    for (input_start, output_start), records in sorted(buckets.items()):
+        ttft_values = [
+            float(record.ttft_seconds)
+            for record in records
+            if record.ttft_seconds is not None
+        ]
+        duration_values = [
+            float(record.duration_seconds)
+            for record in records
+            if record.duration_seconds is not None
+        ]
+        ttft_summary = summarize_numeric_values(ttft_values)
+        duration_summary = summarize_numeric_values(duration_values)
+        rows.append(
+            PerformanceSummaryRow(
+                input_tokens_bin_start=input_start,
+                input_tokens_bin_end=input_start + input_bin_width - 1,
+                output_tokens_bin_start=output_start,
+                output_tokens_bin_end=output_start + output_bin_width - 1,
+                call_count=len(records),
+                ttft_sample_count=ttft_summary.count,
+                duration_sample_count=duration_summary.count,
+                ttft_p90=ttft_summary.p90_value,
+                ttft_p95=ttft_summary.p95_value,
+                ttft_p99=ttft_summary.p99_value,
+                duration_p90=duration_summary.p90_value,
+                duration_p95=duration_summary.p95_value,
+                duration_p99=duration_summary.p99_value,
+            )
+        )
+    return PerformanceSummaryReport(rows=rows)
 
 
 def _metric_value(record: LLMCallRecord, *, metric: str) -> float | None:
@@ -110,6 +165,12 @@ def _metric_value(record: LLMCallRecord, *, metric: str) -> float | None:
     if value is None:
         return None
     return float(value)
+
+
+def _bin_start(value: int, *, width: int) -> int:
+    if width <= 0:
+        raise ValueError("bin width must be positive.")
+    return int(value // width) * width
 
 
 def _build_histogram(values: np.ndarray) -> tuple[list[int], list[float]]:

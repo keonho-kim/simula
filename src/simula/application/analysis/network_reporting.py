@@ -1,16 +1,15 @@
 """Purpose:
-- Render readable Markdown summaries for relationship-network analysis outputs.
+- Render readable Markdown summaries for connection-network analysis outputs.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-
-from simula.application.analysis.models import (
-    ActorEdgeMetrics,
-    ActorNodeMetrics,
-    InteractionDigestRecord,
-    NetworkReport,
+from simula.application.analysis.models import NetworkGrowthReport, NetworkReport, PlannedActionRecord
+from simula.application.analysis.network_narrative import (
+    action_label_map,
+    build_actor_connection_lines,
+    build_growth_leader_shift_lines,
+    build_leader_lines,
 )
 
 
@@ -18,12 +17,14 @@ def render_network_summary_markdown(
     *,
     run_id: str,
     report: NetworkReport,
-    interactions: Sequence[InteractionDigestRecord] | None = None,
+    growth_report: NetworkGrowthReport,
+    planned_actions: list[PlannedActionRecord] | None = None,
 ) -> str:
-    """Render one Korean Markdown report for the analyzed network."""
+    """Render one Korean Markdown report for the analyzed connection network."""
 
     summary = report.summary
-    lines = [f"# {run_id} 관계망 참고 분석", ""]
+    label_by_action_type = action_label_map(planned_actions or [])
+    lines = [f"# {run_id} 연결망 참고 메모", ""]
 
     lines.extend(
         [
@@ -42,17 +43,10 @@ def render_network_summary_markdown(
         [
             "",
             "## 누가 중심에 있었나",
-            *_top_actor_lines(report.nodes),
-        ]
-    )
-
-    lines.extend(
-        [
-            "",
-            "## 어떤 관계가 두드러졌나",
-            *_interaction_lines(
-                interactions=interactions or [],
-                edges=report.edges,
+            *build_actor_connection_lines(
+                nodes=report.nodes,
+                label_by_action_type=label_by_action_type,
+                limit=5,
             ),
         ]
     )
@@ -60,10 +54,28 @@ def render_network_summary_markdown(
     lines.extend(
         [
             "",
-            "## 구조 해석",
+            "## 누가 직접·간접으로 퍼졌나",
+            *build_leader_lines(report),
+        ]
+    )
+
+    lines.extend(
+        [
+            "",
+            "## 연결이 어떻게 늘어났나",
+            *build_growth_leader_shift_lines(growth_report),
+            *_growth_lines(growth_report),
+        ]
+    )
+
+    lines.extend(
+        [
+            "",
+            "## 연결이 어디로 몰렸나",
+            _concentration_line(growth_report),
             _density_line(report),
             _component_line(
-                component_name="가장 큰 연결권",
+                component_name="한 덩어리로 이어진 가장 큰 그룹",
                 count=summary.weak_component_count,
                 largest_size=summary.largest_weak_component_size,
                 largest_ratio=summary.largest_weak_component_ratio,
@@ -76,61 +88,48 @@ def render_network_summary_markdown(
         [
             "",
             "## 계산 메모",
-            "- 연결 밀도는 `nx.density(...)`, 관계 모둠은 `nx.community.greedy_modularity_communities(...)`를 기준으로 계산합니다.",
-            "- 영향력 참고치는 `nx.pagerank(...)`, `nx.hits(...)`, `nx.betweenness_centrality(...)` 등을 사용하지만, 해석은 본문 위주로 읽으면 됩니다.",
-            "- 더 자세한 숫자는 `network/nodes.csv`, `network/edges.csv`, `network/interactions.csv`에서 확인할 수 있습니다.",
+            "- 성장 추이는 라운드별 누적 연결을 다시 계산해 요약합니다.",
+            "- 직접 연결, 중간 다리 역할, 간접 영향력은 각각 상대 수, 중개 중심성, 페이지랭크를 바탕으로 읽습니다.",
+            "- 더 자세한 숫자는 `network/growth.csv`, `network/nodes.csv`, `network/edges.csv`에서 확인할 수 있습니다.",
         ]
     )
 
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _top_actor_lines(nodes: Sequence[ActorNodeMetrics]) -> list[str]:
-    if not nodes:
-        return ["- 중심으로 해석할 행위자 데이터가 없습니다."]
+def _growth_lines(growth_report: NetworkGrowthReport) -> list[str]:
+    if growth_report.empty_reason:
+        return [f"- {growth_report.empty_reason}"]
+    if not growth_report.rows:
+        return ["- 라운드별 성장 기록이 없습니다."]
 
-    lines: list[str] = []
-    for node in nodes[:5]:
+    final_row = growth_report.final_row
+    assert final_row is not None
+    earliest_growth = next(
+        (item for item in growth_report.rows if item.edge_count > 0),
+        None,
+    )
+    largest_jump = max(
+        growth_report.rows,
+        key=lambda item: (item.new_edge_count, item.new_actor_count, -item.round_index),
+    )
+
+    lines = []
+    if earliest_growth is not None:
         lines.append(
             "- "
-            f"{node.display_name}(`{node.cast_id}`): "
-            f"총 관계 가중치 {node.total_weight}, 상대 {node.counterpart_count}명, "
-            f"발신 액션 {node.initiated_actions}건, 수신 액션 {node.received_actions}건"
+            f"연결이 눈에 띄게 생기기 시작한 시점은 {earliest_growth.round_index}라운드였습니다."
         )
-    return lines
-
-
-def _interaction_lines(
-    *,
-    interactions: Sequence[InteractionDigestRecord],
-    edges: Sequence[ActorEdgeMetrics],
-) -> list[str]:
-    if interactions:
-        lines: list[str] = []
-        for item in interactions[:5]:
-            participant_label = " ↔ ".join(item.participant_display_names[:3])
-            if len(item.participant_display_names) > 3:
-                participant_label += f" 외 {len(item.participant_display_names) - 3}명"
-            message = item.latest_message or item.representative_message or item.representative_interaction
-            lines.append(
-                "- "
-                f"{participant_label}: "
-                f"{item.activity_count}건, "
-                f"라운드 {item.round_start}-{item.round_end}, "
-                f"최근 메시지 \"{message}\""
-            )
-        return lines
-
-    if not edges:
-        return ["- 두드러진 관계 엣지가 없습니다."]
-
-    return [
+    lines.append(
         "- "
-        f"{edge.source_display_name} → {edge.target_display_name}: "
-        f"총 {edge.total_weight}건, 실제 대상 액션 {edge.action_count}건, "
-        f"대표 상호작용 \"{edge.label_preview}\""
-        for edge in edges[:5]
-    ]
+        f"가장 큰 확장 구간은 {largest_jump.round_index}라운드로, "
+        f"새 행위자 {largest_jump.new_actor_count}명과 새 연결 {largest_jump.new_edge_count}개가 추가됐습니다."
+    )
+    lines.append(
+        "- "
+        f"최종 상태에서는 참여 행위자 {final_row.participating_actor_count}명과 연결 {final_row.edge_count}개가 남았습니다."
+    )
+    return lines
 
 
 def _coverage_line(report: NetworkReport) -> str:
@@ -138,7 +137,7 @@ def _coverage_line(report: NetworkReport) -> str:
     return (
         f"- 전체 {summary.total_actor_count}명 중 "
         f"{summary.participating_actor_count}명"
-        f"({_format_ratio(summary.participating_actor_ratio)})이 실제 관계망에 등장했습니다."
+        f"({_format_ratio(summary.participating_actor_ratio)})이 실제 연결에 들어왔습니다."
     )
 
 
@@ -146,7 +145,7 @@ def _edge_line(report: NetworkReport) -> str:
     summary = report.summary
     return (
         f"- 채택된 액션 {summary.activity_count}건이 "
-        f"{summary.edge_count}개의 방향 관계로 묶였습니다."
+        f"{summary.edge_count}개의 방향 연결로 묶였습니다."
     )
 
 
@@ -158,13 +157,22 @@ def _isolates_line(report: NetworkReport) -> str:
     )
 
 
+def _concentration_line(growth_report: NetworkGrowthReport) -> str:
+    final_row = growth_report.final_row
+    if final_row is None:
+        return "- 집중도를 계산할 수 없었습니다."
+    return (
+        f"- 최종 라운드 기준 가장 많이 연결된 1명이 전체 연결의 {_format_ratio(final_row.top1_actor_share)}를 차지했습니다. "
+        f"쏠림 정도는 HHI {_format_float(final_row.actor_weight_hhi)}, Gini {_format_float(final_row.actor_weight_gini)}입니다."
+    )
+
+
 def _density_line(report: NetworkReport) -> str:
     summary = report.summary
     if summary.density is None:
-        return "- 연결 밀도는 계산할 수 없었습니다."
+        return "- 실제로 연결된 비율은 계산할 수 없었습니다."
     return (
-        f"- 연결 밀도는 {_format_float(summary.density)}입니다. "
-        "값이 높을수록 가능한 관계 대비 실제 연결이 더 촘촘합니다."
+        f"- 서로 연결될 수 있는 경우 중 실제로 연결된 비율은 {_format_ratio(summary.density)}입니다."
     )
 
 
@@ -176,7 +184,7 @@ def _component_line(
     largest_ratio: float | None,
 ) -> str:
     return (
-        f"- {component_name}은 {count}개이며, 가장 큰 묶음은 "
+        f"- {component_name}은 {count}개이며, 가장 큰 그룹은 "
         f"{largest_size}명({_format_ratio(largest_ratio)})입니다."
     )
 
@@ -184,15 +192,15 @@ def _component_line(
 def _community_line(report: NetworkReport) -> str:
     summary = report.summary
     if not report.communities:
-        return "- 내부적으로 뚜렷하게 묶이는 소그룹은 관찰되지 않았습니다."
+        return "- 내부적으로 따로 뭉쳐 움직인 소그룹은 뚜렷하지 않았습니다."
 
     lead = report.communities[0]
     members = ", ".join(lead.member_display_names[:4])
     if len(lead.member_display_names) > 4:
         members += f" 외 {len(lead.member_display_names) - 4}명"
     return (
-        f"- 의미 있는 커뮤니티는 {summary.community_count}개이며, "
-        f"가장 큰 소그룹은 {members}입니다."
+        f"- 눈에 띄는 소그룹은 {summary.community_count}개였고, "
+        f"가장 큰 그룹은 {members}입니다."
     )
 
 

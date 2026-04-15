@@ -56,6 +56,7 @@ FIXER_SUMMARY_COLUMN_LABELS = {
     "ttft_max": "TTFT 최대값",
     "ttft_mean": "TTFT 평균값",
     "ttft_median": "TTFT 중앙값",
+    "ttft_p90": "TTFT p90",
     "ttft_p95": "TTFT p95",
     "ttft_p99": "TTFT p99",
     "duration_count": "소요 시간 집계 수",
@@ -63,6 +64,7 @@ FIXER_SUMMARY_COLUMN_LABELS = {
     "duration_max": "소요 시간 최대값",
     "duration_mean": "소요 시간 평균값",
     "duration_median": "소요 시간 중앙값",
+    "duration_p90": "소요 시간 p90",
     "duration_p95": "소요 시간 p95",
     "duration_p99": "소요 시간 p99",
 }
@@ -77,6 +79,58 @@ TOKEN_USAGE_COLUMN_LABELS = {
     "input_tokens_missing_count": "입력 토큰 누락 수",
     "output_tokens_missing_count": "출력 토큰 누락 수",
     "total_tokens_missing_count": "총 토큰 누락 수",
+    "input_tokens_count": "입력 토큰 집계 수",
+    "input_tokens_min": "입력 토큰 최소값",
+    "input_tokens_max": "입력 토큰 최대값",
+    "input_tokens_mean": "입력 토큰 평균값",
+    "input_tokens_median": "입력 토큰 중앙값",
+    "input_tokens_p90": "입력 토큰 p90",
+    "input_tokens_p95": "입력 토큰 p95",
+    "input_tokens_p99": "입력 토큰 p99",
+    "output_tokens_count": "출력 토큰 집계 수",
+    "output_tokens_min": "출력 토큰 최소값",
+    "output_tokens_max": "출력 토큰 최대값",
+    "output_tokens_mean": "출력 토큰 평균값",
+    "output_tokens_median": "출력 토큰 중앙값",
+    "output_tokens_p90": "출력 토큰 p90",
+    "output_tokens_p95": "출력 토큰 p95",
+    "output_tokens_p99": "출력 토큰 p99",
+    "total_tokens_count": "총 토큰 집계 수",
+    "total_tokens_min": "총 토큰 최소값",
+    "total_tokens_max": "총 토큰 최대값",
+    "total_tokens_mean": "총 토큰 평균값",
+    "total_tokens_median": "총 토큰 중앙값",
+    "total_tokens_p90": "총 토큰 p90",
+    "total_tokens_p95": "총 토큰 p95",
+    "total_tokens_p99": "총 토큰 p99",
+}
+
+PERFORMANCE_SUMMARY_COLUMN_LABELS = {
+    "input_tokens_bin_start": "입력 토큰 bin 시작",
+    "input_tokens_bin_end": "입력 토큰 bin 끝",
+    "output_tokens_bin_start": "출력 토큰 bin 시작",
+    "output_tokens_bin_end": "출력 토큰 bin 끝",
+    "call_count": "호출 수",
+    "ttft_sample_count": "TTFT 표본 수",
+    "duration_sample_count": "소요 시간 표본 수",
+    "ttft_p90": "TTFT p90",
+    "ttft_p95": "TTFT p95",
+    "ttft_p99": "TTFT p99",
+    "duration_p90": "소요 시간 p90",
+    "duration_p95": "소요 시간 p95",
+    "duration_p99": "소요 시간 p99",
+}
+
+ACTION_SUMMARY_COLUMN_LABELS = {
+    "action_type": "행동 종류 ID",
+    "label": "행동 이름",
+    "description": "설명",
+    "supported_visibility": "지원 노출 방식",
+    "adopted_count": "채택 횟수",
+    "adopted_round_count": "채택 라운드 수",
+    "first_adopted_round": "첫 채택 라운드",
+    "last_adopted_round": "마지막 채택 라운드",
+    "adopted_share": "채택 비중",
 }
 
 INTERACTION_COLUMN_LABELS = {
@@ -100,9 +154,9 @@ NETWORK_NODE_COLUMN_LABELS = {
     "display_name": "행위자 이름",
     "initiated_actions": "발신 액션 수",
     "received_actions": "수신 액션 수",
-    "sent_relations": "발신 관계 수",
-    "received_relations": "수신 관계 수",
-    "total_weight": "총 관계 가중치",
+    "sent_relations": "발신 연결 수",
+    "received_relations": "수신 연결 수",
+    "total_weight": "직접 연결 수",
     "counterpart_count": "상대 수",
     "in_degree_centrality": "내향 중심성",
     "out_degree_centrality": "외향 중심성",
@@ -127,9 +181,37 @@ NETWORK_EDGE_COLUMN_LABELS = {
     "thread_event_count": "스레드 연결 수",
     "first_round": "첫 라운드",
     "last_round": "마지막 라운드",
-    "total_weight": "총 연결 가중치",
+    "total_weight": "누적 연결 횟수",
     "label_preview": "엣지 라벨 요약",
     "label_variant_count": "엣지 라벨 변형 수",
+}
+
+NETWORK_GROWTH_COLUMN_LABELS = {
+    "round_index": "라운드",
+    "cumulative_activity_count": "누적 채택 액션 수",
+    "participating_actor_count": "참여 행위자 수",
+    "edge_count": "연결 수",
+    "largest_component_ratio": "한 그룹으로 이어진 비율",
+    "density": "실제 연결 비율",
+    "top1_actor_share": "가장 많이 연결된 1명의 비중",
+    "top3_actor_share": "상위 3명 점유율",
+    "actor_weight_hhi": "행위자 쏠림 HHI",
+    "actor_weight_gini": "행위자 쏠림 Gini",
+    "top1_edge_share": "상위 1개 연결 점유율",
+    "top3_edge_share": "상위 3개 연결 점유율",
+    "edge_weight_hhi": "연결 쏠림 HHI",
+    "edge_weight_gini": "연결 쏠림 Gini",
+    "new_actor_count": "신규 행위자 수",
+    "new_edge_count": "신규 연결 수",
+    "top_degree_cast_id": "직접 연결 중심 ID",
+    "top_degree_display_name": "직접 연결 중심 이름",
+    "top_degree_score": "직접 연결 중심 점수",
+    "top_broker_cast_id": "중간 연결 중심 ID",
+    "top_broker_display_name": "중간 연결 중심 이름",
+    "top_broker_score": "중간 연결 중심 점수",
+    "top_influence_cast_id": "간접 영향 중심 ID",
+    "top_influence_display_name": "간접 영향 중심 이름",
+    "top_influence_score": "간접 영향 중심 점수",
 }
 
 
@@ -166,13 +248,13 @@ def role_distribution_title(*, run_id: str, role: str, metric: str) -> str:
 def network_title(*, run_id: str) -> str:
     """Build one Korean chart title for the actor graph."""
 
-    return f"{run_id} 행위자 관계도"
+    return f"{run_id} 행위자 연결도"
 
 
 def distribution_overview_title(*, run_id: str) -> str:
     """Build one Korean chart title for the combined distribution overview."""
 
-    return f"{run_id} 주요 분포 개요"
+    return f"{run_id} 성능 요약"
 
 
 def translate_row(

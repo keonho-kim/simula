@@ -5,17 +5,23 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Sequence
 
 from simula.application.analysis.models import (
+    ActionCatalogReport,
     DistributionReport,
     FixerReport,
-    InteractionDigestRecord,
     LoadedRunAnalysis,
+    NetworkGrowthReport,
     NetworkReport,
     TokenUsageReport,
 )
 from simula.application.analysis.localization import role_label
+from simula.application.analysis.network_narrative import (
+    action_label_map,
+    build_actor_connection_lines,
+    build_growth_leader_shift_lines,
+    build_leader_lines,
+)
 
 
 def render_analysis_summary_markdown(
@@ -26,19 +32,46 @@ def render_analysis_summary_markdown(
     token_usage_report: TokenUsageReport,
     fixer_report: FixerReport,
     network_report: NetworkReport,
-    interactions: Sequence[InteractionDigestRecord],
+    action_report: ActionCatalogReport,
+    growth_report: NetworkGrowthReport,
 ) -> str:
     """Render one human-friendly summary page for analysis outputs."""
 
+    label_by_action_type = action_label_map(loaded.planned_actions)
     lines = [f"# {run_id} 분석 요약", ""]
     lines.extend(["## 한눈에 보기", *_overview_lines(loaded, network_report)])
-    lines.extend(["", "## 무슨 일이 있었나", *_what_happened_lines(loaded)])
-    lines.extend(["", "## 누가 중심이었나", *_central_actor_lines(network_report)])
+    lines.extend(["", "## 무슨 일이 있었나", *_what_happened_lines(loaded, label_by_action_type)])
     lines.extend(
         [
             "",
-            "## 관계별 핵심 interaction",
-            *_interaction_lines(interactions),
+            "## 누가 중심에 있었나",
+            *build_actor_connection_lines(
+                nodes=network_report.nodes,
+                label_by_action_type=label_by_action_type,
+                limit=3,
+            ),
+        ]
+    )
+    lines.extend(
+        [
+            "",
+            "## 누가 직접·간접으로 퍼졌나",
+            *build_leader_lines(network_report),
+        ]
+    )
+    lines.extend(
+        [
+            "",
+            "## 어떤 action이 준비됐고 무엇이 채택됐나",
+            *_action_lines(action_report),
+        ]
+    )
+    lines.extend(
+        [
+            "",
+            "## 연결이 어떻게 늘어났나",
+            *build_growth_leader_shift_lines(growth_report),
+            *_growth_lines(growth_report),
         ]
     )
     lines.extend(
@@ -65,18 +98,25 @@ def _overview_lines(
         default=0,
     )
     return [
-        f"- JSONL 이벤트 {loaded.event_count}건, LLM 호출 {len(loaded.llm_calls)}건을 기준으로 분석했습니다.",
-        f"- 채택된 액션은 {len(loaded.adopted_activities)}건이며, 실제 관계망에는 {network_report.summary.participating_actor_count}명이 등장했습니다.",
+        f"- LLM 호출 {len(loaded.llm_calls)}건을 기준으로 분석했습니다.",
+        f"- 채택된 액션은 {len(loaded.adopted_activities)}건이며, 실제 연결에 들어온 행위자는 {network_report.summary.participating_actor_count}명이었습니다.",
         f"- 분석상 확인된 진행 라운드는 {rounds_completed}라운드입니다.",
     ]
 
 
-def _what_happened_lines(loaded: LoadedRunAnalysis) -> list[str]:
+def _what_happened_lines(
+    loaded: LoadedRunAnalysis,
+    label_by_action_type: dict[str, str],
+) -> list[str]:
     if not loaded.adopted_activities:
         return ["- 채택된 액션이 없어 흐름 요약을 만들 수 없습니다."]
 
-    visibility_counts = Counter(item.visibility for item in loaded.adopted_activities if item.visibility)
-    action_type_counts = Counter(item.action_type for item in loaded.adopted_activities if item.action_type)
+    visibility_counts = Counter(
+        item.visibility for item in loaded.adopted_activities if item.visibility
+    )
+    action_type_counts = Counter(
+        item.action_type for item in loaded.adopted_activities if item.action_type
+    )
     most_common_action_type, most_common_action_count = action_type_counts.most_common(1)[0]
     latest_summaries = [
         item.action_summary
@@ -85,7 +125,8 @@ def _what_happened_lines(loaded: LoadedRunAnalysis) -> list[str]:
     ]
     lines = [
         "- "
-        f"가장 자주 채택된 행동은 `{most_common_action_type}` "
+        f"가장 자주 채택된 행동은 "
+        f"{label_by_action_type.get(most_common_action_type, most_common_action_type)} "
         f"({most_common_action_count}건)였습니다.",
         "- "
         + "노출 방식 분포는 "
@@ -100,40 +141,57 @@ def _what_happened_lines(loaded: LoadedRunAnalysis) -> list[str]:
     return lines
 
 
-def _central_actor_lines(report: NetworkReport) -> list[str]:
-    if not report.nodes:
-        return ["- 중심 행위자를 계산할 수 없었습니다."]
+def _action_lines(action_report: ActionCatalogReport) -> list[str]:
+    if action_report.empty_reason:
+        return [f"- {action_report.empty_reason}"]
 
     lines: list[str] = []
-    for node in report.nodes[:3]:
-        lines.append(
-            "- "
-            f"{node.display_name}(`{node.cast_id}`)는 총 관계 가중치 {node.total_weight}, "
-            f"상대 {node.counterpart_count}명으로 가장 많이 얽힌 축에 가깝습니다."
-        )
+    for item in action_report.rows:
+        if item.adopted_count > 0:
+            lines.append(
+                "- "
+                f"{item.label}(`{item.action_type}`): 채택 {item.adopted_count}건, "
+                f"라운드 {item.first_adopted_round}-{item.last_adopted_round}"
+            )
+        else:
+            lines.append(
+                "- "
+                f"{item.label}(`{item.action_type}`): 후보에는 있었지만 채택되지는 않았습니다."
+            )
     return lines
 
 
-def _interaction_lines(
-    interactions: Sequence[InteractionDigestRecord],
-) -> list[str]:
-    if not interactions:
-        return ["- 대표 상호작용을 뽑을 만한 관계 기록이 없습니다."]
+def _growth_lines(growth_report: NetworkGrowthReport) -> list[str]:
+    if growth_report.empty_reason:
+        return [f"- {growth_report.empty_reason}"]
+    if not growth_report.rows:
+        return ["- 연결이 어떻게 늘었는지 계산할 수 없었습니다."]
 
-    lines: list[str] = []
-    for item in interactions[:5]:
-        participants = " ↔ ".join(item.participant_display_names[:3])
-        if len(item.participant_display_names) > 3:
-            participants += f" 외 {len(item.participant_display_names) - 3}명"
-        representative = item.representative_interaction or "대표 상호작용 없음"
-        message = item.latest_message or item.representative_message or "대표 메시지 없음"
-        lines.append(
-            "- "
-            f"{participants}: {item.activity_count}건, "
-            f"대표 상호작용은 \"{representative}\", "
-            f"최근 메시지는 \"{message}\"였습니다."
-        )
-    return lines
+    final_row = growth_report.final_row
+    assert final_row is not None
+    largest_new_edge = max(
+        growth_report.rows,
+        key=lambda item: (item.new_edge_count, item.new_actor_count, -item.round_index),
+    )
+    most_concentrated = max(
+        growth_report.rows,
+        key=lambda item: (
+            _sort_value(item.top1_actor_share),
+            _sort_value(item.actor_weight_hhi),
+            -item.round_index,
+        ),
+    )
+
+    return [
+        "- "
+        f"최종 라운드에는 참여 행위자 {final_row.participating_actor_count}명, 연결 {final_row.edge_count}개까지 커졌습니다.",
+        "- "
+        f"가장 크게 확장된 시점은 {largest_new_edge.round_index}라운드로, "
+        f"새 행위자 {largest_new_edge.new_actor_count}명과 새 연결 {largest_new_edge.new_edge_count}개가 더해졌습니다.",
+        "- "
+        f"쏠림이 가장 강했던 시점은 {most_concentrated.round_index}라운드로, "
+        f"상위 1명이 전체 연결의 {_format_percent(most_concentrated.top1_actor_share)}를 차지했습니다.",
+    ]
 
 
 def _llm_usage_lines(
@@ -194,8 +252,13 @@ def _fixer_lines(fixer_report: FixerReport) -> list[str]:
 
 def _where_to_look_lines() -> list[str]:
     return [
-        "- `network/interactions.csv`: 관계·스레드별 대표 상호작용과 대표 메시지를 더 자세히 볼 때",
-        "- `network/summary.md`: 관계망 수치와 구조 해설을 깊게 볼 때",
+        "- `actions/summary.csv`: 후보 action과 실제 채택 횟수를 비교할 때",
+        "- `performance/summary.png`: 전체 호출 성능 분포를 한눈에 볼 때",
+        "- `performance/summary.csv`: input/output 토큰 크기 조합별 TTFT·소요 시간 p90/p95/p99를 볼 때",
+        "- `network/growth.csv`: 라운드별 연결 변화 수치를 직접 확인할 때",
+        "- `network/growth_metrics.png`: 연결이 늘어나는 흐름을 빠르게 볼 때",
+        "- `network/concentration.png`: 연결이 어느 쪽에 몰렸는지 볼 때",
+        "- `network/growth.mp4`: 연결이 늘어나는 순서를 정지 가능한 영상으로 볼 때",
         "- `token_usage/summary.md`: 역할별 토큰 사용량을 확인할 때",
         "- `llm_calls.csv`: 개별 호출과 원문 응답을 직접 추적할 때",
     ]
@@ -205,3 +268,15 @@ def _format_optional(value: float | None, *, suffix: str) -> str:
     if value is None:
         return "-"
     return f"{value:.2f}{suffix}"
+
+
+def _format_percent(value: float | None) -> str:
+    if value is None:
+        return "-"
+    return f"{value * 100:.1f}%"
+
+
+def _sort_value(value: float | None) -> float:
+    if value is None:
+        return -1.0
+    return value

@@ -22,6 +22,8 @@ class MutableNodeState:
     received_actions: int = 0
     sent_relations: int = 0
     received_relations: int = 0
+    sent_action_counts: dict[str, int] = field(default_factory=dict)
+    received_action_counts: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -71,6 +73,11 @@ def aggregate_relationship_network(
             continue
         _ensure_node(node_state, actors_by_id=actors_by_id, cast_id=source_cast_id)
         node_state[source_cast_id].initiated_actions += 1
+        action_type = activity.action_type.strip()
+        if action_type:
+            node_state[source_cast_id].sent_action_counts[action_type] = (
+                node_state[source_cast_id].sent_action_counts.get(action_type, 0) + 1
+            )
 
         target_cast_ids = _dedupe_ids(activity.target_cast_ids)
         intent_only_cast_ids = [
@@ -85,6 +92,11 @@ def aggregate_relationship_network(
             node_state[source_cast_id].sent_relations += 1
             node_state[target_cast_id].received_relations += 1
             node_state[target_cast_id].received_actions += 1
+            if action_type:
+                node_state[target_cast_id].received_action_counts[action_type] = (
+                    node_state[target_cast_id].received_action_counts.get(action_type, 0)
+                    + 1
+                )
             counterparties[source_cast_id].add(target_cast_id)
             counterparties[target_cast_id].add(source_cast_id)
             _update_edge(

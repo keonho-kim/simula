@@ -17,8 +17,8 @@ fi
 echo "[1/5] 패키지 목록을 갱신합니다."
 run_cmd apt-get update
 
-echo "[2/5] 한글 렌더링용 시스템 패키지를 설치합니다."
-run_cmd apt-get install -y fontconfig fonts-noto-cjk
+echo "[2/5] 한글 렌더링과 영상 렌더링용 시스템 패키지를 설치합니다."
+run_cmd apt-get install -y fontconfig fonts-noto-cjk ffmpeg
 
 echo "[3/5] Noto Sans KR 우선 사용을 위한 fontconfig 설정을 추가합니다."
 mkdir -p "${HOME}/.config/fontconfig/conf.d"
