@@ -11,11 +11,13 @@ import pytest
 import simula.application.analysis.plotting.network as plotting_network
 from simula.application.analysis.plotting.network import (
     _build_edge_label_text,
+    _build_edge_weight_label_text,
     _build_edge_strengths,
     _build_edge_visual_style,
     _build_layout_kwargs,
     _compute_layout_positions,
     _build_node_visual_style,
+    render_network_plot,
 )
 
 
@@ -137,6 +139,17 @@ def test_edge_strengths_are_normalized_between_zero_and_one() -> None:
     assert strengths[("beta", "gamma")] == pytest.approx(1.0)
 
 
+def test_edge_weight_label_text_uses_normalized_strength_values() -> None:
+    graph = nx.DiGraph()
+    graph.add_edge("alpha", "beta", total_weight=3)
+    graph.add_edge("beta", "gamma", total_weight=6)
+
+    labels = _build_edge_weight_label_text(graph)
+
+    assert labels[("alpha", "beta")] == "0.50"
+    assert labels[("beta", "gamma")] == "1.00"
+
+
 def test_edge_label_text_uses_interaction_count_when_present() -> None:
     graph = nx.DiGraph()
     graph.add_edge("alpha", "beta", total_weight=3, weight=0.3, action_count=2)
@@ -156,3 +169,40 @@ def test_edge_label_text_hides_edges_without_interactions() -> None:
     labels = _build_edge_label_text(graph)
 
     assert labels == {}
+
+
+def test_render_network_plot_draws_weight_and_interaction_labels(monkeypatch, tmp_path) -> None:
+    graph = nx.DiGraph()
+    graph.add_node("alpha", display_name="Alpha", total_weight=4)
+    graph.add_node("beta", display_name="Beta", total_weight=2)
+    graph.add_edge("alpha", "beta", total_weight=4, action_count=2)
+    graph.add_edge("beta", "alpha", total_weight=2, action_count=0)
+
+    monkeypatch.setattr(
+        plotting_network,
+        "_compute_layout_positions",
+        lambda graph: {"alpha": (-1.0, 0.0), "beta": (1.0, 0.0)},
+    )
+    captured: list[dict[str, object]] = []
+
+    def _fake_draw_networkx_edge_labels(*args, **kwargs):  # noqa: ANN002, ANN003
+        del args
+        captured.append(dict(kwargs))
+        return {}
+
+    monkeypatch.setattr(
+        plotting_network.nx,
+        "draw_networkx_edge_labels",
+        _fake_draw_networkx_edge_labels,
+    )
+
+    render_network_plot(graph, title="network", output_path=tmp_path / "graph.png")
+
+    assert len(captured) == 2
+    assert captured[0]["edge_labels"] == {
+        ("alpha", "beta"): "1.00",
+        ("beta", "alpha"): "0.50",
+    }
+    assert captured[0]["label_pos"] == pytest.approx(0.5)
+    assert captured[1]["edge_labels"] == {("alpha", "beta"): "2회"}
+    assert captured[1]["label_pos"] == pytest.approx(0.52)
