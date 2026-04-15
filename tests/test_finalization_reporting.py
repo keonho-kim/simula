@@ -10,8 +10,11 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from types import SimpleNamespace
+
+from langchain_core.prompts import PromptTemplate
 
 from simula.application.workflow.graphs.finalization.nodes.build_report_projection import (
     build_report_projection,
@@ -26,10 +29,10 @@ from simula.application.workflow.utils.finalization_sections import (
     normalize_conclusion_section,
     normalize_final_report_sections,
     render_markdown_table,
+    write_report_section,
     validate_actor_dynamics_section,
     validate_bullet_section,
     validate_conclusion_section,
-    validate_forbidden_report_terms,
     validate_markdown_table_rows,
     validate_timeline_section,
 )
@@ -37,6 +40,7 @@ from simula.application.workflow.graphs.finalization.nodes.resolve_timeline_anch
     extract_explicit_anchor,
     extract_partial_anchor_hint,
 )
+from simula.prompts.shared.user_facing_language import build_user_facing_style_block
 
 
 def test_extract_explicit_anchor_parses_date_and_time() -> None:
@@ -215,13 +219,60 @@ def test_validate_actor_dynamics_section_requires_fixed_subheadings() -> None:
     assert error is None
 
 
-def test_validate_forbidden_report_terms_rejects_abstract_jargon() -> None:
-    error = validate_forbidden_report_terms(
-        "### 현재 구도\nAlpha는 조정 축으로 남았다.",
-        scenario_text="테스트 시나리오",
+def test_build_user_facing_style_block_no_longer_mentions_forbidden_terms() -> None:
+    style = build_user_facing_style_block()
+
+    assert "Avoid expressions such as" not in style
+
+
+def test_validate_conclusion_section_allows_terms_previously_blocked_as_jargon() -> None:
+    error = validate_conclusion_section(
+        "### 최종 상태\n"
+        "- 마지막 협상안은 브리지 조건 쪽으로 수렴했다.\n"
+        "### 핵심 판단 근거\n"
+        "- 이사회 직전 구조가 재편되며 선택지가 줄었다."
     )
 
-    assert error is not None
+    assert error is None
+
+
+def test_validate_actor_dynamics_section_allows_terms_previously_blocked_as_jargon() -> None:
+    error = validate_actor_dynamics_section(
+        "### 현재 구도\n"
+        "- CFO와 CEO는 숫자 기준 정렬을 다시 맞추고 있다.\n\n"
+        "### 관계 변화\n"
+        "- 투자사 압박이 커지며 내부 역할이 재편됐다."
+    )
+
+    assert error is None
+
+
+def test_write_report_section_accepts_valid_timeline_with_previously_forbidden_term() -> None:
+    class FakeLLM:
+        async def ainvoke_text_with_meta(self, role, prompt, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            return (
+                "- 2026-04-14 09:00 | 마무리 단계 | CFO가 표결 안건을 숫자 기준으로 정렬함 | 결론 직전 준비가 끝났다.",
+                SimpleNamespace(),
+            )
+
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(
+            llms=FakeLLM(),
+        )
+    )
+
+    result = asyncio.run(
+        write_report_section(
+            runtime=runtime,  # type: ignore[arg-type]
+            prompt=PromptTemplate.from_template("{scenario_text}"),
+            prompt_inputs={"scenario_text": "테스트 시나리오"},
+            section_title="timeline",
+            validator=validate_timeline_section,
+        )
+    )
+
+    assert "정렬함" in result
 
 
 def test_render_markdown_table_keeps_header_when_body_is_empty() -> None:

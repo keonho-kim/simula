@@ -22,9 +22,6 @@ from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
 from simula.application.workflow.utils.prompt_projections import truncate_text
-from simula.prompts.shared.user_facing_language import (
-    find_forbidden_user_facing_term,
-)
 
 
 def build_report_prompt_inputs(
@@ -101,11 +98,6 @@ async def write_report_section(
             feedback = None
         else:
             feedback = validator(normalized_body)
-        if feedback is None:
-            feedback = validate_forbidden_report_terms(
-                normalized_body,
-                scenario_text=prompt_inputs.get("scenario_text", ""),
-            )
         if feedback is None:
             return normalized_body
 
@@ -241,22 +233,6 @@ def validate_actor_dynamics_section(section_body: str) -> str | None:
         headings=["### 현재 구도", "### 관계 변화"],
         min_items=2,
     )
-
-
-def validate_forbidden_report_terms(
-    section_body: str,
-    *,
-    scenario_text: str,
-) -> str | None:
-    """최종 보고서에서 피해야 하는 추상 표현을 검사한다."""
-
-    violation = find_forbidden_user_facing_term(
-        text=section_body,
-        scenario_text=scenario_text,
-    )
-    if violation is None:
-        return None
-    return f"사용자 노출 출력에서 피해야 하는 표현 {violation} 이 포함되어 있습니다."
 
 
 def validate_markdown_table_rows(

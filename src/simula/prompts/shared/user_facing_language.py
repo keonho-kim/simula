@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import re
 import textwrap
 
 _FULL_STYLE_BLOCK = textwrap.dedent(
@@ -20,7 +19,6 @@ _FULL_STYLE_BLOCK = textwrap.dedent(
     - Name the subject and the target explicitly whenever possible.
     - Prefer everyday words over analyst jargon.
     - Prefer action verbs over abstract nouns.
-    - Avoid expressions such as `~축`, `수렴`, `정렬`, `재편`, `재배치`, `허브`, `다이내믹`, `텍스처` unless the scenario text clearly requires them.
     """
 ).strip()
 
@@ -30,7 +28,6 @@ _FULL_STYLE_BLOCK_WITHOUT_RESULT = textwrap.dedent(
     - Name the subject and the target explicitly whenever possible.
     - Prefer everyday words over analyst jargon.
     - Prefer action verbs over abstract nouns.
-    - Avoid expressions such as `~축`, `수렴`, `정렬`, `재편`, `재배치`, `허브`, `다이내믹`, `텍스처` unless the scenario text clearly requires them.
     """
 ).strip()
 
@@ -47,17 +44,6 @@ _COMPACT_STYLE_BLOCK_WITHOUT_RESULT = textwrap.dedent(
     """
 ).strip()
 
-FORBIDDEN_USER_FACING_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("`~축` 표현", re.compile(r"(?:보조|중심|핵심|조정|관계|주도|영향)\s*축")),
-    ("`수렴`", re.compile(r"수렴")),
-    ("`정렬`", re.compile(r"정렬")),
-    ("`재편`", re.compile(r"재편")),
-    ("`재배치`", re.compile(r"재배치")),
-    ("`허브`", re.compile(r"허브")),
-    ("`다이내믹`", re.compile(r"다이내믹")),
-    ("`텍스처`", re.compile(r"텍스처")),
-)
-
 
 def build_user_facing_style_block(
     *,
@@ -73,16 +59,3 @@ def build_user_facing_style_block(
     if include_result_first:
         return _FULL_STYLE_BLOCK
     return _FULL_STYLE_BLOCK_WITHOUT_RESULT
-
-
-def find_forbidden_user_facing_term(
-    *,
-    text: str,
-    scenario_text: str,
-) -> str | None:
-    """금지어가 있는지 확인하고 첫 위반 항목을 반환한다."""
-
-    for label, pattern in FORBIDDEN_USER_FACING_PATTERNS:
-        if pattern.search(text) and not pattern.search(scenario_text):
-            return label
-    return None
