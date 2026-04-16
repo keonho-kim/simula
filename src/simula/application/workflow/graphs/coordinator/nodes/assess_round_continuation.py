@@ -9,6 +9,7 @@ from typing import cast
 
 from langgraph.runtime import Runtime
 
+from simula.application.llm_logging import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.coordinator.output_schema.bundles import (
     build_round_continuation_prompt_bundle,
@@ -223,10 +224,16 @@ async def assess_round_continuation(
         RoundContinuationDecision,
         allow_default_on_failure=True,
         default_payload=_build_default_round_continuation_payload(),
-        log_context={
-            "scope": "round-continuation",
-            "round_index": round_index,
-        },
+        log_context=build_llm_log_context(
+            scope="round-continuation",
+            phase="runtime",
+            task_key="round_continuation",
+            task_label="라운드 지속 여부 판단",
+            artifact_key="stop_reason",
+            artifact_label="stop_reason",
+            schema=RoundContinuationDecision,
+            round_index=round_index,
+        ),
     )
     stop_reason = decision.stop_reason
     if stop_reason == "no_progress" and required_unresolved_events:

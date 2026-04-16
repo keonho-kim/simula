@@ -76,6 +76,12 @@ def test_build_planning_analysis_renders_real_prompt() -> None:
             assert schema is PlanningAnalysis
             assert "시나리오 본문 테스트" in prompt
             assert "Round cap" in prompt
+            assert "`progression_plan.selection_reason` must be non-empty" in prompt
+            assert "`progression_plan.allowed_elapsed_units` must contain unique values." in prompt
+            assert (
+                "`progression_plan.default_elapsed_unit` must be one of "
+                "`progression_plan.allowed_elapsed_units`." in prompt
+            )
             return (
                 PlanningAnalysis(
                     brief_summary="공개 압박과 비공개 조율이 겹친다.",
@@ -118,6 +124,15 @@ def test_build_execution_plan_renders_real_prompt() -> None:
             assert "실행 계획 시나리오" in prompt
             assert '"brief_summary":"요약"' in prompt
             assert "Requested cast count" in prompt
+            assert "Keep the action catalog broad and small." in prompt
+            assert "Each `action_catalog.actions` item must use a unique `action_type`." in prompt
+            assert (
+                "`cast_roster.items` must use unique `cast_id` values and unique "
+                "`display_name` values." in prompt
+            )
+            assert "Each `major_events` item must use a unique `event_id`." in prompt
+            assert "`earliest_round` must be less than or equal to `latest_round`." in prompt
+            assert "actions must contain at most 5 items." not in prompt
             return (
                 ExecutionPlanBundle(
                     situation={
@@ -359,6 +374,19 @@ def test_build_round_directive_renders_real_prompt() -> None:
             assert "같은 선언 반복 금지" in prompt
             assert "공개 대화" in prompt
             assert "최종 선택" in prompt
+            assert (
+                "`focus_summary` and top-level `selection_reason` must be non-empty, "
+                "concrete strings" in prompt
+            )
+            assert "`selected_cast_ids` and `deferred_cast_ids` must stay unique." in prompt
+            assert (
+                "Each `focus_slices` item must keep `stakes` and `selection_reason` "
+                "non-empty and concrete." in prompt
+            )
+            assert (
+                "Each `background_updates` item must keep `future_hook` non-empty "
+                "and concrete." in prompt
+            )
             return (
                 RoundDirective(
                     round_index=2,
@@ -557,6 +585,15 @@ def test_resolve_round_renders_real_prompt() -> None:
             assert "같은 선언 반복 금지" in prompt
             assert "공개 대화" in prompt
             assert '"pressure_level":"high"' in prompt
+            assert "`updated_intent_states` must keep one unique item per `cast_id`." in prompt
+            assert (
+                "Each `event_updates` item must keep `progress_summary` non-empty "
+                "and concrete." in prompt
+            )
+            assert (
+                "`round_time_advance.selection_reason` must be non-empty and grounded "
+                "in the adopted actions" in prompt
+            )
             return (
                 RoundResolution(
                     adopted_cast_ids=[],

@@ -16,6 +16,7 @@ from typing import cast
 
 from langgraph.runtime import Runtime
 
+from simula.application.llm_logging import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.finalization.output_schema.bundles import (
     build_timeline_anchor_decision_prompt_bundle,
@@ -73,7 +74,16 @@ async def resolve_timeline_anchor(
         "observer",
         prompt,
         TimelineAnchorDecision,
-        log_context={"scope": "final-report", "section": "timeline-anchor"},
+        log_context=build_llm_log_context(
+            scope="final-report",
+            phase="finalization",
+            task_key="timeline_anchor",
+            task_label="타임라인 anchor 결정",
+            artifact_key="report_timeline_anchor_json",
+            artifact_label="report_timeline_anchor_json",
+            schema=TimelineAnchorDecision,
+            section="timeline-anchor",
+        ),
     )
     parsed_anchor = datetime.fromisoformat(anchor.anchor_iso)
     normalized = anchor.model_copy(

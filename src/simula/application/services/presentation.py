@@ -92,7 +92,11 @@ def print_trial_run_summary(
         final_report = trial.final_report if isinstance(trial.final_report, dict) else {}
         llm_usage_summary = _dict_value(final_report.get("llm_usage_summary"))
         total_calls = llm_usage_summary.get("total_calls", "-")
-        role_summary = ", ".join(render_llm_usage_lines(llm_usage_summary)[3:4]) or "-"
+        usage_lines = render_llm_usage_lines(llm_usage_summary)
+        role_summary = next(
+            (line for line in usage_lines if line.startswith("역할별 호출:")),
+            "역할별 호출: -",
+        )
         print(
             f"{trial.trial_index} | {trial.success} | {trial.run_id} | "
             f"{total_calls} | {role_summary} | {trial.error or '-'}"

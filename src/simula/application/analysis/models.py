@@ -35,6 +35,56 @@ class LLMCallRecord:
     def scope(self) -> str:
         return str(self.log_context.get("scope", "")).strip()
 
+    @property
+    def phase(self) -> str:
+        return str(self.log_context.get("phase", "")).strip()
+
+    @property
+    def task_key(self) -> str:
+        return str(self.log_context.get("task_key", "")).strip()
+
+    @property
+    def task_label(self) -> str:
+        return str(self.log_context.get("task_label", "")).strip()
+
+    @property
+    def artifact_key(self) -> str:
+        return str(self.log_context.get("artifact_key", "")).strip()
+
+    @property
+    def artifact_label(self) -> str:
+        return str(self.log_context.get("artifact_label", "")).strip()
+
+    @property
+    def schema_name(self) -> str:
+        return str(self.log_context.get("schema_name", "")).strip()
+
+    @property
+    def section(self) -> str:
+        return str(self.log_context.get("section", "")).strip()
+
+    @property
+    def target_role(self) -> str:
+        return str(self.log_context.get("target_role", "")).strip()
+
+    @property
+    def target_task_key(self) -> str:
+        return str(self.log_context.get("target_task_key", "")).strip()
+
+    @property
+    def target_artifact_key(self) -> str:
+        return str(self.log_context.get("target_artifact_key", "")).strip()
+
+    @property
+    def target_schema_name(self) -> str:
+        return str(self.log_context.get("target_schema_name", "")).strip()
+
+    @property
+    def task_identifier(self) -> str:
+        if not self.task_key:
+            return self.role
+        return f"{self.role}.{self.task_key}"
+
     def to_row(self) -> dict[str, object]:
         return {
             "run_id": self.run_id,
@@ -44,6 +94,17 @@ class LLMCallRecord:
             "call_kind": self.call_kind,
             "call_kind_label": call_kind_label(self.call_kind),
             "scope": self.scope,
+            "phase": self.phase,
+            "task_key": self.task_key,
+            "task_label": self.task_label,
+            "artifact_key": self.artifact_key,
+            "artifact_label": self.artifact_label,
+            "schema_name": self.schema_name,
+            "section": self.section,
+            "target_role": self.target_role,
+            "target_task_key": self.target_task_key,
+            "target_artifact_key": self.target_artifact_key,
+            "target_schema_name": self.target_schema_name,
             "duration_seconds": self.duration_seconds,
             "ttft_seconds": self.ttft_seconds,
             "input_tokens": self.input_tokens,

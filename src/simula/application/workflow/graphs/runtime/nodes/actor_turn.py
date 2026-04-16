@@ -17,6 +17,7 @@ from typing import Any, cast
 from langgraph.runtime import Runtime
 from langgraph.types import Overwrite, Send
 
+from simula.application.llm_logging import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.runtime.output_schema.bundles import (
     build_actor_action_proposal_prompt_bundle,
@@ -357,23 +358,30 @@ def _actor_log_context(
         dict[str, object],
         runtime_guidance.get("actor_facing_scenario_digest", {}),
     )
-    return {
-        "round_index": int(state["round_index"]),
-        "simulation_clock_label": str(
+    return build_llm_log_context(
+        scope="actor-turn",
+        phase="runtime",
+        task_key="actor_action_proposal",
+        task_label="행동 제안",
+        artifact_key="pending_actor_proposals",
+        artifact_label="pending_actor_proposals",
+        schema=ActorActionProposal,
+        round_index=int(state["round_index"]),
+        simulation_clock_label=str(
             cast(dict[str, object], state.get("simulation_clock", {})).get(
                 "total_elapsed_label",
                 "0분",
             )
         ),
-        "cast_id": str(actor["cast_id"]),
-        "actor_display_name": actor.get("display_name"),
-        "actor_thought": cast(
+        cast_id=str(actor["cast_id"]),
+        actor_display_name=actor.get("display_name"),
+        actor_thought=cast(
             dict[str, object],
             runtime_guidance.get("current_intent_snapshot", {}),
         ).get("thought", ""),
-        "actor_talking_points": digest.get("talking_points", []),
-        "actor_recommended_tone": digest.get("recommended_tone", ""),
-    }
+        actor_talking_points=digest.get("talking_points", []),
+        actor_recommended_tone=digest.get("recommended_tone", ""),
+    )
 
 
 def _build_runtime_guidance(

@@ -14,6 +14,7 @@ import json
 
 from langgraph.runtime import Runtime
 
+from simula.application.llm_logging import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.generation.prompts.generate_actor_prompt import (
     PROMPT as GENERATE_ACTOR_PROMPT,
@@ -81,7 +82,16 @@ async def generate_actor_slot(
         "generator",
         prompt,
         GeneratedActorCardDraft,
-        log_context={"slot_index": int(slot["slot_index"])},
+        log_context=build_llm_log_context(
+            scope="actor-card-generation",
+            phase="generation",
+            task_key="actor_card_generation",
+            task_label="인물 카드 생성",
+            artifact_key="generated_actor_results",
+            artifact_label="generated_actor_results",
+            schema=GeneratedActorCardDraft,
+            slot_index=int(slot["slot_index"]),
+        ),
     )
     actor_card = ActorCard(
         cast_id=str(slot["cast_id"]),

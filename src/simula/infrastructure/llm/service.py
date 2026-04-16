@@ -22,6 +22,7 @@ from typing import Any, TypeVar, cast
 from langchain_core.exceptions import OutputParserException
 from pydantic import BaseModel, ValidationError
 
+from simula.application.llm_logging import ensure_llm_log_context
 from simula.application.ports.llm import SemanticValidator, StructuredCallMeta
 from simula.infrastructure.config.models import AppSettings
 from simula.application.workflow.helper.fixer import repair_structured_json
@@ -87,7 +88,15 @@ class AsyncStructuredLLMService:
         """비동기 structured 호출과 fixer fallback을 수행한다."""
 
         started_at = time.perf_counter()
-        self.router._log_structured_call_start(role=role, log_context=log_context)
+        normalized_log_context = ensure_llm_log_context(
+            log_context,
+            role=role,
+            schema=schema,
+        )
+        self.router._log_structured_call_start(
+            role=role,
+            log_context=normalized_log_context,
+        )
 
         parser = build_output_parser(schema)
         attempts = _build_structured_attempt_prompts(prompt, parser)
@@ -112,13 +121,14 @@ class AsyncStructuredLLMService:
                 role,
                 candidate,
                 call_kind="structured",
+                log_context=normalized_log_context,
             )
             self.router._emit_llm_call_event(
                 role=role,
                 call_kind="structured",
                 prompt=candidate,
                 raw_response=attempt_raw_response,
-                log_context=log_context,
+                log_context=normalized_log_context,
                 duration_seconds=attempt_duration,
                 ttft_seconds=attempt_ttft,
                 input_tokens=attempt_input,
@@ -153,7 +163,7 @@ class AsyncStructuredLLMService:
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     total_tokens=total_tokens,
-                    log_context=log_context,
+                    log_context=normalized_log_context,
                 )
                 self.router.usage_tracker.record_structured_outcome(
                     parse_failures=parse_failure_count,
@@ -182,10 +192,12 @@ class AsyncStructuredLLMService:
             role=role,
             last_error=last_error,
             last_content=last_content,
-            log_context=log_context,
+            log_context=normalized_log_context,
         )
         fixer_outcome = await repair_structured_json(
             router=self.router,
+            target_role=role,
+            target_log_context=normalized_log_context,
             content=last_content,
             parser=parser,
             semantic_validator=semantic_validator,
@@ -221,7 +233,7 @@ class AsyncStructuredLLMService:
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     total_tokens=total_tokens,
-                    log_context=log_context,
+                    log_context=normalized_log_context,
                 )
                 self.router.usage_tracker.record_structured_outcome(
                     parse_failures=parse_failure_count,
@@ -248,7 +260,7 @@ class AsyncStructuredLLMService:
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 total_tokens=total_tokens,
-                log_context=log_context,
+                log_context=normalized_log_context,
                 parse_error=last_error,
             )
             self.logger.warning("%s 응답을 파싱하지 못해 기본값으로 강등합니다.", role)
@@ -357,9 +369,14 @@ def _log_primary_parse_failure(
     if last_error is None:
         return
 
+    if log_context:
+        task_label = str(log_context.get("task_label", "")).strip()
+        header = f"{role} · {task_label}" if task_label else role
+    else:
+        header = role
     logger.debug(
         "\n%s primary structured parse failed\ncontext: %s\nparse_error: %s\nfull_response:\n%s\n",
-        role,
+        header,
         log_context or {},
         last_error,
         last_content,

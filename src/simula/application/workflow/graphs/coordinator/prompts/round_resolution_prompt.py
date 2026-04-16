@@ -17,7 +17,9 @@ Resolve this round in one object: adoption, updated intents, elapsed-time advanc
 - `stop_reason` may be `"simulation_done"` only when this round clearly completes the simulation objective.
 - Use `event_match_hints_json` as the code-first baseline for which major events may have advanced this round.
 - `event_updates` may mention only event ids that exist in `event_memory_json`.
+- `updated_intent_states` must keep one unique item per `cast_id`.
 - Do not mark a major event as `completed` unless the round activities plausibly satisfy its participants and completion signals.
+- Each `event_updates` item must keep `progress_summary` non-empty and concrete.
 - Use `situation_json` and `coordination_frame_json` as hard realism rails for the next-step direction.
 - Every field is required.
 - Return only the JSON object that matches the required output schema.
@@ -27,6 +29,7 @@ Resolve this round in one object: adoption, updated intents, elapsed-time advanc
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
 - Each `updated_intent_states` item must keep `current_intent` concrete and add `thought` that explains why this actor chose that direction now.
+- `round_time_advance.selection_reason` must be non-empty and grounded in the adopted actions, background updates, or event progress from this round.
 - Keep each updated intent only one plausible beat ahead of the adopted actions. Do not jump straight to public commitment, marriage confirmation, room-wide approval, or shared-strategy leadership unless the supplied actions already justify that intensity.
 - `actor_facing_scenario_digest` must describe the next round for actors, including relationship map, current pressures, talking points, repetition to avoid, and recommended tone.
 - `actor_facing_scenario_digest.world_state_summary` must match the top-level `world_state_summary`.

@@ -76,15 +76,24 @@ def render_llm_usage_lines(llm_usage_summary: dict[str, object]) -> list[str]:
     """사람이 읽기 쉬운 LLM usage summary 줄 목록을 만든다."""
 
     calls_by_role = _dict_value(llm_usage_summary.get("calls_by_role", {}))
+    calls_by_task = _dict_value(llm_usage_summary.get("calls_by_task", {}))
     role_summary = ", ".join(
         f"{role}={_int_value(count)}"
         for role, count in sorted(calls_by_role.items(), key=lambda item: str(item[0]))
+    )
+    task_summary = ", ".join(
+        f"{task}={_int_value(count)}"
+        for task, count in sorted(
+            calls_by_task.items(),
+            key=lambda item: (-_int_value(item[1]), str(item[0])),
+        )[:6]
     )
     return [
         f"총 호출 수: {_int_value(llm_usage_summary.get('total_calls', 0))}",
         f"구조화 호출: {_int_value(llm_usage_summary.get('structured_calls', 0))}",
         f"원문 호출: {_int_value(llm_usage_summary.get('text_calls', 0))}",
         f"역할별 호출: {role_summary or '-'}",
+        f"task별 호출 상위: {task_summary or '-'}",
         f"파싱 실패 누적: {_int_value(llm_usage_summary.get('parse_failures', 0))}",
         f"기본값 강등: {_int_value(llm_usage_summary.get('forced_defaults', 0))}",
         "토큰 입력/출력/전체: "

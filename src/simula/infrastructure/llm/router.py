@@ -25,6 +25,7 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 from pydantic import BaseModel
 
+from simula.application.llm_logging import ensure_llm_log_context
 from simula.application.ports.llm import StructuredCallMeta
 from simula.infrastructure.config.models import AppSettings
 from simula.domain.log_events import build_llm_call_event
@@ -81,6 +82,7 @@ class StructuredLLMRouter:
     ) -> tuple[str, StructuredCallMeta]:
         """LLM 원문 응답과 메타데이터를 함께 반환한다."""
 
+        normalized_log_context = ensure_llm_log_context(log_context, role=role)
         self._log_structured_call_start(role=role, log_context=log_context)
         (
             response,
@@ -91,7 +93,12 @@ class StructuredLLMRouter:
             raw_response,
             duration_seconds,
         ) = (
-            self._invoke_with_metrics(role, prompt, call_kind="text")
+            self._invoke_with_metrics(
+                role,
+                prompt,
+                call_kind="text",
+                log_context=normalized_log_context,
+            )
         )
         content = _content_to_text(response.content).strip()
         if not content:
@@ -101,7 +108,7 @@ class StructuredLLMRouter:
             call_kind="text",
             prompt=prompt,
             raw_response=raw_response,
-            log_context=log_context,
+            log_context=normalized_log_context,
             duration_seconds=duration_seconds,
             ttft_seconds=ttft_seconds,
             input_tokens=input_tokens,
@@ -116,7 +123,7 @@ class StructuredLLMRouter:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=total_tokens,
-            log_context=log_context,
+            log_context=normalized_log_context,
         )
         return content, StructuredCallMeta(
             parse_failure_count=0,
@@ -138,6 +145,7 @@ class StructuredLLMRouter:
     ) -> tuple[str, StructuredCallMeta]:
         """비동기 LLM 원문 응답과 메타데이터를 함께 반환한다."""
 
+        normalized_log_context = ensure_llm_log_context(log_context, role=role)
         self._log_structured_call_start(role=role, log_context=log_context)
         (
             response,
@@ -147,7 +155,12 @@ class StructuredLLMRouter:
             total_tokens,
             raw_response,
             duration_seconds,
-        ) = await self._ainvoke_with_metrics(role, prompt, call_kind="text")
+        ) = await self._ainvoke_with_metrics(
+            role,
+            prompt,
+            call_kind="text",
+            log_context=normalized_log_context,
+        )
         content = _content_to_text(response.content).strip()
         if not content:
             raise ValueError("응답이 비어 있습니다.")
@@ -156,7 +169,7 @@ class StructuredLLMRouter:
             call_kind="text",
             prompt=prompt,
             raw_response=raw_response,
-            log_context=log_context,
+            log_context=normalized_log_context,
             duration_seconds=duration_seconds,
             ttft_seconds=ttft_seconds,
             input_tokens=input_tokens,
@@ -171,7 +184,7 @@ class StructuredLLMRouter:
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=total_tokens,
-            log_context=log_context,
+            log_context=normalized_log_context,
         )
         return content, StructuredCallMeta(
             parse_failure_count=0,
@@ -190,6 +203,7 @@ class StructuredLLMRouter:
         prompt: str,
         *,
         call_kind: CallKind,
+        log_context: dict[str, object] | None = None,
     ) -> tuple[
         Any,
         float | None,
@@ -216,6 +230,7 @@ class StructuredLLMRouter:
         input_tokens, output_tokens, total_tokens = _extract_token_usage(merged_chunk)
         self.usage_tracker.record_transport_call(
             role=role,
+            log_context=log_context,
             call_kind=call_kind,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
@@ -241,6 +256,7 @@ class StructuredLLMRouter:
         prompt: str,
         *,
         call_kind: CallKind,
+        log_context: dict[str, object] | None = None,
     ) -> tuple[
         Any,
         float | None,
@@ -267,6 +283,7 @@ class StructuredLLMRouter:
         input_tokens, output_tokens, total_tokens = _extract_token_usage(merged_chunk)
         self.usage_tracker.record_transport_call(
             role=role,
+            log_context=log_context,
             call_kind=call_kind,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
@@ -302,11 +319,12 @@ class StructuredLLMRouter:
     ) -> None:
         """완료된 structured 응답을 보기 좋은 형태로 로그에 남긴다."""
 
+        normalized_log_context = ensure_llm_log_context(log_context, role=role)
         pretty_text = _pretty_response_text(
             role=role,
             parsed=parsed,
             content=content,
-            log_context=log_context,
+            log_context=normalized_log_context,
         )
         meta_line = _format_metrics_line(
             duration_seconds=duration_seconds,
@@ -317,7 +335,7 @@ class StructuredLLMRouter:
         )
         if parse_error is not None:
             meta_line = f"{meta_line}\n파싱 경고: {parse_error}"
-        title = _format_response_title(role=role, log_context=log_context)
+        title = _format_response_title(role=role, log_context=normalized_log_context)
         summary = meta_line.replace("\n", " | ")
         if parse_error is None:
             self.logger.info("%s | %s", title, summary)
@@ -334,8 +352,12 @@ class StructuredLLMRouter:
     ) -> None:
         """structured LLM 호출 시작 로그를 남긴다."""
 
-        suffix = _format_log_context_suffix(log_context)
-        message = _format_call_start_message(role=role, log_context=log_context)
+        normalized_log_context = ensure_llm_log_context(log_context, role=role)
+        suffix = _format_log_context_suffix(normalized_log_context)
+        message = _format_call_start_message(
+            role=role,
+            log_context=normalized_log_context,
+        )
         if suffix:
             message = f"{message} | {suffix}"
         self.logger.info(message)
@@ -354,6 +376,7 @@ class StructuredLLMRouter:
     ) -> None:
         """완료된 원문 응답을 보기 좋은 형태로 로그에 남긴다."""
 
+        normalized_log_context = ensure_llm_log_context(log_context, role=role)
         meta_line = _format_metrics_line(
             duration_seconds=duration_seconds,
             ttft_seconds=ttft_seconds,
@@ -364,9 +387,9 @@ class StructuredLLMRouter:
         pretty_text = render_text_response(
             role=role,
             content=_strip_json_fence(content),
-            log_context=log_context,
+            log_context=normalized_log_context,
         )
-        title = _format_response_title(role=role, log_context=log_context)
+        title = _format_response_title(role=role, log_context=normalized_log_context)
         self.logger.info("%s | %s", title, meta_line)
         if pretty_text.strip():
             self.logger.debug("\n%s\n", pretty_text)
@@ -390,6 +413,7 @@ class StructuredLLMRouter:
         if self.stream_event_sink is None or not self.run_id:
             return
         self.llm_call_sequence += 1
+        normalized_log_context = ensure_llm_log_context(log_context, role=role)
         entry = build_llm_call_event(
             run_id=self.run_id,
             sequence=self.llm_call_sequence,
@@ -397,7 +421,7 @@ class StructuredLLMRouter:
             call_kind=call_kind,
             prompt=prompt,
             raw_response=raw_response,
-            log_context=_json_safe_mapping(log_context),
+            log_context=_json_safe_mapping(normalized_log_context),
             duration_seconds=duration_seconds,
             ttft_seconds=ttft_seconds,
             input_tokens=input_tokens,
@@ -486,6 +510,14 @@ def _format_log_context_suffix(log_context: dict[str, object] | None) -> str:
         return ""
 
     parts: list[str] = []
+    artifact_key = log_context.get("artifact_key")
+    if artifact_key is not None:
+        parts.append(f"artifact={artifact_key}")
+
+    schema_name = log_context.get("schema_name")
+    if schema_name is not None:
+        parts.append(f"schema={schema_name}")
+
     round_index = log_context.get("round_index")
     if round_index is not None:
         parts.append(f"round_index={round_index}")
@@ -507,6 +539,19 @@ def _format_log_context_suffix(log_context: dict[str, object] | None) -> str:
     if section is not None:
         parts.append(f"section={section}")
 
+    target_role = log_context.get("target_role")
+    target_task_key = log_context.get("target_task_key")
+    if target_role is not None and target_task_key is not None:
+        parts.append(f"target={target_role}.{target_task_key}")
+
+    target_artifact_key = log_context.get("target_artifact_key")
+    if target_artifact_key is not None:
+        parts.append(f"target_artifact={target_artifact_key}")
+
+    target_schema_name = log_context.get("target_schema_name")
+    if target_schema_name is not None:
+        parts.append(f"target_schema={target_schema_name}")
+
     attempt = log_context.get("attempt")
     if attempt is not None:
         parts.append(f"attempt={attempt}")
@@ -518,20 +563,7 @@ def _format_call_start_message(
     role: str,
     log_context: dict[str, object] | None,
 ) -> str:
-    scope = str(log_context.get("scope")) if log_context else ""
-    if role == "planner":
-        if not scope:
-            return "planner 호출 시작"
-        return _planner_scope_label(scope, suffix="시작")
-    if role == "generator":
-        return "인물 카드 생성 시작"
-    if role == "actor":
-        return "행동 제안 시작"
-    if role == "observer":
-        return _observer_scope_label(scope, suffix="시작")
-    if role == "fixer":
-        return _fixer_scope_label(scope, suffix="시작")
-    return f"{role} 호출 시작"
+    return f"{_format_response_header(role=role, log_context=log_context)} 시작"
 
 
 def _format_response_header(
@@ -539,15 +571,26 @@ def _format_response_header(
     role: str,
     log_context: dict[str, object] | None,
 ) -> str:
+    if log_context:
+        task_label = str(log_context.get("task_label", "")).strip()
+        target_role = str(log_context.get("target_role", "")).strip()
+        target_task_label = str(log_context.get("target_task_label", "")).strip()
+        if role == "fixer" and task_label and target_role and target_task_label:
+            return f"fixer · {task_label}"
+        if task_label:
+            return f"{role} · {task_label}"
+
     scope = str(log_context.get("scope")) if log_context else ""
     if role == "planner":
         return _planner_scope_label(scope)
     if role == "generator":
-        return "인물 카드 생성"
+        return "generator"
     if role == "actor":
-        return "행동 제안"
+        return "actor"
     if role == "observer":
         return _observer_scope_label(scope)
+    if role == "coordinator":
+        return _coordinator_scope_label(scope)
     if role == "fixer":
         return _fixer_scope_label(scope)
     return role
@@ -577,6 +620,18 @@ def _observer_scope_label(scope: str, *, suffix: str = "") -> str:
         "final-report": "observer · 최종 보고서 작성",
     }
     base = labels.get(scope, "관찰 요약")
+    if suffix:
+        return f"{base} {suffix}"
+    return base
+
+
+def _coordinator_scope_label(scope: str, *, suffix: str = "") -> str:
+    labels = {
+        "round-continuation": "coordinator · 라운드 지속 여부 판단",
+        "round-directive": "coordinator · 라운드 지시안 작성",
+        "round-resolution": "coordinator · 라운드 해소",
+    }
+    base = labels.get(scope, "coordinator")
     if suffix:
         return f"{base} {suffix}"
     return base

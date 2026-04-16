@@ -12,11 +12,19 @@ Turn the planning analysis into the minimum execution plan bundle.
 
 # Rules
 - Keep the action catalog broad and small.
+- Avoid near-duplicate action entries that only rename the same move.
+- Each `action_catalog.actions` item must use a unique `action_type`.
+- Each `action_catalog.selection_guidance` item should explain how to choose among the broad actions in this scenario.
 - Keep the cast roster unique.
+- `cast_roster.items` must use unique `cast_id` values and unique `display_name` values.
 - Generate `major_events` only when the scenario text implies concrete turning points, staged choices, checkpoints, or end conditions worth tracking.
 - `major_events` may be an empty array when the scenario does not imply any specific shared event track.
+- Each `major_events` item must use a unique `event_id`.
 - Each `major_events` item must use only cast ids that appear in `cast_roster`.
 - Use round windows for `major_events`. `earliest_round` and `latest_round` should fit within `planning_analysis_json.progression_plan.max_rounds`.
+- In each `major_events` item, `participant_cast_ids` and `completion_action_types` must be unique arrays.
+- In each `major_events` item, `participant_cast_ids`, `completion_action_types`, and `completion_signals` must stay non-empty whenever the event exists.
+- In each `major_events` item, `earliest_round` must be less than or equal to `latest_round`.
 - Every field is required.
 - Return only the JSON object that matches the required output schema.
 - Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.

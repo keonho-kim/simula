@@ -17,6 +17,7 @@ from collections.abc import Callable
 from langchain_core.prompts import PromptTemplate
 from langgraph.runtime import Runtime
 
+from simula.application.llm_logging import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
@@ -68,6 +69,9 @@ async def write_report_section(
     prompt: PromptTemplate,
     prompt_inputs: dict[str, str],
     section_title: str,
+    task_key: str,
+    task_label: str,
+    artifact_key: str,
     validator: Callable[[str], str | None] | None = None,
     normalizer: Callable[[str], str] | None = None,
 ) -> str:
@@ -85,11 +89,16 @@ async def write_report_section(
         section_body, _ = await runtime.context.llms.ainvoke_text_with_meta(
             "observer",
             rendered_prompt,
-            log_context={
-                "scope": "final-report",
-                "section": section_title,
-                "attempt": attempt + 1,
-            },
+            log_context=build_llm_log_context(
+                scope="final-report",
+                phase="finalization",
+                task_key=task_key,
+                task_label=task_label,
+                artifact_key=artifact_key,
+                artifact_label=artifact_key,
+                section=section_title,
+                attempt=attempt + 1,
+            ),
         )
         normalized_body = section_body.strip()
         if normalizer is not None:

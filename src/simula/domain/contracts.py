@@ -667,6 +667,9 @@ class RoundResolution(BaseModel):
     def validate_round_resolution(self) -> "RoundResolution":
         if len(self.adopted_cast_ids) != len(set(self.adopted_cast_ids)):
             raise ValueError("adopted_cast_ids must be unique.")
+        intent_state_cast_ids = [item.cast_id for item in self.updated_intent_states]
+        if len(intent_state_cast_ids) != len(set(intent_state_cast_ids)):
+            raise ValueError("updated_intent_states must use unique cast_id values.")
         event_ids = [item.event_id for item in self.event_updates]
         if len(event_ids) != len(set(event_ids)):
             raise ValueError("event_updates must use unique event_id values.")
@@ -687,6 +690,7 @@ class LLMUsageSummary(BaseModel):
 
     total_calls: int
     calls_by_role: dict[str, int]
+    calls_by_task: dict[str, int] = Field(default_factory=dict)
     structured_calls: int
     text_calls: int
     parse_failures: int

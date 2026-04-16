@@ -23,6 +23,7 @@ from typing import Any, Literal, Union, get_args, get_origin
 
 from pydantic import BaseModel
 
+from simula.application.llm_logging import build_fixer_log_context
 from simula.application.ports.llm import SemanticValidator
 from simula.infrastructure.llm.router import (
     StructuredLLMRouter,
@@ -97,6 +98,8 @@ class FixerOutcome:
 async def repair_structured_json(
     *,
     router: StructuredLLMRouter,
+    target_role: str,
+    target_log_context: dict[str, object] | None,
     parser: Any,
     content: str,
     semantic_validator: SemanticValidator[Any] | None = None,
@@ -124,6 +127,12 @@ async def repair_structured_json(
     total_tokens: int | None = None
     parse_failure_count = 0
     last_error: Exception | None = None
+    schema = getattr(parser, "target_schema", None)
+    schema_name = (
+        schema.__name__
+        if isinstance(schema, type) and issubclass(schema, BaseModel)
+        else "UnknownSchema"
+    )
 
     for attempt in range(4):
         fixed_content, meta = await router.ainvoke_text_with_meta(
@@ -134,10 +143,12 @@ async def repair_structured_json(
                 failure_feedback=failure_feedback,
                 repair_context=repair_context,
             ),
-            log_context={
-                "scope": "json-fix",
-                "attempt": attempt + 1,
-            },
+            log_context=build_fixer_log_context(
+                attempt=attempt + 1,
+                target_role=target_role,
+                target_log_context=target_log_context,
+                schema_name=schema_name,
+            ),
         )
         ttft_seconds = _merge_ttft(ttft_seconds, meta.ttft_seconds)
         input_tokens = _merge_token_count(input_tokens, meta.input_tokens)

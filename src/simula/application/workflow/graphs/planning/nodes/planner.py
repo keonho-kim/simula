@@ -9,6 +9,7 @@ from typing import cast
 
 from langgraph.runtime import Runtime
 
+from simula.application.llm_logging import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.planning.output_schema.bundles import (
     build_execution_plan_prompt_bundle,
@@ -43,7 +44,15 @@ async def build_planning_analysis(
         "planner",
         prompt,
         PlanningAnalysis,
-        log_context={"scope": "planning-analysis"},
+        log_context=build_llm_log_context(
+            scope="planning-analysis",
+            phase="planning",
+            task_key="planning_analysis",
+            task_label="계획 분석",
+            artifact_key="planning_analysis",
+            artifact_label="planning_analysis",
+            schema=PlanningAnalysis,
+        ),
     )
     return {
         "planning_analysis": analysis.model_dump(mode="json"),
@@ -82,7 +91,15 @@ async def build_execution_plan(
         "planner",
         prompt,
         ExecutionPlanBundle,
-        log_context={"scope": "execution-plan"},
+        log_context=build_llm_log_context(
+            scope="execution-plan",
+            phase="planning",
+            task_key="execution_plan",
+            task_label="실행 계획 정리",
+            artifact_key="plan",
+            artifact_label="plan",
+            schema=ExecutionPlanBundle,
+        ),
     )
     return {
         "plan": _build_plan_payload(

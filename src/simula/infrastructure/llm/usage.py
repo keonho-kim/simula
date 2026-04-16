@@ -8,6 +8,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Literal
 
+from simula.application.llm_logging import task_counter_key
 from simula.domain.contracts import LLMUsageSummary
 
 CallKind = Literal["structured", "text"]
@@ -18,6 +19,7 @@ class LLMUsageTracker:
     """Collect transport-call usage counters for one workflow run."""
 
     calls_by_role: Counter[str] = field(default_factory=Counter)
+    calls_by_task: Counter[str] = field(default_factory=Counter)
     total_calls: int = 0
     structured_calls: int = 0
     text_calls: int = 0
@@ -34,6 +36,7 @@ class LLMUsageTracker:
         self,
         *,
         role: str,
+        log_context: dict[str, object] | None,
         call_kind: CallKind,
         input_tokens: int | None,
         output_tokens: int | None,
@@ -43,6 +46,7 @@ class LLMUsageTracker:
 
         self.total_calls += 1
         self.calls_by_role[role] += 1
+        self.calls_by_task[task_counter_key(role, log_context)] += 1
         if call_kind == "structured":
             self.structured_calls += 1
         else:
@@ -76,6 +80,9 @@ class LLMUsageTracker:
             total_calls=self.total_calls,
             calls_by_role={
                 role: self.calls_by_role[role] for role in sorted(self.calls_by_role)
+            },
+            calls_by_task={
+                task: self.calls_by_task[task] for task in sorted(self.calls_by_task)
             },
             structured_calls=self.structured_calls,
             text_calls=self.text_calls,

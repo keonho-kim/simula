@@ -9,6 +9,7 @@ from typing import cast
 
 from langgraph.runtime import Runtime
 
+from simula.application.llm_logging import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.coordinator.output_schema.bundles import (
     build_round_directive_prompt_bundle,
@@ -110,10 +111,16 @@ async def build_round_directive(
         RoundDirective,
         allow_default_on_failure=True,
         default_payload=default_payload,
-        log_context={
-            "scope": "round-directive",
-            "round_index": int(state["round_index"]),
-        },
+        log_context=build_llm_log_context(
+            scope="round-directive",
+            phase="runtime",
+            task_key="round_directive",
+            task_label="라운드 지시안 작성",
+            artifact_key="round_focus_plan",
+            artifact_label="round_focus_plan",
+            schema=RoundDirective,
+            round_index=int(state["round_index"]),
+        ),
     )
     normalized = _normalize_round_directive(
         directive=directive.model_dump(mode="json"),

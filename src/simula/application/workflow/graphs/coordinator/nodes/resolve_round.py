@@ -12,6 +12,7 @@ from langgraph.runtime import Runtime
 from langgraph.types import Overwrite
 from pydantic import ValidationError
 
+from simula.application.llm_logging import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.coordinator.output_schema.bundles import (
     build_round_resolution_prompt_bundle,
@@ -189,10 +190,16 @@ async def resolve_round(
         RoundResolution,
         allow_default_on_failure=True,
         default_payload=default_payload,
-        log_context={
-            "scope": "round-resolution",
-            "round_index": int(state["round_index"]),
-        },
+        log_context=build_llm_log_context(
+            scope="round-resolution",
+            phase="runtime",
+            task_key="round_resolution",
+            task_label="라운드 해소",
+            artifact_key="round_resolution",
+            artifact_label="round_resolution",
+            schema=RoundResolution,
+            round_index=int(state["round_index"]),
+        ),
     )
     valid_adopted_cast_ids, invalid_adoption_errors = _filter_invalid_adopted_cast_ids(
         adopted_cast_ids=list(resolution.adopted_cast_ids),

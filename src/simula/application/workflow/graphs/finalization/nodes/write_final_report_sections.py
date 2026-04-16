@@ -47,6 +47,9 @@ async def write_conclusion_section(
         prompt=CONCLUSION_PROMPT,
         prompt_inputs=build_report_prompt_inputs(state),
         section_title="conclusion",
+        task_key="final_report_section.conclusion",
+        task_label="결론 섹션 작성",
+        artifact_key="report_conclusion_section",
         validator=validate_conclusion_section,
         normalizer=normalize_conclusion_section,
     )
@@ -64,6 +67,9 @@ async def write_timeline_section(
         prompt=TIMELINE_PROMPT,
         prompt_inputs=build_report_prompt_inputs(state),
         section_title="timeline",
+        task_key="final_report_section.timeline",
+        task_label="타임라인 섹션 작성",
+        artifact_key="report_timeline_section",
         validator=validate_timeline_section,
         normalizer=normalize_timeline_section,
     )
@@ -81,6 +87,9 @@ async def write_actor_dynamics_section(
         prompt=ACTOR_DYNAMICS_PROMPT,
         prompt_inputs=build_report_prompt_inputs(state),
         section_title="actor-dynamics",
+        task_key="final_report_section.actor_dynamics",
+        task_label="행위자 역학 섹션 작성",
+        artifact_key="report_actor_dynamics_section",
         validator=validate_actor_dynamics_section,
         normalizer=normalize_actor_dynamics_section,
     )
@@ -98,6 +107,9 @@ async def write_major_events_section(
         prompt=MAJOR_EVENTS_PROMPT,
         prompt_inputs=build_report_prompt_inputs(state),
         section_title="major-events",
+        task_key="final_report_section.major_events",
+        task_label="주요 이벤트 섹션 작성",
+        artifact_key="report_major_events_section",
         validator=lambda body: validate_bullet_section(body, min_items=1, max_items=5),
         normalizer=normalize_bullet_only_section,
     )

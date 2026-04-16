@@ -79,6 +79,7 @@ def render_analysis_summary_markdown(
             "",
             "## LLM 사용량",
             *_llm_usage_lines(
+                loaded=loaded,
                 token_usage_report=token_usage_report,
                 distribution_report=distribution_report,
             ),
@@ -196,6 +197,7 @@ def _growth_lines(growth_report: NetworkGrowthReport) -> list[str]:
 
 def _llm_usage_lines(
     *,
+    loaded: LoadedRunAnalysis,
     token_usage_report: TokenUsageReport,
     distribution_report: DistributionReport,
 ) -> list[str]:
@@ -213,6 +215,21 @@ def _llm_usage_lines(
         f"대표 응답 속도는 TTFT p95 { _format_optional(ttft.p95_value, suffix='초') }, "
         f"전체 소요 시간 p95 { _format_optional(duration.p95_value, suffix='초') }입니다.",
     ]
+    task_counts = Counter(
+        record.task_identifier for record in loaded.llm_calls if record.task_identifier
+    )
+    if task_counts:
+        lines.append(
+            "- "
+            + "task 기준 상위 호출: "
+            + ", ".join(
+                f"{task} {count}회"
+                for task, count in sorted(
+                    task_counts.items(),
+                    key=lambda item: (-item[1], item[0]),
+                )[:5]
+            )
+        )
     for summary in top_roles:
         lines.append(
             "- "

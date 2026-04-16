@@ -6,7 +6,9 @@ import json
 from types import UnionType
 from typing import Any, Union, get_args, get_origin
 
+import pytest
 from pydantic import BaseModel
+from pydantic import ValidationError
 
 from simula.application.workflow.graphs.coordinator.nodes.assess_round_continuation import (
     _build_default_round_continuation_payload,
@@ -175,6 +177,59 @@ def test_round_resolution_default_payload_matches_schema() -> None:
             event_updates=[],
         )
     )
+
+
+def test_round_resolution_rejects_duplicate_intent_state_cast_ids() -> None:
+    payload = _build_default_round_resolution_payload(
+        {
+            "round_index": 2,
+            "selected_cast_ids": ["alpha"],
+            "pending_actor_proposals": [
+                {
+                    "cast_id": "alpha",
+                    "forced_idle": False,
+                    "proposal": {
+                        "action_summary": "Alpha가 Beta에게 답을 요구한다.",
+                    },
+                }
+            ],
+            "actor_intent_states": [
+                {
+                    "cast_id": "alpha",
+                    "current_intent": "Beta의 답을 요구한다.",
+                    "thought": "이번에는 반응을 분명히 받아야 한다고 본다.",
+                    "target_cast_ids": ["beta"],
+                    "supporting_action_type": "speech",
+                    "confidence": 0.8,
+                    "changed_from_previous": True,
+                }
+            ],
+            "actors": [
+                {
+                    "cast_id": "alpha",
+                    "display_name": "Alpha",
+                    "private_goal": "답을 요구한다.",
+                }
+            ],
+            "world_state_summary": "직접 압박이 유지되고 있다.",
+            "event_memory": {"events": []},
+            "actor_facing_scenario_digest": {},
+            "plan": {
+                "progression_plan": {
+                    "max_rounds": 4,
+                    "allowed_elapsed_units": ["minute", "hour"],
+                    "default_elapsed_unit": "minute",
+                    "pacing_guidance": ["짧게 본다."],
+                    "selection_reason": "짧은 직접 반응이 중심이다.",
+                }
+            },
+        },
+        event_updates=[],
+    )
+    payload["updated_intent_states"].append(payload["updated_intent_states"][0].copy())
+
+    with pytest.raises(ValidationError, match="updated_intent_states must use unique cast_id"):
+        RoundResolution.model_validate(payload)
 
 
 def _assert_value_matches_annotation(value: Any, annotation: Any) -> None:

@@ -268,6 +268,9 @@ def test_write_report_section_accepts_valid_timeline_with_previously_forbidden_t
             prompt=PromptTemplate.from_template("{scenario_text}"),
             prompt_inputs={"scenario_text": "테스트 시나리오"},
             section_title="timeline",
+            task_key="final_report_section.timeline",
+            task_label="타임라인 섹션 작성",
+            artifact_key="report_timeline_section",
             validator=validate_timeline_section,
         )
     )

@@ -145,6 +145,21 @@ def test_token_usage_report_tracks_overall_and_role_totals() -> None:
     assert report.overall.total_tokens_stats.p95_value is not None
 
 
+def test_load_run_analysis_exposes_task_and_artifact_metadata() -> None:
+    loaded = _load_sample_data()
+
+    planner_call = loaded.llm_calls[0]
+    fixer_call = loaded.llm_calls[2]
+
+    assert planner_call.task_identifier == "planner.planning_analysis"
+    assert planner_call.artifact_key == "planning_analysis"
+    assert planner_call.schema_name == "PlanningAnalysis"
+    assert fixer_call.task_identifier == "fixer.json_repair.actor.actor_action_proposal"
+    assert fixer_call.target_role == "actor"
+    assert fixer_call.target_task_key == "actor_action_proposal"
+    assert fixer_call.target_artifact_key == "pending_actor_proposals"
+
+
 def test_load_run_analysis_parses_planned_actions_and_round_cap() -> None:
     loaded = _load_sample_data()
 
@@ -513,6 +528,8 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
         tmp_path / "analysis" / run_id / "llm_calls.csv"
     ).read_text(encoding="utf-8")
     assert "실행 ID,호출 순번,역할,역할 표시명" in llm_calls_csv
+    assert "태스크 키" in llm_calls_csv
+    assert "결과물 키" in llm_calls_csv
 
     token_usage_md = (
         tmp_path / "analysis" / run_id / "token_usage" / "summary.md"
@@ -694,7 +711,15 @@ def _sample_log_text(*, run_id: str) -> str:
             "sequence": 1,
             "role": "planner",
             "call_kind": "structured",
-            "log_context": {"scope": "planning-analysis"},
+            "log_context": {
+                "scope": "planning-analysis",
+                "phase": "planning",
+                "task_key": "planning_analysis",
+                "task_label": "계획 분석",
+                "artifact_key": "planning_analysis",
+                "artifact_label": "planning_analysis",
+                "schema_name": "PlanningAnalysis",
+            },
             "prompt": "planner prompt",
             "raw_response": "{\"brief_summary\":\"ok\"}",
             "duration_seconds": 0.3,
@@ -711,7 +736,16 @@ def _sample_log_text(*, run_id: str) -> str:
             "sequence": 2,
             "role": "actor",
             "call_kind": "structured",
-            "log_context": {"scope": "actor-turn", "cast_id": "alpha"},
+            "log_context": {
+                "scope": "actor-turn",
+                "phase": "runtime",
+                "task_key": "actor_action_proposal",
+                "task_label": "행동 제안",
+                "artifact_key": "pending_actor_proposals",
+                "artifact_label": "pending_actor_proposals",
+                "schema_name": "ActorActionProposal",
+                "cast_id": "alpha",
+            },
             "prompt": "actor prompt",
             "raw_response": "{\"action_type\":\"talk\"}",
             "duration_seconds": 0.4,
@@ -728,7 +762,19 @@ def _sample_log_text(*, run_id: str) -> str:
             "sequence": 3,
             "role": "fixer",
             "call_kind": "text",
-            "log_context": {"scope": "json-fix", "attempt": 1},
+            "log_context": {
+                "scope": "json-fix",
+                "phase": "repair",
+                "task_key": "json_repair.actor.actor_action_proposal",
+                "task_label": "JSON 복구 (actor · 행동 제안)",
+                "artifact_key": "repaired_json",
+                "artifact_label": "repaired_json",
+                "target_role": "actor",
+                "target_task_key": "actor_action_proposal",
+                "target_artifact_key": "pending_actor_proposals",
+                "target_schema_name": "ActorActionProposal",
+                "attempt": 1,
+            },
             "prompt": "Target schema: ActorActionProposal\nFields:\n- x",
             "raw_response": "{\"fixed\":1}",
             "duration_seconds": 0.25,
@@ -745,7 +791,19 @@ def _sample_log_text(*, run_id: str) -> str:
             "sequence": 4,
             "role": "fixer",
             "call_kind": "text",
-            "log_context": {"scope": "json-fix", "attempt": 2},
+            "log_context": {
+                "scope": "json-fix",
+                "phase": "repair",
+                "task_key": "json_repair.actor.actor_action_proposal",
+                "task_label": "JSON 복구 (actor · 행동 제안)",
+                "artifact_key": "repaired_json",
+                "artifact_label": "repaired_json",
+                "target_role": "actor",
+                "target_task_key": "actor_action_proposal",
+                "target_artifact_key": "pending_actor_proposals",
+                "target_schema_name": "ActorActionProposal",
+                "attempt": 2,
+            },
             "prompt": "Target schema: ActorActionProposal\nFields:\n- x",
             "raw_response": "{\"fixed\":2}",
             "duration_seconds": 0.35,
@@ -762,7 +820,19 @@ def _sample_log_text(*, run_id: str) -> str:
             "sequence": 5,
             "role": "fixer",
             "call_kind": "text",
-            "log_context": {"scope": "json-fix", "attempt": 1},
+            "log_context": {
+                "scope": "json-fix",
+                "phase": "repair",
+                "task_key": "json_repair.observer.timeline_anchor",
+                "task_label": "JSON 복구 (observer · 타임라인 anchor 결정)",
+                "artifact_key": "repaired_json",
+                "artifact_label": "repaired_json",
+                "target_role": "observer",
+                "target_task_key": "timeline_anchor",
+                "target_artifact_key": "report_timeline_anchor_json",
+                "target_schema_name": "TimelineAnchorDecision",
+                "attempt": 1,
+            },
             "prompt": "Target schema: TimelineAnchorDecision\nFields:\n- x",
             "raw_response": "{\"fixed\":3}",
             "duration_seconds": 0.45,

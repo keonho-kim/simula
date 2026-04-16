@@ -26,9 +26,12 @@ Compress the raw scenario into one reusable planning analysis object.
 - Do not turn the scenario into observation questions, analyst prompts, or viewer checklists.
 - Keep the analysis realistic and in-world. Preserve the kind of people, constraints, and actions that could actually happen in the described setting.
 - Do not introduce off-screen systems, formal procedures, legal instruments, or expert frameworks unless the scenario text already implies them.
+- `brief_summary`, `premise`, and `progression_plan.selection_reason` must be non-empty, scenario-grounded strings.
 - `progression_plan.max_rounds` is the maximum number of simulation rounds, not an elapsed-time unit.
 - Choose `progression_plan.max_rounds` from the scenario pacing itself. Do not copy a fixed default if the scenario implies a shorter or longer arc.
 - `progression_plan.allowed_elapsed_units` and `progression_plan.default_elapsed_unit` describe in-world elapsed time only.
+- `progression_plan.allowed_elapsed_units` must contain unique values.
+- `progression_plan.default_elapsed_unit` must be one of `progression_plan.allowed_elapsed_units`.
 - Allowed elapsed-time units are only `minute`, `hour`, `day`, and `week`.
 - `progression_plan.max_rounds` must be between 1 and the provided round cap.
 

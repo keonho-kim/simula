@@ -20,6 +20,7 @@ import logging
 
 import pytest
 
+from simula.application.llm_logging import build_llm_log_context
 from simula.application.workflow.graphs.runtime.proposal_contract import (
     build_actor_proposal_repair_context,
     validate_actor_action_proposal_semantics,
@@ -131,12 +132,20 @@ def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
         run_id="20260414.1",
         stream_event_sink=events.append,
     )
+    log_context = build_llm_log_context(
+        scope="execution-plan",
+        phase="planning",
+        task_key="execution_plan",
+        task_label="실행 계획 정리",
+        artifact_key="plan",
+        artifact_label="plan",
+    )
 
     with caplog.at_level(logging.INFO, logger="simula.test.llm_router"):
         result, meta = router.invoke_text_with_meta(
             "planner",
             "prompt",
-            log_context={"scope": "execution-plan"},
+            log_context=log_context,
         )
 
     assert result.startswith('{"cast_id":"a"')
@@ -151,7 +160,7 @@ def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
     assert events[0]["sequence"] == 1
     assert events[0]["role"] == "planner"
     assert events[0]["call_kind"] == "text"
-    assert events[0]["log_context"] == {"scope": "execution-plan"}
+    assert events[0]["log_context"] == log_context
     assert events[0]["prompt"] == "prompt"
     assert events[0]["raw_response"] == (
         '{"cast_id":"a","display_name":"A","role_hint":"r","group_name":"g","core_tension":"t"}'
@@ -163,6 +172,7 @@ def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
     assert events[0]["input_tokens"] == 10
     assert events[0]["output_tokens"] == 20
     assert events[0]["total_tokens"] == 30
+    assert router.usage_tracker.snapshot()["calls_by_task"] == {"planner.execution_plan": 1}
 
 
 @pytest.mark.anyio
@@ -201,6 +211,15 @@ async def test_service_uses_fixer_after_structured_parse_failure() -> None:
         "planner",
         "prompt",
         ScenarioTimeScope,
+        log_context=build_llm_log_context(
+            scope="planning-analysis",
+            phase="planning",
+            task_key="planning_analysis",
+            task_label="계획 분석",
+            artifact_key="planning_analysis",
+            artifact_label="planning_analysis",
+            schema=ScenarioTimeScope,
+        ),
     )
     assert result.start == "초기 대면 직후"
     assert meta.forced_default is False
@@ -220,6 +239,15 @@ async def test_service_uses_fixer_after_semantic_validation_failure() -> None:
         "planner",
         "prompt",
         ScenarioTimeScope,
+        log_context=build_llm_log_context(
+            scope="planning-analysis",
+            phase="planning",
+            task_key="planning_analysis",
+            task_label="계획 분석",
+            artifact_key="planning_analysis",
+            artifact_label="planning_analysis",
+            schema=ScenarioTimeScope,
+        ),
         semantic_validator=lambda parsed: (
             ["start and end must differ."] if parsed.start == parsed.end else []
         ),
@@ -272,6 +300,17 @@ async def test_service_passes_actor_target_guidance_to_fixer_prompt() -> None:
         "actor",
         "prompt",
         ActorActionProposal,
+        log_context=build_llm_log_context(
+            scope="actor-turn",
+            phase="runtime",
+            task_key="actor_action_proposal",
+            task_label="행동 제안",
+            artifact_key="pending_actor_proposals",
+            artifact_label="pending_actor_proposals",
+            schema=ActorActionProposal,
+            cast_id="seo_yeon",
+            actor_display_name="서연",
+        ),
         semantic_validator=lambda parsed: validate_actor_action_proposal_semantics(
             proposal=parsed,
             cast_id="seo_yeon",
@@ -314,6 +353,10 @@ async def test_service_passes_actor_target_guidance_to_fixer_prompt() -> None:
     assert meta.parse_failure_count == 2
     assert fixer_model.astream_called is True
     assert "No visible other actor can be targeted in this turn." in fixer_model.prompts[0]
+    assert service.router.usage_tracker.snapshot()["calls_by_task"] == {
+        "actor.actor_action_proposal": 2,
+        "fixer.json_repair.actor.actor_action_proposal": 1,
+    }
     assert (
         "If there is no valid visible other actor to target, use `public` visibility and leave both target arrays empty."
         in fixer_model.prompts[0]
