@@ -13,6 +13,19 @@ from simula.application.workflow.graphs.runtime.proposal_semantics import (
 )
 from simula.domain.contracts import ActorActionProposal
 
+_ACTOR_PROPOSAL_TARGET_RULES: tuple[str, ...] = (
+    "For `private` or `group` visibility, `target_cast_ids` must contain at least one real visible other actor `cast_id`.",
+    "Never include your own `cast_id` in `target_cast_ids` or `intent_target_cast_ids`.",
+    "`target_cast_ids` and `intent_target_cast_ids` may contain only real visible other actor `cast_id` values from `visible actors JSON`.",
+    "If there is no valid visible other actor to target, use `public` visibility and leave both target arrays empty.",
+)
+
+
+def actor_proposal_target_rule_lines() -> tuple[str, ...]:
+    """Return the shared actor target contract for prompts and fixer retries."""
+
+    return _ACTOR_PROPOSAL_TARGET_RULES
+
 
 def validate_actor_action_proposal_semantics(
     *,
@@ -113,13 +126,62 @@ def build_actor_proposal_repair_context(
 ) -> dict[str, object]:
     """Build compact repair context for fixer retries."""
 
+    valid_visible_other_targets = [
+        target_id
+        for target_id in valid_target_cast_ids
+        if target_id.strip() and target_id.strip() != cast_id
+    ]
+    current_valid_intent_targets = [
+        target_id
+        for target_id in current_intent_target_cast_ids
+        if target_id in valid_visible_other_targets
+    ]
+    action_types_requiring_target = [
+        str(item.get("action_type", "")).strip()
+        for item in available_actions
+        if bool(item.get("requires_target", False))
+        and str(item.get("action_type", "")).strip()
+    ]
+    repair_guidance = list(actor_proposal_target_rule_lines())
+    if valid_visible_other_targets:
+        repair_guidance.append(
+            "Valid visible other actor `cast_id` values for this turn: "
+            + ", ".join(valid_visible_other_targets)
+            + "."
+        )
+    else:
+        repair_guidance.append("No visible other actor can be targeted in this turn.")
+    if current_valid_intent_targets:
+        repair_guidance.append(
+            "Current intent already points to these valid targets: "
+            + ", ".join(current_valid_intent_targets)
+            + "."
+        )
+    elif current_intent_target_cast_ids:
+        repair_guidance.append(
+            "Current intent target ids are not valid for this turn. Do not copy them into the repaired JSON."
+        )
+    else:
+        repair_guidance.append(
+            "Current intent does not provide a valid visible other target for this turn."
+        )
+    if action_types_requiring_target:
+        repair_guidance.append(
+            "These action types still require a valid target: "
+            + ", ".join(action_types_requiring_target)
+            + "."
+        )
+    repair_guidance.append(
+        f"Do not return more than {max_target_count} target cast_id value(s)."
+    )
+
     return {
         "cast_id": cast_id,
         "actor_display_name": actor_display_name,
         "available_actions": available_actions,
-        "valid_target_cast_ids": valid_target_cast_ids,
+        "valid_target_cast_ids": valid_visible_other_targets,
         "visible_actors": visible_actors,
-        "current_intent_target_cast_ids": current_intent_target_cast_ids,
+        "current_intent_target_cast_ids": current_valid_intent_targets,
         "recent_visible_actions": recent_visible_actions,
         "thread_family_guidance": {
             "date_selection": "same pair/group date line",
@@ -128,6 +190,7 @@ def build_actor_proposal_repair_context(
             "public_conversation": "same ongoing public conversation line",
         },
         "max_target_count": max_target_count,
+        "repair_guidance": repair_guidance,
     }
 
 

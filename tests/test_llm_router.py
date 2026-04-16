@@ -15,11 +15,16 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 
 import pytest
 
-from simula.domain.contracts import ScenarioTimeScope
+from simula.application.workflow.graphs.runtime.proposal_contract import (
+    build_actor_proposal_repair_context,
+    validate_actor_action_proposal_semantics,
+)
+from simula.domain.contracts import ActorActionProposal, ScenarioTimeScope
 from simula.infrastructure.llm.router import StructuredLLMRouter
 from simula.infrastructure.llm.service import AsyncStructuredLLMService
 from simula.infrastructure.llm.usage import LLMUsageTracker
@@ -225,3 +230,91 @@ async def test_service_uses_fixer_after_semantic_validation_failure() -> None:
     assert meta.forced_default is False
     assert meta.parse_failure_count == 2
     assert fixer_model.astream_called is True
+
+
+@pytest.mark.anyio
+async def test_service_passes_actor_target_guidance_to_fixer_prompt() -> None:
+    raw_actor_response = json.dumps(
+        {
+            "action_type": "initial_reaction",
+            "intent": "제품의 마케팅 문구보다 성분표 수치를 먼저 확인한다.",
+            "intent_target_cast_ids": ["seo_yeon"],
+            "action_summary": "성분표를 살피며 혼잣말한다.",
+            "action_detail": "당류와 대체 감미료 정보를 확인한다.",
+            "utterance": "수치부터 확인해봐야겠어.",
+            "visibility": "private",
+            "target_cast_ids": ["seo_yeon"],
+            "thread_id": "",
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    fixed_actor_response = json.dumps(
+        {
+            "action_type": "initial_reaction",
+            "intent": "제품의 마케팅 문구보다 성분표 수치를 먼저 확인한다.",
+            "intent_target_cast_ids": [],
+            "action_summary": "성분표를 살피며 혼잣말한다.",
+            "action_detail": "당류와 대체 감미료 정보를 확인한다.",
+            "utterance": "",
+            "visibility": "public",
+            "target_cast_ids": [],
+            "thread_id": "",
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    model = FakeModel(raw_actor_response)
+    fixer_model = FakeModel(fixed_actor_response)
+    service = _build_service(model, fixer_model=fixer_model)
+
+    result, meta = await service.ainvoke_structured_with_meta(
+        "actor",
+        "prompt",
+        ActorActionProposal,
+        semantic_validator=lambda parsed: validate_actor_action_proposal_semantics(
+            proposal=parsed,
+            cast_id="seo_yeon",
+            available_actions=[
+                {
+                    "action_type": "initial_reaction",
+                    "supported_visibility": ["public", "private"],
+                    "requires_target": False,
+                    "supports_utterance": True,
+                }
+            ],
+            valid_target_cast_ids=[],
+            visible_actors=[],
+            current_intent_snapshot={},
+            max_target_count=1,
+        ),
+        repair_context=build_actor_proposal_repair_context(
+            cast_id="seo_yeon",
+            actor_display_name="서연",
+            available_actions=[
+                {
+                    "action_type": "initial_reaction",
+                    "supported_visibility": ["public", "private"],
+                    "requires_target": False,
+                    "supports_utterance": True,
+                }
+            ],
+            valid_target_cast_ids=[],
+            visible_actors=[],
+            current_intent_target_cast_ids=[],
+            recent_visible_actions=[],
+            max_target_count=1,
+        ),
+    )
+
+    assert result.visibility == "public"
+    assert result.target_cast_ids == []
+    assert result.intent_target_cast_ids == []
+    assert meta.forced_default is False
+    assert meta.parse_failure_count == 2
+    assert fixer_model.astream_called is True
+    assert "No visible other actor can be targeted in this turn." in fixer_model.prompts[0]
+    assert (
+        "If there is no valid visible other actor to target, use `public` visibility and leave both target arrays empty."
+        in fixer_model.prompts[0]
+    )

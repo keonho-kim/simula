@@ -18,8 +18,17 @@ import textwrap
 
 from langchain_core.prompts import PromptTemplate
 
-_PROMPT = textwrap.dedent(
-    """
+from simula.application.workflow.graphs.runtime.proposal_contract import (
+    actor_proposal_target_rule_lines,
+)
+
+_TARGET_RULE_LINES = "\n".join(
+    f"    - {rule}" for rule in actor_proposal_target_rule_lines()
+)
+
+_PROMPT = (
+    textwrap.dedent(
+        """
     # Role
     You are one participant inside our simulation.
     Read the compact state for this round and propose one plausible action.
@@ -35,11 +44,12 @@ _PROMPT = textwrap.dedent(
     - If a field is an array, return a JSON array even when it has only one item.
     - Propose exactly one action for this round.
     - Choose `action_type` from `runtime_guidance.available_actions`.
+<<TARGET_RULE_LINES>>
     - `public` visibility may leave `target_cast_ids` empty.
-    - `private` and `group` visibility must include real `cast_id` values in `target_cast_ids`.
     - If a `public` action is clearly aimed at one or more specific visible people, include those real `cast_id` values in `target_cast_ids` even though the visibility stays `public`.
-    - Never include your own `cast_id` in `target_cast_ids` or `intent_target_cast_ids`.
+    - Do not use `private` or `group` for a solo reaction, self-directed note, product inspection, or any other action that is not aimed at a concrete visible other actor.
     - If there is no spoken line, set `utterance` to an empty string.
+    - For solo observation or internal reasoning, prefer `utterance` as an empty string unless the line is plausibly spoken aloud in the scene.
     - If there is no stable thread identifier, set `thread_id` to an empty string.
     - If this action continues an existing conversation, confession, date line, or choice-pressure line with the same participant set, reuse or continue the stable `thread_id`.
     - Only leave `thread_id` empty when the action is truly standalone and not part of an ongoing interaction line.
@@ -88,6 +98,7 @@ _PROMPT = textwrap.dedent(
     - `action_summary` and `action_detail` should describe the action itself first.
     - A `round` is one outer simulation cycle. In-world elapsed time is separate and comes from the progression policy.
     """
-).strip()
+    ).strip().replace("<<TARGET_RULE_LINES>>", _TARGET_RULE_LINES)
+)
 
 PROMPT = PromptTemplate.from_template(_PROMPT)

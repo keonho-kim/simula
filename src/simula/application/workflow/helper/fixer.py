@@ -247,7 +247,7 @@ def _collect_validation_rules(schema: type[BaseModel]) -> list[str]:
             return
         visited.add(model)
 
-        for rule in _KNOWN_VALIDATION_RULES.get(model.__name__, ()):
+        for rule in _known_validation_rules_for_model(model):
             if rule not in lines:
                 lines.append(rule)
 
@@ -274,11 +274,38 @@ def _render_failure_feedback(failure_feedback: list[str] | None) -> str:
 def _render_repair_context(repair_context: dict[str, object] | None) -> str:
     if not repair_context:
         return "Repair context:\n- None provided."
-    return "Repair context:\n" + json.dumps(
-        repair_context,
-        ensure_ascii=False,
-        separators=(",", ":"),
-    )
+
+    lines = ["Repair context:"]
+    for key, value in repair_context.items():
+        if key == "repair_guidance" and isinstance(value, list):
+            guidance_items = [str(item).strip() for item in value if str(item).strip()]
+            if guidance_items:
+                lines.extend(f"- {item}" for item in guidance_items)
+                continue
+        lines.append(f"- {key}: {_render_context_value(value)}")
+    return "\n".join(lines)
+
+
+def _known_validation_rules_for_model(model: type[BaseModel]) -> tuple[str, ...]:
+    if model.__name__ == "ActorActionProposal":
+        from simula.application.workflow.graphs.runtime.proposal_contract import (
+            actor_proposal_target_rule_lines,
+        )
+
+        return actor_proposal_target_rule_lines()
+    return _KNOWN_VALIDATION_RULES.get(model.__name__, ())
+
+
+def _render_context_value(value: object) -> str:
+    if isinstance(value, list):
+        if not value:
+            return "[]"
+        if all(not isinstance(item, (dict, list)) for item in value):
+            return ", ".join(str(item) for item in value)
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    if isinstance(value, dict):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return str(value)
 
 
 def _describe_annotation(annotation: Any) -> str:

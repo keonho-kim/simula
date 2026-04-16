@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 from simula.application.workflow.graphs.runtime.proposal_contract import (
+    actor_proposal_target_rule_lines,
+    build_actor_proposal_repair_context,
     validate_actor_action_proposal_semantics,
 )
 from simula.application.workflow.graphs.runtime.proposal_semantics import (
@@ -110,3 +112,40 @@ def test_validate_actor_action_proposal_semantics_accepts_inferable_public_targe
     )
 
     assert issues == []
+
+
+def test_actor_proposal_repair_context_includes_no_target_fallback_guidance() -> None:
+    context = build_actor_proposal_repair_context(
+        cast_id="seo_yeon",
+        actor_display_name="서연",
+        available_actions=[
+            {
+                "action_type": "initial_reaction",
+                "supported_visibility": ["public", "private"],
+                "requires_target": False,
+                "supports_utterance": True,
+            },
+            {
+                "action_type": "private_confide",
+                "supported_visibility": ["private"],
+                "requires_target": True,
+                "supports_utterance": True,
+            },
+        ],
+        valid_target_cast_ids=[],
+        visible_actors=[],
+        current_intent_target_cast_ids=[],
+        recent_visible_actions=[],
+        max_target_count=1,
+    )
+
+    assert context["valid_target_cast_ids"] == []
+    assert context["current_intent_target_cast_ids"] == []
+    assert context["repair_guidance"][:4] == list(actor_proposal_target_rule_lines())
+    assert "No visible other actor can be targeted in this turn." in context[
+        "repair_guidance"
+    ]
+    assert (
+        "If there is no valid visible other actor to target, use `public` visibility and leave both target arrays empty."
+        in context["repair_guidance"]
+    )
