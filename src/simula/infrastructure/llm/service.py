@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any, TypeVar, cast
 
 from langchain_core.exceptions import OutputParserException
@@ -36,6 +37,14 @@ from simula.infrastructure.llm.router import (
 from simula.infrastructure.llm.usage import LLMUsageTracker
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
+
+
+@dataclass(frozen=True, slots=True)
+class StructuredPromptAttempt:
+    """One internal transport attempt for a structured response."""
+
+    prompt: str
+    prompt_variant: str
 
 
 class AsyncStructuredLLMService:
@@ -107,8 +116,21 @@ class AsyncStructuredLLMService:
         last_error: Exception | None = None
         last_content = ""
         parse_failure_count = 0
+        last_attempt_log_context = normalized_log_context
 
-        for candidate in attempts:
+        for attempt_index, candidate in enumerate(attempts, start=1):
+            attempt_log_context = _build_attempt_log_context(
+                normalized_log_context,
+                attempt=attempt_index,
+                attempt_total=len(attempts),
+                prompt_variant=candidate.prompt_variant,
+            )
+            last_attempt_log_context = attempt_log_context
+            _log_structured_transport_attempt_start(
+                logger=self.logger,
+                role=role,
+                log_context=attempt_log_context,
+            )
             (
                 response,
                 attempt_ttft,
@@ -119,16 +141,16 @@ class AsyncStructuredLLMService:
                 attempt_duration,
             ) = await self.router._ainvoke_with_metrics(
                 role,
-                candidate,
+                candidate.prompt,
                 call_kind="structured",
-                log_context=normalized_log_context,
+                log_context=attempt_log_context,
             )
             self.router._emit_llm_call_event(
                 role=role,
                 call_kind="structured",
-                prompt=candidate,
+                prompt=candidate.prompt,
                 raw_response=attempt_raw_response,
-                log_context=normalized_log_context,
+                log_context=attempt_log_context,
                 duration_seconds=attempt_duration,
                 ttft_seconds=attempt_ttft,
                 input_tokens=attempt_input,
@@ -163,7 +185,7 @@ class AsyncStructuredLLMService:
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     total_tokens=total_tokens,
-                    log_context=normalized_log_context,
+                    log_context=attempt_log_context,
                 )
                 self.router.usage_tracker.record_structured_outcome(
                     parse_failures=parse_failure_count,
@@ -184,6 +206,12 @@ class AsyncStructuredLLMService:
                 ValidationError,
                 ValueError,
             ) as exc:
+                _log_structured_transport_attempt_failure(
+                    logger=self.logger,
+                    role=role,
+                    error=exc,
+                    log_context=attempt_log_context,
+                )
                 last_error = exc
                 parse_failure_count += 1
 
@@ -260,7 +288,7 @@ class AsyncStructuredLLMService:
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 total_tokens=total_tokens,
-                log_context=normalized_log_context,
+                log_context=last_attempt_log_context,
                 parse_error=last_error,
             )
             self.logger.warning("%s 응답을 파싱하지 못해 기본값으로 강등합니다.", role)
@@ -332,11 +360,23 @@ def build_model_router(
     )
 
 
-def _build_structured_attempt_prompts(prompt: str, parser: Any) -> tuple[str, str]:
+def _build_structured_attempt_prompts(
+    prompt: str,
+    parser: Any,
+) -> tuple[StructuredPromptAttempt, StructuredPromptAttempt]:
     strict_suffix = parser.get_format_instructions()
     return (
-        prompt,
-        f"{prompt}\n\n{strict_suffix}\nDo not add code fences or explanatory text.",
+        StructuredPromptAttempt(
+            prompt=prompt,
+            prompt_variant="primary",
+        ),
+        StructuredPromptAttempt(
+            prompt=(
+                f"{prompt}\n\n{strict_suffix}\n"
+                "Do not add code fences or explanatory text."
+            ),
+            prompt_variant="strict_schema_retry",
+        ),
     )
 
 
@@ -381,6 +421,81 @@ def _log_primary_parse_failure(
         last_error,
         last_content,
     )
+
+
+def _build_attempt_log_context(
+    log_context: dict[str, object] | None,
+    *,
+    attempt: int,
+    attempt_total: int,
+    prompt_variant: str,
+) -> dict[str, object]:
+    enriched = dict(log_context or {})
+    enriched["attempt"] = attempt
+    enriched["attempt_total"] = attempt_total
+    enriched["prompt_variant"] = prompt_variant
+    return enriched
+
+
+def _log_structured_transport_attempt_start(
+    *,
+    logger: Any,
+    role: str,
+    log_context: dict[str, object] | None,
+) -> None:
+    header = _structured_attempt_header(role=role, log_context=log_context)
+    logger.debug("%s transport call 시작 | %s", header, _structured_attempt_suffix(log_context))
+
+
+def _log_structured_transport_attempt_failure(
+    *,
+    logger: Any,
+    role: str,
+    error: Exception,
+    log_context: dict[str, object] | None,
+) -> None:
+    header = _structured_attempt_header(role=role, log_context=log_context)
+    logger.debug(
+        "%s transport call 실패 | %s | error=%s",
+        header,
+        _structured_attempt_suffix(log_context),
+        error,
+    )
+
+
+def _structured_attempt_header(
+    *,
+    role: str,
+    log_context: dict[str, object] | None,
+) -> str:
+    if log_context:
+        task_label = str(log_context.get("task_label", "")).strip()
+        if task_label:
+            return f"{role} · {task_label}"
+    return role
+
+
+def _structured_attempt_suffix(log_context: dict[str, object] | None) -> str:
+    if not log_context:
+        return "-"
+
+    parts: list[str] = []
+    artifact_key = str(log_context.get("artifact_key", "")).strip()
+    if artifact_key:
+        parts.append(f"artifact={artifact_key}")
+    schema_name = str(log_context.get("schema_name", "")).strip()
+    if schema_name:
+        parts.append(f"schema={schema_name}")
+    attempt = log_context.get("attempt")
+    attempt_total = log_context.get("attempt_total")
+    if attempt is not None and attempt_total is not None:
+        parts.append(f"attempt={attempt}/{attempt_total}")
+    elif attempt is not None:
+        parts.append(f"attempt={attempt}")
+    prompt_variant = str(log_context.get("prompt_variant", "")).strip()
+    if prompt_variant:
+        parts.append(f"prompt_variant={prompt_variant}")
+    return " | ".join(parts) if parts else "-"
 
 
 def _run_semantic_validator(

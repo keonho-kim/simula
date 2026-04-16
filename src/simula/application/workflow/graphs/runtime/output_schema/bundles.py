@@ -46,7 +46,7 @@ _ACTOR_ACTION_PROPOSAL_EXAMPLE: dict[str, Any] = {
     "action_detail": "<one Korean sentence describing the concrete action in more detail>",
     "utterance": "<one Korean spoken line or an empty string>",
     "visibility": "<choose exactly one of public, private, group>",
-    "target_cast_ids": ["<real cast_id string when visibility is private or group>"],
+    "target_cast_ids": ["<real visible other cast_id values, or an empty list for solo private/public actions>"],
     "thread_id": "<stable thread identifier or an empty string>",
 }
 

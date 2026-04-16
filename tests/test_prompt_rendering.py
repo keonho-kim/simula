@@ -489,8 +489,15 @@ def test_generate_actor_proposal_renders_real_prompt() -> None:
             assert "같은 선언 반복 금지" in prompt
             assert "질문을 더 분명하게 던진다." in prompt
             assert "Never include your own `cast_id`" in prompt
-            assert "If there is no valid visible other actor to target" in prompt
-            assert "Do not use `private` or `group` for a solo reaction" in prompt
+            assert "If no valid visible other actor is involved" in prompt
+            assert (
+                "`private` visibility may leave `target_cast_ids` empty only for a "
+                "solo self-directed action" in prompt
+            )
+            assert (
+                "Use `public` with empty target arrays only for a room-wide or "
+                "broadcast action." in prompt
+            )
             return (
                 ActorActionProposal(
                     action_type="speech",

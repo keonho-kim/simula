@@ -525,8 +525,6 @@ def _build_default_action_proposal(
         "아직은 관계 신호와 상대 반응을 더 읽어야 한다고 본다.",
     )
     intent_target_cast_ids = _string_list(intent_snapshot.get("target_cast_ids", []))
-    if visibility == "public":
-        target_cast_ids = []
     if not intent_target_cast_ids:
         intent_target_cast_ids = list(target_cast_ids)
     digest = cast(
@@ -602,12 +600,20 @@ def _select_default_action(
 ) -> dict[str, object]:
     if not has_targets:
         for action in available_actions:
-            if "public" in _string_list(
-                action.get("supported_visibility")
-            ) and not bool(action.get("supports_utterance")):
+            if _supports_solo_private_action(action) and not bool(
+                action.get("supports_utterance")
+            ):
                 return action
         for action in available_actions:
-            if "public" in _string_list(action.get("supported_visibility")):
+            if _supports_solo_private_action(action):
+                return action
+        for action in available_actions:
+            if _supports_solo_public_action(action) and not bool(
+                action.get("supports_utterance")
+            ):
+                return action
+        for action in available_actions:
+            if _supports_solo_public_action(action):
                 return action
     for action in available_actions:
         if not bool(action.get("requires_target")) and not bool(
@@ -636,12 +642,28 @@ def _select_default_visibility(
         for visibility in ("private", "group", "public"):
             if visibility in supported_visibility:
                 return visibility
+    if "private" in supported_visibility:
+        return "private"
     if "public" in supported_visibility:
         return "public"
-    for visibility in ("private", "group"):
+    for visibility in ("group",):
         if visibility in supported_visibility:
             return visibility
     return "public"
+
+
+def _supports_solo_private_action(action: dict[str, object]) -> bool:
+    return (
+        not bool(action.get("requires_target"))
+        and "private" in _string_list(action.get("supported_visibility"))
+    )
+
+
+def _supports_solo_public_action(action: dict[str, object]) -> bool:
+    return (
+        not bool(action.get("requires_target"))
+        and "public" in _string_list(action.get("supported_visibility"))
+    )
 
 
 def _default_target_cast_ids(

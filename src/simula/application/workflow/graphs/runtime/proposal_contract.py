@@ -14,10 +14,11 @@ from simula.application.workflow.graphs.runtime.proposal_semantics import (
 from simula.domain.contracts import ActorActionProposal
 
 _ACTOR_PROPOSAL_TARGET_RULES: tuple[str, ...] = (
-    "For `private` or `group` visibility, `target_cast_ids` must contain at least one real visible other actor `cast_id`.",
+    "For `group` visibility, `target_cast_ids` must contain at least one real visible other actor `cast_id`.",
+    "For `private` visibility, `target_cast_ids` may be empty only for a solo self-directed action. If the action is aimed at a concrete visible other actor, include that real `cast_id`.",
     "Never include your own `cast_id` in `target_cast_ids` or `intent_target_cast_ids`.",
     "`target_cast_ids` and `intent_target_cast_ids` may contain only real visible other actor `cast_id` values from `visible actors JSON`.",
-    "If there is no valid visible other actor to target, use `public` visibility and leave both target arrays empty.",
+    "If no valid visible other actor is involved, you may use `private` visibility and leave both target arrays empty for a solo action. Use `public` with empty targets only for room-wide or broadcast actions.",
 )
 
 
@@ -73,9 +74,9 @@ def validate_actor_action_proposal_semantics(
         issues.append(
             f"action_type `{proposal.action_type}` 는 target_cast_ids가 필요합니다."
         )
-    if proposal.visibility in {"private", "group"} and not effective_target_cast_ids:
+    if proposal.visibility == "group" and not effective_target_cast_ids:
         issues.append(
-            f"visibility `{proposal.visibility}` 는 target_cast_ids가 비어 있으면 안 됩니다."
+            "visibility `group` 는 target_cast_ids가 비어 있으면 안 됩니다."
         )
     if proposal.utterance.strip() and not supports_utterance:
         issues.append(
@@ -142,6 +143,13 @@ def build_actor_proposal_repair_context(
         if bool(item.get("requires_target", False))
         and str(item.get("action_type", "")).strip()
     ]
+    solo_private_action_types = [
+        str(item.get("action_type", "")).strip()
+        for item in available_actions
+        if not bool(item.get("requires_target", False))
+        and "private" in _string_list(item.get("supported_visibility", []))
+        and str(item.get("action_type", "")).strip()
+    ]
     repair_guidance = list(actor_proposal_target_rule_lines())
     if valid_visible_other_targets:
         repair_guidance.append(
@@ -151,6 +159,19 @@ def build_actor_proposal_repair_context(
         )
     else:
         repair_guidance.append("No visible other actor can be targeted in this turn.")
+    if solo_private_action_types:
+        repair_guidance.append(
+            "These action types may stay solo with `private` visibility and empty target arrays: "
+            + ", ".join(solo_private_action_types)
+            + "."
+        )
+        repair_guidance.append(
+            "If the repaired action is solo or self-directed, prefer `private` visibility and leave both target arrays empty."
+        )
+    else:
+        repair_guidance.append(
+            "No solo `private` action is supported for this turn. Use `public` with empty target arrays only for a broadcast action."
+        )
     if current_valid_intent_targets:
         repair_guidance.append(
             "Current intent already points to these valid targets: "

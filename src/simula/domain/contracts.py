@@ -457,8 +457,8 @@ class ActorActionProposal(BaseModel):
         for field_name in ("action_type", "intent", "action_summary", "action_detail"):
             if not getattr(self, field_name).strip():
                 raise ValueError(f"{field_name} must not be empty.")
-        if self.visibility in {"private", "group"} and not self.target_cast_ids:
-            raise ValueError("private/group proposals require target_cast_ids.")
+        if self.visibility == "group" and not self.target_cast_ids:
+            raise ValueError("group proposals require target_cast_ids.")
         return self
 
 

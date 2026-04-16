@@ -42,7 +42,7 @@ def test_json_repair_parser_rejects_schema_mismatch() -> None:
     parser = JsonRepairOutputParser(target_schema=ActorActionProposal)
     bad_json = (
         '{"action_type":"","intent":"","intent_target_cast_ids":[],"action_summary":"",'
-        '"action_detail":"","utterance":"","visibility":"private","target_cast_ids":[],"thread_id":""}'
+        '"action_detail":"","utterance":"","visibility":"group","target_cast_ids":[],"thread_id":""}'
     )
 
     with pytest.raises(OutputParserException):

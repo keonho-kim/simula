@@ -81,6 +81,35 @@ def test_route_activity_updates_visible_feeds() -> None:
     assert updated["c"]["unseen_activity_ids"] == []
 
 
+def test_route_activity_keeps_solo_private_action_on_source_only() -> None:
+    actors = [
+        {"cast_id": "a"},
+        {"cast_id": "b"},
+        {"cast_id": "c"},
+    ]
+    feeds = initialize_activity_feeds(actors)
+    activity = create_canonical_action(
+        run_id="run-1",
+        round_index=1,
+        source_cast_id="a",
+        visibility="private",
+        target_cast_ids=[],
+        action_type="product_inspection",
+        intent="혼자 성분표를 다시 확인한다.",
+        intent_target_cast_ids=[],
+        action_summary="혼자 성분표를 본다.",
+        action_detail="광고 문구와 실제 수치를 혼자 대조한다.",
+        utterance="",
+        visibility_scope=build_visibility_scope("a", [], "private"),
+    ).model_dump(mode="json")
+
+    updated = route_activity(feeds, activity)
+
+    assert updated["a"]["seen_activity_ids"] == [activity["activity_id"]]
+    assert updated["b"]["unseen_activity_ids"] == []
+    assert updated["c"]["unseen_activity_ids"] == []
+
+
 def test_list_unseen_activities_does_not_consume_feed() -> None:
     actors = [
         {"cast_id": "a"},

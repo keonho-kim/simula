@@ -47,14 +47,18 @@ _PROMPT = (
 <<TARGET_RULE_LINES>>
     - `public` visibility may leave `target_cast_ids` empty.
     - If a `public` action is clearly aimed at one or more specific visible people, include those real `cast_id` values in `target_cast_ids` even though the visibility stays `public`.
-    - Do not use `private` or `group` for a solo reaction, self-directed note, product inspection, or any other action that is not aimed at a concrete visible other actor.
+    - `group` visibility always requires one or more concrete visible other actor targets.
+    - `private` visibility may leave `target_cast_ids` empty only for a solo self-directed action such as a product inspection, 혼잣말, self-note, or internal reasoning beat.
+    - If a `private` action is clearly aimed at one or more specific visible people, include those real `cast_id` values in `target_cast_ids`.
+    - Use `private` for a solo or self-directed action that is not being broadcast to the room.
+    - Use `public` with empty target arrays only for a room-wide or broadcast action.
     - If there is no spoken line, set `utterance` to an empty string.
     - For solo observation or internal reasoning, prefer `utterance` as an empty string unless the line is plausibly spoken aloud in the scene.
     - If there is no stable thread identifier, set `thread_id` to an empty string.
     - If this action continues an existing conversation, confession, date line, or choice-pressure line with the same participant set, reuse or continue the stable `thread_id`.
     - Only leave `thread_id` empty when the action is truly standalone and not part of an ongoing interaction line.
-    - Only leave both `target_cast_ids` and `thread_id` empty when the action is genuinely broadcast to the room rather than directed at a specific visible person.
-    - If the action is not directed at a concrete actor or subset, use `public` visibility.
+    - It is valid to leave both `target_cast_ids` and `thread_id` empty for a standalone solo `private` action or a genuine room-wide `public` broadcast.
+    - If the action is not directed at a concrete actor or subset, prefer `private` for solo/self-directed behavior and `public` for broadcast behavior.
     - Use `runtime_guidance.current_intent_snapshot.current_intent` for what to do and `runtime_guidance.current_intent_snapshot.thought` for why this actor is choosing it now.
     - Use `runtime_guidance.actor_facing_scenario_digest.talking_points` to decide what should be pushed verbally.
     - Use `runtime_guidance.actor_facing_scenario_digest.avoid_repetition_notes` to avoid flat repetition or generic filler.

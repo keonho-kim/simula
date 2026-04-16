@@ -228,6 +228,40 @@ async def test_service_uses_fixer_after_structured_parse_failure() -> None:
 
 
 @pytest.mark.anyio
+async def test_service_logs_internal_structured_attempts_at_debug(caplog) -> None:
+    model = FakeModel(['{"start":"초기","end":"초기"}', _time_scope_json()])
+    service = _build_service(model)
+
+    with caplog.at_level(logging.DEBUG, logger="simula.test.llm_router"):
+        result, meta = await service.ainvoke_structured_with_meta(
+            "planner",
+            "prompt",
+            ScenarioTimeScope,
+            log_context=build_llm_log_context(
+                scope="planning-analysis",
+                phase="planning",
+                task_key="planning_analysis",
+                task_label="계획 분석",
+                artifact_key="planning_analysis",
+                artifact_label="planning_analysis",
+                schema=ScenarioTimeScope,
+            ),
+            semantic_validator=lambda parsed: (
+                ["start and end must differ."] if parsed.start == parsed.end else []
+            ),
+        )
+
+    assert result.start == "초기 대면 직후"
+    assert meta.parse_failure_count == 1
+    assert "planner · 계획 분석 transport call 시작" in caplog.text
+    assert "attempt=1/2" in caplog.text
+    assert "prompt_variant=primary" in caplog.text
+    assert "transport call 실패" in caplog.text
+    assert "prompt_variant=strict_schema_retry" in caplog.text
+    assert "planner · 계획 분석 완료 | artifact=planning_analysis" in caplog.text
+
+
+@pytest.mark.anyio
 async def test_service_uses_fixer_after_semantic_validation_failure() -> None:
     model = FakeModel(
         '{"start":"같은 시점","end":"같은 시점"}'
@@ -285,7 +319,7 @@ async def test_service_passes_actor_target_guidance_to_fixer_prompt() -> None:
             "action_summary": "성분표를 살피며 혼잣말한다.",
             "action_detail": "당류와 대체 감미료 정보를 확인한다.",
             "utterance": "",
-            "visibility": "public",
+            "visibility": "private",
             "target_cast_ids": [],
             "thread_id": "",
         },
@@ -346,18 +380,22 @@ async def test_service_passes_actor_target_guidance_to_fixer_prompt() -> None:
         ),
     )
 
-    assert result.visibility == "public"
+    assert result.visibility == "private"
     assert result.target_cast_ids == []
     assert result.intent_target_cast_ids == []
     assert meta.forced_default is False
     assert meta.parse_failure_count == 2
     assert fixer_model.astream_called is True
     assert "No visible other actor can be targeted in this turn." in fixer_model.prompts[0]
+    assert (
+        "These action types may stay solo with `private` visibility and empty target arrays: initial_reaction."
+        in fixer_model.prompts[0]
+    )
     assert service.router.usage_tracker.snapshot()["calls_by_task"] == {
         "actor.actor_action_proposal": 2,
         "fixer.json_repair.actor.actor_action_proposal": 1,
     }
     assert (
-        "If there is no valid visible other actor to target, use `public` visibility and leave both target arrays empty."
+        "If the repaired action is solo or self-directed, prefer `private` visibility and leave both target arrays empty."
         in fixer_model.prompts[0]
     )

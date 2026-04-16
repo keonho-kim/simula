@@ -336,6 +336,9 @@ class StructuredLLMRouter:
         if parse_error is not None:
             meta_line = f"{meta_line}\n파싱 경고: {parse_error}"
         title = _format_response_title(role=role, log_context=normalized_log_context)
+        suffix = _format_log_context_suffix(normalized_log_context)
+        if suffix:
+            title = f"{title} | {suffix}"
         summary = meta_line.replace("\n", " | ")
         if parse_error is None:
             self.logger.info("%s | %s", title, summary)
@@ -390,6 +393,9 @@ class StructuredLLMRouter:
             log_context=normalized_log_context,
         )
         title = _format_response_title(role=role, log_context=normalized_log_context)
+        suffix = _format_log_context_suffix(normalized_log_context)
+        if suffix:
+            title = f"{title} | {suffix}"
         self.logger.info("%s | %s", title, meta_line)
         if pretty_text.strip():
             self.logger.debug("\n%s\n", pretty_text)
@@ -554,7 +560,15 @@ def _format_log_context_suffix(log_context: dict[str, object] | None) -> str:
 
     attempt = log_context.get("attempt")
     if attempt is not None:
-        parts.append(f"attempt={attempt}")
+        attempt_total = log_context.get("attempt_total")
+        if attempt_total is not None and "/" not in str(attempt):
+            parts.append(f"attempt={attempt}/{attempt_total}")
+        else:
+            parts.append(f"attempt={attempt}")
+
+    prompt_variant = log_context.get("prompt_variant")
+    if prompt_variant is not None:
+        parts.append(f"prompt_variant={prompt_variant}")
     return " ".join(parts)
 
 

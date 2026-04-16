@@ -128,6 +128,32 @@ def test_actor_action_proposal_default_payload_recovers_from_blank_intent_snapsh
     ActorActionProposal.model_validate(payload)
 
 
+def test_actor_action_proposal_default_payload_prefers_private_for_solo_action() -> None:
+    payload = _build_default_action_proposal(
+        actor={"cast_id": "alpha", "display_name": "Alpha"},
+        visible_actors=[],
+        runtime_guidance={
+            "available_actions": [
+                {
+                    "action_type": "inspect",
+                    "supported_visibility": ["public", "private"],
+                    "requires_target": False,
+                    "supports_utterance": False,
+                }
+            ],
+            "current_intent_snapshot": {
+                "current_intent": "혼자 상황을 더 본다.",
+                "thought": "지금은 조용히 확인하는 편이 낫다.",
+                "target_cast_ids": [],
+            },
+        },
+    )
+
+    assert payload["visibility"] == "private"
+    assert payload["target_cast_ids"] == []
+    ActorActionProposal.model_validate(payload)
+
+
 def test_round_resolution_default_payload_matches_schema() -> None:
     RoundResolution.model_validate(
         _build_default_round_resolution_payload(
