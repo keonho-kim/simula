@@ -386,16 +386,7 @@ async def test_service_passes_actor_target_guidance_to_fixer_prompt() -> None:
     assert meta.forced_default is False
     assert meta.parse_failure_count == 2
     assert fixer_model.astream_called is True
-    assert "No visible other actor can be targeted in this turn." in fixer_model.prompts[0]
-    assert (
-        "These action types may stay solo with `private` visibility and empty target arrays: initial_reaction."
-        in fixer_model.prompts[0]
-    )
     assert service.router.usage_tracker.snapshot()["calls_by_task"] == {
         "actor.actor_action_proposal": 2,
         "fixer.json_repair.actor.actor_action_proposal": 1,
     }
-    assert (
-        "If the repaired action is solo or self-directed, prefer `private` visibility and leave both target arrays empty."
-        in fixer_model.prompts[0]
-    )

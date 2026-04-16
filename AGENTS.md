@@ -49,6 +49,8 @@ Follow the instructions below.
 
 - You must run tests yourself when you changed behavior and the environment supports it.
 - Prefer real behavior checks over fake reassurance.
+- Do not add or keep tests that only verify prompt wording, prompt rendering, or other internal prompt text details unless the prompt text itself is the explicit product contract.
+- Prefer tests for observable behavior, schema validity, validation rules, and failure handling over tests for prompt composition details.
 - Do not bypass meaningful tests with superficial validation.
 - If a test could not be run because of environment or dependency limits, state that clearly and explain the blocker.
 

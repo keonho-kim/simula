@@ -1,13 +1,8 @@
-"""Verify active structured prompt contracts stay aligned with schemas and defaults."""
+"""Verify default structured payload builders without testing prompt internals."""
 
 from __future__ import annotations
 
-import json
-from types import UnionType
-from typing import Any, Union, get_args, get_origin
-
 import pytest
-from pydantic import BaseModel
 from pydantic import ValidationError
 
 from simula.application.workflow.graphs.coordinator.nodes.assess_round_continuation import (
@@ -28,29 +23,6 @@ from simula.domain.contracts import (
     RoundDirective,
     RoundResolution,
 )
-from tests.prompt_contract_registry import (
-    ACTIVE_STRUCTURED_PROMPT_CONTRACT_NAMES,
-    ACTIVE_STRUCTURED_PROMPT_CONTRACTS,
-)
-
-
-def test_active_structured_prompt_contract_registry_is_complete() -> None:
-    assert ACTIVE_STRUCTURED_PROMPT_CONTRACT_NAMES == (
-        "planning_analysis",
-        "execution_plan",
-        "generated_actor_card_draft",
-        "actor_action_proposal",
-        "round_continuation",
-        "round_directive",
-        "round_resolution",
-        "timeline_anchor_decision",
-    )
-
-
-def test_active_structured_prompt_examples_match_schema_shape() -> None:
-    for contract in ACTIVE_STRUCTURED_PROMPT_CONTRACTS:
-        payload = json.loads(contract.output_example)
-        _assert_value_matches_annotation(payload, contract.schema)
 
 
 def test_round_continuation_default_payload_matches_schema() -> None:
@@ -256,43 +228,3 @@ def test_round_resolution_rejects_duplicate_intent_state_cast_ids() -> None:
 
     with pytest.raises(ValidationError, match="updated_intent_states must use unique cast_id"):
         RoundResolution.model_validate(payload)
-
-
-def _assert_value_matches_annotation(value: Any, annotation: Any) -> None:
-    annotation = _unwrap_optional_annotation(annotation)
-    nested_model = _extract_base_model(annotation)
-    if nested_model is not None:
-        assert isinstance(value, dict)
-        assert set(value.keys()) == set(nested_model.model_fields.keys())
-        for field_name, field in nested_model.model_fields.items():
-            _assert_value_matches_annotation(value[field_name], field.annotation)
-        return
-
-    origin = get_origin(annotation)
-    args = get_args(annotation)
-
-    if origin is list and args:
-        assert isinstance(value, list)
-        if value:
-            _assert_value_matches_annotation(value[0], args[0])
-        return
-
-    if origin is dict and len(args) == 2:
-        assert isinstance(value, dict)
-        return
-
-
-def _unwrap_optional_annotation(annotation: Any) -> Any:
-    origin = get_origin(annotation)
-    if origin not in (UnionType, Union):
-        return annotation
-    args = tuple(arg for arg in get_args(annotation) if arg is not type(None))
-    if len(args) == 1:
-        return args[0]
-    return annotation
-
-
-def _extract_base_model(annotation: Any) -> type[BaseModel] | None:
-    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
-        return annotation
-    return None

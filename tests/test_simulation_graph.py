@@ -54,6 +54,9 @@ class FakeMeta:
 class FakeRouter:
     """Compact root-graph integration router."""
 
+    def __init__(self) -> None:
+        self._actor_card_calls = 0
+
     async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
         del role, kwargs
         if schema is PlanningAnalysis:
@@ -132,7 +135,8 @@ class FakeRouter:
                 FakeMeta(),
             )
         if schema is ActorCard:
-            if "cast-alpha" in prompt:
+            self._actor_card_calls += 1
+            if self._actor_card_calls == 1:
                 return (
                     ActorCard(
                         cast_id="cast-alpha",
