@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import time
-from typing import cast
+from typing import cast, get_args
 
 from langgraph.runtime import Runtime
 from langgraph.types import Overwrite
@@ -61,12 +61,20 @@ from simula.domain.runtime_actions import (
     ActorProposalPayload,
     apply_adopted_actor_proposals,
 )
+from simula.domain.time_units import (
+    TimeUnit,
+    cumulative_elapsed_label,
+    duration_label,
+    duration_minutes,
+)
 from simula.domain.log_events import (
     build_round_actions_adopted_event,
     build_round_event_memory_updated_event,
     build_round_observer_report_event,
     build_round_time_advanced_event,
 )
+
+_SUPPORTED_TIME_UNITS = frozenset(get_args(TimeUnit))
 
 
 async def resolve_round(
@@ -653,24 +661,26 @@ def _build_updated_clock(
     previous_clock = cast(dict[str, object], state["simulation_clock"])
     elapsed_unit = str(round_time_advance["elapsed_unit"])
     elapsed_amount = int(str(round_time_advance["elapsed_amount"]))
-    if elapsed_unit == "minute":
-        elapsed_minutes = elapsed_amount
-    elif elapsed_unit == "hour":
-        elapsed_minutes = elapsed_amount * 60
-    elif elapsed_unit == "day":
-        elapsed_minutes = elapsed_amount * 60 * 24
-    else:
+    if elapsed_unit not in _SUPPORTED_TIME_UNITS:
         raise ValueError(f"지원하지 않는 elapsed_unit 입니다: {elapsed_unit}")
+    normalized_elapsed_unit = cast(TimeUnit, elapsed_unit)
+    elapsed_minutes = duration_minutes(
+        time_unit=normalized_elapsed_unit,
+        amount=elapsed_amount,
+    )
 
     total_elapsed_minutes = int(str(previous_clock.get("total_elapsed_minutes", 0))) + elapsed_minutes
     round_time_record = {
         "round_index": int(state["round_index"]),
-        "elapsed_unit": elapsed_unit,
+        "elapsed_unit": normalized_elapsed_unit,
         "elapsed_amount": elapsed_amount,
         "elapsed_minutes": elapsed_minutes,
-        "elapsed_label": _elapsed_label(elapsed_unit, elapsed_amount),
+        "elapsed_label": duration_label(
+            time_unit=normalized_elapsed_unit,
+            amount=elapsed_amount,
+        ),
         "total_elapsed_minutes": total_elapsed_minutes,
-        "total_elapsed_label": _minutes_label(total_elapsed_minutes),
+        "total_elapsed_label": cumulative_elapsed_label(total_elapsed_minutes),
         "selection_reason": str(round_time_advance["selection_reason"]),
         "signals": list(cast(list[object], round_time_advance.get("signals", []))),
     }
@@ -685,25 +695,6 @@ def _build_updated_clock(
         "round_time_advance": cast(dict[str, object], round_time_record),
         "simulation_clock": cast(dict[str, object], clock),
     }
-
-
-def _elapsed_label(unit: str, amount: int) -> str:
-    if unit == "minute":
-        return f"{amount}분"
-    if unit == "hour":
-        return f"{amount}시간"
-    if unit == "day":
-        return f"{amount}일"
-    return f"{amount}{unit}"
-
-
-def _minutes_label(total_elapsed_minutes: int) -> str:
-    if total_elapsed_minutes < 60:
-        return f"{total_elapsed_minutes}분"
-    hours, minutes = divmod(total_elapsed_minutes, 60)
-    if minutes == 0:
-        return f"{hours}시간"
-    return f"{hours}시간 {minutes}분"
 
 
 def _string_list(value: object) -> list[str]:

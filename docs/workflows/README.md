@@ -18,18 +18,30 @@ flowchart LR
 
 | If you need to understand... | Read |
 | --- | --- |
-| root graph boundaries | [`simulation.md`](./simulation.md) |
-| planning shape | [`planning.md`](./planning.md) |
-| actor generation | [`generation.md`](./generation.md) |
-| runtime loop | [`runtime.md`](./runtime.md) |
-| final report writing | [`finalization.md`](./finalization.md) |
+| the root graph boundary | [`simulation.md`](./simulation.md) |
+| how scenario text becomes a plan | [`planning.md`](./planning.md) |
+| how cast slots become actors | [`generation.md`](./generation.md) |
+| how rounds loop and stop | [`runtime.md`](./runtime.md) |
+| how the report is assembled | [`finalization.md`](./finalization.md) |
 
-## Stage Handoffs
+## Cross-Stage Handoffs
 
 | Stage | Consumes | Produces |
 | --- | --- | --- |
-| simulation root | public input + runtime context | hydrated workflow state |
-| planning | scenario and step budget | compact execution plan + major event track |
-| generation | cast roster and planning views | actor cards |
-| runtime | plan, actors, activity history | completed runtime trace + event memory history |
-| finalization | completed runtime trace | final report artifacts |
+| simulation root | public input plus runtime context | hydrated workflow state |
+| planning | scenario text and scenario controls | compact execution plan plus planned round target |
+| generation | plan cast roster | finalized actor cards |
+| runtime | plan, actors, and accumulated trace | completed runtime trace plus event history |
+| finalization | completed runtime trace | structured final report, report projection, markdown sections |
+
+## Notes
+
+- the runtime stage is the only looping stage
+- generation and runtime both use explicit fan-out/fan-in patterns
+- finalization writes section strings in parallel and renders markdown after all sections finish
+
+Related docs:
+
+- root graph boundary: [`simulation.md`](./simulation.md)
+- system architecture: [`../architecture.md`](../architecture.md)
+- artifact contracts: [`../contracts.md`](../contracts.md)

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The root graph defines the public workflow boundary and stage order.
+The root graph defines the public workflow boundary, hydration step, and stage order.
 
 ## Active Path
 
@@ -16,46 +16,78 @@ flowchart LR
     Finalization --> End([END])
 ```
 
-## Public Boundary
+## Graph Shape
 
-The root graph uses:
+The root builder is a `StateGraph` configured with:
 
 - `input_schema=SimulationInputState`
 - `state_schema=SimulationWorkflowState`
 - `output_schema=SimulationOutputState`
+- `context_schema=WorkflowRuntimeContext`
 
-That separation follows the LangGraph pattern of narrow public input/output with a richer internal
-state for node communication.
+That keeps the public boundary narrow while allowing downstream nodes to communicate through a
+fully hydrated required-only internal state.
 
 ## Hydration
 
-`hydrate_initial_state` is the only node that consumes public input directly.
+`hydrate_initial_state` is the only root node that reads public input directly.
 
 It expands:
 
 - `run_id`
 - `scenario`
+- `scenario_controls`
 - `max_rounds`
 - `rng_seed`
 
-into the fully initialized workflow state, including scratch channels such as:
+into a fully initialized workflow state, including:
 
-- `planning_analysis`
-- `round_focus_plan`
-- `simulation_clock`
-- `final_report_sections`
-- `errors`
+- empty planning and runtime scratch fields
+- initial simulation clock fields
+- initial report buffers
+- empty `errors`
+- internal-only `checkpoint_enabled`
 
-Downstream nodes assume those keys already exist.
+Downstream nodes assume those keys already exist and do not defend against missing state shape.
 
 ## Runtime Context
 
-The root graph also receives `WorkflowRuntimeContext`, which provides:
+The graph also receives `WorkflowRuntimeContext`, which currently provides:
 
-- settings
-- store
-- llms
-- logger
-- llm_usage_tracker
+- `settings`
+- `store`
+- `llms`
+- `logger`
+- `llm_usage_tracker`
+- `run_jsonl_appender`
 
-Those dependencies stay outside the state surface.
+These dependencies stay outside the graph state.
+
+## Execution Stream Surface
+
+The graph itself defines the workflow shape. The executor defines how it is consumed.
+
+During execution, the executor streams:
+
+- `custom` events for stable runtime log entries
+- `values` snapshots for state output
+
+Operationally this means:
+
+- custom events are appended to `simulation.log.jsonl`
+- the last `values` snapshot becomes the final graph output seen by the executor
+
+## Stage Ownership
+
+Each stage has one clear responsibility:
+
+- `planning`: scenario interpretation and execution plan construction
+- `generation`: actor card generation
+- `runtime`: round loop, action adoption, and stop decisions
+- `finalization`: final report projection and markdown assembly
+
+## Related Docs
+
+- stage hub: [`README.md`](./README.md)
+- state and runtime context contracts: [`../contracts.md`](../contracts.md)
+- architecture and stream boundary: [`../architecture.md`](../architecture.md)

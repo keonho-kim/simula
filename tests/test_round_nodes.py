@@ -21,6 +21,7 @@ from simula.application.workflow.graphs.coordinator.nodes.prepare_focus_candidat
     prepare_focus_candidates,
 )
 from simula.application.workflow.graphs.coordinator.nodes.resolve_round import (
+    _build_updated_clock,
     resolve_round,
 )
 from simula.application.workflow.graphs.runtime.nodes.lifecycle import (
@@ -173,6 +174,42 @@ def test_round_resolution_rejects_no_progress() -> None:
             },
             world_state_summary="상태",
             stop_reason="no_progress",
+        )
+
+
+def test_build_updated_clock_supports_week_elapsed_unit() -> None:
+    result = _build_updated_clock(
+        state={
+            "simulation_clock": {"total_elapsed_minutes": 0},
+            "round_index": 3,
+        },
+        round_time_advance={
+            "elapsed_unit": "week",
+            "elapsed_amount": 1,
+            "selection_reason": "다음 갈등 국면까지 장면 전환이 필요하다.",
+            "signals": ["오프스크린 경과"],
+        },
+    )
+
+    assert result["round_time_advance"]["elapsed_minutes"] == 60 * 24 * 7
+    assert result["round_time_advance"]["elapsed_label"] == "1주"
+    assert result["round_time_advance"]["total_elapsed_label"] == "1주"
+    assert result["simulation_clock"]["last_elapsed_label"] == "1주"
+
+
+def test_build_updated_clock_rejects_unsupported_elapsed_unit() -> None:
+    with pytest.raises(ValueError, match="지원하지 않는 elapsed_unit 입니다: month"):
+        _build_updated_clock(
+            state={
+                "simulation_clock": {"total_elapsed_minutes": 0},
+                "round_index": 1,
+            },
+            round_time_advance={
+                "elapsed_unit": "month",
+                "elapsed_amount": 1,
+                "selection_reason": "잘못된 테스트 입력이다.",
+                "signals": [],
+            },
         )
 
 

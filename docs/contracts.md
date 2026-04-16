@@ -1,78 +1,129 @@
 # Contracts
 
-## Public Graph Input
+## Public Graph Surfaces
 
-The root graph accepts a compact `SimulationInputState`.
+The root graph exposes three state surfaces.
+
+| Surface | Purpose |
+| --- | --- |
+| `SimulationInputState` | compact public input accepted by the root graph |
+| `SimulationWorkflowState` | fully hydrated internal state used between nodes |
+| `SimulationOutputState` | compact public output returned by the root graph |
+
+This separation matches the current LangGraph graph API pattern of narrow input/output schemas with
+a richer internal state.
+
+## Public Input
+
+`SimulationInputState` contains:
 
 | Field | Meaning |
 | --- | --- |
 | `run_id` | stable identifier for one run |
-| `scenario` | cleaned scenario body without YAML frontmatter |
-| `scenario_controls` | parsed scenario authoring controls (`num_cast`, `allow_additional_cast`) |
+| `scenario` | scenario body with frontmatter removed |
+| `scenario_controls` | parsed scenario controls from frontmatter |
 | `max_rounds` | configured runtime hard ceiling |
 | `rng_seed` | deterministic seed derived before graph execution |
 
-`checkpoint_enabled` is not part of the public input. It is injected during hydration from
-runtime settings.
+`checkpoint_enabled` is not part of public input. It is injected during hydration from runtime
+settings.
+
+## Public Output
+
+`SimulationOutputState` contains:
+
+| Field | Meaning |
+| --- | --- |
+| `run_id` | completed run identifier |
+| `final_report` | structured final report payload |
+| `llm_usage_summary` | deterministic usage summary from the completed run |
+| `final_report_markdown` | rendered markdown report |
+| `simulation_log_jsonl` | newline-delimited runtime event log |
+| `stop_reason` | final stop enum: `""`, `no_progress`, or `simulation_done` |
+| `errors` | accumulated explicit default notices and validation drops |
+
+## Runtime Context Contract
+
+`WorkflowRuntimeContext` carries services that should not live in graph state:
+
+- `settings`
+- `store`
+- `llms`
+- `logger`
+- `llm_usage_tracker`
+- `run_jsonl_appender`
+
+Nodes read these services through LangGraph runtime context instead of smuggling them through the
+state dictionary.
 
 ## Internal Workflow State
 
-`SimulationWorkflowState` is the fully hydrated internal state. Every active field is required,
-and absence is represented with explicit empty values such as `""`, `[]`, or `{}`.
+`SimulationWorkflowState` is required-only. Empty values are represented explicitly with `""`,
+`[]`, and `{}` rather than optional keys.
 
-### Planning and cast
+### Core execution
+
+- `run_id`
+- `scenario`
+- `scenario_controls`
+- `max_rounds`
+- `planned_max_rounds`
+- `checkpoint_enabled`
+- `rng_seed`
+
+### Planning and generation
 
 - `planning_analysis`
 - `plan`
-- `planned_max_rounds`
-- `actors`
 - `pending_cast_slots`
 - `cast_slot`
 - `generated_actor_results`
+- `actors`
+- `generation_started_at`
+- `generation_latency_seconds`
 
-### Runtime activity and feeds
+### Runtime trace
 
 - `activity_feeds`
 - `activities`
 - `latest_round_activities`
 - `observer_reports`
-- `background_updates`
-- `latest_background_updates`
-
-### Runtime coordination and intent
-
 - `focus_candidates`
 - `round_focus_history`
 - `selected_cast_ids`
 - `deferred_cast_ids`
+- `latest_background_updates`
+- `background_updates`
+- `round_focus_plan`
+- `round_time_advance`
+- `simulation_clock`
+- `round_time_history`
+- `round_index`
+- `current_round_started_at`
+- `last_round_latency_seconds`
+
+### Event and intent tracking
+
 - `event_memory`
 - `event_memory_history`
 - `actor_intent_states`
 - `intent_history`
-- `round_focus_plan`
-- `round_time_advance`
-- `round_time_history`
 - `actor_facing_scenario_digest`
 - `actor_proposal_task`
 - `pending_actor_proposals`
 
-### Runtime lifecycle and metrics
+### Lifecycle and counters
 
-- `round_index`
-- `simulation_clock`
 - `stop_requested`
-- `stop_reason` (`""`, `no_progress`, or `simulation_done`)
+- `stop_reason`
 - `world_state_summary`
 - `parse_failures`
 - `forced_idles`
 - `stagnation_rounds`
 - `planning_latency_seconds`
-- `generation_started_at`
-- `generation_latency_seconds`
-- `current_round_started_at`
-- `last_round_latency_seconds`
+- `errors`
 
-### Finalization artifacts
+### Finalization
 
 - `final_report`
 - `llm_usage_summary`
@@ -85,50 +136,30 @@ and absence is represented with explicit empty values such as `""`, `[]`, or `{}
 - `report_major_events_section`
 - `final_report_sections`
 - `final_report_markdown`
-- `errors`
-
-## Public Graph Output
-
-The root graph returns `SimulationOutputState`.
-
-| Field | Meaning |
-| --- | --- |
-| `run_id` | completed run identifier |
-| `final_report` | structured report payload |
-| `llm_usage_summary` | deterministic LLM usage summary for the completed run |
-| `final_report_markdown` | rendered Markdown report |
-| `simulation_log_jsonl` | newline-delimited event log |
-| `stop_reason` | final stop reason enum (`""`, `no_progress`, or `simulation_done`) |
-| `errors` | accumulated explicit errors/default notices |
 
 ## Structured LLM Contracts
 
-All active structured outputs are required-only. There are no optional response fields in the
-active prompt-facing contracts.
+All active structured outputs are required-only. Missing data is represented through explicit empty
+values in workflow state, not through optional response fields.
 
 | Stage | Contract |
 | --- | --- |
 | planning | `PlanningAnalysis`, `ExecutionPlanBundle` |
 | generation | `GeneratedActorCardDraft` |
-| runtime round continuation | `RoundContinuationDecision` |
-| runtime round planning | `RoundDirective` |
+| runtime continuation | `RoundContinuationDecision` |
+| runtime directive | `RoundDirective` |
 | runtime actor turn | `ActorActionProposal` |
-| runtime round resolution | `RoundResolution` including `event_updates` |
+| runtime resolution | `RoundResolution` |
 | finalization anchor | `TimelineAnchorDecision` |
 
-Finalization report section writers are validated text outputs. They are not active structured
-Pydantic contracts.
+Finalization section writers are text outputs with validators, not active structured Pydantic
+schemas.
 
-## Artifact Contracts
-
-### `final_report`
-
-Structured summary of the completed run, including scenario, objective, elapsed time, round
-count, activity totals, visibility counts, notable events, explicit errors, and LLM usage summary.
+## Durable Artifacts
 
 ### `plan`
 
-The persisted execution plan contains:
+The persisted plan contains:
 
 - `interpretation`
 - `situation`
@@ -138,75 +169,105 @@ The persisted execution plan contains:
 - `cast_roster`
 - `major_events`
 
-`progression_plan.max_rounds` is the planner-recommended target round budget, retained separately
-from the configured runtime hard ceiling.
+Important details:
+
+- `planned_max_rounds` is copied from `planning_analysis.progression_plan.max_rounds`
+- `finalize_plan` validates cast uniqueness
+- `finalize_plan` validates `major_events` round windows and participant cast ids
 
 ### `event_memory`
 
-Shared runtime memory for planner-generated major events. It tracks:
+Shared runtime memory for planner-defined major events. It tracks:
 
-- per-event status
+- event status
 - next and overdue event ids
 - completed and missed event ids
-- whether unresolved required events still keep the endgame gate open
+- whether unresolved required events keep the endgame gate open
 
 ### `event_memory_history`
 
-Round-scoped append-only history of event-memory transitions. Each record stores:
+Append-only event-memory transitions. Each record stores:
 
 - `round_index`
-- `source` (`resolve_round`, `continuation_hard_stop`, or `continuation_stale_required_stop`)
+- `source`
 - `event_updates`
 - `event_memory_summary`
 - `stop_context`
 
-### `simulation_log_jsonl`
+Current `source` values are:
 
-Ordered event stream containing:
+- `resolve_round`
+- `continuation_hard_stop`
+- `continuation_stale_required_stop`
 
-- simulation start
-- raw LLM calls including prompt text and merged raw response text
-- finalized plan
-- finalized actors
-- round focus selection
-- round time advancement
-- background updates
-- adopted actions
-- observer reports
-- event-memory updates
-- final report
-- LLM usage summary
+### `final_report`
 
-`stop_reason` remains explicit in the final report event and is limited to `""`, `no_progress`,
-or `simulation_done`.
+Structured summary of the completed run, including scenario framing, elapsed simulation time,
+round count, activity totals, notable events, explicit errors, and LLM usage summary.
+
+### `report_projection_json`
+
+Persistent finalization projection used by report-section writers. It is built after the final
+structured report exists and includes the final event state plus the recorded history needed to
+explain how the run arrived there.
 
 ### `final_report_sections`
 
-Intermediate structured bundle used to render the final Markdown report. It contains:
+Intermediate string bundle used to render markdown. It contains:
 
 - `conclusion_section`
-- `actor_results_rows` (may be an empty string when there are no body rows)
+- `actor_results_rows`
 - `timeline_section`
-- `actor_dynamics_section` using `### 현재 구도` and `### 관계 변화`, with bullet lines under each subheading
+- `actor_dynamics_section`
 - `major_events_section`
 
-The workflow state also stores the rendered section strings separately as:
+The workflow also stores each section string separately before render time.
 
-- `report_conclusion_section`
-- `report_timeline_section`
-- `report_actor_dynamics_section`
-- `report_major_events_section`
+### `simulation_log_jsonl`
 
-## Failure Policy
+`simulation.log.jsonl` is an ordered append-only event stream. Each row includes:
 
-- Planning and generation are strict structured calls. If the contract cannot be satisfied, the
-  run fails instead of silently degrading.
-- Runtime actor proposals, round directives, and round resolutions may use explicit default payloads.
-  When that happens, the event is recorded through `errors`.
-- Runtime stop behavior is event-aware. Required unresolved major events may keep the runtime alive
-  past the planner target round budget until the hard ceiling is reached.
-- There is one code-first exception: once the planner target has been reached, overdue required
-  events with no matched activity evidence and sustained stagnation may stop as `no_progress`,
-  and those unresolved events are finalized as `missed`.
-- Final report section writing retries once with validation feedback. It does not silently
-  substitute synthetic section text.
+- `index`
+- `event`
+- `event_key`
+- `run_id`
+
+Current event families are:
+
+- `simulation_started`
+- `llm_call`
+- `plan_finalized`
+- `actors_finalized`
+- `round_focus_selected`
+- `round_background_updated`
+- `round_time_advanced`
+- `round_actions_adopted`
+- `round_observer_report`
+- `round_event_memory_updated`
+- `final_report`
+- `llm_usage_summary`
+
+Notes:
+
+- `event_key` is used to avoid duplicate append writes
+- `round_actions_adopted` is written only when a round actually adopts activities
+- raw LLM call rows include prompt text, merged raw response text, timing, token counts, and
+  structured `log_context`
+
+## Failure and Default Policy
+
+- planning and generation are strict structured calls and fail when the contract cannot be satisfied
+- runtime continuation, directive, actor proposal, and resolution nodes may use explicit default
+  payloads when parsing or validation fails
+- defaulted runtime behavior remains observable through `errors`
+- invalid adopted proposals are dropped explicitly and recorded in `errors`
+- required unresolved major events can keep the runtime alive past the planner target until the
+  hard ceiling is reached
+- final report section writing retries once with validation feedback instead of silently inserting
+  synthetic filler text
+
+## Related Docs
+
+- execution boundaries: [`architecture.md`](./architecture.md)
+- model routing and retries: [`llm.md`](./llm.md)
+- stage-level producers of these artifacts: [`workflows/README.md`](./workflows/README.md)

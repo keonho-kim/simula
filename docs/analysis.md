@@ -2,46 +2,49 @@
 
 ## Purpose
 
-`analysis` reads one completed `simulation.log.jsonl` file and writes reproducible artifacts under
-`analysis/<run_id>/`.
+`analysis` reads one completed `simulation.log.jsonl` artifact and writes deterministic summaries,
+tables, and plots under `analysis/<run_id>/`.
 
-The analyzer is intentionally separate from the simulation workflow. It does not mutate runtime
-state, replay the graph, or regenerate LLM outputs. It only reads persisted artifacts and turns
-them into deterministic summaries, tables, and plots.
+The analyzer is intentionally separate from the simulation workflow:
 
-## Entry Point
+- it does not replay the graph
+- it does not regenerate LLM outputs
+- it does not mutate runtime state
+- it only reads persisted artifacts and derives secondary outputs
 
-Run the analyzer with an explicit run directory path:
+## Input Selection
+
+Run the analyzer with an explicit run directory:
 
 ```bash
 uv run analysis --run-dir ./output/2026-04-14.10
 ```
 
-Legacy `run_id` mode is still available when you want resolution through `storage.output_dir`:
+Or use the compatibility selector by `run_id`:
 
 ```bash
 uv run analysis --run-id 2026-04-14.10 --env ./env.toml
 ```
 
-For Korean chart rendering on Ubuntu, install the recommended system dependencies first:
+Input resolution rules:
 
-```bash
-./scripts/install_deps_ubuntu.sh
-```
+- `--run-dir` expects a real run directory and reads `<run-dir>/simulation.log.jsonl`
+- `--run-id` resolves `<storage.output_dir>/<run_id>/simulation.log.jsonl`
+- when `--env` is omitted for `--run-id`, the analyzer falls back to the default `./output`
+- the expected `run_id` is validated against every JSONL row
 
-`--run-dir` reads:
+The analyzer does not auto-pick the latest run.
+
+## Output Location
+
+Analyzer output is always written to:
 
 ```text
-<run-dir>/simulation.log.jsonl
+analysis/<run_id>/
 ```
 
-`--run-id` resolves to:
-
-```text
-<storage.output_dir>/<run_id>/simulation.log.jsonl
-```
-
-When `--env` is omitted for `--run-id`, it falls back to the default `./output` location.
+This location is not derived from `storage.output_dir`. It is a separate analysis workspace rooted
+at the current working directory.
 
 ## Internal Layout
 
@@ -49,62 +52,54 @@ The implementation is split across `src/simula/application/analysis/`:
 
 | Module area | Responsibility |
 | --- | --- |
-| `models.py` | typed analyzer records and artifact payloads |
-| `loader.py` | JSONL loading, event validation, and normalization |
-| `metrics/actions.py` | planned-action versus adopted-action summaries |
-| `metrics/distributions.py` | role-aware token/latency summaries and performance binning |
-| `metrics/token_usage.py` | cumulative token usage totals overall and by role |
-| `metrics/fixer.py` | fixer attribution, retry grouping, and summaries |
-| `metrics/network.py` | public orchestration entrypoint for final network analysis |
-| `metrics/network_growth.py` | cumulative round-by-round network growth metrics |
-| `metrics/network_aggregation.py` | actor relationship node and edge aggregation |
-| `metrics/network_algorithms.py` | NetworkX metric computation, communities, and leaderboards |
-| `metrics/network_graph.py` | directed export graph and undirected projection building |
-| `plotting/distributions.py` | performance summary figure rendering |
-| `plotting/network.py` | ForceAtlas2 graph rendering, collision resolution, and growth GIF output |
+| `loader.py` | JSONL loading, row validation, event normalization |
+| `models.py` | typed records and manifest payloads |
+| `metrics/actions.py` | planned-versus-adopted action summaries |
+| `metrics/distributions.py` | token and latency distributions |
+| `metrics/token_usage.py` | cumulative token accounting |
+| `metrics/fixer.py` | fixer attribution and retry summaries |
+| `metrics/network.py` | top-level network analysis orchestration |
+| `metrics/network_growth.py` | cumulative round-by-round network growth |
+| `metrics/network_aggregation.py` | node and edge aggregation from adopted activities |
+| `metrics/network_algorithms.py` | NetworkX metrics, leaderboards, and communities |
+| `metrics/network_graph.py` | export graph and projection building |
+| `plotting/distributions.py` | performance overview figure rendering |
+| `plotting/network.py` | static network rendering and growth video rendering |
 | `plotting/network_metrics.py` | growth and concentration plots |
-| `network_reporting.py` | readable network reference Markdown |
-| `summary_reporting.py` | non-specialist top-level summary rendering |
-| `token_usage_reporting.py` | deterministic Markdown token summary rendering |
-| `artifacts.py` | deterministic JSON, CSV, PNG, GIF, and GraphML writing |
+| `summary_reporting.py` | human-readable summary page |
+| `network_reporting.py` | network reference markdown |
+| `token_usage_reporting.py` | token summary markdown |
+| `artifacts.py` | deterministic JSON, CSV, image, and GraphML writing |
 
-`src/simula/application/services/analysis_runner.py` owns orchestration only: settings
-resolution, path selection, module ordering, and manifest generation.
+`src/simula/application/services/analysis_runner.py` owns orchestration only: input resolution,
+module ordering, output recording, and manifest generation.
 
-## Analysis Pipeline
+## Pipeline
 
-The current analyzer performs these passes on the loaded run:
+The current analyzer performs these passes:
 
-1. Load and validate JSONL events, then extract `llm_call`, `plan_finalized`,
-   `actors_finalized`, and `round_actions_adopted`.
-2. Build overall token/latency summaries for `input_tokens`, `output_tokens`,
-   `ttft_seconds`, and `duration_seconds`, then render one combined performance plot.
-3. Group calls into `input_tokens x output_tokens` bins with width `1000 x 1000`, then persist
-   TTFT and duration `p90/p95/p99` percentiles as a performance CSV summary.
-4. Aggregate cumulative `input_tokens`, `output_tokens`, and `total_tokens` overall and by role,
-   then persist the totals plus per-call descriptive stats as CSV and Markdown summaries.
-5. Attribute `fixer` calls back to the original role by parsing the fixer prompt's
-   `Target schema:` line, then aggregate call counts, sessions, retries, TTFT, and duration.
-6. Join the execution-plan action catalog with adopted activities so the analyzer can show which
-   action options were available, which ones were used, and which ones were never adopted.
-7. Build a directed actor interaction graph from adopted activities using `source_cast_id`,
-   `target_cast_ids`, `intent_target_cast_ids`, `visibility`, and `round_index`, then derive
-   connectivity, influence, brokerage, cohesion, and community summaries from NetworkX.
-8. Rebuild the relationship graph cumulatively by round to measure growth, concentration, and
-   structural change over time.
-9. Render a static network graph and a cumulative growth MP4 with a shared final-graph ForceAtlas2
-   layout. The renderer applies deterministic post-layout collision resolution in display space so
-   nodes do not overlap in the final output.
-10. Persist one high-level `summary.md` page plus deeper reference artifacts so the output remains
-   readable without opening several folders first.
+1. Load and validate JSONL rows, then extract the events relevant to analysis.
+2. Persist one `llm_calls.csv` table containing raw LLM-call level records.
+3. Build token and latency distributions for `input_tokens`, `output_tokens`,
+   `ttft_seconds`, and `duration_seconds`, then render a single performance overview image.
+4. Group calls into `input_tokens x output_tokens` bins and compute TTFT and duration
+   `p90`, `p95`, and `p99` percentiles for `performance/summary.csv`.
+5. Attribute fixer calls back to the repaired role and summarize retries, sessions, and timing.
+6. Aggregate cumulative token usage overall and by role, then render CSV and Markdown summaries.
+7. Compare the execution plan's action catalog with adopted activities to show available,
+   used, and unused action types.
+8. Build an actor interaction graph from adopted activities, then derive connectivity,
+   concentration, leaderboards, and community structure from NetworkX.
+9. Rebuild the same relationship graph cumulatively by round to measure network growth and
+   concentration over time.
+10. Render one high-level `summary.md` page plus deeper reference artifacts.
 
-KDE curves are computed directly with `numpy`. If a series has fewer than two valid values or is
-constant, the analyzer renders the skip reason inside the combined overview figure instead of
-inventing a curve.
+KDE curves are computed locally. When a series is too short or constant, the renderer writes the
+skip reason into the figure instead of inventing a curve.
 
-## Output Layout
+## Artifact Guide
 
-Each analyzer run writes:
+The analyzer may produce:
 
 ```text
 analysis/<run_id>/
@@ -134,40 +129,26 @@ analysis/<run_id>/
     growth.mp4
 ```
 
-`summary.md` is the preferred entry point. It combines the main reading path, planned-versus-used
-actions, network growth, token usage, and fixer status in one non-specialist document.
+Artifact notes:
 
-`actions/summary.csv` compares the planned action catalog against adopted action counts and round
-coverage.
-
-`performance/summary.png` is the compact top-level performance figure, while
-`performance/summary.csv` groups calls by `input_tokens x output_tokens` bins and records TTFT and
-duration `p90/p95/p99` percentiles.
-
-`token_usage/summary.csv` keeps cumulative totals and now also includes per-call descriptive token
-stats such as min, max, mean, median, `p90`, `p95`, and `p99`.
-
-`network/growth.csv` contains cumulative round-by-round network metrics. `network/growth_metrics.png`
-and `network/concentration.png` make the same information easier to scan visually, while
-`network/growth.mp4` shows the graph emerging over time in a pausable video artifact.
-
-`network/summary.json` contains the final global network metrics, skipped-metric reasons, top actor
-leaderboards, and meaningful community groups. `network/summary.md` is the human-readable reference
-note for the same final and time-series network analysis.
-
-`network/graph.png` keeps the ForceAtlas2 layout because the exported relationship graph is not a
-tree or forest in general. Graphviz overlap removal is a valid reference technique, but the
-current analyzer keeps the Atlas-style layout and resolves node overlaps with a deterministic
-display-space collision pass instead of switching layout engines.
-
-`manifest.json` records the analyzed input path, output directory, run metadata, and the list of
-produced files. It is an index, not a duplicate data bundle.
+- `summary.md` is the preferred human entrypoint.
+- `manifest.json` is an index of what was analyzed and what was written.
+- `llm_calls.csv` stays close to the raw runtime evidence.
+- `performance/summary.png` is the compact overview chart.
+- `token_usage/summary.md` is the readable token summary.
+- `network/summary.md` is the readable network reference note.
+- localized CSV headers and plot titles are intentionally written in Korean by the analyzer's
+  localization layer.
 
 ## Failure Policy
 
-- `--run-dir` expects a real run directory path such as `./output/2026-04-14.10`.
-- `--run-id` remains available as a compatibility alias.
-- The analyzer does not auto-pick the latest run.
-- Missing input files, invalid JSONL rows, or logs without any `llm_call` events fail fast.
-- Missing `plan_finalized`, `actors_finalized`, or `round_actions_adopted` events remain explicit
-  in the derived summaries instead of silently degrading into fabricated outputs.
+- missing input files fail fast
+- invalid JSONL rows fail fast
+- logs without any `llm_call` events fail fast
+- missing `plan_finalized`, `actors_finalized`, or `round_actions_adopted` evidence remains
+  explicit in the derived summaries instead of silently fabricating outputs
+
+## Related Docs
+
+- run and output operations: [`operations.md`](./operations.md)
+- runtime artifact contracts: [`contracts.md`](./contracts.md)

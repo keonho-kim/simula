@@ -2,8 +2,8 @@
 
 ## Purpose
 
-Planning turns raw scenario text into one compact execution plan that downstream stages can use
-without reopening the original scenario every time.
+Planning turns raw scenario text plus scenario controls into one compact execution plan that later
+stages can reuse without reopening the full scenario every time.
 
 ## Active Path
 
@@ -19,20 +19,30 @@ flowchart LR
 
 ### `build_planning_analysis`
 
-Generates `PlanningAnalysis` in one structured call. This bundle captures:
+Generates `PlanningAnalysis` in one strict structured call. The bundle includes:
 
-- brief summary
-- premise
-- time scope
-- public context
-- private context
-- key pressures
-- progression plan
+- `brief_summary`
+- `premise`
+- `time_scope`
+- `public_context`
+- `private_context`
+- `key_pressures`
+- `progression_plan`
+
+It also writes `planned_max_rounds` into workflow state from
+`planning_analysis.progression_plan.max_rounds`.
 
 ### `build_execution_plan`
 
-Generates `ExecutionPlanBundle` from the planning analysis plus the raw scenario text and
-cast-count controls. This bundle contains:
+Generates `ExecutionPlanBundle` from:
+
+- raw scenario text
+- the planning analysis JSON
+- the configured round cap
+- `scenario_controls.num_cast`
+- `scenario_controls.allow_additional_cast`
+
+The bundle contributes:
 
 - `situation`
 - `action_catalog`
@@ -40,18 +50,31 @@ cast-count controls. This bundle contains:
 - `cast_roster`
 - `major_events`
 
-`cast_roster` generation is guided by `scenario_controls.num_cast` and
-`scenario_controls.allow_additional_cast`.
-`major_events` is scenario-dependent and may be empty when the scenario does not imply a
-trackable shared event sequence.
+`major_events` may be empty when the scenario does not imply a shared event track worth carrying
+through runtime.
 
 ### `finalize_plan`
 
-Builds the persisted plan payload, validates cast uniqueness, and writes the plan to storage.
+Builds the persisted `plan` payload and performs code-side validation before the runtime ever sees
+the plan.
+
+Current validation includes:
+
+- unique `cast_id`
+- unique `display_name`
+- cast roster count matches `scenario_controls`
+- each major event has a non-empty unique `event_id`
+- each major event round window stays within `planned_max_rounds`
+- each major event participant id exists in the cast roster
+
+After validation, the node:
+
+- saves the plan through the store
+- writes a `plan_finalized` runtime log event
 
 ## Stage Output
 
-The final `plan` retained in workflow state contains only the keys used downstream:
+The final `plan` stored in workflow state contains:
 
 - `interpretation`
 - `situation`
@@ -61,5 +84,15 @@ The final `plan` retained in workflow state contains only the keys used downstre
 - `cast_roster`
 - `major_events`
 
-`build_planning_analysis` also writes `planned_max_rounds` into workflow state. This is the
-planner-recommended target round budget and is distinct from the configured runtime hard ceiling.
+Important distinctions:
+
+- `planned_max_rounds` is the planner-recommended target
+- `max_rounds` is the configured hard ceiling from runtime settings
+
+## Failure Policy
+
+- planning analysis is strict
+- execution plan generation is strict
+- plan finalization fails fast on invalid cast or major-event structure
+
+There is no silent fallback plan.

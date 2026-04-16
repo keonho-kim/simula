@@ -3,17 +3,22 @@
 ## Purpose
 
 `simula` is a layered application centered on one compiled LangGraph workflow. The workflow owns
-simulation state transitions. Everything else around it exists to supply context, persist
-artifacts, and expose a clean operator interface.
+simulation state transitions. The surrounding application is responsible for:
+
+- turning CLI input into a compact graph input
+- supplying services through runtime context
+- persisting SQL-backed artifacts
+- streaming JSONL runtime events
+- writing human-facing files after the graph completes
 
 ## Layers
 
 | Layer | Responsibility | Representative modules |
 | --- | --- | --- |
 | Entry | CLI parsing and process bootstrap | `simula.entrypoints.*` |
-| Application | command handling, workflow execution, presentation | `simula.application.*` |
-| Domain | contracts, policy, report builders, pure reducers | `simula.domain.*` |
-| Infrastructure | config loading, LLM routing, storage backends | `simula.infrastructure.*` |
+| Application | commands, workflow execution, presentation, analysis orchestration | `simula.application.*` |
+| Domain | typed contracts, reducers, runtime policy, reporting, event builders | `simula.domain.*` |
+| Infrastructure | config loading, provider adapters, storage engines, checkpointers | `simula.infrastructure.*` |
 
 ## Execution Path
 
@@ -23,73 +28,113 @@ flowchart LR
     Bootstrap --> Command["application.commands.simulation_runs"]
     Command --> Executor["application.services.executor"]
     Executor --> Input["SimulationInputState"]
+    Executor --> Context["WorkflowRuntimeContext"]
     Input --> Hydrate["hydrate_initial_state"]
     Hydrate --> Workflow["SIMULATION_WORKFLOW"]
-    Executor --> Context["WorkflowRuntimeContext"]
     Context --> Workflow
     Workflow --> Output["SimulationOutputState"]
     Output --> Presentation["application.services.presentation"]
-    Presentation --> Files["output/<run_id>/*"]
+    Presentation --> Files["final_report.md"]
+    Executor --> Jsonl["simulation.log.jsonl"]
+    Executor --> Store["SQL store"]
 ```
+
+The executor is the boundary that combines graph execution, output streaming, storage, and final
+presentation.
+
+## LangGraph Boundary
+
+The root graph follows the current LangGraph pattern of distinct public input, internal state, and
+public output schemas:
+
+- `input_schema=SimulationInputState`
+- `state_schema=SimulationWorkflowState`
+- `output_schema=SimulationOutputState`
+- `context_schema=WorkflowRuntimeContext`
+
+This keeps the public API narrow while allowing the internal workflow state to stay fully hydrated
+and required-only.
+
+## Hydrated Internal State
+
+The graph accepts a compact input and expands it exactly once in `hydrate_initial_state`.
+
+Why this exists:
+
+- CLI callers should not construct dozens of internal scratch fields manually.
+- downstream nodes should be able to assume required keys already exist.
+- runtime-only fields such as `checkpoint_enabled`, `event_memory_history`, and report section
+  buffers belong in internal state, not in the public graph input.
 
 ## Runtime Context
 
-The graph does not carry service dependencies inside state. Nodes read shared execution context
-through `WorkflowRuntimeContext`.
+Service dependencies stay out of the graph state and are carried through `WorkflowRuntimeContext`.
+
+The current context includes:
 
 - `settings`
 - `store`
 - `llms`
 - `logger`
+- `llm_usage_tracker`
+- `run_jsonl_appender`
 
-That keeps workflow state focused on simulation data, not infrastructure handles.
+That split matters because LangGraph state should model simulation data, not database handles,
+provider clients, or loggers.
 
-## State Surfaces
+## Stream Surface
 
-The root graph exposes three distinct state surfaces.
+The executor runs the graph with:
 
-| Surface | Purpose |
-| --- | --- |
-| `SimulationInputState` | compact public input accepted by the root graph |
-| `SimulationWorkflowState` | hydrated internal state used between nodes |
-| `SimulationOutputState` | compact public output returned by the root graph |
+- `app.astream(...)`
+- `stream_mode=["custom", "values"]`
+- `version="v2"`
 
-The hydration boundary exists because the planning node needs fully initialized runtime channels,
-but operators should not need to pass the entire internal state shape by hand.
+The stream responsibilities are separated:
 
-## Graph Composition
+- `custom` parts carry stable domain events that are appended to `simulation.log.jsonl`
+- `values` parts carry state snapshots, with the last snapshot treated as the final graph output
 
-The root path is linear at the stage level:
+This matches the LangGraph guidance of exposing a narrow stream surface instead of leaking the full
+internal state by default.
 
-1. `hydrate_initial_state`
-2. `planning`
-3. `generation`
-4. `runtime`
-5. `finalization`
+## Persistence Split
 
-The runtime stage itself contains the loop. The other stages are straight-line subgraphs.
+There are two persistence paths on purpose.
 
-## System Boundaries
+### SQL-backed runtime store
 
-### Workflow state vs. file output
+The application store persists:
 
-The workflow returns structured report data such as `final_report` and
-`final_report_markdown`. The executor reads the append-driven `simulation.log.jsonl` artifact
-back into `simulation_log_jsonl`, and the presentation layer turns those outputs into files.
+- run records
+- the finalized plan
+- finalized actors
+- per-round adopted activities and observer reports
+- the structured final report
 
-### Rich state vs. prompt projections
+### File outputs
 
-LLM-facing nodes do not consume the full workflow state. They receive compact JSON projections
-assembled for their role.
+File output is separate from the SQL store:
 
-### Prompt projections vs. report projection
+- `RunJsonlAppender` writes `simulation.log.jsonl` incrementally during execution
+- the presentation layer writes `final_report.md` after the workflow completes
 
-Planning, generation, and runtime use transient prompt projections. Finalization additionally
-builds a persistent `report_projection_json` artifact for report writing.
+This keeps append-heavy event logging separate from relational storage and keeps markdown rendering
+out of the graph nodes that manage simulation state.
+
+## Prompt and Report Boundaries
+
+The workflow uses several progressively narrower data shapes.
+
+- rich internal workflow state is used for node-to-node coordination
+- compact prompt projections are built for LLM-facing nodes
+- `report_projection_json` is a durable finalization artifact built only for report writing
+
+The same raw state is therefore not reused blindly across planning, runtime, and final reporting.
 
 ## Related Docs
 
-- contracts: [`contracts.md`](./contracts.md)
-- model routing and structured outputs: [`llm.md`](./llm.md)
-- workflow hub: [`workflows/README.md`](./workflows/README.md)
-- local operations: [`operations.md`](./operations.md)
+- state and artifact contracts: [`contracts.md`](./contracts.md)
+- settings and storage configuration: [`configuration.md`](./configuration.md)
+- role routing and parsing policy: [`llm.md`](./llm.md)
+- stage-level workflow details: [`workflows/README.md`](./workflows/README.md)

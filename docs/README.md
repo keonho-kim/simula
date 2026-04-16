@@ -1,38 +1,41 @@
 # Documentation
 
-This documentation set describes the current compiled workflow only. Each document owns one
-layer of detail so the same concept is not explained in five places.
+This directory documents the current implementation in `src/`. It follows the compiled
+LangGraph workflow, the shipped CLI surface, and the artifacts produced by the application today.
 
-## Reading Order
+## Suggested Reading Paths
 
 | Goal | Start here | Then read |
 | --- | --- | --- |
-| Understand the project quickly | [`../README.md`](../README.md) | [`architecture.md`](./architecture.md) |
-| Understand graph boundaries | [`architecture.md`](./architecture.md) | [`contracts.md`](./contracts.md) |
-| Understand stage handoffs | [`workflows/README.md`](./workflows/README.md) | the stage document you need |
-| Change prompts or model routing | [`llm.md`](./llm.md) | the matching workflow doc |
-| Inspect saved JSONL runs | [`analysis.md`](./analysis.md) | [`operations.md`](./operations.md) |
-| Run locally and validate changes | [`operations.md`](./operations.md) | [`contracts.md`](./contracts.md) |
+| Configure models, storage, and checkpoints | [`configuration.md`](./configuration.md) | [`operations.md`](./operations.md) |
+| Run the simulator locally | [`operations.md`](./operations.md) | [`workflows/README.md`](./workflows/README.md) |
+| Understand system boundaries | [`architecture.md`](./architecture.md) | [`contracts.md`](./contracts.md) |
+| Understand one workflow stage | [`workflows/README.md`](./workflows/README.md) | the stage document you need |
+| Change prompts, routing, or retry behavior | [`llm.md`](./llm.md) | the matching workflow doc |
+| Inspect saved runs and analyzer output | [`analysis.md`](./analysis.md) | [`operations.md`](./operations.md) |
 
-## Document Roles
+## Document Map
 
 | Document | Owns |
 | --- | --- |
-| [`../README.md`](../README.md) | project pitch, quick start, high-level flow |
-| [`architecture.md`](./architecture.md) | layers, execution path, state/runtime boundaries |
-| [`contracts.md`](./contracts.md) | public I/O, internal state groups, structured contracts, artifacts |
-| [`llm.md`](./llm.md) | model roles, prompt projections, structured-output policy |
-| [`analysis.md`](./analysis.md) | analyzer CLI, analysis pipeline, and artifact outputs |
-| [`operations.md`](./operations.md) | commands, validation, outputs, maintenance |
-| [`workflows/README.md`](./workflows/README.md) | workflow hub and stage handoffs |
-| [`workflows/simulation.md`](./workflows/simulation.md) | root graph assembly and hydration |
-| [`workflows/planning.md`](./workflows/planning.md) | compact planning path |
-| [`workflows/generation.md`](./workflows/generation.md) | actor generation fan-out/fan-in |
-| [`workflows/runtime.md`](./workflows/runtime.md) | runtime loop and step resolution |
-| [`workflows/finalization.md`](./workflows/finalization.md) | report finalization path |
+| [`../README.md`](../README.md) | project pitch, quick start, and high-level flow |
+| [`configuration.md`](./configuration.md) | settings resolution, `env.toml` shape, provider rules, storage, checkpoints |
+| [`operations.md`](./operations.md) | CLI usage, scenario input rules, bootstrap commands, validation, output directories |
+| [`architecture.md`](./architecture.md) | execution path, layer boundaries, LangGraph integration, persistence split |
+| [`contracts.md`](./contracts.md) | public state surfaces, runtime context, structured contracts, durable artifacts |
+| [`llm.md`](./llm.md) | role routing, provider support, prompt projections, parsing, retries, and raw call logging |
+| [`analysis.md`](./analysis.md) | analyzer input selection, processing pipeline, localized artifacts, failure behavior |
+| [`workflows/README.md`](./workflows/README.md) | workflow hub and cross-stage handoffs |
+| [`workflows/simulation.md`](./workflows/simulation.md) | root graph boundary, hydration, and execution stream surface |
+| [`workflows/planning.md`](./workflows/planning.md) | scenario analysis, plan construction, and planning validation |
+| [`workflows/generation.md`](./workflows/generation.md) | actor generation fan-out/fan-in flow |
+| [`workflows/runtime.md`](./workflows/runtime.md) | round loop, branching, event gating, and runtime trace building |
+| [`workflows/finalization.md`](./workflows/finalization.md) | final report projection, section writing, and markdown assembly |
 
-## Rules
+## Conventions
 
-- These docs follow the compiled graph, not historical module layout.
-- Workflow docs use active node names.
-- `README.md` stays product-oriented; `docs/` holds the implementation detail.
+- These docs describe the active compiled graph, not historical experiments.
+- Workflow docs use the active node names from the graph definitions.
+- `docs/` stays implementation-oriented. Product framing stays in the root `README.md`.
+- Configuration, storage, and artifact descriptions follow current code behavior even when that
+  behavior is stricter than the sample scenario files or older notes.

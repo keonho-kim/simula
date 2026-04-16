@@ -2,8 +2,8 @@
 
 ## Purpose
 
-Runtime is the only looping stage. It chooses the next focus, fans out actor proposals, resolves
-the round, and decides whether to continue.
+Runtime is the only looping stage. It selects the next focus, fans out actor proposals, resolves
+the round, updates event tracking, and decides whether another round is still useful.
 
 ## Active Path
 
@@ -14,12 +14,14 @@ flowchart TD
     Continue -->|continue| Prepare["prepare_round"]
     Continue -->|stop| End([END])
     Prepare --> Plan["plan_round"]
-    Plan --> FanOut["generate_actor_proposal*"]
+    Plan --> Dispatch{"dispatch_selected_actor_proposals"}
+    Dispatch -->|selected actors| FanOut["generate_actor_proposal*"]
+    Dispatch -->|no selected actors| Resolve["resolve_round"]
     FanOut --> Reduce["reduce_actor_proposals"]
-    Reduce --> Resolve["resolve_round"]
-    Resolve --> Route{"resolved stop?"}
-    Route -->|continue| Continue
+    Reduce --> Resolve
+    Resolve --> Route{"route_after_resolution"}
     Route -->|simulation_done| End
+    Route -->|continue| Continue
 ```
 
 `generate_actor_proposal*` fans out once per selected actor in the current round.
@@ -28,52 +30,91 @@ flowchart TD
 
 ### `initialize_runtime_state`
 
-Normalizes runtime counters, initializes `event_memory` from `plan.major_events`, and ensures the
-runtime loop starts from a clean state.
+Builds the runtime-only starting point after planning and generation:
 
-### `prepare_round`
-
-Advances `round_index`, refreshes `event_memory`, compresses focus candidates, resets
-current-round scratch fields, and starts round timing.
+- initializes `activity_feeds`
+- initializes `event_memory` from `plan.major_events`
+- initializes actor intent snapshots
+- builds the initial actor-facing scenario digest
+- resets runtime scratch fields
 
 ### `assess_round_continuation`
 
-Runs before each new round. It can end the runtime loop in two ways:
+Runs before each new round.
 
-- deterministic `simulation_done` when the configured hard stop derived from
-  `max_rounds`, `planned_max_rounds`, and the grace buffer has been reached
-- coordinator-produced `no_progress` when another round would not add meaningful movement
+Deterministic checks happen first:
 
-Required unresolved major events can prevent both planner-target completion and `no_progress`
-stops until the hard ceiling is reached. There is one code-first exception: once the planner target
-round has been reached, overdue required events with no matched activity evidence and sustained
-stagnation can stop as `no_progress`, and those unresolved events are finalized as `missed`.
+- hard-stop completion once the configured hard stop is reached
+- immediate completion once `planned_max_rounds` has been reached and no required unresolved
+  events remain
+- continued execution when required unresolved events still keep the endgame gate open
+- stale-required-event stop when required unresolved events have gone overdue without evidence and
+  stagnation has accumulated after the planner target
+
+Only after those checks does the node ask the `coordinator` role whether the run should stop for
+`no_progress`.
+
+If required unresolved events remain, a coordinator-produced `no_progress` stop is suppressed and
+the loop continues.
+
+When event-memory transitions happen at this front-stop boundary, the node writes
+`round_event_memory_updated` events and appends to `event_memory_history`.
+
+### `prepare_round`
+
+Prepares the next round by:
+
+- incrementing `round_index`
+- refreshing `event_memory`
+- rebuilding compact focus candidates
+- resetting round-local scratch fields
+- starting round latency timing
 
 ### `plan_round`
 
-Generates one `RoundDirective` bundle:
+Builds one `RoundDirective` bundle through the `coordinator` role.
 
-- focus summary
-- selection reason
-- selected actor ids
-- deferred actor ids
-- focus slices
-- background updates
+It receives:
 
-The prompt is built from compact focus candidates, deferred actor views, compact situation and
-coordination-frame views, the simulation clock, event memory, and the latest observer summary.
+- focus candidates
+- deferred actor views
+- compact situation and coordination-frame views
+- simulation clock
+- event memory
+- latest observer summary
 
-It also appends the directive to `round_focus_history`.
-When stagnation has already accumulated, this step may inject one high-pressure deferred
-background hook so the next round is not forced to recycle the same visible beat.
+After local normalization, the node:
+
+- enforces focus-slice and actor-call limits
+- normalizes selected and deferred cast ids
+- may inject one stagnation-breaking background hook
+- appends to `round_focus_history`
+- writes `round_focus_selected`
+- writes `round_background_updated` when background updates exist
+
+### `dispatch_selected_actor_proposals`
+
+Decides the next branch after the directive:
+
+- when selected cast ids exist, fan out actor proposal work
+- when none exist, jump directly to `resolve_round`
+
+This keeps the round resolver as the single place that finalizes the round, even when no actor
+gets direct focus.
 
 ### `generate_actor_proposal`
 
-Generates one `ActorActionProposal` for one selected actor from compact runtime inputs.
+Builds one `ActorActionProposal` for one selected actor using:
 
-The prompt combines the selected focus slice, visible action context, unread backlog digest,
-visible actors, and runtime guidance. Runtime guidance includes the current actor-facing digest,
-channel guidance, current constraints, allowed actions, and the current intent snapshot.
+- the actor card
+- one focus slice
+- visible action context
+- unread backlog digest
+- visible actors
+- runtime guidance, including allowed actions and current intent state
+
+The node also applies semantic validation and may fall back to an explicit forced-idle default
+payload when parsing or validation fails.
 
 ### `reduce_actor_proposals`
 
@@ -81,46 +122,58 @@ Restores deterministic actor order after fan-in.
 
 ### `resolve_round`
 
-Generates one `RoundResolution` bundle, applies adopted actions, advances the simulation clock,
-writes observer output, updates `event_memory`, appends `event_memory_history`, persists round
-artifacts, and sets stop state.
+Resolves the round in one `RoundResolution` bundle and then performs the code-side updates that the
+LLM is not trusted to do directly.
 
-The prompt is built from pending actor proposals, latest background updates, visible activities,
-compact situation and coordination-frame views, relevant intent states, the previous actor-facing
-digest, the simulation clock, `stagnation_rounds`, progression policy, and event memory.
+Current responsibilities:
+
+- filter invalid adopted cast ids
+- apply adopted activities
+- sanitize event updates
+- update `event_memory` and append `event_memory_history`
+- advance the simulation clock
+- write observer output
+- merge updated intent snapshots
+- update stagnation counters
+- persist round artifacts through the store
+- write runtime log events for time advancement, adopted actions, observer output, and event-memory
+  transitions
+- set `stop_reason` when the resolver completes the simulation
 
 ## Stop Behavior
 
-The runtime loop ends when either:
+The runtime loop ends when one of these happens:
 
+- `assess_round_continuation` returns `simulation_done`
 - `assess_round_continuation` returns `no_progress`
-- `assess_round_continuation` deterministically returns `simulation_done` at the configured hard stop
 - `resolve_round` returns `simulation_done`
 
 The active stop policy combines:
 
 - configured hard ceiling: `max_rounds`
 - planner target: `planned_max_rounds`
-- grace buffer for unresolved required major events
-- stale overdue required events with no evidence after the planner target
-- round-level resolver completion signal
+- grace for unresolved required major events
+- stale overdue required events after the planner target
+- round-level resolver completion
 
-Active `stop_reason` values are:
+`stop_reason` values remain:
 
-- `""` for continue
-- `no_progress` for a front-stop before the next round
-- `simulation_done` for a completed simulation
+- `""`
+- `no_progress`
+- `simulation_done`
 
 ## Stage Output
 
-Runtime leaves behind the full execution trace used by finalization:
+Runtime leaves behind the trace consumed by finalization:
 
 - `activities`
 - `observer_reports`
+- `background_updates`
 - `round_focus_history`
 - `round_time_history`
-- `background_updates`
 - `event_memory`
 - `event_memory_history`
+- `actor_intent_states`
+- `intent_history`
 - `world_state_summary`
 - `stop_reason`
