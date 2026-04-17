@@ -664,6 +664,38 @@ class ActorEdgeMetrics:
 
 
 @dataclass(slots=True)
+class NetworkBenchmarkMetrics:
+    """Benchmark-oriented network metrics for cross-run comparison."""
+
+    participation_entropy: float | None = None
+    action_type_diversity: float | None = None
+    density: float | None = None
+    average_path_depth: float | None = None
+    network_diameter: int | None = None
+    centralization: float | None = None
+    community_count: int = 0
+    modularity: float | None = None
+    mean_edge_growth_rate: float | None = None
+    mean_active_actor_growth_rate: float | None = None
+    top20_interaction_share: float | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "participation_entropy": self.participation_entropy,
+            "action_type_diversity": self.action_type_diversity,
+            "density": self.density,
+            "average_path_depth": self.average_path_depth,
+            "network_diameter": self.network_diameter,
+            "centralization": self.centralization,
+            "community_count": self.community_count,
+            "modularity": self.modularity,
+            "mean_edge_growth_rate": self.mean_edge_growth_rate,
+            "mean_active_actor_growth_rate": self.mean_active_actor_growth_rate,
+            "top20_interaction_share": self.top20_interaction_share,
+        }
+
+
+@dataclass(slots=True)
 class NetworkSummary:
     """Top-level actor network summary."""
 
@@ -688,6 +720,7 @@ class NetworkSummary:
     transitivity: float | None
     max_core_number: int | None
     community_count: int
+    benchmark_metrics: NetworkBenchmarkMetrics = field(default_factory=NetworkBenchmarkMetrics)
     skipped_metrics: dict[str, str] = field(default_factory=dict)
     empty_reason: str | None = None
     input_warnings: list[str] = field(default_factory=list)
@@ -770,6 +803,7 @@ class NetworkReport:
     def to_dict(self) -> dict[str, object]:
         return {
             "summary": self.summary.to_dict(),
+            "benchmark_metrics": self.summary.benchmark_metrics.to_dict(),
             "leaderboards": {
                 key: [entry.to_dict() for entry in entries]
                 for key, entries in sorted(self.leaderboards.items())
@@ -798,6 +832,10 @@ class NetworkGrowthRecord:
     edge_weight_gini: float | None
     new_actor_count: int
     new_edge_count: int
+    average_path_depth: float | None = None
+    edge_growth_rate: float | None = None
+    active_actor_growth_rate: float | None = None
+    top20_interaction_share: float | None = None
     top_degree_cast_id: str = ""
     top_degree_display_name: str = ""
     top_degree_score: float | None = None
@@ -816,6 +854,10 @@ class NetworkGrowthRecord:
             "edge_count": self.edge_count,
             "largest_component_ratio": self.largest_component_ratio,
             "density": self.density,
+            "average_path_depth": self.average_path_depth,
+            "edge_growth_rate": self.edge_growth_rate,
+            "active_actor_growth_rate": self.active_actor_growth_rate,
+            "top20_interaction_share": self.top20_interaction_share,
             "top1_actor_share": self.top1_actor_share,
             "top3_actor_share": self.top3_actor_share,
             "actor_weight_hhi": self.actor_weight_hhi,

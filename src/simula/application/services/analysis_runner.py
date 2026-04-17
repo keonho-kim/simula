@@ -160,12 +160,15 @@ def run_analysis(
     network_report, graph = build_network_report(
         actors_by_id=loaded.actors_by_id,
         activities=loaded.adopted_activities,
+        planned_actions=loaded.planned_actions,
+        planned_max_rounds=loaded.planned_max_rounds,
         has_actors_finalized_event=loaded.has_actors_finalized_event,
         has_round_actions_adopted_event=loaded.has_round_actions_adopted_event,
     )
     growth_report = build_network_growth_report(
         actors_by_id=loaded.actors_by_id,
         activities=loaded.adopted_activities,
+        planned_actions=loaded.planned_actions,
         planned_max_rounds=loaded.planned_max_rounds,
         has_actors_finalized_event=loaded.has_actors_finalized_event,
         has_round_actions_adopted_event=loaded.has_round_actions_adopted_event,
@@ -249,6 +252,7 @@ def run_analysis(
         actors_by_id=loaded.actors_by_id,
         activities=loaded.adopted_activities,
         growth_report=growth_report,
+        planned_actions=loaded.planned_actions,
         planned_max_rounds=loaded.planned_max_rounds,
         has_actors_finalized_event=loaded.has_actors_finalized_event,
         has_round_actions_adopted_event=loaded.has_round_actions_adopted_event,

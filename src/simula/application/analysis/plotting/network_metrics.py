@@ -26,11 +26,11 @@ def render_network_growth_metrics_plot(
     growth_report: NetworkGrowthReport,
     output_path: Path,
 ) -> None:
-    """Render a 2x2 plot showing how the network grows over rounds."""
+    """Render a 3x2 plot showing how the network grows over rounds."""
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     label_font = configure_korean_font()
-    figure, axes = plt.subplots(2, 2, figsize=(12, 8))
+    figure, axes = plt.subplots(3, 2, figsize=(13, 11))
     flat_axes = list(axes.flat)
 
     try:
@@ -60,19 +60,36 @@ def render_network_growth_metrics_plot(
             _plot_series(
                 axis=flat_axes[2],
                 rounds=rounds,
-                values=[
-                    _none_to_nan(item.largest_component_ratio)
-                    for item in growth_report.rows
-                ],
-                title="한 그룹으로 이어진 비율",
+                values=[_none_to_nan(item.density) for item in growth_report.rows],
+                title="밀도",
                 color="#2ca02c",
                 percent=True,
             )
             _plot_series(
                 axis=flat_axes[3],
                 rounds=rounds,
-                values=[_none_to_nan(item.top1_actor_share) for item in growth_report.rows],
-                title="가장 많이 연결된 1명의 비중",
+                values=[
+                    _none_to_nan(item.average_path_depth)
+                    for item in growth_report.rows
+                ],
+                title="평균 경로 깊이",
+                color="#9467bd",
+            )
+            _plot_series(
+                axis=flat_axes[4],
+                rounds=rounds,
+                values=[_none_to_nan(item.edge_growth_rate) for item in growth_report.rows],
+                title="엣지 성장률",
+                color="#8c564b",
+            )
+            _plot_series(
+                axis=flat_axes[5],
+                rounds=rounds,
+                values=[
+                    _none_to_nan(item.top20_interaction_share)
+                    for item in growth_report.rows
+                ],
+                title="상위 20% actor 점유율",
                 color="#d62728",
                 percent=True,
             )

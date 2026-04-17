@@ -87,6 +87,14 @@ def render_network_summary_markdown(
     lines.extend(
         [
             "",
+            "## 벤치마크 지표",
+            *_benchmark_lines(report),
+        ]
+    )
+
+    lines.extend(
+        [
+            "",
             "## 계산 메모",
             "- 성장 추이는 라운드별 누적 연결을 다시 계산해 요약합니다.",
             "- 직접 연결, 중간 다리 역할, 간접 영향력은 각각 상대 수, 중개 중심성, 페이지랭크를 바탕으로 읽습니다.",
@@ -204,10 +212,51 @@ def _community_line(report: NetworkReport) -> str:
     )
 
 
+def _benchmark_lines(
+    report: NetworkReport,
+) -> list[str]:
+    benchmark = report.summary.benchmark_metrics
+    return [
+        "- "
+        f"참여 분산 엔트로피는 {_format_float(benchmark.participation_entropy)}이고, "
+        f"행동 다양성은 {_format_float(benchmark.action_type_diversity)}입니다.",
+        "- "
+        f"밀도는 {_format_ratio(benchmark.density)}, 평균 경로 깊이는 {_format_float(benchmark.average_path_depth)}, "
+        f"지름은 {_format_int(benchmark.network_diameter)}입니다.",
+        "- "
+        f"중심화는 {_format_float(benchmark.centralization)}입니다.",
+        "- "
+        f"커뮤니티는 {benchmark.community_count}개, 모듈러리티는 {_format_float(benchmark.modularity)}입니다.",
+        "- "
+        f"평균 엣지 성장률은 {_format_float(benchmark.mean_edge_growth_rate)}, "
+        f"평균 활성 actor 성장률은 {_format_float(benchmark.mean_active_actor_growth_rate)}입니다.",
+        "- "
+        f"상위 20% actor의 상호작용 점유율은 {_format_ratio(benchmark.top20_interaction_share)}입니다.",
+        *[
+            f"- 계산 제외: {metric} -> {reason}"
+            for metric, reason in sorted(report.summary.skipped_metrics.items())
+            if metric
+            in {
+                "participation_entropy",
+                "action_type_diversity",
+                "average_path_depth",
+                "network_diameter",
+                "modularity",
+            }
+        ],
+    ]
+
+
 def _format_float(value: float | None) -> str:
     if value is None:
         return "-"
     return f"{value:.4f}"
+
+
+def _format_int(value: int | None) -> str:
+    if value is None:
+        return "-"
+    return str(value)
 
 
 def _format_ratio(value: float | None) -> str:

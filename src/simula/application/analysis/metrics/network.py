@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
+
 import networkx as nx
 
 from simula.application.analysis.metrics.network_aggregation import (
@@ -20,10 +22,12 @@ from simula.application.analysis.metrics.network_graph import (
 )
 from simula.application.analysis.models import (
     ActorNodeMetrics,
+    NetworkBenchmarkMetrics,
     ActorRecord,
     AdoptedActivityRecord,
     NetworkReport,
     NetworkSummary,
+    PlannedActionRecord,
 )
 
 
@@ -31,6 +35,8 @@ def build_network_report(
     *,
     actors_by_id: dict[str, ActorRecord],
     activities: list[AdoptedActivityRecord],
+    planned_actions: list[PlannedActionRecord] | None = None,
+    planned_max_rounds: int = 0,
     has_actors_finalized_event: bool = True,
     has_round_actions_adopted_event: bool = True,
 ) -> tuple[NetworkReport, nx.DiGraph]:
@@ -50,6 +56,12 @@ def build_network_report(
         directed_graph=directed_graph,
         undirected_graph=undirected_graph,
         total_actor_count=len(actors_by_id),
+        activities=activities,
+        planned_action_types=_planned_action_types(planned_actions or []),
+    )
+    mean_edge_growth_rate, mean_active_actor_growth_rate = _compute_mean_growth_rates(
+        activities=activities,
+        planned_max_rounds=planned_max_rounds,
     )
 
     nodes = sorted(
@@ -111,6 +123,19 @@ def build_network_report(
         transitivity=computed.transitivity,
         max_core_number=computed.max_core_number,
         community_count=len(computed.communities),
+        benchmark_metrics=NetworkBenchmarkMetrics(
+            participation_entropy=computed.participation_entropy,
+            action_type_diversity=computed.action_type_diversity,
+            density=computed.density,
+            average_path_depth=computed.average_path_depth,
+            network_diameter=computed.network_diameter,
+            centralization=computed.centralization,
+            community_count=len(computed.communities),
+            modularity=computed.modularity,
+            mean_edge_growth_rate=mean_edge_growth_rate,
+            mean_active_actor_growth_rate=mean_active_actor_growth_rate,
+            top20_interaction_share=computed.top20_interaction_share,
+        ),
         skipped_metrics=computed.skipped_metrics,
         empty_reason=(
             "`actors_finalized` 이벤트가 없어 행위자 노드가 비어 있습니다."
@@ -134,6 +159,81 @@ def build_network_report(
     )
     graph = build_network_graph(nodes=nodes, edges=aggregated.edges)
     return report, graph
+
+
+def _planned_action_types(planned_actions: list[PlannedActionRecord]) -> set[str]:
+    return {
+        item.action_type.strip()
+        for item in planned_actions
+        if item.action_type.strip()
+    }
+
+
+def _compute_mean_growth_rates(
+    *,
+    activities: list[AdoptedActivityRecord],
+    planned_max_rounds: int,
+) -> tuple[float | None, float | None]:
+    max_activity_round = max((item.round_index for item in activities), default=0)
+    max_round = max(planned_max_rounds, max_activity_round)
+    if max_round <= 1:
+        return None, None
+
+    activities_by_round: dict[int, list[AdoptedActivityRecord]] = defaultdict(list)
+    for activity in activities:
+        activities_by_round[activity.round_index].append(activity)
+
+    cumulative_actor_ids: set[str] = set()
+    cumulative_edge_ids: set[tuple[str, str]] = set()
+    previous_actor_count = 0
+    previous_edge_count = 0
+    edge_deltas: list[int] = []
+    actor_deltas: list[int] = []
+
+    for round_index in range(1, max_round + 1):
+        for activity in activities_by_round.get(round_index, []):
+            for source_cast_id, target_cast_id in _activity_pairs(activity):
+                cumulative_edge_ids.add((source_cast_id, target_cast_id))
+                cumulative_actor_ids.add(source_cast_id)
+                cumulative_actor_ids.add(target_cast_id)
+        actor_count = len(cumulative_actor_ids)
+        edge_count = len(cumulative_edge_ids)
+        if round_index > 1:
+            edge_deltas.append(edge_count - previous_edge_count)
+            actor_deltas.append(actor_count - previous_actor_count)
+        previous_actor_count = actor_count
+        previous_edge_count = edge_count
+
+    if not edge_deltas or not actor_deltas:
+        return None, None
+    return sum(edge_deltas) / len(edge_deltas), sum(actor_deltas) / len(actor_deltas)
+
+
+def _activity_pairs(activity: AdoptedActivityRecord) -> list[tuple[str, str]]:
+    source_cast_id = activity.source_cast_id.strip()
+    if not source_cast_id:
+        return []
+
+    pairs: list[tuple[str, str]] = []
+    actual_targets = _dedupe_ids(activity.target_cast_ids)
+    intent_targets = [
+        cast_id
+        for cast_id in _dedupe_ids(activity.intent_target_cast_ids)
+        if cast_id not in set(actual_targets)
+    ]
+    for target_cast_id in [*actual_targets, *intent_targets]:
+        if not target_cast_id or target_cast_id == source_cast_id:
+            continue
+        pairs.append((source_cast_id, target_cast_id))
+    return pairs
+
+
+def _dedupe_ids(values: list[str]) -> list[str]:
+    deduped: list[str] = []
+    for value in values:
+        if value and value not in deduped:
+            deduped.append(value)
+    return deduped
 
 
 __all__ = [

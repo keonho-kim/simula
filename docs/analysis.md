@@ -58,7 +58,7 @@ The implementation is split across `src/simula/application/analysis/`:
 | `metrics/distributions.py` | token and latency distributions |
 | `metrics/token_usage.py` | cumulative token accounting |
 | `metrics/fixer.py` | fixer attribution and retry summaries |
-| `metrics/network.py` | top-level network analysis orchestration |
+| `metrics/network.py` | top-level network analysis orchestration and benchmark summaries |
 | `metrics/network_growth.py` | cumulative round-by-round network growth |
 | `metrics/network_aggregation.py` | node and edge aggregation from adopted activities |
 | `metrics/network_algorithms.py` | NetworkX metrics, leaderboards, and communities |
@@ -89,9 +89,10 @@ The current analyzer performs these passes:
 7. Compare the execution plan's action catalog with adopted activities to show available,
    used, and unused action types.
 8. Build an actor interaction graph from adopted activities, then derive connectivity,
-   concentration, leaderboards, and community structure from NetworkX.
-9. Rebuild the same relationship graph cumulatively by round to measure network growth and
-   concentration over time.
+   concentration, leaderboards, community structure, and benchmark-oriented structure metrics
+   from NetworkX and deterministic helper functions.
+9. Rebuild the same relationship graph cumulatively by round to measure network growth,
+   concentration, path depth, and structural change over time.
 10. Render one high-level `summary.md` page plus deeper reference artifacts.
 
 KDE curves are computed locally. When a series is too short or constant, the renderer writes the
@@ -135,10 +136,37 @@ Artifact notes:
 - `manifest.json` is an index of what was analyzed and what was written.
 - `llm_calls.csv` stays close to the raw runtime evidence.
 - `performance/summary.png` is the compact overview chart.
+- `performance/summary.csv` stores TTFT and duration percentiles by `input_tokens x output_tokens`
+  bins.
 - `token_usage/summary.md` is the readable token summary.
+- `token_usage/summary.csv` includes cumulative totals plus descriptive token statistics.
+- `actions/summary.csv` compares planned action types against adopted usage and round coverage.
+- `network/growth.csv` includes cumulative growth metrics such as density, average path depth,
+  edge growth rate, and top-20-percent interaction share.
 - `network/summary.md` is the readable network reference note.
+- `network/summary.json` includes `summary`, `benchmark_metrics`, leaderboards, communities, and
+  explicit skipped-metric reasons.
+- `network/graph.png` keeps the ForceAtlas2 layout and uses deterministic collision cleanup rather
+  than switching layout engines.
 - localized CSV headers and plot titles are intentionally written in Korean by the analyzer's
   localization layer.
+
+## Benchmark Metric Basis
+
+The benchmark metrics use fixed comparison rules so runs remain comparable:
+
+- participation entropy normalizes actor activity share by the full finalized actor roster size
+- action-type diversity uses the planned action catalog size when available, otherwise the observed
+  action-type count
+- density and path depth are computed on the directed interaction graph
+- average path depth and diameter only use reachable ordered node pairs instead of assuming strong
+  connectivity
+- communities and modularity use the weighted undirected projection built from the directed graph
+- mean edge growth rate and mean active-actor growth rate average cumulative round deltas from
+  round 2 through the final round
+
+When a metric cannot be computed, the analyzer stores `None` in the metric field and records the
+explicit reason under `summary.skipped_metrics` instead of silently substituting a fallback value.
 
 ## Failure Policy
 

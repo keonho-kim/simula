@@ -24,6 +24,10 @@ one opaque loop. `simula` keeps them separate.
 
 The result is easier to inspect, test, and evolve than a single prompt chain.
 
+The analyzer also exposes benchmark-friendly network metrics so saved runs can be compared on
+participation spread, action diversity, path depth, concentration, community structure, and
+cumulative growth.
+
 ## Why This Design
 
 - Small public API, rich internal state: the root graph accepts `SimulationInputState`, then
@@ -77,10 +81,13 @@ analysis/
     network/
       nodes.csv
       edges.csv
+      growth.csv
       summary.json
       summary.md
       graph.graphml
       graph.png
+      growth_metrics.png
+      concentration.png
 ```
 
 ## One End-to-End Flow

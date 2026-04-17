@@ -19,6 +19,7 @@ from simula.application.analysis.models import (
     AdoptedActivityRecord,
     NetworkGrowthRecord,
     NetworkGrowthReport,
+    PlannedActionRecord,
 )
 
 
@@ -26,6 +27,7 @@ def build_network_growth_report(
     *,
     actors_by_id: dict[str, ActorRecord],
     activities: list[AdoptedActivityRecord],
+    planned_actions: list[PlannedActionRecord] | None = None,
     planned_max_rounds: int = 0,
     has_actors_finalized_event: bool = True,
     has_round_actions_adopted_event: bool = True,
@@ -54,6 +56,8 @@ def build_network_growth_report(
         report, _ = build_network_report(
             actors_by_id=actors_by_id,
             activities=list(cumulative_activities),
+            planned_actions=planned_actions,
+            planned_max_rounds=planned_max_rounds,
             has_actors_finalized_event=has_actors_finalized_event,
             has_round_actions_adopted_event=has_round_actions_adopted_event,
         )
@@ -88,6 +92,18 @@ def build_network_growth_report(
                 edge_count=report.summary.edge_count,
                 largest_component_ratio=report.summary.largest_weak_component_ratio,
                 density=report.summary.density,
+                average_path_depth=report.summary.benchmark_metrics.average_path_depth,
+                edge_growth_rate=(
+                    float(len(edge_ids - previous_edge_ids))
+                    if round_index > 1
+                    else None
+                ),
+                active_actor_growth_rate=(
+                    float(len(actor_ids - previous_actor_ids))
+                    if round_index > 1
+                    else None
+                ),
+                top20_interaction_share=report.summary.benchmark_metrics.top20_interaction_share,
                 top1_actor_share=_top_share(actor_weights, limit=1),
                 top3_actor_share=_top_share(actor_weights, limit=3),
                 actor_weight_hhi=_hhi(actor_weights),
@@ -119,6 +135,7 @@ def build_cumulative_network_graphs(
     *,
     actors_by_id: dict[str, ActorRecord],
     activities: list[AdoptedActivityRecord],
+    planned_actions: list[PlannedActionRecord] | None = None,
     planned_max_rounds: int = 0,
     has_actors_finalized_event: bool = True,
     has_round_actions_adopted_event: bool = True,
@@ -141,6 +158,8 @@ def build_cumulative_network_graphs(
         _, graph = build_network_report(
             actors_by_id=actors_by_id,
             activities=list(cumulative_activities),
+            planned_actions=planned_actions,
+            planned_max_rounds=planned_max_rounds,
             has_actors_finalized_event=has_actors_finalized_event,
             has_round_actions_adopted_event=has_round_actions_adopted_event,
         )

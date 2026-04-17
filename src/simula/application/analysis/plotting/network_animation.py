@@ -16,6 +16,7 @@ from simula.application.analysis.models import (
     ActorRecord,
     AdoptedActivityRecord,
     NetworkGrowthReport,
+    PlannedActionRecord,
 )
 from simula.application.analysis.plotting.fonts import configure_korean_font
 from simula.application.analysis.plotting.network_layout import RenderLayout
@@ -38,6 +39,7 @@ def render_network_growth_video(
     actors_by_id: dict[str, ActorRecord],
     activities: list[AdoptedActivityRecord],
     growth_report: NetworkGrowthReport,
+    planned_actions: list[PlannedActionRecord] | None = None,
     planned_max_rounds: int = 0,
     has_actors_finalized_event: bool = True,
     has_round_actions_adopted_event: bool = True,
@@ -48,6 +50,7 @@ def render_network_growth_video(
     frames = build_cumulative_network_graphs(
         actors_by_id=actors_by_id,
         activities=activities,
+        planned_actions=planned_actions,
         planned_max_rounds=planned_max_rounds,
         has_actors_finalized_event=has_actors_finalized_event,
         has_round_actions_adopted_event=has_round_actions_adopted_event,

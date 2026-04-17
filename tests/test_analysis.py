@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import math
 import tempfile
 from pathlib import Path
 
@@ -23,7 +24,11 @@ from simula.application.analysis.metrics.fixer import build_fixer_report
 from simula.application.analysis.metrics.network_growth import build_network_growth_report
 from simula.application.analysis.metrics.network import build_network_report
 from simula.application.analysis.metrics.token_usage import build_token_usage_report
-from simula.application.analysis.models import ActorRecord, AdoptedActivityRecord
+from simula.application.analysis.models import (
+    ActorRecord,
+    AdoptedActivityRecord,
+    PlannedActionRecord,
+)
 from simula.application.analysis.network_reporting import (
     render_network_summary_markdown,
 )
@@ -280,6 +285,11 @@ def test_network_report_builds_complexity_rankings() -> None:
     assert report.leaderboards["authorities"][0].cast_id == "delta"
     assert report.leaderboards["brokers"][0].cast_id == "delta"
     assert report.leaderboards["influence"][0].cast_id == "epsilon"
+    assert report.summary.benchmark_metrics.participation_entropy == pytest.approx(
+        0.7435,
+        rel=1e-3,
+    )
+    assert report.summary.benchmark_metrics.centralization == pytest.approx(0.7)
 
 
 def test_network_report_tracks_clustering_core_and_communities() -> None:
@@ -302,6 +312,9 @@ def test_network_report_tracks_clustering_core_and_communities() -> None:
     assert report.summary.transitivity == pytest.approx(1.0)
     assert report.summary.max_core_number == 2
     assert report.summary.community_count == 2
+    assert report.summary.benchmark_metrics.community_count == 2
+    assert report.summary.benchmark_metrics.modularity is not None
+    assert report.summary.benchmark_metrics.modularity > 0
     assert report.communities[0].member_cast_ids == ["alpha", "beta", "gamma"]
     assert report.communities[1].member_cast_ids == ["delta", "epsilon"]
 
@@ -318,6 +331,10 @@ def test_network_report_marks_skipped_metrics_for_edge_free_graph() -> None:
     assert report.summary.empty_reason == "채택된 행위자 상호작용이 없습니다."
     assert report.summary.skipped_metrics["hub_score"] == "연결 엣지가 없어 계산할 수 없습니다."
     assert report.summary.skipped_metrics["core_number"] == "연결 엣지가 없어 계산할 수 없습니다."
+    assert report.summary.skipped_metrics["participation_entropy"] == "채택된 액션이 없어 계산할 수 없습니다."
+    assert report.summary.skipped_metrics["action_type_diversity"] == "채택된 액션이 없어 계산할 수 없습니다."
+    assert report.summary.skipped_metrics["average_path_depth"] == "도달 가능한 경로가 없어 계산할 수 없습니다."
+    assert report.summary.skipped_metrics["network_diameter"] == "도달 가능한 경로가 없어 계산할 수 없습니다."
     assert report.leaderboards["hubs"] == []
     assert all(node.hub_score is None for node in report.nodes)
     assert all(node.in_degree_centrality == 0.0 for node in report.nodes)
@@ -382,12 +399,132 @@ def test_network_summary_markdown_describes_algorithms_and_lists_all_actor_score
     assert "## 누가 직접·간접으로 퍼졌나" in markdown
     assert "## 연결이 어떻게 늘어났나" in markdown
     assert "## 연결이 어디로 몰렸나" in markdown
+    assert "## 벤치마크 지표" in markdown
     assert "## 계산 메모" in markdown
     assert "Alpha(`alpha`): 1명과 연결됨" in markdown
     assert "발신:" in markdown
     assert "수신:" in markdown
     assert "가장 많은 사람과 직접 연결된 사람" in markdown
     assert "### 전체 행위자 연결 점수" not in markdown
+
+
+def test_network_report_uses_planned_action_catalog_for_action_diversity() -> None:
+    report, _ = build_network_report(
+        actors_by_id=_actors("alpha", "beta", "gamma", "delta", "epsilon", "zeta"),
+        activities=[
+            AdoptedActivityRecord(
+                round_index=1,
+                source_cast_id="alpha",
+                target_cast_ids=["beta"],
+                intent_target_cast_ids=["beta"],
+                visibility="private",
+                thread_id="thread-1",
+                action_type="private_check_in",
+            ),
+            AdoptedActivityRecord(
+                round_index=2,
+                source_cast_id="beta",
+                target_cast_ids=["gamma"],
+                intent_target_cast_ids=["gamma"],
+                visibility="public",
+                thread_id="thread-2",
+                action_type="public_signal",
+            ),
+        ],
+        planned_actions=[
+            PlannedActionRecord("private_check_in", "비공개 확인", "", ["private"], True, True),
+            PlannedActionRecord("public_signal", "공개 신호", "", ["public"], False, True),
+            PlannedActionRecord("unused_1", "미사용 1", "", ["group"], False, False),
+            PlannedActionRecord("unused_2", "미사용 2", "", ["group"], False, False),
+            PlannedActionRecord("unused_3", "미사용 3", "", ["group"], False, False),
+        ],
+    )
+
+    assert report.summary.benchmark_metrics.action_type_diversity == pytest.approx(
+        math.log(2) / math.log(5)
+    )
+
+
+def test_network_report_falls_back_to_observed_actions_for_action_diversity() -> None:
+    report, _ = build_network_report(
+        actors_by_id=_actors("alpha", "beta", "gamma"),
+        activities=[
+            AdoptedActivityRecord(
+                round_index=1,
+                source_cast_id="alpha",
+                target_cast_ids=["beta"],
+                intent_target_cast_ids=["beta"],
+                visibility="private",
+                thread_id="thread-1",
+                action_type="private_check_in",
+            ),
+            AdoptedActivityRecord(
+                round_index=2,
+                source_cast_id="beta",
+                target_cast_ids=["gamma"],
+                intent_target_cast_ids=["gamma"],
+                visibility="public",
+                thread_id="thread-2",
+                action_type="public_signal",
+            ),
+        ],
+    )
+
+    assert report.summary.benchmark_metrics.action_type_diversity == pytest.approx(1.0)
+
+
+def test_network_report_tracks_directed_depth_metrics() -> None:
+    report, _ = build_network_report(
+        actors_by_id=_actors("alpha", "beta", "gamma", "delta"),
+        activities=_activities(
+            ("alpha", "beta"),
+            ("beta", "gamma"),
+            ("gamma", "delta"),
+        ),
+    )
+
+    assert report.summary.benchmark_metrics.average_path_depth == pytest.approx(10 / 6)
+    assert report.summary.benchmark_metrics.network_diameter == 3
+
+
+def test_network_report_tracks_top20_interaction_share_by_participating_actor_count() -> None:
+    five_actor_report, _ = build_network_report(
+        actors_by_id=_actors("alpha", "beta", "gamma", "delta", "epsilon"),
+        activities=_activities(
+            ("alpha", "beta"),
+            ("alpha", "gamma"),
+            ("alpha", "delta"),
+            ("alpha", "epsilon"),
+        ),
+    )
+    six_actor_report, _ = build_network_report(
+        actors_by_id=_actors("alpha", "beta", "gamma", "delta", "epsilon", "zeta"),
+        activities=[
+            *_activities(
+                ("alpha", "beta"),
+                ("alpha", "gamma"),
+                ("alpha", "delta"),
+                ("alpha", "epsilon"),
+            ),
+            AdoptedActivityRecord(
+                round_index=5,
+                source_cast_id="zeta",
+                target_cast_ids=["alpha"],
+                intent_target_cast_ids=["alpha"],
+                visibility="private",
+                thread_id="thread-5",
+            ),
+        ],
+    )
+
+    assert five_actor_report.summary.participating_actor_count == 5
+    assert five_actor_report.summary.benchmark_metrics.top20_interaction_share == pytest.approx(
+        0.5
+    )
+    assert six_actor_report.summary.participating_actor_count == 6
+    assert six_actor_report.summary.benchmark_metrics.top20_interaction_share == pytest.approx(
+        0.6
+    )
 
 
 def test_interaction_digests_prefer_thread_grouping_and_latest_utterance() -> None:
@@ -561,6 +698,10 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
         ).read_text(encoding="utf-8")
     )
     assert network_summary_json["summary"]["edge_count"] == 3
+    assert "benchmark_metrics" in network_summary_json
+    assert network_summary_json["benchmark_metrics"]["action_type_diversity"] == pytest.approx(
+        math.log(2) / math.log(3)
+    )
     assert "hubs" in network_summary_json["leaderboards"]
     network_summary_md = (
         tmp_path / "analysis" / run_id / "network" / "summary.md"
@@ -570,6 +711,7 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
     assert "## 누가 직접·간접으로 퍼졌나" in network_summary_md
     assert "## 연결이 어떻게 늘어났나" in network_summary_md
     assert "## 연결이 어디로 몰렸나" in network_summary_md
+    assert "## 벤치마크 지표" in network_summary_md
     assert "## 계산 메모" in network_summary_md
     assert "### 전체 행위자 연결 점수" not in network_summary_md
     assert "발신:" in network_summary_md
@@ -599,6 +741,9 @@ def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
         tmp_path / "analysis" / run_id / "network" / "growth.csv"
     ).read_text(encoding="utf-8")
     assert "라운드" in growth_csv
+    assert "평균 경로 깊이" in growth_csv
+    assert "엣지 성장률" in growth_csv
+    assert "상위 20% 행위자 점유율" in growth_csv
     assert "행위자 쏠림 HHI" in growth_csv
     assert "직접 연결 중심 ID" in growth_csv
     assert "간접 영향 중심 ID" in growth_csv

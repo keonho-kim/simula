@@ -8,7 +8,12 @@ import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
 
-from simula.application.analysis.models import ActorRecord, AdoptedActivityRecord, NetworkGrowthReport
+from simula.application.analysis.models import (
+    ActorRecord,
+    AdoptedActivityRecord,
+    NetworkGrowthReport,
+    PlannedActionRecord,
+)
 from simula.application.analysis.plotting.network_animation import render_network_growth_video as _render_network_growth_video
 from simula.application.analysis.plotting.network_collision import (
     resolve_node_collisions_pixel_space as _resolve_node_collisions_pixel_space,
@@ -100,6 +105,7 @@ def render_network_growth_video(
     actors_by_id: dict[str, ActorRecord],
     activities: list[AdoptedActivityRecord],
     growth_report: NetworkGrowthReport,
+    planned_actions: list[PlannedActionRecord] | None = None,
     planned_max_rounds: int = 0,
     has_actors_finalized_event: bool = True,
     has_round_actions_adopted_event: bool = True,
@@ -114,6 +120,7 @@ def render_network_growth_video(
         actors_by_id=actors_by_id,
         activities=activities,
         growth_report=growth_report,
+        planned_actions=planned_actions,
         planned_max_rounds=planned_max_rounds,
         has_actors_finalized_event=has_actors_finalized_event,
         has_round_actions_adopted_event=has_round_actions_adopted_event,

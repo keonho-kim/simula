@@ -11,11 +11,14 @@ import networkx as nx
 
 from simula.application.analysis.models import (
     ActorNodeMetrics,
+    AdoptedActivityRecord,
     NetworkCommunitySummary,
     NetworkLeaderboardEntry,
 )
 
 _NO_EDGE_REASON = "연결 엣지가 없어 계산할 수 없습니다."
+_NO_ACTIVITY_REASON = "채택된 액션이 없어 계산할 수 없습니다."
+_NO_PATH_REASON = "도달 가능한 경로가 없어 계산할 수 없습니다."
 
 
 @dataclass(slots=True)
@@ -24,7 +27,12 @@ class ComputedNetworkMetrics:
     participating_actor_ratio: float | None
     isolated_actor_count: int
     isolated_actor_ratio: float | None
+    participation_entropy: float | None
+    action_type_diversity: float | None
     density: float | None
+    average_path_depth: float | None
+    network_diameter: int | None
+    centralization: float | None
     weak_component_count: int
     strong_component_count: int
     largest_weak_component_size: int
@@ -43,6 +51,8 @@ class ComputedNetworkMetrics:
     pagerank: dict[str, float | None]
     core_number: dict[str, int | None]
     effective_size: dict[str, float | None]
+    modularity: float | None
+    top20_interaction_share: float | None
     communities: list[NetworkCommunitySummary]
     skipped_metrics: dict[str, str]
 
@@ -52,6 +62,8 @@ def compute_network_metrics(
     directed_graph: nx.DiGraph,
     undirected_graph: nx.Graph,
     total_actor_count: int,
+    activities: list[AdoptedActivityRecord],
+    planned_action_types: set[str] | None = None,
 ) -> ComputedNetworkMetrics:
     """Compute global and per-node metrics for the aggregated actor graph."""
 
@@ -76,7 +88,22 @@ def compute_network_metrics(
         default=0,
     )
     skipped_metrics: dict[str, str] = {}
+    participation_entropy = _compute_participation_entropy(
+        activities=activities,
+        total_actor_count=total_actor_count,
+        skipped_metrics=skipped_metrics,
+    )
+    action_type_diversity = _compute_action_type_diversity(
+        activities=activities,
+        planned_action_types=planned_action_types or set(),
+        skipped_metrics=skipped_metrics,
+    )
     density = _safe_scalar(nx.density(directed_graph))
+    average_path_depth, network_diameter = _compute_path_metrics(
+        directed_graph=directed_graph,
+        skipped_metrics=skipped_metrics,
+    )
+    centralization = _compute_centralization(directed_graph=directed_graph)
     in_degree_centrality = _degree_centrality(
         graph=directed_graph,
         node_ids=node_ids,
@@ -97,6 +124,8 @@ def compute_network_metrics(
     average_clustering: float | None = None
     transitivity: float | None = None
     max_core_number: int | None = None
+    modularity: float | None = None
+    top20_interaction_share = _compute_top20_interaction_share(directed_graph=directed_graph)
     communities: list[NetworkCommunitySummary] = []
 
     if edge_count == 0:
@@ -149,7 +178,7 @@ def compute_network_metrics(
             undirected_graph=undirected_graph,
             skipped_metrics=skipped_metrics,
         )
-        communities = _compute_communities(
+        communities, modularity = _compute_communities(
             undirected_graph=undirected_graph,
             skipped_metrics=skipped_metrics,
         )
@@ -159,7 +188,12 @@ def compute_network_metrics(
         participating_actor_ratio=_ratio(participating_actor_count, total_actor_count),
         isolated_actor_count=isolated_actor_count,
         isolated_actor_ratio=_ratio(isolated_actor_count, total_actor_count),
+        participation_entropy=participation_entropy,
+        action_type_diversity=action_type_diversity,
         density=density,
+        average_path_depth=average_path_depth,
+        network_diameter=network_diameter,
+        centralization=centralization,
         weak_component_count=len(weak_components),
         strong_component_count=len(strong_components),
         largest_weak_component_size=largest_weak_component_size,
@@ -178,6 +212,8 @@ def compute_network_metrics(
         pagerank=pagerank,
         core_number=core_number,
         effective_size=effective_size,
+        modularity=modularity,
+        top20_interaction_share=top20_interaction_share,
         communities=communities,
         skipped_metrics=skipped_metrics,
     )
@@ -212,6 +248,119 @@ def _degree_centrality(
         node_id: _safe_scalar(scores.get(node_id))
         for node_id in node_ids
     }
+
+
+def _compute_participation_entropy(
+    *,
+    activities: list[AdoptedActivityRecord],
+    total_actor_count: int,
+    skipped_metrics: dict[str, str],
+) -> float | None:
+    source_counts: dict[str, int] = {}
+    for activity in activities:
+        source_cast_id = activity.source_cast_id.strip()
+        if not source_cast_id:
+            continue
+        source_counts[source_cast_id] = source_counts.get(source_cast_id, 0) + 1
+    total = sum(source_counts.values())
+    if total <= 0:
+        skipped_metrics["participation_entropy"] = _NO_ACTIVITY_REASON
+        return None
+    entropy_raw = -sum(
+        (count / total) * math.log(count / total)
+        for count in source_counts.values()
+        if count > 0
+    )
+    denominator = math.log(max(total_actor_count, 2))
+    if denominator <= 0:
+        return None
+    return entropy_raw / denominator
+
+
+def _compute_action_type_diversity(
+    *,
+    activities: list[AdoptedActivityRecord],
+    planned_action_types: set[str],
+    skipped_metrics: dict[str, str],
+) -> float | None:
+    observed_counts: dict[str, int] = {}
+    for activity in activities:
+        action_type = activity.action_type.strip()
+        if not action_type:
+            continue
+        observed_counts[action_type] = observed_counts.get(action_type, 0) + 1
+    observed_total = sum(observed_counts.values())
+    if observed_total <= 0:
+        skipped_metrics["action_type_diversity"] = _NO_ACTIVITY_REASON
+        return None
+    entropy_raw = -sum(
+        (count / observed_total) * math.log(count / observed_total)
+        for count in observed_counts.values()
+        if count > 0
+    )
+    action_space_size = len(planned_action_types) if planned_action_types else len(observed_counts)
+    denominator = math.log(max(action_space_size, 2))
+    if denominator <= 0:
+        return None
+    return entropy_raw / denominator
+
+
+def _compute_path_metrics(
+    *,
+    directed_graph: nx.DiGraph,
+    skipped_metrics: dict[str, str],
+) -> tuple[float | None, int | None]:
+    path_lengths: list[int] = []
+    for source, lengths in nx.all_pairs_shortest_path_length(directed_graph):
+        del source
+        path_lengths.extend(
+            distance
+            for target, distance in lengths.items()
+            if distance > 0 and target is not None
+        )
+    if not path_lengths:
+        skipped_metrics["average_path_depth"] = _NO_PATH_REASON
+        skipped_metrics["network_diameter"] = _NO_PATH_REASON
+        return None, None
+    return sum(path_lengths) / len(path_lengths), max(path_lengths)
+
+
+def _compute_centralization(
+    *,
+    directed_graph: nx.DiGraph,
+) -> float | None:
+    node_count = directed_graph.number_of_nodes()
+    if node_count == 0:
+        return None
+    degrees = [int(directed_graph.in_degree(node) + directed_graph.out_degree(node)) for node in directed_graph.nodes()]
+    if not degrees:
+        return None
+    max_degree = max(degrees)
+    numerator = sum(max_degree - degree for degree in degrees)
+    denominator = max((node_count - 1) * (node_count - 2), 1)
+    return numerator / denominator
+
+
+def _compute_top20_interaction_share(
+    *,
+    directed_graph: nx.DiGraph,
+) -> float | None:
+    weights = sorted(
+        [
+            float(attrs.get("total_weight", 0.0))
+            for _, attrs in directed_graph.nodes(data=True)
+            if float(attrs.get("total_weight", 0.0)) > 0.0
+        ],
+        reverse=True,
+    )
+    if not weights:
+        return None
+    participating_actor_count = len(weights)
+    limit = max(1, math.ceil(participating_actor_count * 0.2))
+    total = sum(weights)
+    if total <= 0:
+        return None
+    return sum(weights[:limit]) / total
 
 
 def _compute_reciprocity(
@@ -366,7 +515,7 @@ def _compute_communities(
     *,
     undirected_graph: nx.Graph,
     skipped_metrics: dict[str, str],
-) -> list[NetworkCommunitySummary]:
+) -> tuple[list[NetworkCommunitySummary], float | None]:
     try:
         communities = nx.community.greedy_modularity_communities(
             undirected_graph,
@@ -374,7 +523,13 @@ def _compute_communities(
         )
     except Exception as exc:  # pragma: no cover - exercised through tests via patched functions
         skipped_metrics["community_detection"] = _exception_reason(exc)
-        return []
+        skipped_metrics["modularity"] = skipped_metrics["community_detection"]
+        return [], None
+    modularity = _compute_modularity(
+        undirected_graph=undirected_graph,
+        communities=[set(community) for community in communities],
+        skipped_metrics=skipped_metrics,
+    )
     meaningful_groups = [
         community
         for community in communities
@@ -403,7 +558,26 @@ def _compute_communities(
                 member_display_names=member_display_names,
             )
         )
-    return summaries
+    return summaries, modularity
+
+
+def _compute_modularity(
+    *,
+    undirected_graph: nx.Graph,
+    communities: list[set[str]],
+    skipped_metrics: dict[str, str],
+) -> float | None:
+    try:
+        return _safe_scalar(
+            nx.community.modularity(
+                undirected_graph,
+                communities,
+                weight="total_weight",
+            )
+        )
+    except Exception as exc:  # pragma: no cover - exercised through tests via patched functions
+        skipped_metrics["modularity"] = _exception_reason(exc)
+        return None
 
 
 def _top_entries(
