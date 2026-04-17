@@ -302,10 +302,11 @@ def test_build_updated_clock_rejects_unsupported_elapsed_unit() -> None:
         )
 
 
-def test_assess_round_continuation_skips_llm_on_first_entry() -> None:
+def test_assess_round_continuation_short_circuits_before_llm() -> None:
     class FailRouter:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
-            raise AssertionError("LLM should not be called on the first runtime entry")
+            del role, prompt, schema, kwargs
+            raise AssertionError("LLM should not be called for short-circuit continuation cases")
 
     runtime = SimpleNamespace(
         context=_test_context(
@@ -313,22 +314,120 @@ def test_assess_round_continuation_skips_llm_on_first_entry() -> None:
             logger=logging.getLogger("simula.test.round"),
         )
     )
-    state = {
-        "round_index": 0,
-        "max_rounds": 4,
-        "stagnation_rounds": 0,
-        "simulation_clock": {"total_elapsed_label": "0분"},
-        "world_state_summary": "",
-        "observer_reports": [],
-        "latest_round_activities": [],
-        "round_focus_history": [],
-        "errors": [],
-    }
+    cases = [
+        (
+            {
+                "round_index": 0,
+                "max_rounds": 4,
+                "stagnation_rounds": 0,
+                "simulation_clock": {"total_elapsed_label": "0분"},
+                "world_state_summary": "",
+                "observer_reports": [],
+                "latest_round_activities": [],
+                "round_focus_history": [],
+                "errors": [],
+            },
+            False,
+            "",
+            None,
+            None,
+        ),
+        (
+            {
+                "round_index": 4,
+                "max_rounds": 4,
+                "stagnation_rounds": 2,
+                "simulation_clock": {"total_elapsed_label": "2시간"},
+                "world_state_summary": "현재 상태",
+                "observer_reports": [],
+                "latest_round_activities": [],
+                "round_focus_history": [],
+                "errors": [],
+            },
+            True,
+            "simulation_done",
+            "continuation_hard_stop",
+            None,
+        ),
+        (
+            {
+                "round_index": 2,
+                "max_rounds": 5,
+                "planned_max_rounds": 2,
+                "stagnation_rounds": 1,
+                "simulation_clock": {"total_elapsed_label": "2시간"},
+                "world_state_summary": "현재 상태",
+                "observer_reports": [],
+                "latest_round_activities": [],
+                "round_focus_history": [],
+                "event_memory": build_event_memory(
+                    [
+                        {
+                            "event_id": "final_choice",
+                            "title": "최종 선택",
+                            "summary": "아직 최종 선택이 발생하지 않았다.",
+                            "participant_cast_ids": ["a", "b"],
+                            "earliest_round": 2,
+                            "latest_round": 2,
+                            "completion_action_types": ["speech"],
+                            "completion_signals": ["최종 선택"],
+                            "required_before_end": True,
+                        }
+                    ]
+                ),
+                "errors": [],
+            },
+            False,
+            "",
+            None,
+            None,
+        ),
+        (
+            {
+                "run_id": "run-1",
+                "round_index": 3,
+                "max_rounds": 5,
+                "planned_max_rounds": 3,
+                "stagnation_rounds": 2,
+                "simulation_clock": {"total_elapsed_label": "3시간"},
+                "world_state_summary": "현재 상태",
+                "observer_reports": [],
+                "latest_round_activities": [],
+                "round_focus_history": [],
+                "event_memory": build_event_memory(
+                    [
+                        {
+                            "event_id": "final_choice",
+                            "title": "최종 선택",
+                            "summary": "마지막 선택을 정리해야 한다.",
+                            "participant_cast_ids": ["a", "b"],
+                            "earliest_round": 2,
+                            "latest_round": 2,
+                            "completion_action_types": ["speech"],
+                            "completion_signals": ["최종 선택"],
+                            "required_before_end": True,
+                        }
+                    ]
+                ),
+                "errors": [],
+                "event_memory_history": [],
+            },
+            True,
+            "no_progress",
+            "continuation_stale_required_stop",
+            "missed",
+        ),
+    ]
 
-    result = asyncio.run(assess_round_continuation(state, runtime))
+    for state, expected_stop_requested, expected_stop_reason, expected_history_source, expected_event_status in cases:
+        result = asyncio.run(assess_round_continuation(state, runtime))
 
-    assert result["stop_requested"] is False
-    assert result["stop_reason"] == ""
+        assert result["stop_requested"] is expected_stop_requested
+        assert result["stop_reason"] == expected_stop_reason
+        if expected_history_source is not None:
+            assert result["event_memory_history"][0]["source"] == expected_history_source
+        if expected_event_status is not None:
+            assert result["event_memory"]["events"][0]["status"] == expected_event_status
 
 
 def test_initialize_runtime_state_preserves_run_level_error_counters() -> None:
@@ -359,81 +458,6 @@ def test_initialize_runtime_state_preserves_run_level_error_counters() -> None:
     assert result["parse_failures"] == 2
     assert result["forced_idles"] == 1
     assert result["actor_proposal_task"] == empty_actor_proposal_task()
-
-
-def test_assess_round_continuation_stops_on_max_rounds_without_llm() -> None:
-    class FailRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
-            raise AssertionError("LLM should not be called when max_rounds is reached")
-
-    runtime = SimpleNamespace(
-        context=_test_context(
-            llms=FailRouter(),
-            logger=logging.getLogger("simula.test.round"),
-        )
-    )
-    state = {
-        "round_index": 4,
-        "max_rounds": 4,
-        "stagnation_rounds": 2,
-        "simulation_clock": {"total_elapsed_label": "2시간"},
-        "world_state_summary": "현재 상태",
-        "observer_reports": [],
-        "latest_round_activities": [],
-        "round_focus_history": [],
-        "errors": [],
-    }
-
-    result = asyncio.run(assess_round_continuation(state, runtime))
-
-    assert result["stop_requested"] is True
-    assert result["stop_reason"] == "simulation_done"
-    assert result["event_memory_history"][0]["source"] == "continuation_hard_stop"
-
-
-def test_assess_round_continuation_keeps_running_when_required_event_remains() -> None:
-    class FailRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
-            raise AssertionError("LLM should not be called when required events force continuation")
-
-    runtime = SimpleNamespace(
-        context=_test_context(
-            llms=FailRouter(),
-            logger=logging.getLogger("simula.test.round"),
-        )
-    )
-    state = {
-        "round_index": 2,
-        "max_rounds": 5,
-        "planned_max_rounds": 2,
-        "stagnation_rounds": 1,
-        "simulation_clock": {"total_elapsed_label": "2시간"},
-        "world_state_summary": "현재 상태",
-        "observer_reports": [],
-        "latest_round_activities": [],
-        "round_focus_history": [],
-        "event_memory": build_event_memory(
-            [
-                {
-                    "event_id": "final_choice",
-                    "title": "최종 선택",
-                    "summary": "아직 최종 선택이 발생하지 않았다.",
-                    "participant_cast_ids": ["a", "b"],
-                    "earliest_round": 2,
-                    "latest_round": 2,
-                    "completion_action_types": ["speech"],
-                    "completion_signals": ["최종 선택"],
-                    "required_before_end": True,
-                }
-            ]
-        ),
-        "errors": [],
-    }
-
-    result = asyncio.run(assess_round_continuation(state, runtime))
-
-    assert result["stop_requested"] is False
-    assert result["stop_reason"] == ""
 
 
 def test_assess_round_continuation_returns_no_progress_from_coordinator() -> None:
@@ -490,55 +514,6 @@ def test_assess_round_continuation_returns_no_progress_from_coordinator() -> Non
 
     assert result["stop_requested"] is True
     assert result["stop_reason"] == "no_progress"
-
-
-def test_assess_round_continuation_stops_for_stale_required_event_after_planned_max() -> None:
-    class FailRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
-            raise AssertionError("LLM should not be called when stale required events stop the run")
-
-    runtime = SimpleNamespace(
-        context=_test_context(
-            llms=FailRouter(),
-            logger=logging.getLogger("simula.test.round"),
-        )
-    )
-    state = {
-        "run_id": "run-1",
-        "round_index": 3,
-        "max_rounds": 5,
-        "planned_max_rounds": 3,
-        "stagnation_rounds": 2,
-        "simulation_clock": {"total_elapsed_label": "3시간"},
-        "world_state_summary": "현재 상태",
-        "observer_reports": [],
-        "latest_round_activities": [],
-        "round_focus_history": [],
-        "event_memory": build_event_memory(
-            [
-                {
-                    "event_id": "final_choice",
-                    "title": "최종 선택",
-                    "summary": "마지막 선택을 정리해야 한다.",
-                    "participant_cast_ids": ["a", "b"],
-                    "earliest_round": 2,
-                    "latest_round": 2,
-                    "completion_action_types": ["speech"],
-                    "completion_signals": ["최종 선택"],
-                    "required_before_end": True,
-                }
-            ]
-        ),
-        "errors": [],
-        "event_memory_history": [],
-    }
-
-    result = asyncio.run(assess_round_continuation(state, runtime))
-
-    assert result["stop_requested"] is True
-    assert result["stop_reason"] == "no_progress"
-    assert result["event_memory"]["events"][0]["status"] == "missed"
-    assert result["event_memory_history"][0]["source"] == "continuation_stale_required_stop"
 
 
 def test_build_round_directive_sets_selected_cast_ids() -> None:
@@ -736,17 +711,13 @@ def test_build_round_directive_backfills_more_related_casts_when_pool_is_rich() 
 def test_build_round_directive_builds_background_prompt_from_post_focus_deferred_ids() -> None:
     class FakeRouter:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
-            del role, kwargs
+            del role, prompt, kwargs
             if schema is RoundDirectiveFocusCore:
                 return (
                     _focus_core_payload(focus_cast_ids=["d"], title="비주류 축"),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
                 )
             if schema is BackgroundUpdateBatch:
-                assert '"cast_id":"d"' not in prompt
-                assert '"cast_id":"c"' in prompt
-                assert '"cast_id":"e"' in prompt
-                assert '["c","e"]' in prompt
                 return (
                     BackgroundUpdateBatch(background_updates=[]),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),

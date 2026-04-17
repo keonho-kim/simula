@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 import simula.application.analysis.metrics.network_algorithms as network_algorithms
-import simula.application.analysis.plotting.network as plotting_network
 
 from simula.application.analysis.interactions import (
     build_interaction_digests,
@@ -32,14 +31,7 @@ from simula.application.analysis.models import (
 from simula.application.analysis.network_reporting import (
     render_network_summary_markdown,
 )
-from simula.application.services import analysis_runner
-from simula.infrastructure.config.loader import LoadedSettingsBundle
-from simula.infrastructure.config.models import (
-    AppSettings,
-    ModelConfig,
-    ModelRouterConfig,
-    StorageConfig,
-)
+from tests.helpers import sample_analysis_log_text
 
 
 def test_load_run_analysis_rejects_invalid_jsonl(tmp_path) -> None:
@@ -67,11 +59,6 @@ def test_load_run_analysis_requires_llm_calls(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="llm_call 이벤트가 없습니다"):
         load_run_analysis(log_path, expected_run_id="run-1")
-
-
-def test_run_analysis_rejects_empty_run_dir() -> None:
-    with pytest.raises(ValueError, match="`--run-dir`는 비어 있으면 안 됩니다."):
-        analysis_runner.run_analysis(run_dir="   ")
 
 
 def test_distribution_report_tracks_missing_values_and_kde_skip() -> None:
@@ -408,69 +395,55 @@ def test_network_summary_markdown_describes_algorithms_and_lists_all_actor_score
     assert "### 전체 행위자 연결 점수" not in markdown
 
 
-def test_network_report_uses_planned_action_catalog_for_action_diversity() -> None:
-    report, _ = build_network_report(
-        actors_by_id=_actors("alpha", "beta", "gamma", "delta", "epsilon", "zeta"),
-        activities=[
-            AdoptedActivityRecord(
-                round_index=1,
-                source_cast_id="alpha",
-                target_cast_ids=["beta"],
-                intent_target_cast_ids=["beta"],
-                visibility="private",
-                thread_id="thread-1",
-                action_type="private_check_in",
-            ),
-            AdoptedActivityRecord(
-                round_index=2,
-                source_cast_id="beta",
-                target_cast_ids=["gamma"],
-                intent_target_cast_ids=["gamma"],
-                visibility="public",
-                thread_id="thread-2",
-                action_type="public_signal",
-            ),
-        ],
-        planned_actions=[
-            PlannedActionRecord("private_check_in", "비공개 확인", "", ["private"], True, True),
-            PlannedActionRecord("public_signal", "공개 신호", "", ["public"], False, True),
-            PlannedActionRecord("unused_1", "미사용 1", "", ["group"], False, False),
-            PlannedActionRecord("unused_2", "미사용 2", "", ["group"], False, False),
-            PlannedActionRecord("unused_3", "미사용 3", "", ["group"], False, False),
-        ],
-    )
+def test_network_report_computes_action_type_diversity() -> None:
+    cases = [
+        (
+            _actors("alpha", "beta", "gamma", "delta", "epsilon", "zeta"),
+            [
+                PlannedActionRecord("private_check_in", "비공개 확인", "", ["private"], True, True),
+                PlannedActionRecord("public_signal", "공개 신호", "", ["public"], False, True),
+                PlannedActionRecord("unused_1", "미사용 1", "", ["group"], False, False),
+                PlannedActionRecord("unused_2", "미사용 2", "", ["group"], False, False),
+                PlannedActionRecord("unused_3", "미사용 3", "", ["group"], False, False),
+            ],
+            math.log(2) / math.log(5),
+        ),
+        (
+            _actors("alpha", "beta", "gamma"),
+            [],
+            1.0,
+        ),
+    ]
 
-    assert report.summary.benchmark_metrics.action_type_diversity == pytest.approx(
-        math.log(2) / math.log(5)
-    )
+    for actors_by_id, planned_actions, expected_diversity in cases:
+        report, _ = build_network_report(
+            actors_by_id=actors_by_id,
+            activities=[
+                AdoptedActivityRecord(
+                    round_index=1,
+                    source_cast_id="alpha",
+                    target_cast_ids=["beta"],
+                    intent_target_cast_ids=["beta"],
+                    visibility="private",
+                    thread_id="thread-1",
+                    action_type="private_check_in",
+                ),
+                AdoptedActivityRecord(
+                    round_index=2,
+                    source_cast_id="beta",
+                    target_cast_ids=["gamma"],
+                    intent_target_cast_ids=["gamma"],
+                    visibility="public",
+                    thread_id="thread-2",
+                    action_type="public_signal",
+                ),
+            ],
+            planned_actions=planned_actions,
+        )
 
-
-def test_network_report_falls_back_to_observed_actions_for_action_diversity() -> None:
-    report, _ = build_network_report(
-        actors_by_id=_actors("alpha", "beta", "gamma"),
-        activities=[
-            AdoptedActivityRecord(
-                round_index=1,
-                source_cast_id="alpha",
-                target_cast_ids=["beta"],
-                intent_target_cast_ids=["beta"],
-                visibility="private",
-                thread_id="thread-1",
-                action_type="private_check_in",
-            ),
-            AdoptedActivityRecord(
-                round_index=2,
-                source_cast_id="beta",
-                target_cast_ids=["gamma"],
-                intent_target_cast_ids=["gamma"],
-                visibility="public",
-                thread_id="thread-2",
-                action_type="public_signal",
-            ),
-        ],
-    )
-
-    assert report.summary.benchmark_metrics.action_type_diversity == pytest.approx(1.0)
+        assert report.summary.benchmark_metrics.action_type_diversity == pytest.approx(
+            expected_diversity
+        )
 
 
 def test_network_report_tracks_directed_depth_metrics() -> None:
@@ -582,465 +555,11 @@ def test_interaction_digests_prefer_thread_grouping_and_latest_utterance() -> No
     assert digests[1].interaction_key == "alpha+gamma:public_signal"
 
 
-def test_run_analysis_writes_expected_artifacts(tmp_path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    output_dir = tmp_path / "output"
-    run_id = "run-1"
-    run_dir = output_dir / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "simulation.log.jsonl").write_text(
-        _sample_log_text(run_id=run_id),
-        encoding="utf-8",
-    )
-    settings = _build_settings(output_dir=output_dir)
-
-    def _fake_load_settings_bundle(env_file=None, *, cli_overrides=None):  # noqa: ANN001
-        del env_file, cli_overrides
-        return LoadedSettingsBundle(settings=settings)
-
-    monkeypatch.setattr(
-        analysis_runner,
-        "load_settings_bundle",
-        _fake_load_settings_bundle,
-    )
-    monkeypatch.setattr(
-        plotting_network,
-        "_compute_layout_positions",
-        lambda graph: {
-            node: (float(index), float(index))
-            for index, node in enumerate(graph.nodes(), start=1)
-        },
-    )
-
-    outcome = analysis_runner.run_analysis(run_id=run_id)
-
-    assert outcome.run_id == run_id
-    assert (tmp_path / "analysis" / run_id / "manifest.json").exists()
-    assert (tmp_path / "analysis" / run_id / "summary.md").exists()
-    assert (tmp_path / "analysis" / run_id / "llm_calls.csv").exists()
-    assert (tmp_path / "analysis" / run_id / "performance" / "summary.png").exists()
-    assert (tmp_path / "analysis" / run_id / "performance" / "summary.csv").exists()
-    assert (tmp_path / "analysis" / run_id / "actions" / "summary.csv").exists()
-    assert (tmp_path / "analysis" / run_id / "fixer" / "summary.csv").exists()
-    assert (tmp_path / "analysis" / run_id / "token_usage" / "summary.csv").exists()
-    assert (tmp_path / "analysis" / run_id / "token_usage" / "summary.md").exists()
-    assert (tmp_path / "analysis" / run_id / "network" / "nodes.csv").exists()
-    assert (tmp_path / "analysis" / run_id / "network" / "edges.csv").exists()
-    assert (tmp_path / "analysis" / run_id / "network" / "growth.csv").exists()
-    assert (tmp_path / "analysis" / run_id / "network" / "summary.json").exists()
-    assert (tmp_path / "analysis" / run_id / "network" / "summary.md").exists()
-    assert (tmp_path / "analysis" / run_id / "network" / "growth_metrics.png").exists()
-    assert (tmp_path / "analysis" / run_id / "network" / "concentration.png").exists()
-    assert (tmp_path / "analysis" / run_id / "network" / "growth.mp4").exists()
-    assert (tmp_path / "analysis" / run_id / "network" / "graph.graphml").exists()
-    assert (tmp_path / "analysis" / run_id / "network" / "graph.png").exists()
-    assert not (tmp_path / "analysis" / run_id / "distributions" / "overview.png").exists()
-    assert not (tmp_path / "analysis" / run_id / "fixer" / "summary.json").exists()
-    assert not (tmp_path / "analysis" / run_id / "token_usage" / "summary.json").exists()
-    assert not (tmp_path / "analysis" / run_id / "network" / "interactions.csv").exists()
-
-    manifest = json.loads(
-        (tmp_path / "analysis" / run_id / "manifest.json").read_text(encoding="utf-8")
-    )
-    assert manifest["run_id"] == run_id
-    assert manifest["roles_display"] == ["actor (행위자)", "fixer (JSON 복구)", "planner (계획)"]
-    assert "summary.md" in manifest["artifact_paths"]
-    assert "llm_calls.csv" in manifest["artifact_paths"]
-    assert "actions/summary.csv" in manifest["artifact_paths"]
-    assert "performance/summary.png" in manifest["artifact_paths"]
-    assert "performance/summary.csv" in manifest["artifact_paths"]
-    assert "token_usage/summary.csv" in manifest["artifact_paths"]
-    assert "token_usage/summary.md" in manifest["artifact_paths"]
-    assert "distributions/overview.png" not in manifest["artifact_paths"]
-    assert "network/summary.json" in manifest["artifact_paths"]
-    assert "network/summary.md" in manifest["artifact_paths"]
-    assert "network/growth.csv" in manifest["artifact_paths"]
-    assert "network/growth_metrics.png" in manifest["artifact_paths"]
-    assert "network/concentration.png" in manifest["artifact_paths"]
-    assert "network/growth.mp4" in manifest["artifact_paths"]
-    assert "token_usage_summary" not in manifest
-    assert "network_summary" not in manifest
-    assert "fixer_summary" not in manifest
-    llm_calls_csv = (
-        tmp_path / "analysis" / run_id / "llm_calls.csv"
-    ).read_text(encoding="utf-8")
-    assert "실행 ID,호출 순번,역할,역할 표시명" in llm_calls_csv
-    assert "태스크 키" in llm_calls_csv
-    assert "결과물 키" in llm_calls_csv
-
-    token_usage_md = (
-        tmp_path / "analysis" / run_id / "token_usage" / "summary.md"
-    ).read_text(encoding="utf-8")
-    assert "## 개요" in token_usage_md
-    assert "## 역할별 누적 사용량" in token_usage_md
-    assert "평균" in token_usage_md
-    assert "범위" in token_usage_md
-    assert "p95" in token_usage_md
-    token_usage_csv = (
-        tmp_path / "analysis" / run_id / "token_usage" / "summary.csv"
-    ).read_text(encoding="utf-8")
-    assert "입력 토큰 평균값" in token_usage_csv
-    assert "총 토큰 p95" in token_usage_csv
-    performance_csv = (
-        tmp_path / "analysis" / run_id / "performance" / "summary.csv"
-    ).read_text(encoding="utf-8")
-    assert "입력 토큰 bin 시작" in performance_csv
-    assert "출력 토큰 bin 끝" in performance_csv
-    assert "TTFT p90" in performance_csv
-    assert "소요 시간 p99" in performance_csv
-    network_summary_json = json.loads(
-        (
-            tmp_path
-            / "analysis"
-            / run_id
-            / "network"
-            / "summary.json"
-        ).read_text(encoding="utf-8")
-    )
-    assert network_summary_json["summary"]["edge_count"] == 3
-    assert "benchmark_metrics" in network_summary_json
-    assert network_summary_json["benchmark_metrics"]["action_type_diversity"] == pytest.approx(
-        math.log(2) / math.log(3)
-    )
-    assert "hubs" in network_summary_json["leaderboards"]
-    network_summary_md = (
-        tmp_path / "analysis" / run_id / "network" / "summary.md"
-    ).read_text(encoding="utf-8")
-    assert "## 먼저 볼 것" in network_summary_md
-    assert "## 누가 중심에 있었나" in network_summary_md
-    assert "## 누가 직접·간접으로 퍼졌나" in network_summary_md
-    assert "## 연결이 어떻게 늘어났나" in network_summary_md
-    assert "## 연결이 어디로 몰렸나" in network_summary_md
-    assert "## 벤치마크 지표" in network_summary_md
-    assert "## 계산 메모" in network_summary_md
-    assert "### 전체 행위자 연결 점수" not in network_summary_md
-    assert "발신:" in network_summary_md
-    assert "수신:" in network_summary_md
-    assert "비공개 확인" in network_summary_md
-    summary_md = (
-        tmp_path / "analysis" / run_id / "summary.md"
-    ).read_text(encoding="utf-8")
-    assert "## 한눈에 보기" in summary_md
-    assert "JSONL 이벤트" not in summary_md
-    assert "총 관계 가중치" not in summary_md
-    assert "## 관계별 핵심 interaction" not in summary_md
-    assert "## 어떤 action이 준비됐고 무엇이 채택됐나" in summary_md
-    assert "## 누가 직접·간접으로 퍼졌나" in summary_md
-    assert "## 연결이 어떻게 늘어났나" in summary_md
-    assert "## 어디를 더 보면 되는가" in summary_md
-    assert "실제 연결에 들어온 행위자는" in summary_md
-    assert "발신:" in summary_md
-    assert "수신:" in summary_md
-    assert "비공개 확인" in summary_md
-    actions_csv = (
-        tmp_path / "analysis" / run_id / "actions" / "summary.csv"
-    ).read_text(encoding="utf-8")
-    assert "행동 이름" in actions_csv
-    assert "unused_action" in actions_csv
-    growth_csv = (
-        tmp_path / "analysis" / run_id / "network" / "growth.csv"
-    ).read_text(encoding="utf-8")
-    assert "라운드" in growth_csv
-    assert "평균 경로 깊이" in growth_csv
-    assert "엣지 성장률" in growth_csv
-    assert "상위 20% 행위자 점유율" in growth_csv
-    assert "행위자 쏠림 HHI" in growth_csv
-    assert "직접 연결 중심 ID" in growth_csv
-    assert "간접 영향 중심 ID" in growth_csv
-
-
-def test_run_analysis_accepts_run_dir_path(tmp_path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    output_dir = tmp_path / "output"
-    run_id = "run-1"
-    run_dir = output_dir / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
-    log_path = run_dir / "simulation.log.jsonl"
-    log_path.write_text(_sample_log_text(run_id=run_id), encoding="utf-8")
-    monkeypatch.setattr(
-        plotting_network,
-        "_compute_layout_positions",
-        lambda graph: {
-            node: (float(index), float(index))
-            for index, node in enumerate(graph.nodes(), start=1)
-        },
-    )
-
-    outcome = analysis_runner.run_analysis(run_dir=str(run_dir))
-
-    assert outcome.run_id == run_id
-    assert outcome.input_path == log_path
-    assert outcome.output_dir == Path("analysis") / run_id
-
-
-def test_install_deps_script_exists() -> None:
-    script_path = Path("scripts/install_deps_ubuntu.sh")
-
-    assert script_path.exists()
-    script_text = script_path.read_text(encoding="utf-8")
-    assert "fonts-noto-cjk" in script_text
-    assert "ffmpeg" in script_text
-
-
 def _load_sample_data():
     temp_dir = Path(tempfile.mkdtemp(prefix="analysis-loader-"))
     log_path = temp_dir / "simulation.log.jsonl"
-    log_path.write_text(_sample_log_text(run_id="run-1"), encoding="utf-8")
+    log_path.write_text(sample_analysis_log_text(run_id="run-1"), encoding="utf-8")
     return load_run_analysis(log_path, expected_run_id="run-1")
-
-
-def _sample_log_text(*, run_id: str) -> str:
-    entries = [
-        {
-            "index": 1,
-            "event": "simulation_started",
-            "event_key": "simulation_started",
-            "run_id": run_id,
-            "scenario": "scenario",
-            "max_rounds": 2,
-            "rng_seed": 1234,
-        },
-        {
-            "index": 2,
-            "event": "actors_finalized",
-            "event_key": "actors_finalized",
-            "run_id": run_id,
-            "actors": [
-                {"cast_id": "alpha", "display_name": "Alpha"},
-                {"cast_id": "beta", "display_name": "Beta"},
-                {"cast_id": "gamma", "display_name": "Gamma"},
-            ],
-        },
-        {
-            "index": 3,
-            "event": "plan_finalized",
-            "event_key": "plan_finalized",
-            "run_id": run_id,
-            "plan": {
-                "progression_plan": {"max_rounds": 3},
-                "action_catalog": {
-                    "actions": [
-                        {
-                            "action_type": "private_check_in",
-                            "label": "비공개 확인",
-                            "description": "상대의 반응을 제한 채널에서 확인한다.",
-                            "supported_visibility": ["private"],
-                            "requires_target": True,
-                            "supports_utterance": True,
-                        },
-                        {
-                            "action_type": "public_signal",
-                            "label": "공개 신호",
-                            "description": "직접 지목하지 않고 공개적으로 신호를 보낸다.",
-                            "supported_visibility": ["public"],
-                            "requires_target": False,
-                            "supports_utterance": True,
-                        },
-                        {
-                            "action_type": "unused_action",
-                            "label": "미채택 행동",
-                            "description": "후보에는 있었지만 채택되지 않는다.",
-                            "supported_visibility": ["group"],
-                            "requires_target": True,
-                            "supports_utterance": False,
-                        },
-                    ]
-                },
-            },
-        },
-        {
-            "index": 4,
-            "event": "llm_call",
-            "event_key": "llm_call:1",
-            "run_id": run_id,
-            "sequence": 1,
-            "role": "planner",
-            "call_kind": "structured",
-            "log_context": {
-                "scope": "planning-analysis",
-                "phase": "planning",
-                "task_key": "planning_analysis",
-                "task_label": "계획 분석",
-                "artifact_key": "planning_analysis",
-                "artifact_label": "planning_analysis",
-                "schema_name": "PlanningAnalysis",
-            },
-            "prompt": "planner prompt",
-            "raw_response": "{\"brief_summary\":\"ok\"}",
-            "duration_seconds": 0.3,
-            "ttft_seconds": 0.1,
-            "input_tokens": 10,
-            "output_tokens": None,
-            "total_tokens": 10,
-        },
-        {
-            "index": 5,
-            "event": "llm_call",
-            "event_key": "llm_call:2",
-            "run_id": run_id,
-            "sequence": 2,
-            "role": "actor",
-            "call_kind": "structured",
-            "log_context": {
-                "scope": "actor-turn",
-                "phase": "runtime",
-                "task_key": "actor_action_proposal",
-                "task_label": "행동 제안",
-                "artifact_key": "pending_actor_proposals",
-                "artifact_label": "pending_actor_proposals",
-                "schema_name": "ActorActionProposal",
-                "cast_id": "alpha",
-            },
-            "prompt": "actor prompt",
-            "raw_response": "{\"action_type\":\"talk\"}",
-            "duration_seconds": 0.4,
-            "ttft_seconds": 0.2,
-            "input_tokens": 10,
-            "output_tokens": 5,
-            "total_tokens": 15,
-        },
-        {
-            "index": 6,
-            "event": "llm_call",
-            "event_key": "llm_call:3",
-            "run_id": run_id,
-            "sequence": 3,
-            "role": "fixer",
-            "call_kind": "text",
-            "log_context": {
-                "scope": "json-fix",
-                "phase": "repair",
-                "task_key": "json_repair.actor.actor_action_proposal",
-                "task_label": "JSON 복구 (actor · 행동 제안)",
-                "artifact_key": "repaired_json",
-                "artifact_label": "repaired_json",
-                "target_role": "actor",
-                "target_task_key": "actor_action_proposal",
-                "target_artifact_key": "pending_actor_proposals",
-                "target_schema_name": "ActorActionProposal",
-                "attempt": 1,
-            },
-            "prompt": "Target schema: ActorActionProposal\nFields:\n- x",
-            "raw_response": "{\"fixed\":1}",
-            "duration_seconds": 0.25,
-            "ttft_seconds": 0.08,
-            "input_tokens": 10,
-            "output_tokens": 3,
-            "total_tokens": 13,
-        },
-        {
-            "index": 7,
-            "event": "llm_call",
-            "event_key": "llm_call:4",
-            "run_id": run_id,
-            "sequence": 4,
-            "role": "fixer",
-            "call_kind": "text",
-            "log_context": {
-                "scope": "json-fix",
-                "phase": "repair",
-                "task_key": "json_repair.actor.actor_action_proposal",
-                "task_label": "JSON 복구 (actor · 행동 제안)",
-                "artifact_key": "repaired_json",
-                "artifact_label": "repaired_json",
-                "target_role": "actor",
-                "target_task_key": "actor_action_proposal",
-                "target_artifact_key": "pending_actor_proposals",
-                "target_schema_name": "ActorActionProposal",
-                "attempt": 2,
-            },
-            "prompt": "Target schema: ActorActionProposal\nFields:\n- x",
-            "raw_response": "{\"fixed\":2}",
-            "duration_seconds": 0.35,
-            "ttft_seconds": 0.09,
-            "input_tokens": 10,
-            "output_tokens": 4,
-            "total_tokens": 14,
-        },
-        {
-            "index": 8,
-            "event": "llm_call",
-            "event_key": "llm_call:5",
-            "run_id": run_id,
-            "sequence": 5,
-            "role": "fixer",
-            "call_kind": "text",
-            "log_context": {
-                "scope": "json-fix",
-                "phase": "repair",
-                "task_key": "json_repair.observer.timeline_anchor",
-                "task_label": "JSON 복구 (observer · 타임라인 anchor 결정)",
-                "artifact_key": "repaired_json",
-                "artifact_label": "repaired_json",
-                "target_role": "observer",
-                "target_task_key": "timeline_anchor",
-                "target_artifact_key": "report_timeline_anchor_json",
-                "target_schema_name": "TimelineAnchorDecision",
-                "attempt": 1,
-            },
-            "prompt": "Target schema: TimelineAnchorDecision\nFields:\n- x",
-            "raw_response": "{\"fixed\":3}",
-            "duration_seconds": 0.45,
-            "ttft_seconds": 0.11,
-            "input_tokens": 10,
-            "output_tokens": 6,
-            "total_tokens": 16,
-        },
-        {
-            "index": 9,
-            "event": "round_actions_adopted",
-            "event_key": "round_actions_adopted:1",
-            "run_id": run_id,
-            "round_index": 1,
-            "activities": [
-                {
-                    "round_index": 1,
-                    "source_cast_id": "alpha",
-                    "target_cast_ids": ["beta"],
-                    "intent_target_cast_ids": ["beta", "gamma"],
-                    "action_type": "private_check_in",
-                    "intent": "Beta의 반응을 비공개로 확인한다.",
-                    "action_summary": "Alpha가 Beta에게 비공개로 확인을 요청한다.",
-                    "action_detail": "지금 감정선을 비공개로 먼저 확인하려고 한다.",
-                    "utterance": "지금 잠깐 따로 이야기할래?",
-                    "visibility": "private",
-                    "thread_id": "pair-thread",
-                },
-                {
-                    "round_index": 1,
-                    "source_cast_id": "beta",
-                    "target_cast_ids": [],
-                    "intent_target_cast_ids": ["alpha"],
-                    "action_type": "public_signal",
-                    "intent": "Alpha를 공개적으로 의식한다.",
-                    "action_summary": "Beta가 Alpha를 공개적으로 의식한다.",
-                    "action_detail": "직접 지목하진 않지만 시선을 보내며 반응을 탐색한다.",
-                    "utterance": "오늘 분위기가 좀 다르네요.",
-                    "visibility": "public",
-                    "thread_id": "",
-                },
-            ],
-        },
-    ]
-    return "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in entries)
-
-
-def _build_settings(*, output_dir: Path) -> AppSettings:
-    model = ModelConfig(provider="ollama", model="dummy")
-    return AppSettings(
-        storage=StorageConfig(
-            output_dir=str(output_dir),
-            sqlite_path=str(output_dir / "runtime.sqlite"),
-        ),
-        models=ModelRouterConfig(
-            planner=model,
-            generator=model,
-            coordinator=model,
-            actor=model,
-            observer=model,
-            fixer=model,
-        ),
-    )
 
 
 def _actors(*cast_ids: str) -> dict[str, ActorRecord]:

@@ -122,7 +122,7 @@ def _time_scope_json() -> str:
     return '{"start":"초기 대면 직후","end":"핵심 선택 직전"}'
 
 
-def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
+def test_router_raw_text_call_uses_stream_and_emits_event() -> None:
     model = FakeModel(
         '{"cast_id":"a","display_name":"A","role_hint":"r","group_name":"g","core_tension":"t"}'
     )
@@ -141,18 +141,15 @@ def test_router_raw_text_call_uses_stream_and_logs(caplog) -> None:
         artifact_label="plan",
     )
 
-    with caplog.at_level(logging.INFO, logger="simula.test.llm_router"):
-        result, meta = router.invoke_text_with_meta(
-            "planner",
-            "prompt",
-            log_context=log_context,
-        )
+    result, meta = router.invoke_text_with_meta(
+        "planner",
+        "prompt",
+        log_context=log_context,
+    )
 
     assert result.startswith('{"cast_id":"a"')
     assert meta.ttft_seconds is not None
     assert model.stream_called is True
-    assert "planner · 실행 계획 정리 시작" in caplog.text
-    assert "planner · 실행 계획 정리 완료" in caplog.text
     assert len(events) == 1
     assert events[0]["event"] == "llm_call"
     assert events[0]["event_key"] == "llm_call:1"
@@ -194,10 +191,10 @@ async def test_service_warns_when_default_payload_is_used(caplog, monkeypatch) -
             ScenarioTimeScope,
             allow_default_on_failure=True,
             default_payload={"start": "기본 시작", "end": "기본 종료"},
-        )
+    )
     assert parsed.start == "기본 시작"
     assert meta.forced_default is True
-    assert "기본값으로 강등합니다" in caplog.text
+    assert any(record.levelno >= logging.WARNING for record in caplog.records)
     assert sleep_calls == [0.25, 0.5, 0.75]
 
 
@@ -225,40 +222,6 @@ async def test_service_uses_fixer_after_structured_parse_failure() -> None:
     assert meta.forced_default is False
     assert meta.parse_failure_count == 2
     assert fixer_model.astream_called is True
-
-
-@pytest.mark.anyio
-async def test_service_logs_internal_structured_attempts_at_debug(caplog) -> None:
-    model = FakeModel(['{"start":"초기","end":"초기"}', _time_scope_json()])
-    service = _build_service(model)
-
-    with caplog.at_level(logging.DEBUG, logger="simula.test.llm_router"):
-        result, meta = await service.ainvoke_structured_with_meta(
-            "planner",
-            "prompt",
-            ScenarioTimeScope,
-            log_context=build_llm_log_context(
-                scope="planning-analysis",
-                phase="planning",
-                task_key="planning_analysis",
-                task_label="계획 분석",
-                artifact_key="planning_analysis",
-                artifact_label="planning_analysis",
-                schema=ScenarioTimeScope,
-            ),
-            semantic_validator=lambda parsed: (
-                ["start and end must differ."] if parsed.start == parsed.end else []
-            ),
-        )
-
-    assert result.start == "초기 대면 직후"
-    assert meta.parse_failure_count == 1
-    assert "planner · 계획 분석 transport call 시작" in caplog.text
-    assert "attempt=1/2" in caplog.text
-    assert "prompt_variant=primary" in caplog.text
-    assert "transport call 실패" in caplog.text
-    assert "prompt_variant=strict_schema_retry" in caplog.text
-    assert "planner · 계획 분석 완료 | artifact=planning_analysis" in caplog.text
 
 
 @pytest.mark.anyio

@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -377,10 +378,11 @@ def test_build_report_prompt_inputs_compacts_long_scenario_and_summary() -> None
             "report_projection_json": '{"summary_context":{}}',
         }
     )
+    final_report_payload = json.loads(prompt_inputs["final_report_json"])
 
     assert len(prompt_inputs["scenario_text"]) < 2_000
-    assert '"objective":"긴장 추적"' in prompt_inputs["final_report_json"]
-    assert '"rounds_completed":4' in prompt_inputs["final_report_json"]
+    assert final_report_payload["objective"] == "긴장 추적"
+    assert final_report_payload["rounds_completed"] == 4
 
 
 def test_render_and_persist_final_report_omits_actor_results_section() -> None:

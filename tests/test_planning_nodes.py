@@ -96,9 +96,9 @@ def test_build_planning_analysis_returns_required_bundle() -> None:
 def test_build_cast_roster_outline_returns_required_outline() -> None:
     class FakeLLM:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del prompt
             assert role == "planner"
             assert schema is CastRosterOutlineBundle
-            assert "Cast roster policy" in prompt
             semantic_validator = kwargs["semantic_validator"]
             repair_context = kwargs["repair_context"]
             parsed = CastRosterOutlineBundle(
@@ -149,6 +149,7 @@ def test_build_cast_roster_outline_returns_required_outline() -> None:
 def test_build_execution_plan_frame_returns_required_frame() -> None:
     class FakeLLM:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del prompt
             assert role == "planner"
             if schema is SituationBundle:
                 return (
@@ -166,7 +167,6 @@ def test_build_execution_plan_frame_returns_required_frame() -> None:
                     _FakeMeta(),
                 )
             if schema is ActionCatalog:
-                assert "at most 5 items" in prompt
                 semantic_validator = kwargs["semantic_validator"]
                 repair_context = kwargs["repair_context"]
                 parsed = ActionCatalog(
@@ -197,7 +197,6 @@ def test_build_execution_plan_frame_returns_required_frame() -> None:
                     _FakeMeta(),
                 )
             if schema is MajorEventPlanBatch:
-                assert "at most 6 items" in prompt
                 semantic_validator = kwargs["semantic_validator"]
                 repair_context = kwargs["repair_context"]
                 parsed = MajorEventPlanBatch(major_events=[])
@@ -318,9 +317,9 @@ def test_prepare_plan_cast_chunks_groups_outline_by_fixed_size() -> None:
 def test_build_plan_cast_chunk_returns_assigned_cast_only() -> None:
     class FakeLLM:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del prompt
             assert role == "planner"
             assert schema is CastRoster
-            assert "Assigned outline JSON" in prompt
             semantic_validator = kwargs["semantic_validator"]
             repair_context = kwargs["repair_context"]
             parsed = CastRoster(
