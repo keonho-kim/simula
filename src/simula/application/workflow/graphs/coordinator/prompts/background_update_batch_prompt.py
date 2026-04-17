@@ -12,6 +12,8 @@ Generate only the deferred background updates for actors not selected for direct
 
 # Rules
 - `background_updates` should only describe actors from `deferred_actors_json`.
+- `cast_id` must be copied exactly from `valid_deferred_cast_ids_json`.
+- Never rename, transliterate, romanize differently, or reformat a `cast_id`.
 - Each item must keep `summary` and `future_hook` non-empty and concrete.
 - `pressure_level` must be exactly one of `low`, `medium`, or `high`.
 - Keep the updates realistic and useful for the next round.
@@ -28,6 +30,9 @@ Round index:
 
 Deferred actors JSON:
 {deferred_actors_json}
+
+Valid deferred cast ids JSON:
+{valid_deferred_cast_ids_json}
 
 Focus core JSON:
 {focus_core_json}

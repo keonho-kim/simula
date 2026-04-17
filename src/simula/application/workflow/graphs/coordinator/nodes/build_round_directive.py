@@ -55,24 +55,8 @@ async def build_round_directive(
 
     max_focus_slices = runtime.context.settings.runtime.max_focus_slices_per_step
     max_actor_calls = runtime.context.settings.runtime.max_actor_calls_per_step
-    candidate_ids = [
-        str(item.get("cast_id", ""))
-        for item in list(state.get("focus_candidates", []))
-        if str(item.get("cast_id", "")).strip()
-    ]
-    deferred_cast_ids = candidate_ids[max_actor_calls:]
-    deferred_actors = [
-        actor
-        for actor in list(state["actors"])
-        if str(actor.get("cast_id", "")) in set(deferred_cast_ids)
-    ]
     focus_candidates_json = json.dumps(
         build_focus_candidates_prompt_view(list(state["focus_candidates"])),
-        ensure_ascii=False,
-        separators=(",", ":"),
-    )
-    deferred_actors_json = json.dumps(
-        build_deferred_actor_views(deferred_actors),
         ensure_ascii=False,
         separators=(",", ":"),
     )
@@ -107,6 +91,7 @@ async def build_round_directive(
     )
     total_parse_failures = 0
     total_duration_seconds = 0.0
+    background_defaulted = False
 
     focus_core_prompt = BUILD_ROUND_DIRECTIVE_FOCUS_CORE_PROMPT.format(
         round_index=state["round_index"],
@@ -172,9 +157,26 @@ async def build_round_directive(
             max_focus_slices=max_focus_slices,
             max_actor_calls=max_actor_calls,
         )
+        deferred_cast_ids = as_string_list(
+            provisional_normalized.get("deferred_cast_ids", [])
+        )
+        deferred_actors = [
+            actor
+            for actor in list(state["actors"])
+            if str(actor.get("cast_id", "")) in set(deferred_cast_ids)
+        ]
         background_prompt = BUILD_BACKGROUND_UPDATE_BATCH_PROMPT.format(
             round_index=state["round_index"],
-            deferred_actors_json=deferred_actors_json,
+            deferred_actors_json=json.dumps(
+                build_deferred_actor_views(deferred_actors),
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            valid_deferred_cast_ids_json=json.dumps(
+                deferred_cast_ids,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
             focus_core_json=json.dumps(
                 focus_core.model_dump(mode="json"),
                 ensure_ascii=False,
@@ -194,15 +196,11 @@ async def build_round_directive(
             default_payload={"background_updates": []},
             semantic_validator=lambda parsed: validate_background_update_batch_semantics(
                 background_update_batch=parsed,
-                deferred_cast_ids=as_string_list(
-                    provisional_normalized.get("deferred_cast_ids", [])
-                ),
+                deferred_cast_ids=deferred_cast_ids,
                 round_index=int(state["round_index"]),
             ),
             repair_context=build_background_update_batch_repair_context(
-                deferred_cast_ids=as_string_list(
-                    provisional_normalized.get("deferred_cast_ids", [])
-                ),
+                deferred_actors=deferred_actors,
                 round_index=int(state["round_index"]),
             ),
             log_context=build_llm_log_context(
@@ -218,14 +216,10 @@ async def build_round_directive(
         )
         total_parse_failures += int(background_meta.parse_failure_count)
         total_duration_seconds += float(background_meta.duration_seconds)
-        forced_default = bool(background_meta.forced_default)
-        if forced_default:
-            normalized = _normalize_round_directive(
-                directive=default_payload,
-                focus_candidates=list(state["focus_candidates"]),
-                max_focus_slices=max_focus_slices,
-                max_actor_calls=max_actor_calls,
-            )
+        background_defaulted = bool(background_meta.forced_default)
+        if background_defaulted:
+            forced_default = False
+            normalized = provisional_normalized
         else:
             assembled = _assemble_round_directive_from_stages(
                 state=state,
@@ -250,6 +244,8 @@ async def build_round_directive(
     errors = list(state["errors"])
     if forced_default:
         errors.append(f"round {state['round_index']} directive defaulted")
+    if background_defaulted:
+        errors.append(f"round {state['round_index']} background updates defaulted")
     record_simulation_log_event(
         runtime.context,
         build_round_focus_selected_event(
@@ -448,16 +444,28 @@ def validate_background_update_batch_semantics(
 
 def build_background_update_batch_repair_context(
     *,
-    deferred_cast_ids: list[str],
+    deferred_actors: list[dict[str, object]],
     round_index: int,
 ) -> dict[str, object]:
     """Build repair context for the background-update stage."""
 
+    valid_deferred_cast_ids = [
+        str(actor.get("cast_id", ""))
+        for actor in deferred_actors
+        if str(actor.get("cast_id", "")).strip()
+    ]
     return {
-        "valid_deferred_cast_ids": deferred_cast_ids,
+        "valid_deferred_cast_ids": valid_deferred_cast_ids,
+        "valid_deferred_actor_map": {
+            str(actor.get("cast_id", "")): str(actor.get("display_name", ""))
+            for actor in deferred_actors
+            if str(actor.get("cast_id", "")).strip()
+        },
         "round_index": round_index,
         "repair_guidance": [
             "Use only deferred actor cast ids in `background_updates`.",
+            "Copy each `cast_id` exactly from `valid_deferred_cast_ids`; never rename or reformat it.",
+            "If a cast_id is invalid, replace it with the closest matching valid deferred cast id instead of dropping the item.",
             "Keep `pressure_level` as one of low, medium, high.",
             "Set each `round_index` to the provided round index.",
         ],

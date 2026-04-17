@@ -733,6 +733,116 @@ def test_build_round_directive_backfills_more_related_casts_when_pool_is_rich() 
     )
 
 
+def test_build_round_directive_builds_background_prompt_from_post_focus_deferred_ids() -> None:
+    class FakeRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del role, kwargs
+            if schema is RoundDirectiveFocusCore:
+                return (
+                    _focus_core_payload(focus_cast_ids=["d"], title="비주류 축"),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            if schema is BackgroundUpdateBatch:
+                assert '"cast_id":"d"' not in prompt
+                assert '"cast_id":"c"' in prompt
+                assert '"cast_id":"e"' in prompt
+                assert '["c","e"]' in prompt
+                return (
+                    BackgroundUpdateBatch(background_updates=[]),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            raise AssertionError(f"unexpected schema: {schema}")
+
+    runtime = SimpleNamespace(
+        context=_test_context(
+            llms=FakeRouter(),
+            logger=logging.getLogger("simula.test.round"),
+            settings=SimpleNamespace(
+                runtime=SimpleNamespace(
+                    max_focus_slices_per_step=3,
+                    max_actor_calls_per_step=3,
+                )
+            ),
+        )
+    )
+    state = {
+        "run_id": "run-1",
+        "round_index": 3,
+        "actors": [
+            {"cast_id": cast_id, "display_name": cast_id.upper()}
+            for cast_id in ["a", "b", "c", "d", "e"]
+        ],
+        "focus_candidates": [{"cast_id": cast_id} for cast_id in ["a", "b", "c", "d", "e"]],
+        "plan": {
+            "coordination_frame": {"focus_selection_rules": ["규칙"]},
+            "situation": {"simulation_objective": "긴장 추적"},
+        },
+        "simulation_clock": {"total_elapsed_label": "2시간"},
+        "observer_reports": [{"summary": "직전"}],
+        "round_focus_history": [],
+        "background_updates": [],
+        "errors": [],
+    }
+
+    result = asyncio.run(build_round_directive(state, runtime))
+
+    assert result["selected_cast_ids"] == ["d", "a", "b"]
+    assert result["deferred_cast_ids"] == ["c", "e"]
+
+
+def test_build_round_directive_keeps_focus_when_background_stage_defaults() -> None:
+    class FakeRouter:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            if schema is RoundDirectiveFocusCore:
+                return (
+                    _focus_core_payload(focus_cast_ids=["a", "b"]),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            if schema is BackgroundUpdateBatch:
+                return (
+                    BackgroundUpdateBatch(background_updates=[]),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=2, forced_default=True),
+                )
+            raise AssertionError(f"unexpected schema: {schema}")
+
+    runtime = SimpleNamespace(
+        context=_test_context(
+            llms=FakeRouter(),
+            logger=logging.getLogger("simula.test.round"),
+            settings=SimpleNamespace(
+                runtime=SimpleNamespace(
+                    max_focus_slices_per_step=3,
+                    max_actor_calls_per_step=3,
+                )
+            ),
+        )
+    )
+    state = {
+        "run_id": "run-1",
+        "round_index": 2,
+        "actors": [{"cast_id": "c", "display_name": "C"}],
+        "focus_candidates": [{"cast_id": "a"}, {"cast_id": "b"}, {"cast_id": "c"}],
+        "plan": {
+            "coordination_frame": {"focus_selection_rules": ["규칙"]},
+            "situation": {"simulation_objective": "긴장 추적"},
+        },
+        "simulation_clock": {"total_elapsed_label": "1시간"},
+        "observer_reports": [{"summary": "직전"}],
+        "round_focus_history": [],
+        "background_updates": [],
+        "errors": [],
+        "parse_failures": 0,
+    }
+
+    result = asyncio.run(build_round_directive(state, runtime))
+
+    assert result["selected_cast_ids"] == ["a", "b"]
+    assert result["latest_background_updates"] == []
+    assert "background updates defaulted" in result["errors"][0]
+    assert result["parse_failures"] == 2
+
+
 def test_resolve_round_persists_round_artifacts() -> None:
     class FakeRouter:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
