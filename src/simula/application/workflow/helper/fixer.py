@@ -78,6 +78,45 @@ _KNOWN_VALIDATION_RULES: dict[str, tuple[str, ...]] = {
         "brief_summary must not be empty.",
         "premise must not be empty.",
     ),
+    "ActionCatalog": (
+        "actions must not be empty.",
+        "action_type values must be unique.",
+        "actions must contain at most 5 items.",
+    ),
+    "CoordinationFrame": (
+        "focus_selection_rules must not be empty.",
+        "background_motion_rules must not be empty.",
+        "focus_archetypes must not be empty.",
+        "attention_shift_rules must not be empty.",
+        "budget_guidance must not be empty.",
+    ),
+    "CastRoster": (
+        "items must not be empty.",
+        "cast_id values must be unique.",
+        "display_name values must be unique.",
+    ),
+    "CastRosterOutlineBundle": (
+        "items must not be empty.",
+        "slot_index values must be unique.",
+        "cast_id values must be unique.",
+        "display_name values must be unique.",
+    ),
+    "ExecutionPlanFrameBundle": (
+        "major_events must use unique event_id values.",
+        "major_events must contain at most 6 items.",
+    ),
+    "ExecutionPlanBundle": (
+        "major_events must use unique event_id values.",
+        "major_events must contain at most 6 items.",
+    ),
+    "MajorEventPlanItem": (
+        "participant_cast_ids must not be empty.",
+        "completion_action_types must not be empty.",
+        "completion_signals must not be empty.",
+        "participant_cast_ids must be unique.",
+        "completion_action_types must be unique.",
+        "earliest_round must be less than or equal to latest_round.",
+    ),
 }
 
 

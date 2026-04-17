@@ -13,6 +13,9 @@ from simula.application.workflow.graphs.simulation.states.state import (
 from simula.application.workflow.graphs.generation.states.state import (
     empty_cast_slot_spec,
 )
+from simula.application.workflow.graphs.planning.states.state import (
+    empty_plan_cast_chunk_spec,
+)
 from simula.application.workflow.graphs.runtime.states.state import (
     empty_actor_proposal_task,
 )
@@ -60,6 +63,8 @@ def expand_input_state_to_workflow_state(
             "checkpoint_enabled": settings.runtime.enable_checkpointing,
             "rng_seed": input_state["rng_seed"],
             "planning_analysis": {},
+            "cast_roster_outline": {},
+            "execution_plan_frame": {},
             "plan": {},
             "actors": [],
             "activity_feeds": {},
@@ -94,6 +99,9 @@ def expand_input_state_to_workflow_state(
             },
             "round_time_history": [],
             "actor_facing_scenario_digest": {},
+            "pending_plan_cast_chunks": [],
+            "plan_cast_chunk": empty_plan_cast_chunk_spec(),
+            "generated_plan_cast_results": [],
             "pending_cast_slots": [],
             "cast_slot": empty_cast_slot_spec(),
             "generated_actor_results": [],

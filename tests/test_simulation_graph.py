@@ -21,7 +21,9 @@ from simula.application.workflow.graphs.simulation.states.initial_state import (
 from simula.domain.contracts import (
     ActorActionProposal,
     ActorCard,
-    ExecutionPlanBundle,
+    CastRoster,
+    CastRosterOutlineBundle,
+    ExecutionPlanFrameBundle,
     PlanningAnalysis,
     RoundContinuationDecision,
     RoundDirective,
@@ -78,9 +80,27 @@ class FakeRouter:
                 ),
                 FakeMeta(),
             )
-        if schema is ExecutionPlanBundle:
+        if schema is CastRosterOutlineBundle:
             return (
-                ExecutionPlanBundle(
+                CastRosterOutlineBundle(
+                    items=[
+                        {
+                            "slot_index": 1,
+                            "cast_id": "cast-alpha",
+                            "display_name": "Alpha",
+                        },
+                        {
+                            "slot_index": 2,
+                            "cast_id": "cast-beta",
+                            "display_name": "Beta",
+                        },
+                    ]
+                ),
+                FakeMeta(),
+            )
+        if schema is ExecutionPlanFrameBundle:
+            return (
+                ExecutionPlanFrameBundle(
                     situation={
                         "simulation_objective": "긴장 추적",
                         "world_summary": "짧은 직접 조율이 핵심이다.",
@@ -112,8 +132,15 @@ class FakeRouter:
                         "attention_shift_rules": ["조용했던 actor도 압력이 올라가면 끌어올린다."],
                         "budget_guidance": ["한 round에는 소수 actor만 직접 호출한다."],
                     },
-                    cast_roster={
-                        "items": [
+                    major_events=[],
+                ),
+                FakeMeta(),
+            )
+        if schema is CastRoster:
+            if '"chunk_index":1' in prompt or '"slot_index":1' in prompt:
+                return (
+                    CastRoster(
+                        items=[
                             {
                                 "cast_id": "cast-alpha",
                                 "display_name": "Alpha",
@@ -129,8 +156,27 @@ class FakeRouter:
                                 "core_tension": "즉시 결정을 피하고 싶다.",
                             },
                         ]
-                    },
-                    major_events=[],
+                    ),
+                    FakeMeta(),
+                )
+            return (
+                CastRoster(
+                    items=[
+                        {
+                            "cast_id": "cast-alpha",
+                            "display_name": "Alpha",
+                            "role_hint": "선도자",
+                            "group_name": "A",
+                            "core_tension": "먼저 압박하고 싶다.",
+                        },
+                        {
+                            "cast_id": "cast-beta",
+                            "display_name": "Beta",
+                            "role_hint": "조정자",
+                            "group_name": "B",
+                            "core_tension": "즉시 결정을 피하고 싶다.",
+                        },
+                    ]
                 ),
                 FakeMeta(),
             )

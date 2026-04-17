@@ -9,18 +9,29 @@ import logging
 from types import SimpleNamespace
 
 import pytest
+from langgraph.types import Overwrite
 
 from simula.application.workflow.graphs.planning.nodes.planner import (
-    build_execution_plan,
+    assemble_execution_plan,
+    build_cast_roster_outline,
+    build_execution_plan_frame,
+    build_plan_cast_chunk,
     build_planning_analysis,
     finalize_plan,
+    prepare_plan_cast_chunks,
 )
-from simula.domain.contracts import ExecutionPlanBundle, PlanningAnalysis
+from simula.domain.contracts import (
+    CastRoster,
+    CastRosterOutlineBundle,
+    ExecutionPlanFrameBundle,
+    PlanningAnalysis,
+)
 
 
 class _FakeMeta:
     duration_seconds = 0.01
     forced_default = False
+    parse_failure_count = 0
 
 
 def _build_runtime(llms: object) -> SimpleNamespace:
@@ -77,65 +88,112 @@ def test_build_planning_analysis_returns_required_bundle() -> None:
     assert result["planning_analysis"]["premise"] == "표면적 입장보다 실제 정렬 방향이 중요하다."
 
 
-def test_build_execution_plan_returns_minimum_plan_payload() -> None:
+def test_build_cast_roster_outline_returns_required_outline() -> None:
     class FakeLLM:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
-            del prompt, kwargs
             assert role == "planner"
-            assert schema is ExecutionPlanBundle
-            return (
-                ExecutionPlanBundle(
-                    situation={
-                        "simulation_objective": "위기 추적",
-                        "world_summary": "요약",
-                        "initial_tensions": ["긴장"],
-                        "channel_guidance": {
-                            "public": "공개",
-                            "private": "비공개",
-                            "group": "그룹",
-                        },
-                        "current_constraints": ["제약"],
+            assert schema is CastRosterOutlineBundle
+            assert "Cast roster policy" in prompt
+            semantic_validator = kwargs["semantic_validator"]
+            repair_context = kwargs["repair_context"]
+            parsed = CastRosterOutlineBundle(
+                items=[
+                    {
+                        "slot_index": 1,
+                        "cast_id": "cast-alpha",
+                        "display_name": "알파",
                     },
-                    action_catalog={
-                        "actions": [
-                            {
-                                "action_type": "speech",
-                                "label": "발화",
-                                "description": "말한다.",
-                                "supported_visibility": ["public", "private", "group"],
-                                "requires_target": False,
-                                "supports_utterance": True,
-                            }
-                        ],
-                        "selection_guidance": ["상황에 맞게 고른다."],
+                    {
+                        "slot_index": 2,
+                        "cast_id": "cast-beta",
+                        "display_name": "베타",
                     },
-                    coordination_frame={
-                        "focus_selection_rules": ["직접 압박을 본다."],
-                        "background_motion_rules": ["배경은 요약한다."],
-                        "focus_archetypes": ["직접 충돌"],
-                        "attention_shift_rules": ["조용한 actor도 끌어올린다."],
-                        "budget_guidance": ["소수만 직접 본다."],
-                    },
-                    cast_roster={
-                        "items": [
-                            {
-                                "cast_id": "cast-alpha",
-                                "display_name": "알파",
-                                "role_hint": "선도자",
-                                "group_name": "A",
-                                "core_tension": "먼저 움직인다.",
-                            }
-                        ]
-                    },
-                    major_events=[],
-                ),
-                _FakeMeta(),
+                ]
             )
+            assert semantic_validator(parsed) == []
+            assert repair_context["num_cast"] == 2
+            return parsed, _FakeMeta()
+
+    state = {
+        "scenario": "등장인물 2명 테스트 시나리오",
+        "scenario_controls": {"num_cast": 2, "allow_additional_cast": False},
+        "planning_analysis": {
+            "brief_summary": "요약",
+            "premise": "전제",
+            "time_scope": {"start": "초기", "end": "종결"},
+            "public_context": ["공개"],
+            "private_context": ["비공개"],
+            "key_pressures": ["압박"],
+            "progression_plan": {
+                "max_rounds": 6,
+                "allowed_elapsed_units": ["hour"],
+                "default_elapsed_unit": "hour",
+                "pacing_guidance": ["짧게 본다."],
+                "selection_reason": "짧은 조율이 중심이다.",
+            },
+        },
+        "planning_latency_seconds": 0.0,
+    }
+
+    result = asyncio.run(build_cast_roster_outline(state, _build_runtime(FakeLLM())))
+
+    assert len(result["cast_roster_outline"]["items"]) == 2
+    assert result["cast_roster_outline"]["items"][0]["cast_id"] == "cast-alpha"
+
+
+def test_build_execution_plan_frame_returns_required_frame() -> None:
+    class FakeLLM:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            assert role == "planner"
+            assert schema is ExecutionPlanFrameBundle
+            assert "at most 5 items" in prompt
+            assert "at most 6 items" in prompt
+            semantic_validator = kwargs["semantic_validator"]
+            repair_context = kwargs["repair_context"]
+            parsed = ExecutionPlanFrameBundle(
+                situation={
+                    "simulation_objective": "위기 추적",
+                    "world_summary": "요약",
+                    "initial_tensions": ["긴장"],
+                    "channel_guidance": {
+                        "public": "공개",
+                        "private": "비공개",
+                        "group": "그룹",
+                    },
+                    "current_constraints": ["제약"],
+                },
+                action_catalog={
+                    "actions": [
+                        {
+                            "action_type": "speech",
+                            "label": "발화",
+                            "description": "말한다.",
+                            "supported_visibility": ["public", "private", "group"],
+                            "requires_target": False,
+                            "supports_utterance": True,
+                        }
+                    ],
+                    "selection_guidance": ["상황에 맞게 고른다."],
+                },
+                coordination_frame={
+                    "focus_selection_rules": ["직접 압박을 본다."],
+                    "background_motion_rules": ["배경은 요약한다."],
+                    "focus_archetypes": ["직접 충돌"],
+                    "attention_shift_rules": ["조용한 actor도 끌어올린다."],
+                    "budget_guidance": ["소수만 직접 본다."],
+                },
+                major_events=[],
+            )
+            assert semantic_validator(parsed) == []
+            assert repair_context["max_actions"] == 5
+            assert repair_context["max_major_events"] == 6
+            return parsed, _FakeMeta()
 
     state = {
         "scenario": "등장인물 1명이 있는 테스트 시나리오",
         "scenario_controls": {"num_cast": 1, "allow_additional_cast": False},
         "max_rounds": 6,
+        "planned_max_rounds": 6,
         "planning_latency_seconds": 0.0,
         "planning_analysis": {
             "brief_summary": "요약",
@@ -152,12 +210,193 @@ def test_build_execution_plan_returns_minimum_plan_payload() -> None:
                 "selection_reason": "짧은 조율이 중심이다.",
             },
         },
+        "cast_roster_outline": {
+            "items": [
+                {
+                    "slot_index": 1,
+                    "cast_id": "cast-alpha",
+                    "display_name": "알파",
+                }
+            ]
+        },
     }
 
-    result = asyncio.run(build_execution_plan(state, _build_runtime(FakeLLM())))
+    result = asyncio.run(build_execution_plan_frame(state, _build_runtime(FakeLLM())))
 
-    assert result["plan"]["interpretation"]["brief_summary"] == "요약"
-    assert result["plan"]["cast_roster"][0]["cast_id"] == "cast-alpha"
+    assert result["execution_plan_frame"]["action_catalog"]["actions"][0]["requires_target"] is False
+
+
+def test_prepare_plan_cast_chunks_groups_outline_by_fixed_size() -> None:
+    runtime = _build_runtime(object())
+    state = {
+        "cast_roster_outline": {
+            "items": [
+                {
+                    "slot_index": index,
+                    "cast_id": f"cast-{index}",
+                    "display_name": f"배역 {index}",
+                }
+                for index in range(1, 15)
+            ]
+        }
+    }
+
+    result = prepare_plan_cast_chunks(state, runtime)
+
+    assert [len(item["cast_outline_items"]) for item in result["pending_plan_cast_chunks"]] == [5, 5, 4]
+    assert isinstance(result["generated_plan_cast_results"], Overwrite)
+
+
+def test_build_plan_cast_chunk_returns_assigned_cast_only() -> None:
+    class FakeLLM:
+        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            assert role == "planner"
+            assert schema is CastRoster
+            assert "Assigned outline JSON" in prompt
+            semantic_validator = kwargs["semantic_validator"]
+            repair_context = kwargs["repair_context"]
+            parsed = CastRoster(
+                items=[
+                    {
+                        "cast_id": "cast-alpha",
+                        "display_name": "알파",
+                        "role_hint": "선도자",
+                        "group_name": "A",
+                        "core_tension": "먼저 움직인다.",
+                    },
+                    {
+                        "cast_id": "cast-beta",
+                        "display_name": "베타",
+                        "role_hint": "조정자",
+                        "group_name": "B",
+                        "core_tension": "즉시 결정이 부담스럽다.",
+                    },
+                ]
+            )
+            assert semantic_validator(parsed) == []
+            assert repair_context["exact_chunk_size"] == 2
+            meta = _FakeMeta()
+            meta.parse_failure_count = 1
+            return parsed, meta
+
+    state = {
+        "scenario": "테스트 시나리오",
+        "planning_analysis": {
+            "brief_summary": "요약",
+            "premise": "전제",
+            "time_scope": {"start": "초기", "end": "종결"},
+            "public_context": ["공개"],
+            "private_context": ["비공개"],
+            "key_pressures": ["압박"],
+            "progression_plan": {
+                "max_rounds": 6,
+                "allowed_elapsed_units": ["hour"],
+                "default_elapsed_unit": "hour",
+                "pacing_guidance": ["짧게 본다."],
+                "selection_reason": "짧은 조율이 중심이다.",
+            },
+        },
+        "execution_plan_frame": {
+            "situation": {},
+            "action_catalog": {},
+            "coordination_frame": {},
+            "major_events": [],
+        },
+        "plan_cast_chunk": {
+            "chunk_index": 1,
+            "cast_outline_items": [
+                {
+                    "slot_index": 1,
+                    "cast_id": "cast-alpha",
+                    "display_name": "알파",
+                },
+                {
+                    "slot_index": 2,
+                    "cast_id": "cast-beta",
+                    "display_name": "베타",
+                },
+            ],
+        },
+    }
+
+    result = asyncio.run(build_plan_cast_chunk(state, _build_runtime(FakeLLM())))
+
+    assert result["generated_plan_cast_results"][0]["chunk_index"] == 1
+    assert result["generated_plan_cast_results"][0]["cast_items"][0]["slot_index"] == 1
+    assert result["generated_plan_cast_results"][0]["parse_failure_count"] == 1
+
+
+def test_assemble_execution_plan_merges_chunk_results_in_slot_order() -> None:
+    runtime = _build_runtime(object())
+    state = {
+        "planning_analysis": {
+            "brief_summary": "요약",
+            "premise": "전제",
+            "time_scope": {"start": "초기", "end": "종결"},
+            "public_context": ["공개"],
+            "private_context": ["비공개"],
+            "key_pressures": ["압박"],
+            "progression_plan": {
+                "max_rounds": 6,
+                "allowed_elapsed_units": ["hour"],
+                "default_elapsed_unit": "hour",
+                "pacing_guidance": ["짧게 본다."],
+                "selection_reason": "짧은 조율이 중심이다.",
+            },
+        },
+        "execution_plan_frame": {
+            "situation": {"simulation_objective": "위기 추적"},
+            "action_catalog": {"actions": []},
+            "coordination_frame": {"focus_selection_rules": []},
+            "major_events": [],
+        },
+        "generated_plan_cast_results": [
+            {
+                "chunk_index": 2,
+                "cast_items": [
+                    {
+                        "slot_index": 3,
+                        "cast_id": "cast-gamma",
+                        "display_name": "감마",
+                        "role_hint": "관찰자",
+                        "group_name": "C",
+                        "core_tension": "흐름을 본다.",
+                    }
+                ],
+                "parse_failure_count": 0,
+            },
+            {
+                "chunk_index": 1,
+                "cast_items": [
+                    {
+                        "slot_index": 2,
+                        "cast_id": "cast-beta",
+                        "display_name": "베타",
+                        "role_hint": "조정자",
+                        "group_name": "B",
+                        "core_tension": "즉시 결정이 부담스럽다.",
+                    },
+                    {
+                        "slot_index": 1,
+                        "cast_id": "cast-alpha",
+                        "display_name": "알파",
+                        "role_hint": "선도자",
+                        "group_name": "A",
+                        "core_tension": "먼저 움직인다.",
+                    },
+                ],
+                "parse_failure_count": 0,
+            },
+        ],
+    }
+
+    result = assemble_execution_plan(state, runtime)
+
+    assert [item["cast_id"] for item in result["plan"]["cast_roster"]] == [
+        "cast-alpha",
+        "cast-beta",
+        "cast-gamma",
+    ]
 
 
 def test_finalize_plan_persists_compact_plan() -> None:

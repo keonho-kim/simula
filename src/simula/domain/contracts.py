@@ -243,6 +243,61 @@ class CastRoster(BaseModel):
         return self
 
 
+class CastRosterOutlineItem(BaseModel):
+    """One compact cast-outline item."""
+
+    slot_index: int = Field(ge=1)
+    cast_id: str
+    display_name: str
+
+    @model_validator(mode="after")
+    def validate_cast_roster_outline_item(self) -> "CastRosterOutlineItem":
+        if not self.cast_id.strip():
+            raise ValueError("cast_id must not be empty.")
+        if not self.display_name.strip():
+            raise ValueError("display_name must not be empty.")
+        return self
+
+
+class CastRosterOutlineBundle(BaseModel):
+    """Compact cast roster outline used before chunk expansion."""
+
+    items: list[CastRosterOutlineItem]
+
+    @model_validator(mode="after")
+    def validate_cast_roster_outline_bundle(self) -> "CastRosterOutlineBundle":
+        if not self.items:
+            raise ValueError("items must not be empty.")
+        slot_indexes = [item.slot_index for item in self.items]
+        cast_ids = [item.cast_id for item in self.items]
+        display_names = [item.display_name for item in self.items]
+        if len(slot_indexes) != len(set(slot_indexes)):
+            raise ValueError("slot_index values must be unique.")
+        if len(cast_ids) != len(set(cast_ids)):
+            raise ValueError("cast_id values must be unique.")
+        if len(display_names) != len(set(display_names)):
+            raise ValueError("display_name values must be unique.")
+        return self
+
+
+class ExecutionPlanFrameBundle(BaseModel):
+    """Execution-plan frame generated before cast chunk expansion."""
+
+    situation: SituationBundle
+    action_catalog: ActionCatalog
+    coordination_frame: CoordinationFrame
+    major_events: list["MajorEventPlanItem"]
+
+    @model_validator(mode="after")
+    def validate_execution_plan_frame_bundle(self) -> "ExecutionPlanFrameBundle":
+        event_ids = [item.event_id for item in self.major_events]
+        if len(event_ids) != len(set(event_ids)):
+            raise ValueError("major_events must use unique event_id values.")
+        if len(self.major_events) > 6:
+            raise ValueError("major_events must contain at most 6 items.")
+        return self
+
+
 class ExecutionPlanBundle(BaseModel):
     """Single execution-plan bundle."""
 

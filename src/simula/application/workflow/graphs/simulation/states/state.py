@@ -10,6 +10,10 @@ from simula.application.workflow.graphs.generation.states.state import (
     CastSlotSpec,
     GeneratedActorResult,
 )
+from simula.application.workflow.graphs.planning.states.state import (
+    GeneratedPlanCastResult,
+    PlanCastChunkSpec,
+)
 from simula.application.workflow.graphs.runtime.states.state import (
     ActorProposalResult,
     ActorProposalTask,
@@ -52,6 +56,8 @@ class SimulationWorkflowState(TypedDict):
     checkpoint_enabled: bool
     rng_seed: int
     planning_analysis: dict[str, Any]
+    cast_roster_outline: dict[str, Any]
+    execution_plan_frame: dict[str, Any]
     plan: dict[str, Any]
     actors: list[dict[str, Any]]
     activity_feeds: dict[str, dict[str, Any]]
@@ -73,6 +79,9 @@ class SimulationWorkflowState(TypedDict):
     simulation_clock: dict[str, Any]
     round_time_history: list[dict[str, Any]]
     actor_facing_scenario_digest: dict[str, Any]
+    pending_plan_cast_chunks: list[PlanCastChunkSpec]
+    plan_cast_chunk: PlanCastChunkSpec
+    generated_plan_cast_results: Annotated[list[GeneratedPlanCastResult], extend_list]
     pending_cast_slots: list[CastSlotSpec]
     cast_slot: CastSlotSpec
     generated_actor_results: Annotated[list[GeneratedActorResult], extend_list]

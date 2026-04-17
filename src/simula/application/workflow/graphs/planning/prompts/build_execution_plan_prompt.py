@@ -1,5 +1,5 @@
 """Purpose:
-- Prompt for compact execution-plan construction.
+- Prompt for compact execution-plan frame construction.
 """
 
 from __future__ import annotations
@@ -8,19 +8,19 @@ PROMPT = """# Role
 You are the planner for a state-driven simulation.
 
 # Goal
-Turn the planning analysis into the minimum execution plan bundle.
+Turn the planning analysis and cast outline into the minimum execution-plan frame bundle.
 
 # Rules
 - Keep the action catalog broad and small.
 - Avoid near-duplicate action entries that only rename the same move.
+- `action_catalog.actions` must contain at most 5 items.
 - Each `action_catalog.actions` item must use a unique `action_type`.
 - Each `action_catalog.selection_guidance` item should explain how to choose among the broad actions in this scenario.
-- Keep the cast roster unique.
-- `cast_roster.items` must use unique `cast_id` values and unique `display_name` values.
 - Generate `major_events` only when the scenario text implies concrete turning points, staged choices, checkpoints, or end conditions worth tracking.
 - `major_events` may be an empty array when the scenario does not imply any specific shared event track.
+- `major_events` must contain at most 6 items.
 - Each `major_events` item must use a unique `event_id`.
-- Each `major_events` item must use only cast ids that appear in `cast_roster`.
+- Each `major_events` item must use only cast ids that appear in `cast_roster_outline_json.items`.
 - Use round windows for `major_events`. `earliest_round` and `latest_round` should fit within `planning_analysis_json.progression_plan.max_rounds`.
 - In each `major_events` item, `participant_cast_ids` and `completion_action_types` must be unique arrays.
 - In each `major_events` item, `participant_cast_ids`, `completion_action_types`, and `completion_signals` must stay non-empty whenever the event exists.
@@ -44,17 +44,11 @@ Scenario text:
 Planning analysis JSON:
 {planning_analysis_json}
 
+Cast roster outline JSON:
+{cast_roster_outline_json}
+
 Runtime hard ceiling:
 {max_rounds}
-
-Requested cast count:
-{num_cast}
-
-Allow additional cast beyond the requested count:
-{allow_additional_cast}
-
-Cast roster policy:
-{cast_roster_policy}
 
 # Output
 Format:
