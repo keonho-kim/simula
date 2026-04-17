@@ -115,7 +115,7 @@ _EXECUTION_PLAN_FRAME_EXAMPLE: dict[str, Any] = {
                     "<choose one or more of public, private, group>",
                 ],
                 "requires_target": False,
-                "supports_utterance": False,
+                "supports_utterance": True,
             },
         ],
         "selection_guidance": [

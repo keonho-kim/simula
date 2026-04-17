@@ -28,6 +28,26 @@ def build_actor_action_proposal_prompt_bundle(
     )
 
 
+def build_actor_action_shell_prompt_bundle(
+    *,
+    example_mode: ExampleMode = "minimal",
+) -> dict[str, str]:
+    return build_json_prompt_bundle(
+        example=_ACTOR_ACTION_SHELL_EXAMPLE,
+        example_mode=example_mode,
+    )
+
+
+def build_actor_action_narrative_prompt_bundle(
+    *,
+    example_mode: ExampleMode = "minimal",
+) -> dict[str, str]:
+    return build_json_prompt_bundle(
+        example=_ACTOR_ACTION_NARRATIVE_EXAMPLE,
+        example_mode=example_mode,
+    )
+
+
 def build_observer_report_prompt_bundle(
     *,
     example_mode: ExampleMode = "minimal",
@@ -48,6 +68,21 @@ _ACTOR_ACTION_PROPOSAL_EXAMPLE: dict[str, Any] = {
     "visibility": "<choose exactly one of public, private, group>",
     "target_cast_ids": ["<real visible other cast_id values, or an empty list for solo private/public actions>"],
     "thread_id": "<stable thread identifier or an empty string>",
+}
+
+_ACTOR_ACTION_SHELL_EXAMPLE: dict[str, Any] = {
+    "action_type": "<choose one action_type from runtime_guidance.available_actions>",
+    "visibility": "<choose exactly one of public, private, group>",
+    "target_cast_ids": ["<real visible other cast_id values, or an empty list for solo private/public actions>"],
+    "thread_id": "<stable thread identifier or an empty string>",
+}
+
+_ACTOR_ACTION_NARRATIVE_EXAMPLE: dict[str, Any] = {
+    "intent": "<one Korean sentence describing the intended change>",
+    "intent_target_cast_ids": ["<cast_id string or an empty list>"],
+    "action_summary": "<one Korean sentence summarizing the action>",
+    "action_detail": "<one Korean sentence describing the concrete action in more detail>",
+    "utterance": "<one Korean spoken line or an empty string; return an empty string when the selected action does not support utterance>",
 }
 
 _OBSERVER_REPORT_EXAMPLE: dict[str, Any] = {

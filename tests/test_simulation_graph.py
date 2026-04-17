@@ -19,7 +19,8 @@ from simula.application.workflow.graphs.simulation.states.initial_state import (
     expand_input_state_to_workflow_state,
 )
 from simula.domain.contracts import (
-    ActorActionProposal,
+    ActorActionNarrative,
+    ActorActionShell,
     ActorCard,
     CastRoster,
     CastRosterOutlineBundle,
@@ -247,18 +248,24 @@ class FakeRouter:
                 ),
                 FakeMeta(),
             )
-        if schema is ActorActionProposal:
+        if schema is ActorActionShell:
             return (
-                ActorActionProposal(
+                ActorActionShell(
                     action_type="speech",
+                    visibility="private",
+                    target_cast_ids=["beta"],
+                    thread_id="review-thread",
+                ),
+                FakeMeta(),
+            )
+        if schema is ActorActionNarrative:
+            return (
+                ActorActionNarrative(
                     intent="Beta가 재검토를 피하지 못하게 만든다.",
                     intent_target_cast_ids=["beta"],
                     action_summary="Alpha가 비공개로 재검토를 요구한다.",
                     action_detail="지금 바로 결론을 내지 말고 리스크를 다시 보자고 압박한다.",
                     utterance="지금 결론 내리지 말고 리스크를 다시 봅시다.",
-                    visibility="private",
-                    target_cast_ids=["beta"],
-                    thread_id="review-thread",
                 ),
                 FakeMeta(),
             )
@@ -452,18 +459,24 @@ class RuntimeGraphRouter:
                 ),
                 FakeMeta(),
             )
-        if schema is ActorActionProposal:
+        if schema is ActorActionShell:
             return (
-                ActorActionProposal(
+                ActorActionShell(
                     action_type="speech",
+                    visibility="private",
+                    target_cast_ids=["beta"],
+                    thread_id="review-thread",
+                ),
+                FakeMeta(),
+            )
+        if schema is ActorActionNarrative:
+            return (
+                ActorActionNarrative(
                     intent="Beta의 결정을 재검토로 이끈다.",
                     intent_target_cast_ids=["beta"],
                     action_summary="Alpha가 재검토를 요구한다.",
                     action_detail="비공개로 다시 판단해야 한다고 압박한다.",
                     utterance="지금 결론 내리지 말고 다시 봅시다.",
-                    visibility="private",
-                    target_cast_ids=["beta"],
-                    thread_id="review-thread",
                 ),
                 FakeMeta(),
             )
@@ -649,7 +662,8 @@ def test_runtime_subgraph_stops_before_next_round_on_no_progress() -> None:
     assert result["stop_reason"] == "no_progress"
     assert result["round_index"] == 1
     assert router.calls.get("RoundDirective", 0) == 1
-    assert router.calls.get("ActorActionProposal", 0) == 2
+    assert router.calls.get("ActorActionShell", 0) == 2
+    assert router.calls.get("ActorActionNarrative", 0) == 2
     assert router.calls.get("RoundResolution", 0) == 1
     assert router.calls.get("RoundContinuationDecision", 0) == 1
     assert len(store.round_artifacts) == 1
@@ -672,7 +686,8 @@ def test_runtime_subgraph_finishes_immediately_on_simulation_done() -> None:
     assert result["stop_reason"] == "simulation_done"
     assert result["round_index"] == 1
     assert router.calls.get("RoundDirective", 0) == 1
-    assert router.calls.get("ActorActionProposal", 0) == 2
+    assert router.calls.get("ActorActionShell", 0) == 2
+    assert router.calls.get("ActorActionNarrative", 0) == 2
     assert router.calls.get("RoundResolution", 0) == 1
     assert router.calls.get("RoundContinuationDecision", 0) == 0
     assert len(store.round_artifacts) == 1

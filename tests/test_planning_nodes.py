@@ -19,6 +19,7 @@ from simula.application.workflow.graphs.planning.nodes.planner import (
     build_planning_analysis,
     finalize_plan,
     prepare_plan_cast_chunks,
+    validate_execution_plan_frame_semantics,
 )
 from simula.domain.contracts import (
     CastRoster,
@@ -224,6 +225,57 @@ def test_build_execution_plan_frame_returns_required_frame() -> None:
     result = asyncio.run(build_execution_plan_frame(state, _build_runtime(FakeLLM())))
 
     assert result["execution_plan_frame"]["action_catalog"]["actions"][0]["requires_target"] is False
+
+
+def test_validate_execution_plan_frame_semantics_rejects_speaking_action_without_utterance_support() -> None:
+    issues = validate_execution_plan_frame_semantics(
+        execution_plan_frame=ExecutionPlanFrameBundle(
+            situation={
+                "simulation_objective": "위기 추적",
+                "world_summary": "요약",
+                "initial_tensions": ["긴장"],
+                "channel_guidance": {
+                    "public": "공개",
+                    "private": "비공개",
+                    "group": "그룹",
+                },
+                "current_constraints": ["제약"],
+            },
+            action_catalog={
+                "actions": [
+                    {
+                        "action_type": "review_sharing",
+                        "label": "후기 공유",
+                        "description": "체험 후 느낀 점을 공개적으로 공유한다.",
+                        "supported_visibility": ["public", "private"],
+                        "requires_target": False,
+                        "supports_utterance": False,
+                    }
+                ],
+                "selection_guidance": ["상황에 맞게 고른다."],
+            },
+            coordination_frame={
+                "focus_selection_rules": ["직접 압박을 본다."],
+                "background_motion_rules": ["배경은 요약한다."],
+                "focus_archetypes": ["직접 충돌"],
+                "attention_shift_rules": ["조용한 actor도 끌어올린다."],
+                "budget_guidance": ["소수만 직접 본다."],
+            },
+            major_events=[],
+        ),
+        cast_roster_outline=CastRosterOutlineBundle(
+            items=[
+                {
+                    "slot_index": 1,
+                    "cast_id": "cast-alpha",
+                    "display_name": "알파",
+                }
+            ]
+        ),
+        planned_max_rounds=6,
+    )
+
+    assert "supports_utterance=true" in issues[0]
 
 
 def test_prepare_plan_cast_chunks_groups_outline_by_fixed_size() -> None:

@@ -109,6 +109,15 @@ _KNOWN_VALIDATION_RULES: dict[str, tuple[str, ...]] = {
         "major_events must use unique event_id values.",
         "major_events must contain at most 6 items.",
     ),
+    "ActorActionShell": (
+        "action_type must not be empty.",
+        "group proposals require target_cast_ids.",
+    ),
+    "ActorActionNarrative": (
+        "intent must not be empty.",
+        "action_summary must not be empty.",
+        "action_detail must not be empty.",
+    ),
     "MajorEventPlanItem": (
         "participant_cast_ids must not be empty.",
         "completion_action_types must not be empty.",

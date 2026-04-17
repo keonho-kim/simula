@@ -20,17 +20,23 @@ from langgraph.types import Overwrite, Send
 from simula.application.llm_logging import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.runtime.output_schema.bundles import (
-    build_actor_action_proposal_prompt_bundle,
+    build_actor_action_narrative_prompt_bundle,
+    build_actor_action_shell_prompt_bundle,
 )
 from simula.application.workflow.graphs.runtime.proposal_contract import (
-    build_actor_proposal_repair_context,
-    validate_actor_action_proposal_semantics,
+    build_actor_action_narrative_repair_context,
+    build_actor_action_shell_repair_context,
+    validate_actor_action_narrative_semantics,
+    validate_actor_action_shell_semantics,
 )
 from simula.application.workflow.graphs.runtime.proposal_semantics import (
     normalize_actor_action_proposal,
 )
-from simula.application.workflow.graphs.runtime.prompts.actor_turn_prompt import (
-    PROMPT as ACTOR_PROPOSAL_PROMPT,
+from simula.application.workflow.graphs.runtime.prompts.actor_action_narrative_prompt import (
+    PROMPT as ACTOR_ACTION_NARRATIVE_PROMPT,
+)
+from simula.application.workflow.graphs.runtime.prompts.actor_action_shell_prompt import (
+    PROMPT as ACTOR_ACTION_SHELL_PROMPT,
 )
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
@@ -40,7 +46,6 @@ from simula.application.workflow.utils.prompt_projections import (
     build_actor_prompt_actor_view,
     build_actor_runtime_guidance_view,
     build_actor_visible_actors_view,
-    build_progression_plan_prompt_view,
     build_visible_action_context,
 )
 from simula.domain.activities import recent_actions
@@ -48,7 +53,12 @@ from simula.domain.activity_feeds import (
     list_recent_visible_activities,
     list_unseen_activities,
 )
-from simula.domain.contracts import ActionCatalog, ActorActionProposal
+from simula.domain.contracts import (
+    ActionCatalog,
+    ActorActionNarrative,
+    ActorActionProposal,
+    ActorActionShell,
+)
 from simula.domain.reporting import latest_observer_summary
 from simula.domain.runtime_actions import ActorProposalPayload, apply_actor_proposals
 
@@ -133,94 +143,170 @@ async def generate_actor_proposal(
     actor = actor_task["actor"]
     cast_id = str(actor["cast_id"])
     runtime_guidance = dict(actor_task.get("runtime_guidance", {}))
+    visible_actors = [
+        item
+        for item in list(actor_task.get("visible_actors", []))
+        if isinstance(item, dict)
+    ]
+    visible_action_context = [
+        item
+        for item in list(actor_task.get("visible_action_context", []))
+        if isinstance(item, dict)
+    ]
+    default_proposal_payload = _build_default_action_proposal(
+        actor=actor,
+        visible_actors=visible_actors,
+        runtime_guidance=runtime_guidance,
+    )
+    default_proposal = ActorActionProposal.model_validate(default_proposal_payload)
+    available_actions = [
+        cast(dict[str, object], item)
+        for item in _object_list(runtime_guidance.get("available_actions", []))
+        if isinstance(item, dict)
+    ]
+    current_intent_snapshot = cast(
+        dict[str, object],
+        runtime_guidance.get("current_intent_snapshot", {}),
+    )
+    valid_target_cast_ids = [
+        str(item.get("cast_id", ""))
+        for item in visible_actors
+        if str(item.get("cast_id", "")).strip()
+    ]
 
-    prompt = _build_actor_proposal_prompt(
+    shell_prompt = _build_actor_action_shell_prompt(
         state=state,
         actor=actor,
         focus_slice=dict(actor_task.get("focus_slice", {})),
         visible_action_context=list(actor_task.get("visible_action_context", [])),
         unread_backlog_digest=actor_task.get("unread_backlog_digest"),
-        visible_actors=list(actor_task.get("visible_actors", [])),
+        visible_actors=visible_actors,
         runtime_guidance=runtime_guidance,
         max_recipients_per_message=runtime.context.settings.runtime.max_recipients_per_message,
     )
-    proposal, meta = await runtime.context.llms.ainvoke_structured_with_meta(
+    shell, shell_meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "actor",
-        prompt,
-        ActorActionProposal,
+        shell_prompt,
+        ActorActionShell,
         allow_default_on_failure=True,
-        default_payload=_build_default_action_proposal(
+        default_payload=_build_default_action_shell(
             actor=actor,
-            visible_actors=list(actor_task.get("visible_actors", [])),
+            visible_actors=visible_actors,
             runtime_guidance=runtime_guidance,
         ),
-        semantic_validator=_build_actor_proposal_semantic_validator(
+        semantic_validator=_build_actor_action_shell_semantic_validator(
             actor=actor,
-            visible_actors=list(actor_task.get("visible_actors", [])),
+            visible_actors=visible_actors,
             runtime_guidance=runtime_guidance,
             max_recipients_per_message=runtime.context.settings.runtime.max_recipients_per_message,
         ),
-        repair_context=build_actor_proposal_repair_context(
+        repair_context=build_actor_action_shell_repair_context(
             cast_id=cast_id,
             actor_display_name=str(actor.get("display_name", cast_id)),
-            available_actions=[
-                cast(dict[str, object], item)
-                for item in _object_list(runtime_guidance.get("available_actions", []))
-                if isinstance(item, dict)
-            ],
-            valid_target_cast_ids=[
-                str(item.get("cast_id", ""))
-                for item in list(actor_task.get("visible_actors", []))
-                if str(item.get("cast_id", "")).strip()
-            ],
-            visible_actors=[
-                item
-                for item in list(actor_task.get("visible_actors", []))
-                if isinstance(item, dict)
-            ],
+            available_actions=available_actions,
+            valid_target_cast_ids=valid_target_cast_ids,
+            visible_actors=visible_actors,
             current_intent_target_cast_ids=_string_list(
-                cast(
-                    dict[str, object],
-                    runtime_guidance.get("current_intent_snapshot", {}),
-                ).get("target_cast_ids", [])
+                current_intent_snapshot.get("target_cast_ids", [])
             ),
-            recent_visible_actions=[
-                item
-                for item in list(actor_task.get("visible_action_context", []))
-                if isinstance(item, dict)
-            ],
+            recent_visible_actions=visible_action_context,
             max_target_count=runtime.context.settings.runtime.max_recipients_per_message,
         ),
-        log_context=_actor_log_context(state, actor),
-    )
-    proposal = normalize_actor_action_proposal(
-        proposal=proposal,
-        source_cast_id=cast_id,
-        visible_actors=[
-            item
-            for item in list(actor_task.get("visible_actors", []))
-            if isinstance(item, dict)
-        ],
-        visible_action_context=[
-            item
-            for item in list(actor_task.get("visible_action_context", []))
-            if isinstance(item, dict)
-        ],
-        current_intent_snapshot=cast(
-            dict[str, object],
-            runtime_guidance.get("current_intent_snapshot", {}),
+        log_context=_actor_log_context(
+            state,
+            actor,
+            task_key="actor_action_shell",
+            schema=ActorActionShell,
         ),
     )
+    total_parse_failures = int(shell_meta.parse_failure_count)
+    total_duration_seconds = float(shell_meta.duration_seconds)
+    if shell_meta.forced_default:
+        proposal = default_proposal
+        forced_default = True
+    else:
+        shell = _normalize_actor_action_shell(
+            shell=shell,
+            source_cast_id=cast_id,
+            visible_actors=visible_actors,
+            visible_action_context=visible_action_context,
+            current_intent_snapshot=current_intent_snapshot,
+        )
+        selected_action_spec = _action_spec_by_type(
+            available_actions=available_actions,
+            action_type=shell.action_type,
+        )
+        narrative_prompt = _build_actor_action_narrative_prompt(
+            state=state,
+            actor=actor,
+            focus_slice=dict(actor_task.get("focus_slice", {})),
+            visible_action_context=visible_action_context,
+            visible_actors=visible_actors,
+            runtime_guidance=runtime_guidance,
+            shell=shell,
+            selected_action_spec=selected_action_spec,
+        )
+        narrative, narrative_meta = await runtime.context.llms.ainvoke_structured_with_meta(
+            "actor",
+            narrative_prompt,
+            ActorActionNarrative,
+            allow_default_on_failure=True,
+            default_payload=_build_default_action_narrative(
+                actor=actor,
+                runtime_guidance=runtime_guidance,
+                shell=shell,
+            ),
+            semantic_validator=_build_actor_action_narrative_semantic_validator(
+                actor=actor,
+                visible_actors=visible_actors,
+                runtime_guidance=runtime_guidance,
+                shell=shell,
+                max_recipients_per_message=runtime.context.settings.runtime.max_recipients_per_message,
+            ),
+            repair_context=build_actor_action_narrative_repair_context(
+                cast_id=cast_id,
+                actor_display_name=str(actor.get("display_name", cast_id)),
+                selected_action_shell=shell,
+                selected_action_spec=selected_action_spec,
+                valid_target_cast_ids=valid_target_cast_ids,
+            ),
+            log_context=_actor_log_context(
+                state,
+                actor,
+                task_key="actor_action_narrative",
+                schema=ActorActionNarrative,
+                action_type=shell.action_type,
+            ),
+        )
+        total_parse_failures += int(narrative_meta.parse_failure_count)
+        total_duration_seconds += float(narrative_meta.duration_seconds)
+        if narrative_meta.forced_default:
+            proposal = default_proposal
+            forced_default = True
+        else:
+            proposal = _assemble_actor_action_proposal(
+                shell=shell,
+                narrative=narrative,
+            )
+            proposal = normalize_actor_action_proposal(
+                proposal=proposal,
+                source_cast_id=cast_id,
+                visible_actors=visible_actors,
+                visible_action_context=visible_action_context,
+                current_intent_snapshot=current_intent_snapshot,
+            )
+            forced_default = False
+
     _log_actor_proposal_completed(
         logger=runtime.context.logger,
         round_index=int(state["round_index"]),
         actor=actor,
         proposal=proposal,
-        forced_default=bool(meta.forced_default),
-        duration_seconds=float(meta.duration_seconds),
+        forced_default=forced_default,
+        duration_seconds=total_duration_seconds,
     )
     proposal_payload: dict[str, object]
-    if meta.forced_default:
+    if forced_default:
         proposal_payload = {}
     else:
         proposal_payload = proposal.model_dump(mode="json")
@@ -230,12 +316,67 @@ async def generate_actor_proposal(
                 "cast_id": cast_id,
                 "unread_activity_ids": list(actor_task.get("unread_activity_ids", [])),
                 "proposal": proposal_payload,
-                "forced_idle": meta.forced_default,
-                "parse_failure_count": meta.parse_failure_count,
-                "latency_seconds": meta.duration_seconds,
+                "forced_idle": forced_default,
+                "parse_failure_count": total_parse_failures,
+                "latency_seconds": total_duration_seconds,
             }
         ],
     }
+
+
+def _assemble_actor_action_proposal(
+    *,
+    shell: ActorActionShell,
+    narrative: ActorActionNarrative,
+) -> ActorActionProposal:
+    """Assemble the final actor proposal from the shell and narrative stages."""
+
+    return ActorActionProposal(
+        action_type=shell.action_type,
+        intent=narrative.intent,
+        intent_target_cast_ids=list(narrative.intent_target_cast_ids),
+        action_summary=narrative.action_summary,
+        action_detail=narrative.action_detail,
+        utterance=narrative.utterance,
+        visibility=shell.visibility,
+        target_cast_ids=list(shell.target_cast_ids),
+        thread_id=shell.thread_id,
+    )
+
+
+def _normalize_actor_action_shell(
+    *,
+    shell: ActorActionShell,
+    source_cast_id: str,
+    visible_actors: list[dict[str, object]],
+    visible_action_context: list[dict[str, object]],
+    current_intent_snapshot: dict[str, object],
+) -> ActorActionShell:
+    """Normalize the shell stage through the existing proposal normalization."""
+
+    normalized = normalize_actor_action_proposal(
+        proposal=ActorActionProposal(
+            action_type=shell.action_type,
+            intent="shell normalization",
+            intent_target_cast_ids=[],
+            action_summary="shell normalization",
+            action_detail="shell normalization",
+            utterance="",
+            visibility=shell.visibility,
+            target_cast_ids=list(shell.target_cast_ids),
+            thread_id=shell.thread_id,
+        ),
+        source_cast_id=source_cast_id,
+        visible_actors=visible_actors,
+        visible_action_context=visible_action_context,
+        current_intent_snapshot=current_intent_snapshot,
+    )
+    return ActorActionShell(
+        action_type=normalized.action_type,
+        visibility=normalized.visibility,
+        target_cast_ids=list(normalized.target_cast_ids),
+        thread_id=normalized.thread_id,
+    )
 
 
 def reduce_actor_proposals(state: SimulationWorkflowState) -> dict[str, object]:
@@ -293,7 +434,7 @@ def route_round_activities(
     }
 
 
-def _build_actor_proposal_prompt(
+def _build_actor_action_shell_prompt(
     *,
     state: SimulationWorkflowState,
     actor: dict[str, Any],
@@ -304,20 +445,8 @@ def _build_actor_proposal_prompt(
     runtime_guidance: dict[str, object],
     max_recipients_per_message: int,
 ) -> str:
-    return ACTOR_PROPOSAL_PROMPT.format(
+    return ACTOR_ACTION_SHELL_PROMPT.format(
         round_index=state["round_index"],
-        progression_plan_json=json.dumps(
-            build_progression_plan_prompt_view(
-                cast(dict[str, object], state["plan"]["progression_plan"])
-            ),
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        simulation_clock_json=json.dumps(
-            state.get("simulation_clock", {}),
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
         actor_json=json.dumps(actor, ensure_ascii=False, separators=(",", ":")),
         focus_slice_json=json.dumps(
             focus_slice if isinstance(focus_slice, dict) else {},
@@ -345,13 +474,65 @@ def _build_actor_proposal_prompt(
             separators=(",", ":"),
         ),
         max_recipients_per_message=max_recipients_per_message,
-        **build_actor_action_proposal_prompt_bundle(),
+        **build_actor_action_shell_prompt_bundle(),
+    )
+
+
+def _build_actor_action_narrative_prompt(
+    *,
+    state: SimulationWorkflowState,
+    actor: dict[str, Any],
+    focus_slice: dict[str, object],
+    visible_action_context: list[dict[str, object]],
+    visible_actors: list[dict[str, object]],
+    runtime_guidance: dict[str, object],
+    shell: ActorActionShell,
+    selected_action_spec: dict[str, object],
+) -> str:
+    return ACTOR_ACTION_NARRATIVE_PROMPT.format(
+        round_index=state["round_index"],
+        actor_json=json.dumps(actor, ensure_ascii=False, separators=(",", ":")),
+        selected_action_shell_json=json.dumps(
+            shell.model_dump(mode="json"),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        selected_action_spec_json=json.dumps(
+            selected_action_spec,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        focus_slice_json=json.dumps(
+            focus_slice if isinstance(focus_slice, dict) else {},
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        visible_action_context_json=json.dumps(
+            visible_action_context,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        visible_actors_json=json.dumps(
+            visible_actors,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        runtime_guidance_json=json.dumps(
+            runtime_guidance,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        **build_actor_action_narrative_prompt_bundle(),
     )
 
 
 def _actor_log_context(
     state: SimulationWorkflowState,
     actor: dict[str, Any],
+    *,
+    task_key: str,
+    schema: type[object],
+    action_type: str = "",
 ) -> dict[str, object]:
     runtime_guidance = state.get("actor_proposal_task", {}).get("runtime_guidance", {})
     digest = cast(
@@ -361,11 +542,11 @@ def _actor_log_context(
     return build_llm_log_context(
         scope="actor-turn",
         phase="runtime",
-        task_key="actor_action_proposal",
+        task_key=task_key,
         task_label="행동 제안",
         artifact_key="pending_actor_proposals",
         artifact_label="pending_actor_proposals",
-        schema=ActorActionProposal,
+        schema=cast(type[Any], schema),
         round_index=int(state["round_index"]),
         simulation_clock_label=str(
             cast(dict[str, object], state.get("simulation_clock", {})).get(
@@ -375,6 +556,7 @@ def _actor_log_context(
         ),
         cast_id=str(actor["cast_id"]),
         actor_display_name=actor.get("display_name"),
+        action_type=action_type,
         actor_thought=cast(
             dict[str, object],
             runtime_guidance.get("current_intent_snapshot", {}),
@@ -557,7 +739,85 @@ def _build_default_action_proposal(
     }
 
 
-def _build_actor_proposal_semantic_validator(
+def _build_default_action_shell(
+    *,
+    actor: dict[str, Any],
+    visible_actors: list[dict[str, object]],
+    runtime_guidance: dict[str, object],
+) -> dict[str, object]:
+    available_actions = [
+        cast(dict[str, object], item)
+        for item in _object_list(runtime_guidance.get("available_actions", []))
+        if isinstance(item, dict)
+    ]
+    cast_id = str(actor.get("cast_id", ""))
+    target_cast_ids = _default_target_cast_ids(
+        cast_id=cast_id,
+        visible_actors=visible_actors,
+        runtime_guidance=runtime_guidance,
+    )
+    selected_action = _select_default_action(
+        available_actions,
+        has_targets=bool(target_cast_ids),
+    )
+    supported_visibility = _string_list(selected_action.get("supported_visibility"))
+    visibility = _select_default_visibility(
+        supported_visibility=supported_visibility,
+        has_targets=bool(target_cast_ids),
+    )
+    return {
+        "action_type": _fallback_non_empty_text(
+            selected_action.get("action_type"),
+            "observe",
+        ),
+        "visibility": visibility,
+        "target_cast_ids": target_cast_ids,
+        "thread_id": "",
+    }
+
+
+def _build_default_action_narrative(
+    *,
+    actor: dict[str, Any],
+    runtime_guidance: dict[str, object],
+    shell: ActorActionShell,
+) -> dict[str, object]:
+    intent_snapshot = cast(
+        dict[str, object],
+        runtime_guidance.get("current_intent_snapshot", {}),
+    )
+    current_intent = _fallback_non_empty_text(
+        intent_snapshot.get("current_intent"),
+        "현재 상황을 조금 더 파악한다.",
+    )
+    current_thought = _fallback_non_empty_text(
+        intent_snapshot.get("thought"),
+        "아직은 관계 신호와 상대 반응을 더 읽어야 한다고 본다.",
+    )
+    digest = cast(
+        dict[str, object],
+        runtime_guidance.get("actor_facing_scenario_digest", {}),
+    )
+    talking_points = _string_list(digest.get("talking_points", []))
+    avoid_notes = _string_list(digest.get("avoid_repetition_notes", []))
+    action_summary = "이번 단계에는 즉시 큰 움직임보다 상황 파악에 집중한다."
+    action_detail = (
+        "지금 단계에서는 급하게 새로운 조치를 밀어붙이기보다, 현재 action 흐름과 상대 반응을 더 살핀다."
+    )
+    if talking_points:
+        action_summary = f"이번 단계에는 {talking_points[0]} 방향으로 반응을 정리한다."
+    if avoid_notes:
+        action_detail += f" 같은 말 반복은 피하고 {avoid_notes[0]}."
+    return {
+        "intent": current_intent,
+        "intent_target_cast_ids": list(shell.target_cast_ids),
+        "action_summary": action_summary,
+        "action_detail": f"{action_detail} 판단 근거는 {current_thought}",
+        "utterance": "",
+    }
+
+
+def _build_actor_action_shell_semantic_validator(
     *,
     actor: dict[str, Any],
     visible_actors: list[dict[str, object]],
@@ -576,9 +836,9 @@ def _build_actor_proposal_semantic_validator(
         if str(item.get("cast_id", "")).strip()
     ]
 
-    def validator(proposal: ActorActionProposal) -> list[str]:
-        return validate_actor_action_proposal_semantics(
-            proposal=proposal,
+    def validator(shell: ActorActionShell) -> list[str]:
+        return validate_actor_action_shell_semantics(
+            shell=shell,
             cast_id=cast_id,
             available_actions=available_actions,
             valid_target_cast_ids=valid_target_cast_ids,
@@ -591,6 +851,60 @@ def _build_actor_proposal_semantic_validator(
         )
 
     return validator
+
+
+def _build_actor_action_narrative_semantic_validator(
+    *,
+    actor: dict[str, Any],
+    visible_actors: list[dict[str, object]],
+    runtime_guidance: dict[str, object],
+    shell: ActorActionShell,
+    max_recipients_per_message: int,
+):
+    cast_id = str(actor.get("cast_id", ""))
+    available_actions = [
+        cast(dict[str, object], item)
+        for item in _object_list(runtime_guidance.get("available_actions", []))
+        if isinstance(item, dict)
+    ]
+    valid_target_cast_ids = [
+        str(item.get("cast_id", ""))
+        for item in visible_actors
+        if str(item.get("cast_id", "")).strip()
+    ]
+
+    def validator(narrative: ActorActionNarrative) -> list[str]:
+        return validate_actor_action_narrative_semantics(
+            narrative=narrative,
+            shell=shell,
+            cast_id=cast_id,
+            available_actions=available_actions,
+            valid_target_cast_ids=valid_target_cast_ids,
+            visible_actors=visible_actors,
+            current_intent_snapshot=cast(
+                dict[str, object],
+                runtime_guidance.get("current_intent_snapshot", {}),
+            ),
+            max_target_count=max_recipients_per_message,
+        )
+
+    return validator
+
+
+def _action_spec_by_type(
+    *,
+    available_actions: list[dict[str, object]],
+    action_type: str,
+) -> dict[str, object]:
+    for action in available_actions:
+        if str(action.get("action_type", "")).strip() == action_type:
+            return dict(action)
+    return {
+        "action_type": action_type,
+        "supported_visibility": ["public"],
+        "requires_target": False,
+        "supports_utterance": False,
+    }
 
 
 def _select_default_action(

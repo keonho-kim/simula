@@ -517,6 +517,40 @@ class ActorActionProposal(BaseModel):
         return self
 
 
+class ActorActionShell(BaseModel):
+    """Action shell chosen before narrative details are filled."""
+
+    action_type: str
+    visibility: VisibilityType
+    target_cast_ids: list[str]
+    thread_id: str
+
+    @model_validator(mode="after")
+    def validate_actor_action_shell(self) -> "ActorActionShell":
+        if not self.action_type.strip():
+            raise ValueError("action_type must not be empty.")
+        if self.visibility == "group" and not self.target_cast_ids:
+            raise ValueError("group proposals require target_cast_ids.")
+        return self
+
+
+class ActorActionNarrative(BaseModel):
+    """Narrative fields filled after the action shell is fixed."""
+
+    intent: str
+    intent_target_cast_ids: list[str]
+    action_summary: str
+    action_detail: str
+    utterance: str
+
+    @model_validator(mode="after")
+    def validate_actor_action_narrative(self) -> "ActorActionNarrative":
+        for field_name in ("intent", "action_summary", "action_detail"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        return self
+
+
 class CanonicalAction(BaseModel):
     """Persisted canonical action."""
 

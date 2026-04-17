@@ -11,7 +11,12 @@ from __future__ import annotations
 from simula.application.workflow.graphs.runtime.proposal_semantics import (
     infer_target_cast_ids,
 )
-from simula.domain.contracts import ActorActionProposal
+from simula.domain.contracts import (
+    ActorActionNarrative,
+    ActorActionProposal,
+    ActorActionShell,
+    VisibilityType,
+)
 
 _ACTOR_PROPOSAL_TARGET_RULES: tuple[str, ...] = (
     "For `group` visibility, `target_cast_ids` must contain at least one real visible other actor `cast_id`.",
@@ -114,6 +119,61 @@ def validate_actor_action_proposal_semantics(
     return issues
 
 
+def validate_actor_action_shell_semantics(
+    *,
+    shell: ActorActionShell,
+    cast_id: str,
+    available_actions: list[dict[str, object]],
+    valid_target_cast_ids: list[str],
+    visible_actors: list[dict[str, object]],
+    current_intent_snapshot: dict[str, object],
+    max_target_count: int,
+) -> list[str]:
+    """Return semantic contract violations for one actor action shell."""
+
+    return _validate_action_core_semantics(
+        action_type=shell.action_type,
+        visibility=shell.visibility,
+        target_cast_ids=shell.target_cast_ids,
+        intent_target_cast_ids=[],
+        utterance="",
+        cast_id=cast_id,
+        available_actions=available_actions,
+        valid_target_cast_ids=valid_target_cast_ids,
+        visible_actors=visible_actors,
+        current_intent_snapshot=current_intent_snapshot,
+        max_target_count=max_target_count,
+    )
+
+
+def validate_actor_action_narrative_semantics(
+    *,
+    narrative: ActorActionNarrative,
+    shell: ActorActionShell,
+    cast_id: str,
+    available_actions: list[dict[str, object]],
+    valid_target_cast_ids: list[str],
+    visible_actors: list[dict[str, object]],
+    current_intent_snapshot: dict[str, object],
+    max_target_count: int,
+) -> list[str]:
+    """Return semantic contract violations for one actor narrative."""
+
+    return _validate_action_core_semantics(
+        action_type=shell.action_type,
+        visibility=shell.visibility,
+        target_cast_ids=shell.target_cast_ids,
+        intent_target_cast_ids=narrative.intent_target_cast_ids,
+        utterance=narrative.utterance,
+        cast_id=cast_id,
+        available_actions=available_actions,
+        valid_target_cast_ids=valid_target_cast_ids,
+        visible_actors=visible_actors,
+        current_intent_snapshot=current_intent_snapshot,
+        max_target_count=max_target_count,
+    )
+
+
 def build_actor_proposal_repair_context(
     *,
     cast_id: str,
@@ -213,6 +273,119 @@ def build_actor_proposal_repair_context(
         "max_target_count": max_target_count,
         "repair_guidance": repair_guidance,
     }
+
+
+def build_actor_action_shell_repair_context(
+    *,
+    cast_id: str,
+    actor_display_name: str,
+    available_actions: list[dict[str, object]],
+    valid_target_cast_ids: list[str],
+    visible_actors: list[dict[str, object]],
+    current_intent_target_cast_ids: list[str],
+    recent_visible_actions: list[dict[str, object]],
+    max_target_count: int,
+) -> dict[str, object]:
+    """Build repair context for the action shell stage."""
+
+    context = build_actor_proposal_repair_context(
+        cast_id=cast_id,
+        actor_display_name=actor_display_name,
+        available_actions=available_actions,
+        valid_target_cast_ids=valid_target_cast_ids,
+        visible_actors=visible_actors,
+        current_intent_target_cast_ids=current_intent_target_cast_ids,
+        recent_visible_actions=recent_visible_actions,
+        max_target_count=max_target_count,
+    )
+    raw_repair_guidance = context.get("repair_guidance", [])
+    repair_guidance = (
+        list(raw_repair_guidance)
+        if isinstance(raw_repair_guidance, list)
+        else []
+    )
+    repair_guidance.append(
+        "In this shell step, return only action_type, visibility, target_cast_ids, and thread_id."
+    )
+    repair_guidance.append(
+        "Do not change the chosen action later by inventing a different action_type during repair."
+    )
+    return {
+        **context,
+        "repair_guidance": repair_guidance,
+    }
+
+
+def build_actor_action_narrative_repair_context(
+    *,
+    cast_id: str,
+    actor_display_name: str,
+    selected_action_shell: ActorActionShell,
+    selected_action_spec: dict[str, object],
+    valid_target_cast_ids: list[str],
+) -> dict[str, object]:
+    """Build repair context for the action narrative stage."""
+
+    supports_utterance = bool(selected_action_spec.get("supports_utterance", False))
+    repair_guidance = [
+        "Do not change the selected action shell. Keep the fixed action_type, visibility, target_cast_ids, and thread_id.",
+        "Do not swap to a different action_type just to make the JSON pass validation.",
+    ]
+    if supports_utterance:
+        repair_guidance.append(
+            "This action may include a spoken line, but `utterance` may still be an empty string if no line is needed."
+        )
+    else:
+        repair_guidance.append(
+            "This action does not support utterance. Return `utterance` as an empty string."
+        )
+    repair_guidance.append(
+        "intent_target_cast_ids may contain only cast ids already present in the selected shell target_cast_ids."
+    )
+    return {
+        "cast_id": cast_id,
+        "actor_display_name": actor_display_name,
+        "selected_action_shell": selected_action_shell.model_dump(mode="json"),
+        "selected_action_spec": dict(selected_action_spec),
+        "valid_target_cast_ids": valid_target_cast_ids,
+        "repair_guidance": repair_guidance,
+    }
+
+
+def _validate_action_core_semantics(
+    *,
+    action_type: str,
+    visibility: VisibilityType,
+    target_cast_ids: list[str],
+    intent_target_cast_ids: list[str],
+    utterance: str,
+    cast_id: str,
+    available_actions: list[dict[str, object]],
+    valid_target_cast_ids: list[str],
+    visible_actors: list[dict[str, object]],
+    current_intent_snapshot: dict[str, object],
+    max_target_count: int,
+) -> list[str]:
+    proposal = ActorActionProposal(
+        action_type=action_type,
+        intent="semantic placeholder",
+        intent_target_cast_ids=list(intent_target_cast_ids),
+        action_summary="semantic placeholder",
+        action_detail="semantic placeholder",
+        utterance=utterance,
+        visibility=visibility,
+        target_cast_ids=list(target_cast_ids),
+        thread_id="",
+    )
+    return validate_actor_action_proposal_semantics(
+        proposal=proposal,
+        cast_id=cast_id,
+        available_actions=available_actions,
+        valid_target_cast_ids=valid_target_cast_ids,
+        visible_actors=visible_actors,
+        current_intent_snapshot=current_intent_snapshot,
+        max_target_count=max_target_count,
+    )
 
 
 def _string_list(value: object) -> list[str]:

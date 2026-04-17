@@ -49,6 +49,29 @@ from simula.domain.contracts import (
 from simula.domain.log_events import build_plan_finalized_event
 
 _PLAN_CAST_CHUNK_SIZE = 5
+_SPEAKING_ACTION_KEYWORDS = (
+    "exposure",
+    "reaction",
+    "review",
+    "sharing",
+    "share",
+    "speech",
+    "conversation",
+    "dialogue",
+    "comment",
+    "question",
+    "recommend",
+    "response",
+    "발화",
+    "대화",
+    "후기",
+    "공유",
+    "반응",
+    "질문",
+    "추천",
+    "코멘트",
+    "의견",
+)
 
 
 async def build_planning_analysis(
@@ -471,6 +494,11 @@ def validate_execution_plan_frame_semantics(
     """Return semantic issues for the execution-plan frame."""
 
     issues: list[str] = []
+    issues.extend(
+        _validate_action_catalog_semantics(
+            action_catalog=execution_plan_frame.action_catalog.model_dump(mode="json")
+        )
+    )
     cast_roster = cast(
         list[dict[str, object]],
         [
@@ -507,8 +535,38 @@ def build_execution_plan_frame_repair_context(
             "Keep `action_catalog.actions` at 5 items or fewer.",
             "Keep `major_events` at 6 items or fewer.",
             "Use only the provided cast ids in `major_events.participant_cast_ids`.",
+            "Set `supports_utterance` to true for speaking, reaction, sharing, or conversation actions.",
+            "Set `supports_utterance` to false for silent inspection, silent sampling, observation, or purchase-only actions.",
         ],
     }
+
+
+def _validate_action_catalog_semantics(
+    *,
+    action_catalog: dict[str, object],
+) -> list[str]:
+    issues: list[str] = []
+    for raw_action in cast(list[object], action_catalog.get("actions", [])):
+        if not isinstance(raw_action, dict):
+            continue
+        action = cast(dict[str, object], raw_action)
+        action_type = str(action.get("action_type", "")).strip()
+        action_text = " ".join(
+            [
+                action_type.lower(),
+                str(action.get("label", "")).strip().lower(),
+                str(action.get("description", "")).strip().lower(),
+            ]
+        )
+        supports_utterance = bool(action.get("supports_utterance", False))
+        if (
+            any(keyword in action_text for keyword in _SPEAKING_ACTION_KEYWORDS)
+            and not supports_utterance
+        ):
+            issues.append(
+                f"action_type `{action_type}` 는 말/반응/공유 성격이므로 supports_utterance=true 여야 합니다."
+            )
+    return issues
 
 
 def validate_plan_cast_chunk_semantics(
