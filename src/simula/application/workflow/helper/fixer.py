@@ -105,6 +105,10 @@ _KNOWN_VALIDATION_RULES: dict[str, tuple[str, ...]] = {
         "major_events must use unique event_id values.",
         "major_events must contain at most 6 items.",
     ),
+    "MajorEventPlanBatch": (
+        "major_events must use unique event_id values.",
+        "major_events must contain at most 6 items.",
+    ),
     "ExecutionPlanBundle": (
         "major_events must use unique event_id values.",
         "major_events must contain at most 6 items.",
@@ -118,6 +122,10 @@ _KNOWN_VALIDATION_RULES: dict[str, tuple[str, ...]] = {
         "action_summary must not be empty.",
         "action_detail must not be empty.",
     ),
+    "RoundDirectiveFocusCore": (
+        "focus_summary must not be empty.",
+        "selection_reason must not be empty.",
+    ),
     "MajorEventPlanItem": (
         "participant_cast_ids must not be empty.",
         "completion_action_types must not be empty.",
@@ -125,6 +133,24 @@ _KNOWN_VALIDATION_RULES: dict[str, tuple[str, ...]] = {
         "participant_cast_ids must be unique.",
         "completion_action_types must be unique.",
         "earliest_round must be less than or equal to latest_round.",
+    ),
+    "MajorEventUpdateBatch": (
+        "event_updates must use unique event_id values.",
+    ),
+    "ObserverReportBody": (
+        "summary must not be empty.",
+        "atmosphere must not be empty.",
+    ),
+    "ActorFacingScenarioDigestBody": (
+        "relationship_map_summary must not be empty.",
+        "recommended_tone must not be empty.",
+        "current_pressures must not be empty.",
+        "talking_points must not be empty.",
+        "avoid_repetition_notes must not be empty.",
+    ),
+    "RoundResolutionCore": (
+        "adopted_cast_ids must be unique.",
+        "world_state_summary must not be empty.",
     ),
 }
 

@@ -22,10 +22,14 @@ from simula.application.workflow.graphs.planning.nodes.planner import (
     validate_execution_plan_frame_semantics,
 )
 from simula.domain.contracts import (
+    ActionCatalog,
     CastRoster,
     CastRosterOutlineBundle,
+    CoordinationFrame,
     ExecutionPlanFrameBundle,
+    MajorEventPlanBatch,
     PlanningAnalysis,
+    SituationBundle,
 )
 
 
@@ -146,25 +150,27 @@ def test_build_execution_plan_frame_returns_required_frame() -> None:
     class FakeLLM:
         async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             assert role == "planner"
-            assert schema is ExecutionPlanFrameBundle
-            assert "at most 5 items" in prompt
-            assert "at most 6 items" in prompt
-            semantic_validator = kwargs["semantic_validator"]
-            repair_context = kwargs["repair_context"]
-            parsed = ExecutionPlanFrameBundle(
-                situation={
-                    "simulation_objective": "위기 추적",
-                    "world_summary": "요약",
-                    "initial_tensions": ["긴장"],
-                    "channel_guidance": {
-                        "public": "공개",
-                        "private": "비공개",
-                        "group": "그룹",
-                    },
-                    "current_constraints": ["제약"],
-                },
-                action_catalog={
-                    "actions": [
+            if schema is SituationBundle:
+                return (
+                    SituationBundle(
+                        simulation_objective="위기 추적",
+                        world_summary="요약",
+                        initial_tensions=["긴장"],
+                        channel_guidance={
+                            "public": "공개",
+                            "private": "비공개",
+                            "group": "그룹",
+                        },
+                        current_constraints=["제약"],
+                    ),
+                    _FakeMeta(),
+                )
+            if schema is ActionCatalog:
+                assert "at most 5 items" in prompt
+                semantic_validator = kwargs["semantic_validator"]
+                repair_context = kwargs["repair_context"]
+                parsed = ActionCatalog(
+                    actions=[
                         {
                             "action_type": "speech",
                             "label": "발화",
@@ -174,21 +180,31 @@ def test_build_execution_plan_frame_returns_required_frame() -> None:
                             "supports_utterance": True,
                         }
                     ],
-                    "selection_guidance": ["상황에 맞게 고른다."],
-                },
-                coordination_frame={
-                    "focus_selection_rules": ["직접 압박을 본다."],
-                    "background_motion_rules": ["배경은 요약한다."],
-                    "focus_archetypes": ["직접 충돌"],
-                    "attention_shift_rules": ["조용한 actor도 끌어올린다."],
-                    "budget_guidance": ["소수만 직접 본다."],
-                },
-                major_events=[],
-            )
-            assert semantic_validator(parsed) == []
-            assert repair_context["max_actions"] == 5
-            assert repair_context["max_major_events"] == 6
-            return parsed, _FakeMeta()
+                    selection_guidance=["상황에 맞게 고른다."],
+                )
+                assert semantic_validator(parsed) == []
+                assert repair_context["max_actions"] == 5
+                return parsed, _FakeMeta()
+            if schema is CoordinationFrame:
+                return (
+                    CoordinationFrame(
+                        focus_selection_rules=["직접 압박을 본다."],
+                        background_motion_rules=["배경은 요약한다."],
+                        focus_archetypes=["직접 충돌"],
+                        attention_shift_rules=["조용한 actor도 끌어올린다."],
+                        budget_guidance=["소수만 직접 본다."],
+                    ),
+                    _FakeMeta(),
+                )
+            if schema is MajorEventPlanBatch:
+                assert "at most 6 items" in prompt
+                semantic_validator = kwargs["semantic_validator"]
+                repair_context = kwargs["repair_context"]
+                parsed = MajorEventPlanBatch(major_events=[])
+                assert semantic_validator(parsed) == []
+                assert repair_context["max_major_events"] == 6
+                return parsed, _FakeMeta()
+            raise AssertionError(f"unexpected schema: {schema}")
 
     state = {
         "scenario": "등장인물 1명이 있는 테스트 시나리오",

@@ -14,22 +14,34 @@ from langgraph.types import Overwrite, Send
 from simula.application.llm_logging import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.planning.output_schema.bundles import (
+    build_action_catalog_prompt_bundle,
     build_cast_roster_outline_prompt_bundle,
-    build_execution_plan_frame_prompt_bundle,
+    build_coordination_frame_prompt_bundle,
+    build_major_event_plan_batch_prompt_bundle,
     build_plan_cast_chunk_prompt_bundle,
     build_planning_analysis_prompt_bundle,
+    build_situation_prompt_bundle,
+)
+from simula.application.workflow.graphs.planning.prompts.build_action_catalog_prompt import (
+    PROMPT as BUILD_ACTION_CATALOG_PROMPT,
 )
 from simula.application.workflow.graphs.planning.prompts.build_cast_roster_outline_prompt import (
     PROMPT as BUILD_CAST_ROSTER_OUTLINE_PROMPT,
 )
-from simula.application.workflow.graphs.planning.prompts.build_execution_plan_prompt import (
-    PROMPT as BUILD_EXECUTION_PLAN_PROMPT,
+from simula.application.workflow.graphs.planning.prompts.build_coordination_frame_prompt import (
+    PROMPT as BUILD_COORDINATION_FRAME_PROMPT,
+)
+from simula.application.workflow.graphs.planning.prompts.build_major_event_plan_batch_prompt import (
+    PROMPT as BUILD_MAJOR_EVENT_PLAN_BATCH_PROMPT,
 )
 from simula.application.workflow.graphs.planning.prompts.build_plan_cast_chunk_prompt import (
     PROMPT as BUILD_PLAN_CAST_CHUNK_PROMPT,
 )
 from simula.application.workflow.graphs.planning.prompts.build_planning_analysis_prompt import (
     PROMPT as BUILD_PLANNING_ANALYSIS_PROMPT,
+)
+from simula.application.workflow.graphs.planning.prompts.build_situation_prompt import (
+    PROMPT as BUILD_SITUATION_PROMPT,
 )
 from simula.application.workflow.graphs.planning.states.state import (
     GeneratedPlanCastResult,
@@ -40,11 +52,15 @@ from simula.application.workflow.graphs.simulation.states.state import (
 )
 from simula.application.workflow.utils.streaming import record_simulation_log_event
 from simula.domain.contracts import (
+    ActionCatalog,
     CastRoster,
     CastRosterOutlineBundle,
     CastRosterOutlineItem,
+    CoordinationFrame,
     ExecutionPlanFrameBundle,
+    MajorEventPlanBatch,
     PlanningAnalysis,
+    SituationBundle,
 )
 from simula.domain.log_events import build_plan_finalized_event
 
@@ -171,52 +187,161 @@ async def build_execution_plan_frame(
 ) -> dict[str, object]:
     """Build the execution-plan frame without the full cast roster."""
 
-    prompt = BUILD_EXECUTION_PLAN_PROMPT.format(
-        scenario_text=state["scenario"],
-        planning_analysis_json=json.dumps(
-            state["planning_analysis"],
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        cast_roster_outline_json=json.dumps(
-            state["cast_roster_outline"],
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        max_rounds=state["max_rounds"],
-        **build_execution_plan_frame_prompt_bundle(),
+    planning_analysis_json = json.dumps(
+        state["planning_analysis"],
+        ensure_ascii=False,
+        separators=(",", ":"),
     )
-    frame_bundle, meta = await runtime.context.llms.ainvoke_structured_with_meta(
+    cast_roster_outline_json = json.dumps(
+        state["cast_roster_outline"],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    cast_roster_outline = build_cast_roster_outline_model(state["cast_roster_outline"])
+    planned_max_rounds = int(state["planned_max_rounds"])
+
+    total_duration_seconds = 0.0
+
+    situation_prompt = BUILD_SITUATION_PROMPT.format(
+        scenario_text=state["scenario"],
+        planning_analysis_json=planning_analysis_json,
+        **build_situation_prompt_bundle(),
+    )
+    situation, situation_meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "planner",
-        prompt,
-        ExecutionPlanFrameBundle,
+        situation_prompt,
+        SituationBundle,
         log_context=build_llm_log_context(
             scope="execution-plan-frame",
             phase="planning",
-            task_key="execution_plan_frame",
+            task_key="execution_plan_situation",
             task_label="실행 계획 프레임 정리",
             artifact_key="execution_plan_frame",
             artifact_label="execution_plan_frame",
-            schema=ExecutionPlanFrameBundle,
-        ),
-        semantic_validator=lambda parsed: validate_execution_plan_frame_semantics(
-            execution_plan_frame=parsed,
-            cast_roster_outline=build_cast_roster_outline_model(
-                state["cast_roster_outline"]
-            ),
-            planned_max_rounds=int(state["planned_max_rounds"]),
-        ),
-        repair_context=build_execution_plan_frame_repair_context(
-            cast_roster_outline=build_cast_roster_outline_model(
-                state["cast_roster_outline"]
-            ),
-            planned_max_rounds=int(state["planned_max_rounds"]),
+            schema=SituationBundle,
         ),
     )
+    total_duration_seconds += float(situation_meta.duration_seconds)
+
+    action_catalog_prompt = BUILD_ACTION_CATALOG_PROMPT.format(
+        scenario_text=state["scenario"],
+        planning_analysis_json=planning_analysis_json,
+        **build_action_catalog_prompt_bundle(),
+    )
+    action_catalog, action_catalog_meta = (
+        await runtime.context.llms.ainvoke_structured_with_meta(
+            "planner",
+            action_catalog_prompt,
+            ActionCatalog,
+            semantic_validator=lambda parsed: _validate_action_catalog_semantics(
+                action_catalog=parsed.model_dump(mode="json")
+            ),
+            repair_context=build_action_catalog_repair_context(),
+            log_context=build_llm_log_context(
+                scope="execution-plan-frame",
+                phase="planning",
+                task_key="execution_plan_action_catalog",
+                task_label="실행 계획 프레임 정리",
+                artifact_key="execution_plan_frame",
+                artifact_label="execution_plan_frame",
+                schema=ActionCatalog,
+            ),
+        )
+    )
+    total_duration_seconds += float(action_catalog_meta.duration_seconds)
+
+    coordination_frame_prompt = BUILD_COORDINATION_FRAME_PROMPT.format(
+        scenario_text=state["scenario"],
+        planning_analysis_json=planning_analysis_json,
+        cast_roster_outline_json=cast_roster_outline_json,
+        situation_json=json.dumps(
+            situation.model_dump(mode="json"),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        action_catalog_json=json.dumps(
+            action_catalog.model_dump(mode="json"),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        **build_coordination_frame_prompt_bundle(),
+    )
+    coordination_frame, coordination_frame_meta = (
+        await runtime.context.llms.ainvoke_structured_with_meta(
+            "planner",
+            coordination_frame_prompt,
+            CoordinationFrame,
+            log_context=build_llm_log_context(
+                scope="execution-plan-frame",
+                phase="planning",
+                task_key="execution_plan_coordination_frame",
+                task_label="실행 계획 프레임 정리",
+                artifact_key="execution_plan_frame",
+                artifact_label="execution_plan_frame",
+                schema=CoordinationFrame,
+            ),
+        )
+    )
+    total_duration_seconds += float(coordination_frame_meta.duration_seconds)
+
+    major_event_prompt = BUILD_MAJOR_EVENT_PLAN_BATCH_PROMPT.format(
+        scenario_text=state["scenario"],
+        planning_analysis_json=planning_analysis_json,
+        cast_roster_outline_json=cast_roster_outline_json,
+        action_catalog_json=json.dumps(
+            action_catalog.model_dump(mode="json"),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        planned_max_rounds=planned_max_rounds,
+        **build_major_event_plan_batch_prompt_bundle(),
+    )
+    major_event_batch, major_event_meta = (
+        await runtime.context.llms.ainvoke_structured_with_meta(
+            "planner",
+            major_event_prompt,
+            MajorEventPlanBatch,
+            semantic_validator=lambda parsed: validate_major_event_plan_batch_semantics(
+                major_event_batch=parsed,
+                cast_roster_outline=cast_roster_outline,
+                action_catalog=action_catalog,
+                planned_max_rounds=planned_max_rounds,
+            ),
+            repair_context=build_major_event_plan_batch_repair_context(
+                cast_roster_outline=cast_roster_outline,
+                action_catalog=action_catalog,
+                planned_max_rounds=planned_max_rounds,
+            ),
+            log_context=build_llm_log_context(
+                scope="execution-plan-frame",
+                phase="planning",
+                task_key="execution_plan_major_events",
+                task_label="실행 계획 프레임 정리",
+                artifact_key="execution_plan_frame",
+                artifact_label="execution_plan_frame",
+                schema=MajorEventPlanBatch,
+            ),
+        )
+    )
+    total_duration_seconds += float(major_event_meta.duration_seconds)
+
+    frame_bundle = ExecutionPlanFrameBundle(
+        situation=situation,
+        action_catalog=action_catalog,
+        coordination_frame=coordination_frame,
+        major_events=major_event_batch.major_events,
+    )
+    semantic_issues = validate_execution_plan_frame_semantics(
+        execution_plan_frame=frame_bundle,
+        cast_roster_outline=cast_roster_outline,
+        planned_max_rounds=planned_max_rounds,
+    )
+    if semantic_issues:
+        raise ValueError("; ".join(semantic_issues))
     return {
         "execution_plan_frame": frame_bundle.model_dump(mode="json"),
         "planning_latency_seconds": float(state["planning_latency_seconds"])
-        + meta.duration_seconds,
+        + total_duration_seconds,
     }
 
 
@@ -537,6 +662,85 @@ def build_execution_plan_frame_repair_context(
             "Use only the provided cast ids in `major_events.participant_cast_ids`.",
             "Set `supports_utterance` to true for speaking, reaction, sharing, or conversation actions.",
             "Set `supports_utterance` to false for silent inspection, silent sampling, observation, or purchase-only actions.",
+        ],
+    }
+
+
+def build_action_catalog_repair_context() -> dict[str, object]:
+    """Build repair context for the action catalog stage."""
+
+    return {
+        "max_actions": 5,
+        "repair_guidance": [
+            "Keep `actions` at 5 items or fewer.",
+            "Keep `action_type` values unique.",
+            "Set `supports_utterance` to true for speaking, reaction, sharing, or conversation actions.",
+            "Set `supports_utterance` to false for silent inspection, silent sampling, observation, or purchase-only actions.",
+        ],
+    }
+
+
+def validate_major_event_plan_batch_semantics(
+    *,
+    major_event_batch: MajorEventPlanBatch,
+    cast_roster_outline: CastRosterOutlineBundle,
+    action_catalog: ActionCatalog,
+    planned_max_rounds: int,
+) -> list[str]:
+    """Return semantic issues for the major-event batch stage."""
+
+    issues: list[str] = []
+    cast_roster = cast(
+        list[dict[str, object]],
+        [
+            {"cast_id": item.cast_id, "display_name": item.display_name}
+            for item in cast_roster_outline.items
+        ],
+    )
+    try:
+        _validate_major_events(
+            major_events=[
+                item.model_dump(mode="json") for item in major_event_batch.major_events
+            ],
+            cast_roster=cast_roster,
+            planned_max_rounds=planned_max_rounds,
+        )
+    except ValueError as exc:
+        issues.append(str(exc))
+    allowed_action_types = {
+        item.action_type for item in action_catalog.actions
+    }
+    for event in major_event_batch.major_events:
+        invalid_action_types = [
+            action_type
+            for action_type in event.completion_action_types
+            if action_type not in allowed_action_types
+        ]
+        if invalid_action_types:
+            issues.append(
+                f"major event `{event.event_id}` 의 completion_action_types가 action catalog에 없습니다: {', '.join(invalid_action_types)}"
+            )
+    return issues
+
+
+def build_major_event_plan_batch_repair_context(
+    *,
+    cast_roster_outline: CastRosterOutlineBundle,
+    action_catalog: ActionCatalog,
+    planned_max_rounds: int,
+) -> dict[str, object]:
+    """Build repair context for the major-event batch stage."""
+
+    return {
+        "valid_cast_ids": [item.cast_id for item in cast_roster_outline.items],
+        "valid_action_types": [item.action_type for item in action_catalog.actions],
+        "max_major_events": 6,
+        "planned_max_rounds": planned_max_rounds,
+        "repair_guidance": [
+            "Use only the provided cast ids in `participant_cast_ids`.",
+            "Use only the provided action types in `completion_action_types`.",
+            "Keep `completion_signals` as a non-empty array of strings.",
+            "Keep `major_events` at 6 items or fewer.",
         ],
     }
 

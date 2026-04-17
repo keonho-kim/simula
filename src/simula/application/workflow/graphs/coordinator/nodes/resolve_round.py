@@ -15,10 +15,22 @@ from pydantic import ValidationError
 from simula.application.llm_logging import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.coordinator.output_schema.bundles import (
-    build_round_resolution_prompt_bundle,
+    build_actor_intent_state_batch_prompt_bundle,
+    build_major_event_update_batch_prompt_bundle,
+    build_round_resolution_core_prompt_bundle,
+    build_round_resolution_narrative_bodies_prompt_bundle,
 )
-from simula.application.workflow.graphs.coordinator.prompts.round_resolution_prompt import (
-    PROMPT as STEP_RESOLUTION_PROMPT,
+from simula.application.workflow.graphs.coordinator.prompts.actor_intent_state_batch_prompt import (
+    PROMPT as ACTOR_INTENT_STATE_BATCH_PROMPT,
+)
+from simula.application.workflow.graphs.coordinator.prompts.major_event_update_batch_prompt import (
+    PROMPT as MAJOR_EVENT_UPDATE_BATCH_PROMPT,
+)
+from simula.application.workflow.graphs.coordinator.prompts.round_resolution_core_prompt import (
+    PROMPT as ROUND_RESOLUTION_CORE_PROMPT,
+)
+from simula.application.workflow.graphs.coordinator.prompts.round_resolution_narrative_bodies_prompt import (
+    PROMPT as ROUND_RESOLUTION_NARRATIVE_BODIES_PROMPT,
 )
 from simula.application.workflow.graphs.runtime.proposal_contract import (
     validate_actor_action_proposal_semantics,
@@ -42,6 +54,12 @@ from simula.application.workflow.utils.prompt_projections import (
 from simula.domain.contracts import (
     ActionCatalog,
     ActorActionProposal,
+    ActorIntentStateBatch,
+    ActorFacingScenarioDigest,
+    MajorEventUpdateBatch,
+    ObserverReport,
+    RoundResolutionCore,
+    RoundResolutionNarrativeBodies,
     RoundResolution,
     RuntimeProgressionPlan,
 )
@@ -109,106 +127,315 @@ async def resolve_round(
             if str(item.get("cast_id", "")).strip()
         ],
     ]
-    prompt = STEP_RESOLUTION_PROMPT.format(
-        round_index=state["round_index"],
-        round_focus_plan_json=json.dumps(
-            state["round_focus_plan"],
-            ensure_ascii=False,
-            separators=(",", ":"),
+    round_focus_plan_json = json.dumps(
+        state["round_focus_plan"],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    pending_actor_proposals_json = json.dumps(
+        build_compact_pending_actor_proposals(pending_actor_proposals),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    latest_background_updates_json = json.dumps(
+        build_compact_background_updates(latest_background_updates),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    latest_activities_json = json.dumps(
+        latest_action_views,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    situation_json = json.dumps(
+        build_planning_situation_view(cast(dict[str, object], plan.get("situation", {}))),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    coordination_frame_json = json.dumps(
+        build_planning_coordination_frame_view(
+            cast(dict[str, object], plan.get("coordination_frame", {}))
         ),
-        pending_actor_proposals_json=json.dumps(
-            build_compact_pending_actor_proposals(pending_actor_proposals),
-            ensure_ascii=False,
-            separators=(",", ":"),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    actor_intent_states_json = json.dumps(
+        build_relevant_intent_states(
+            list(state["actor_intent_states"]),
+            relevant_cast_ids=relevant_cast_ids,
         ),
-        latest_background_updates_json=json.dumps(
-            build_compact_background_updates(latest_background_updates),
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        latest_activities_json=json.dumps(
-            latest_action_views,
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        situation_json=json.dumps(
-            build_planning_situation_view(cast(dict[str, object], plan.get("situation", {}))),
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        coordination_frame_json=json.dumps(
-            build_planning_coordination_frame_view(
-                cast(dict[str, object], plan.get("coordination_frame", {}))
-            ),
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        actor_intent_states_json=json.dumps(
-            build_relevant_intent_states(
-                list(state["actor_intent_states"]),
-                relevant_cast_ids=relevant_cast_ids,
-            ),
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        actor_facing_scenario_digest_json=json.dumps(
-            state.get("actor_facing_scenario_digest", {}),
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        simulation_clock_json=json.dumps(
-            state["simulation_clock"],
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        stagnation_rounds=int(state["stagnation_rounds"]),
-        progression_plan_json=json.dumps(
-            build_progression_plan_prompt_view(
-                cast(dict[str, object], plan["progression_plan"])
-            ),
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        event_memory_json=json.dumps(
-            build_event_memory_prompt_view(
-                state.get("event_memory", {}),
-                limit=5,
-            ),
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        event_match_hints_json=json.dumps(
-            pending_event_match_hints,
-            ensure_ascii=False,
-            separators=(",", ":"),
-        ),
-        world_state_summary=truncate_text(
-            state["world_state_summary"],
-            WORLD_STATE_SUMMARY_LIMIT,
-        ),
-        **build_round_resolution_prompt_bundle(),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    actor_facing_scenario_digest_json = json.dumps(
+        state.get("actor_facing_scenario_digest", {}),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    simulation_clock_json = json.dumps(
+        state["simulation_clock"],
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    progression_plan_json = json.dumps(
+        build_progression_plan_prompt_view(cast(dict[str, object], plan["progression_plan"])),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    event_memory_json = json.dumps(
+        build_event_memory_prompt_view(state.get("event_memory", {}), limit=5),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    event_match_hints_json = json.dumps(
+        pending_event_match_hints,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    truncated_world_state_summary = truncate_text(
+        state["world_state_summary"],
+        WORLD_STATE_SUMMARY_LIMIT,
     )
     default_payload = _build_default_round_resolution_payload(
         state,
         event_updates=pending_event_match_hints["suggested_updates"],
     )
-    resolution, meta = await runtime.context.llms.ainvoke_structured_with_meta(
+    total_parse_failures = 0
+    total_duration_seconds = 0.0
+
+    core_prompt = ROUND_RESOLUTION_CORE_PROMPT.format(
+        round_index=state["round_index"],
+        round_focus_plan_json=round_focus_plan_json,
+        pending_actor_proposals_json=pending_actor_proposals_json,
+        latest_background_updates_json=latest_background_updates_json,
+        latest_activities_json=latest_activities_json,
+        situation_json=situation_json,
+        coordination_frame_json=coordination_frame_json,
+        simulation_clock_json=simulation_clock_json,
+        stagnation_rounds=int(state["stagnation_rounds"]),
+        progression_plan_json=progression_plan_json,
+        event_memory_json=event_memory_json,
+        world_state_summary=truncated_world_state_summary,
+        **build_round_resolution_core_prompt_bundle(),
+    )
+    resolution_core, core_meta = await runtime.context.llms.ainvoke_structured_with_meta(
         "coordinator",
-        prompt,
-        RoundResolution,
+        core_prompt,
+        RoundResolutionCore,
         allow_default_on_failure=True,
-        default_payload=default_payload,
+        default_payload=_build_default_round_resolution_core_payload(
+            default_resolution=default_payload
+        ),
+        semantic_validator=lambda parsed: validate_round_resolution_core_semantics(
+            resolution_core=parsed,
+            pending_actor_proposals=cast(
+                list[dict[str, object]],
+                list(state["pending_actor_proposals"]),
+            ),
+        ),
+        repair_context=build_round_resolution_core_repair_context(
+            pending_actor_proposals=cast(
+                list[dict[str, object]],
+                list(state["pending_actor_proposals"]),
+            ),
+        ),
         log_context=build_llm_log_context(
             scope="round-resolution",
             phase="runtime",
-            task_key="round_resolution",
+            task_key="round_resolution_core",
             task_label="라운드 해소",
             artifact_key="round_resolution",
             artifact_label="round_resolution",
-            schema=RoundResolution,
+            schema=RoundResolutionCore,
             round_index=int(state["round_index"]),
         ),
     )
+    total_parse_failures += int(core_meta.parse_failure_count)
+    total_duration_seconds += float(core_meta.duration_seconds)
+    forced_default = bool(core_meta.forced_default)
+    if forced_default:
+        resolution = RoundResolution.model_validate(default_payload)
+    else:
+        event_batch_prompt = MAJOR_EVENT_UPDATE_BATCH_PROMPT.format(
+            round_index=state["round_index"],
+            resolution_core_json=json.dumps(
+                resolution_core.model_dump(mode="json"),
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ),
+            pending_actor_proposals_json=pending_actor_proposals_json,
+            latest_activities_json=latest_activities_json,
+            event_memory_json=event_memory_json,
+            event_match_hints_json=event_match_hints_json,
+            **build_major_event_update_batch_prompt_bundle(),
+        )
+        event_update_batch, event_meta = await runtime.context.llms.ainvoke_structured_with_meta(
+            "coordinator",
+            event_batch_prompt,
+            MajorEventUpdateBatch,
+            allow_default_on_failure=True,
+            default_payload={"event_updates": pending_event_match_hints["suggested_updates"]},
+            semantic_validator=lambda parsed: validate_major_event_update_batch_semantics(
+                major_event_update_batch=parsed,
+                event_memory=cast(dict[str, object], state.get("event_memory", {})),
+            ),
+            repair_context=build_major_event_update_batch_repair_context(
+                event_memory=cast(dict[str, object], state.get("event_memory", {})),
+            ),
+            log_context=build_llm_log_context(
+                scope="round-resolution",
+                phase="runtime",
+                task_key="round_resolution_event_updates",
+                task_label="라운드 해소",
+                artifact_key="round_resolution",
+                artifact_label="round_resolution",
+                schema=MajorEventUpdateBatch,
+                round_index=int(state["round_index"]),
+            ),
+        )
+        total_parse_failures += int(event_meta.parse_failure_count)
+        total_duration_seconds += float(event_meta.duration_seconds)
+        forced_default = bool(event_meta.forced_default)
+        if forced_default:
+            resolution = RoundResolution.model_validate(default_payload)
+        else:
+            intent_batch_prompt = ACTOR_INTENT_STATE_BATCH_PROMPT.format(
+                round_index=state["round_index"],
+                resolution_core_json=json.dumps(
+                    resolution_core.model_dump(mode="json"),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                round_focus_plan_json=round_focus_plan_json,
+                pending_actor_proposals_json=pending_actor_proposals_json,
+                latest_background_updates_json=latest_background_updates_json,
+                actors_json=json.dumps(
+                    list(state["actors"]),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+                actor_intent_states_json=actor_intent_states_json,
+                **build_actor_intent_state_batch_prompt_bundle(),
+            )
+            intent_batch, intent_meta = await runtime.context.llms.ainvoke_structured_with_meta(
+                "coordinator",
+                intent_batch_prompt,
+                ActorIntentStateBatch,
+                allow_default_on_failure=True,
+                default_payload={"actor_intent_states": []},
+                semantic_validator=lambda parsed: validate_actor_intent_state_batch_semantics(
+                    actor_intent_state_batch=parsed,
+                    actors=list(state["actors"]),
+                ),
+                repair_context=build_actor_intent_state_batch_repair_context(
+                    actors=list(state["actors"]),
+                ),
+                log_context=build_llm_log_context(
+                    scope="round-resolution",
+                    phase="runtime",
+                    task_key="round_resolution_intent_states",
+                    task_label="라운드 해소",
+                    artifact_key="round_resolution",
+                    artifact_label="round_resolution",
+                    schema=ActorIntentStateBatch,
+                    round_index=int(state["round_index"]),
+                ),
+            )
+            total_parse_failures += int(intent_meta.parse_failure_count)
+            total_duration_seconds += float(intent_meta.duration_seconds)
+            forced_default = bool(intent_meta.forced_default)
+            if forced_default:
+                resolution = RoundResolution.model_validate(default_payload)
+            else:
+                narrative_bodies_prompt = ROUND_RESOLUTION_NARRATIVE_BODIES_PROMPT.format(
+                    round_index=state["round_index"],
+                    resolution_core_json=json.dumps(
+                        resolution_core.model_dump(mode="json"),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
+                    event_updates_json=json.dumps(
+                        event_update_batch.model_dump(mode="json"),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
+                    updated_intent_states_json=json.dumps(
+                        intent_batch.model_dump(mode="json"),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
+                    latest_background_updates_json=latest_background_updates_json,
+                    latest_activities_json=latest_activities_json,
+                    situation_json=situation_json,
+                    coordination_frame_json=coordination_frame_json,
+                    actor_facing_scenario_digest_json=actor_facing_scenario_digest_json,
+                    world_state_summary=resolution_core.world_state_summary,
+                    **build_round_resolution_narrative_bodies_prompt_bundle(),
+                )
+                narrative_bodies, narrative_meta = (
+                    await runtime.context.llms.ainvoke_structured_with_meta(
+                        "coordinator",
+                        narrative_bodies_prompt,
+                        RoundResolutionNarrativeBodies,
+                        allow_default_on_failure=True,
+                        default_payload=_build_default_round_resolution_narrative_bodies_payload(
+                            default_resolution=default_payload
+                        ),
+                        log_context=build_llm_log_context(
+                            scope="round-resolution",
+                            phase="runtime",
+                            task_key="round_resolution_narrative_bodies",
+                            task_label="라운드 해소",
+                            artifact_key="round_resolution",
+                            artifact_label="round_resolution",
+                            schema=RoundResolutionNarrativeBodies,
+                            round_index=int(state["round_index"]),
+                        ),
+                    )
+                )
+                total_parse_failures += int(narrative_meta.parse_failure_count)
+                total_duration_seconds += float(narrative_meta.duration_seconds)
+                forced_default = bool(narrative_meta.forced_default)
+                if forced_default:
+                    resolution = RoundResolution.model_validate(default_payload)
+                else:
+                    resolution = RoundResolution(
+                        adopted_cast_ids=list(resolution_core.adopted_cast_ids),
+                        updated_intent_states=list(intent_batch.actor_intent_states),
+                        event_updates=list(event_update_batch.event_updates),
+                        round_time_advance=resolution_core.round_time_advance,
+                        observer_report=ObserverReport(
+                            round_index=int(state["round_index"]),
+                            summary=narrative_bodies.observer_report.summary,
+                            notable_events=list(
+                                narrative_bodies.observer_report.notable_events
+                            ),
+                            atmosphere=narrative_bodies.observer_report.atmosphere,
+                            momentum=narrative_bodies.observer_report.momentum,
+                            world_state_summary=resolution_core.world_state_summary,
+                        ),
+                        actor_facing_scenario_digest=ActorFacingScenarioDigest(
+                            round_index=int(state["round_index"]),
+                            relationship_map_summary=(
+                                narrative_bodies.actor_facing_scenario_digest.relationship_map_summary
+                            ),
+                            current_pressures=list(
+                                narrative_bodies.actor_facing_scenario_digest.current_pressures
+                            ),
+                            talking_points=list(
+                                narrative_bodies.actor_facing_scenario_digest.talking_points
+                            ),
+                            avoid_repetition_notes=list(
+                                narrative_bodies.actor_facing_scenario_digest.avoid_repetition_notes
+                            ),
+                            recommended_tone=(
+                                narrative_bodies.actor_facing_scenario_digest.recommended_tone
+                            ),
+                            world_state_summary=resolution_core.world_state_summary,
+                        ),
+                        world_state_summary=resolution_core.world_state_summary,
+                        stop_reason=resolution_core.stop_reason,
+                    )
     valid_adopted_cast_ids, invalid_adoption_errors = _filter_invalid_adopted_cast_ids(
         adopted_cast_ids=list(resolution.adopted_cast_ids),
         pending_actor_proposals=cast(
@@ -351,7 +578,7 @@ async def resolve_round(
         )
     )
     errors = list(state["errors"]) + invalid_adoption_errors
-    if meta.forced_default:
+    if forced_default:
         errors.append(f"round {state['round_index']} resolution defaulted")
     next_actor_intent_states = _merge_actor_intent_states(
         actors=list(state["actors"]),
@@ -390,7 +617,7 @@ async def resolve_round(
         "stop_reason": stop_reason,
         "parse_failures": int(state["parse_failures"])
         + applied["parse_failure_count"]
-        + meta.parse_failure_count,
+        + total_parse_failures,
         "forced_idles": int(state["forced_idles"]) + applied["forced_idle_count"],
         "last_round_latency_seconds": time.perf_counter()
         - float(state["current_round_started_at"]),
@@ -543,6 +770,188 @@ def _build_default_round_resolution_payload(
         ),
         "world_state_summary": world_state_summary,
         "stop_reason": "",
+    }
+
+
+def _build_default_round_resolution_core_payload(
+    *,
+    default_resolution: dict[str, object],
+) -> dict[str, object]:
+    return {
+        "adopted_cast_ids": _string_list(default_resolution.get("adopted_cast_ids", [])),
+        "round_time_advance": cast(
+            dict[str, object],
+            default_resolution.get("round_time_advance", {}),
+        ),
+        "world_state_summary": str(default_resolution.get("world_state_summary", "")),
+        "stop_reason": str(default_resolution.get("stop_reason", "")),
+    }
+
+
+def _build_default_round_resolution_narrative_bodies_payload(
+    *,
+    default_resolution: dict[str, object],
+) -> dict[str, object]:
+    observer_report = cast(
+        dict[str, object],
+        default_resolution.get("observer_report", {}),
+    )
+    digest = cast(
+        dict[str, object],
+        default_resolution.get("actor_facing_scenario_digest", {}),
+    )
+    return {
+        "observer_report": {
+            "summary": str(observer_report.get("summary", "")),
+            "notable_events": _string_list(observer_report.get("notable_events", [])),
+            "atmosphere": str(observer_report.get("atmosphere", "")),
+            "momentum": str(observer_report.get("momentum", "medium")),
+        },
+        "actor_facing_scenario_digest": {
+            "relationship_map_summary": str(
+                digest.get("relationship_map_summary", "")
+            ),
+            "current_pressures": _string_list(digest.get("current_pressures", [])),
+            "talking_points": _string_list(digest.get("talking_points", [])),
+            "avoid_repetition_notes": _string_list(
+                digest.get("avoid_repetition_notes", [])
+            ),
+            "recommended_tone": str(digest.get("recommended_tone", "")),
+        },
+    }
+
+
+def validate_round_resolution_core_semantics(
+    *,
+    resolution_core: RoundResolutionCore,
+    pending_actor_proposals: list[dict[str, object]],
+) -> list[str]:
+    """Return semantic issues for the resolution core stage."""
+
+    valid_cast_ids = {
+        str(item.get("cast_id", "")).strip()
+        for item in pending_actor_proposals
+        if str(item.get("cast_id", "")).strip()
+    }
+    invalid_cast_ids = [
+        cast_id
+        for cast_id in resolution_core.adopted_cast_ids
+        if cast_id not in valid_cast_ids
+    ]
+    if not invalid_cast_ids:
+        return []
+    return [
+        "adopted_cast_ids에 pending proposal 밖 cast_id가 있습니다: "
+        + ", ".join(invalid_cast_ids)
+    ]
+
+
+def build_round_resolution_core_repair_context(
+    *,
+    pending_actor_proposals: list[dict[str, object]],
+) -> dict[str, object]:
+    """Build repair context for the resolution core stage."""
+
+    return {
+        "valid_adopted_cast_ids": [
+            str(item.get("cast_id", ""))
+            for item in pending_actor_proposals
+            if str(item.get("cast_id", "")).strip()
+        ],
+        "repair_guidance": [
+            "Adopt only cast ids from the pending proposal set.",
+            "Keep `world_state_summary` non-empty and concrete.",
+            "Use only `\"\"` or `\"simulation_done\"` for `stop_reason`.",
+        ],
+    }
+
+
+def validate_major_event_update_batch_semantics(
+    *,
+    major_event_update_batch: MajorEventUpdateBatch,
+    event_memory: dict[str, object],
+) -> list[str]:
+    """Return semantic issues for the event-update batch stage."""
+
+    valid_event_ids = {
+        str(item.get("event_id", "")).strip()
+        for item in _dict_list(event_memory.get("events", []))
+        if str(item.get("event_id", "")).strip()
+    }
+    invalid_event_ids = [
+        update.event_id
+        for update in major_event_update_batch.event_updates
+        if update.event_id not in valid_event_ids
+    ]
+    if not invalid_event_ids:
+        return []
+    return [
+        "event_updates에 event memory 밖 event_id가 있습니다: "
+        + ", ".join(invalid_event_ids)
+    ]
+
+
+def build_major_event_update_batch_repair_context(
+    *,
+    event_memory: dict[str, object],
+) -> dict[str, object]:
+    """Build repair context for the event-update batch stage."""
+
+    return {
+        "valid_event_ids": [
+            str(item.get("event_id", ""))
+            for item in _dict_list(event_memory.get("events", []))
+            if str(item.get("event_id", "")).strip()
+        ],
+        "repair_guidance": [
+            "Use only event ids from event memory.",
+            "Keep `progress_summary` concrete and non-empty.",
+        ],
+    }
+
+
+def validate_actor_intent_state_batch_semantics(
+    *,
+    actor_intent_state_batch: ActorIntentStateBatch,
+    actors: list[dict[str, object]],
+) -> list[str]:
+    """Return semantic issues for the intent-state batch stage."""
+
+    valid_cast_ids = {
+        str(actor.get("cast_id", "")).strip()
+        for actor in actors
+        if str(actor.get("cast_id", "")).strip()
+    }
+    invalid_cast_ids = [
+        snapshot.cast_id
+        for snapshot in actor_intent_state_batch.actor_intent_states
+        if snapshot.cast_id not in valid_cast_ids
+    ]
+    if not invalid_cast_ids:
+        return []
+    return [
+        "actor_intent_states에 actor roster 밖 cast_id가 있습니다: "
+        + ", ".join(invalid_cast_ids)
+    ]
+
+
+def build_actor_intent_state_batch_repair_context(
+    *,
+    actors: list[dict[str, object]],
+) -> dict[str, object]:
+    """Build repair context for the intent-state batch stage."""
+
+    return {
+        "valid_cast_ids": [
+            str(actor.get("cast_id", ""))
+            for actor in actors
+            if str(actor.get("cast_id", "")).strip()
+        ],
+        "repair_guidance": [
+            "Use only actor roster cast ids.",
+            "Keep `current_intent` and `thought` concrete.",
+            "Return each cast id at most once.",
+        ],
     }
 
 

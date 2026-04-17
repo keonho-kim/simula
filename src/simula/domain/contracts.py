@@ -317,6 +317,21 @@ class ExecutionPlanBundle(BaseModel):
         return self
 
 
+class MajorEventPlanBatch(BaseModel):
+    """Batch of major-event plan items."""
+
+    major_events: list["MajorEventPlanItem"]
+
+    @model_validator(mode="after")
+    def validate_major_event_plan_batch(self) -> "MajorEventPlanBatch":
+        event_ids = [item.event_id for item in self.major_events]
+        if len(event_ids) != len(set(event_ids)):
+            raise ValueError("major_events must use unique event_id values.")
+        if len(self.major_events) > 6:
+            raise ValueError("major_events must contain at most 6 items.")
+        return self
+
+
 class MajorEventPlanItem(BaseModel):
     """Scenario-grounded major event plan item."""
 
@@ -365,6 +380,19 @@ class MajorEventUpdate(BaseModel):
                 raise ValueError(f"{field_name} must not be empty.")
         if len(self.matched_activity_ids) != len(set(self.matched_activity_ids)):
             raise ValueError("matched_activity_ids must be unique.")
+        return self
+
+
+class MajorEventUpdateBatch(BaseModel):
+    """Batch of major-event updates."""
+
+    event_updates: list[MajorEventUpdate]
+
+    @model_validator(mode="after")
+    def validate_major_event_update_batch(self) -> "MajorEventUpdateBatch":
+        event_ids = [item.event_id for item in self.event_updates]
+        if len(event_ids) != len(set(event_ids)):
+            raise ValueError("event_updates must use unique event_id values.")
         return self
 
 
@@ -656,6 +684,22 @@ class BackgroundUpdateBatch(BaseModel):
     background_updates: list[BackgroundUpdate]
 
 
+class RoundDirectiveFocusCore(BaseModel):
+    """Focus-only portion of a round directive."""
+
+    focus_summary: str
+    selection_reason: str
+    focus_slices: list[FocusSlice]
+
+    @model_validator(mode="after")
+    def validate_round_directive_focus_core(self) -> "RoundDirectiveFocusCore":
+        if not self.focus_summary.strip():
+            raise ValueError("focus_summary must not be empty.")
+        if not self.selection_reason.strip():
+            raise ValueError("selection_reason must not be empty.")
+        return self
+
+
 class ActorFacingScenarioDigest(BaseModel):
     """Actor-facing round digest for the next decision."""
 
@@ -676,6 +720,32 @@ class ActorFacingScenarioDigest(BaseModel):
             "recommended_tone",
             "world_state_summary",
         ):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        for field_name in (
+            "current_pressures",
+            "talking_points",
+            "avoid_repetition_notes",
+        ):
+            if not getattr(self, field_name):
+                raise ValueError(f"{field_name} must not be empty.")
+        return self
+
+
+class ActorFacingScenarioDigestBody(BaseModel):
+    """Round-digest body before round/world injection."""
+
+    relationship_map_summary: str
+    current_pressures: list[str]
+    talking_points: list[str]
+    avoid_repetition_notes: list[str]
+    recommended_tone: str
+
+    @model_validator(mode="after")
+    def validate_actor_facing_scenario_digest_body(
+        self,
+    ) -> "ActorFacingScenarioDigestBody":
+        for field_name in ("relationship_map_summary", "recommended_tone"):
             if not getattr(self, field_name).strip():
                 raise ValueError(f"{field_name} must not be empty.")
         for field_name in (
@@ -713,6 +783,46 @@ class RoundDirective(BaseModel):
         for focus_slice in self.focus_slices:
             if not set(focus_slice.focus_cast_ids).issubset(selected_set):
                 raise ValueError("focus_cast_ids must be contained in selected_cast_ids.")
+        return self
+
+
+class ObserverReportBody(BaseModel):
+    """Observer-report body before round/world injection."""
+
+    summary: str
+    notable_events: list[str]
+    atmosphere: str
+    momentum: SimulationMomentum
+
+    @model_validator(mode="after")
+    def validate_observer_report_body(self) -> "ObserverReportBody":
+        for field_name in ("summary", "atmosphere"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        return self
+
+
+class RoundResolutionNarrativeBodies(BaseModel):
+    """Narrative-only portion of round resolution."""
+
+    observer_report: ObserverReportBody
+    actor_facing_scenario_digest: ActorFacingScenarioDigestBody
+
+
+class RoundResolutionCore(BaseModel):
+    """Core non-narrative portion of round resolution."""
+
+    adopted_cast_ids: list[str]
+    round_time_advance: RoundTimeAdvanceProposal
+    world_state_summary: str
+    stop_reason: ResolutionStopReason
+
+    @model_validator(mode="after")
+    def validate_round_resolution_core(self) -> "RoundResolutionCore":
+        if len(self.adopted_cast_ids) != len(set(self.adopted_cast_ids)):
+            raise ValueError("adopted_cast_ids must be unique.")
+        if not self.world_state_summary.strip():
+            raise ValueError("world_state_summary must not be empty.")
         return self
 
 
