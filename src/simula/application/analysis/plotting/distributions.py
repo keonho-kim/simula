@@ -11,7 +11,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
-from matplotlib.ticker import MultipleLocator
+from matplotlib.ticker import MultipleLocator, StrMethodFormatter
 
 from simula.application.analysis.localization import (
     distribution_overview_title,
@@ -145,7 +145,7 @@ def _apply_time_axis_spacing(
     if not distribution.histogram_bin_edges:
         return
 
-    step = 0.25
+    step = _time_axis_step(distribution)
     minimum = float(distribution.histogram_bin_edges[0])
     maximum = float(distribution.histogram_bin_edges[-1])
     lower_bound = np.floor(minimum / step) * step
@@ -155,3 +155,26 @@ def _apply_time_axis_spacing(
 
     axis.set_xlim(lower_bound, upper_bound)
     axis.xaxis.set_major_locator(MultipleLocator(step))
+    axis.xaxis.set_major_formatter(StrMethodFormatter("{x:g}"))
+
+
+def _time_axis_step(distribution: MetricDistribution) -> float:
+    """Choose a readable major tick step for time distributions."""
+
+    if distribution.max_value is None or distribution.min_value is None:
+        return 0.25
+
+    span = max(float(distribution.max_value - distribution.min_value), 0.0)
+    if span <= 1.0:
+        return 0.25
+    if span <= 2.0:
+        return 0.5
+    if span <= 5.0:
+        return 1.0
+    if span <= 10.0:
+        return 2.0
+    if span <= 30.0:
+        return 5.0
+    if span <= 60.0:
+        return 10.0
+    return 30.0

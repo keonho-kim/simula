@@ -17,25 +17,24 @@ from simula.infrastructure.config.models import (
     BedrockProviderConfig,
     GoogleProviderConfig,
     ModelConfig,
-    OllamaProviderConfig,
+    OpenAICompatibleProviderConfig,
     OpenAIProviderConfig,
     Provider,
-    VllmProviderConfig,
 )
 from simula.infrastructure.config.provider_defaults import (
     default_max_tokens,
     provider_default_anthropic_effort,
+    provider_default_api_key,
+    provider_default_base_url,
+    provider_default_stream_usage,
     provider_default_bedrock_credentials_profile_name,
     provider_default_bedrock_endpoint_url,
     provider_default_bedrock_region_name,
-    provider_default_api_key,
-    provider_default_base_url,
     provider_default_google_credentials_path,
     provider_default_google_location,
     provider_default_google_project_id,
     provider_default_google_thinking_budget,
     provider_default_google_thinking_level,
-    provider_default_ollama_reasoning,
     provider_default_openai_reasoning_effort,
     provider_default_openai_verbosity,
 )
@@ -44,7 +43,7 @@ from simula.infrastructure.config.scalar_parsers import (
     env_float,
     env_google_thinking_level,
     env_int,
-    env_ollama_reasoning,
+    env_json_object,
     env_optional_int,
     env_reasoning_effort,
     env_str,
@@ -73,6 +72,15 @@ def build_model_config(
         openai=OpenAIProviderConfig(
             api_key=provider_default_api_key(values, "openai", role=role),
             base_url=provider_default_base_url(values, "openai", role=role),
+            stream_usage=(
+                provider_default_stream_usage(
+                    values,
+                    "openai",
+                    role=role,
+                )
+                if provider == "openai"
+                else None
+            ),
             reasoning_effort=env_reasoning_effort(
                 values,
                 f"SIM_{role}_REASONING_EFFORT",
@@ -91,6 +99,24 @@ def build_model_config(
                     model=model,
                 ),
             ),
+        ),
+        openai_compatible=OpenAICompatibleProviderConfig(
+            api_key=_openai_compatible_api_key(values, role=role, provider=provider),
+            base_url=provider_default_base_url(
+                values,
+                "openai-compatible",
+                role=role,
+            ),
+            stream_usage=(
+                provider_default_stream_usage(
+                    values,
+                    "openai-compatible",
+                    role=role,
+                )
+                if provider == "openai-compatible"
+                else None
+            ),
+            extra_body=_provider_extra_body(values, role=role, provider=provider),
         ),
         anthropic=AnthropicProviderConfig(
             api_key=provider_default_api_key(values, "anthropic", role=role),
@@ -156,19 +182,36 @@ def build_model_config(
                 provider=provider,
             ),
         ),
-        ollama=OllamaProviderConfig(
-            base_url=provider_default_base_url(values, "ollama", role=role),
-            reasoning=env_ollama_reasoning(
-                values,
-                f"SIM_{role}_REASONING",
-                default=provider_default_ollama_reasoning(
-                    values,
-                    provider=provider,
-                ),
-            ),
-        ),
-        vllm=VllmProviderConfig(
-            api_key=provider_default_api_key(values, "vllm", role=role),
-            base_url=provider_default_base_url(values, "vllm", role=role),
-        ),
     )
+
+
+def _provider_extra_body(
+    values: dict[str, str],
+    *,
+    role: str,
+    provider: Provider,
+) -> dict[str, object]:
+    """OpenAI-compatible extra_body를 병합한다."""
+
+    if provider != "openai-compatible":
+        return {}
+
+    merged = env_json_object(values, "OPENAI_COMPATIBLE_EXTRA_BODY")
+    merged.update(env_json_object(values, f"SIM_{role}_EXTRA_BODY"))
+    return merged
+
+
+def _openai_compatible_api_key(
+    values: dict[str, str],
+    *,
+    role: str,
+    provider: Provider,
+) -> str | None:
+    """OpenAI-compatible API key를 결정한다."""
+
+    api_key = provider_default_api_key(values, "openai-compatible", role=role)
+    if api_key is not None:
+        return api_key
+    if provider == "openai-compatible":
+        return "EMPTY"
+    return None

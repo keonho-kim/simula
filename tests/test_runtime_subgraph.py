@@ -9,7 +9,7 @@ import logging
 from dataclasses import dataclass
 
 from simula.application.workflow.context import WorkflowRuntimeContext
-from simula.application.workflow.graphs.runtime.graph import RUNTIME_SUBGRAPH
+from simula.application.workflow.graphs.runtime import RUNTIME_SUBGRAPH
 from simula.application.workflow.graphs.simulation.states.initial_state import (
     build_simulation_input_state,
     expand_input_state_to_workflow_state,
@@ -17,14 +17,14 @@ from simula.application.workflow.graphs.simulation.states.initial_state import (
 from simula.domain.contracts import (
     ActorActionNarrative,
     ActorActionShell,
-    ActorIntentStateBatch,
-    BackgroundUpdateBatch,
-    MajorEventUpdateBatch,
-    RoundContinuationDecision,
+    ActorIntentSnapshot,
+    BackgroundUpdate,
+    MajorEventUpdate,
     RoundDirectiveFocusCore,
     RoundResolutionCore,
     RoundResolutionNarrativeBodies,
 )
+from simula.domain.contracts.shared import ContinuationStopReason
 from simula.infrastructure.config.models import (
     AppSettings,
     ModelConfig,
@@ -100,14 +100,14 @@ class RuntimeGraphRouter:
         self.resolution_stop_reason = resolution_stop_reason
         self.calls: dict[str, int] = {}
 
-    async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+    async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
         del role, prompt, kwargs
         self.calls[schema.__name__] = self.calls.get(schema.__name__, 0) + 1
         if schema is RoundDirectiveFocusCore:
             return (
                 RoundDirectiveFocusCore(
                     focus_summary="Alpha의 직접 압박을 따라간다.",
-                    selection_reason="현재 직접 반응 압력이 가장 높다.",
+                    reason="현재 직접 반응 압력이 가장 높다.",
                     focus_slices=[
                         {
                             "slice_id": "focus-1",
@@ -115,24 +115,9 @@ class RuntimeGraphRouter:
                             "focus_cast_ids": ["alpha"],
                             "visibility": "private",
                             "stakes": "즉시 반응이 필요하다.",
-                            "selection_reason": "가장 빠른 상태 변화가 난다.",
+                            "reason": "가장 빠른 상태 변화가 난다.",
                         }
                     ],
-                ),
-                FakeMeta(),
-            )
-        if schema is BackgroundUpdateBatch:
-            return (
-                BackgroundUpdateBatch(
-                    background_updates=[
-                        {
-                            "round_index": 1,
-                            "cast_id": "beta",
-                            "summary": "Beta는 아직 직접 응답을 아끼고 있다.",
-                            "pressure_level": "medium",
-                            "future_hook": "다음 round에 직접 응답할 수 있다.",
-                        }
-                    ]
                 ),
                 FakeMeta(),
             )
@@ -142,17 +127,15 @@ class RuntimeGraphRouter:
                     action_type="speech",
                     visibility="private",
                     target_cast_ids=["beta"],
-                    thread_id="review-thread",
                 ),
                 FakeMeta(),
             )
         if schema is ActorActionNarrative:
             return (
                 ActorActionNarrative(
-                    intent="Beta의 결정을 재검토로 이끈다.",
-                    intent_target_cast_ids=["beta"],
-                    action_summary="Alpha가 재검토를 요구한다.",
-                    action_detail="비공개로 다시 판단해야 한다고 압박한다.",
+                    goal="Beta의 결정을 재검토로 이끈다.",
+                    summary="Alpha가 재검토를 요구한다.",
+                    detail="비공개로 다시 판단해야 한다고 압박한다.",
                     utterance="지금 결론 내리지 말고 다시 봅시다.",
                 ),
                 FakeMeta(),
@@ -161,42 +144,13 @@ class RuntimeGraphRouter:
             return (
                 RoundResolutionCore(
                     adopted_cast_ids=["alpha"],
-                    round_time_advance={
+                    time_advance={
                         "elapsed_unit": "minute",
                         "elapsed_amount": 30,
-                        "selection_reason": "짧은 직접 반응이 중심이다.",
-                        "signals": ["직접 압박"],
+                        "reason": "짧은 직접 반응이 중심이다.",
                     },
                     world_state_summary="직접 압박이 유지되고 있다.",
                     stop_reason=self.resolution_stop_reason,
-                ),
-                FakeMeta(),
-            )
-        if schema is MajorEventUpdateBatch:
-            return (MajorEventUpdateBatch(event_updates=[]), FakeMeta())
-        if schema is ActorIntentStateBatch:
-            return (
-                ActorIntentStateBatch(
-                    actor_intent_states=[
-                        {
-                            "cast_id": "alpha",
-                            "current_intent": "Beta의 결정을 늦춘다.",
-                            "thought": "조금 더 압박해야 유리한 흐름이 유지된다고 본다.",
-                            "target_cast_ids": ["beta"],
-                            "supporting_action_type": "speech",
-                            "confidence": 0.8,
-                            "changed_from_previous": True,
-                        },
-                        {
-                            "cast_id": "beta",
-                            "current_intent": "상황을 더 본다.",
-                            "thought": "즉시 답하면 밀릴 수 있어 시간을 더 벌고 싶다.",
-                            "target_cast_ids": [],
-                            "supporting_action_type": "initial_state",
-                            "confidence": 0.5,
-                            "changed_from_previous": False,
-                        },
-                    ]
                 ),
                 FakeMeta(),
             )
@@ -210,21 +164,59 @@ class RuntimeGraphRouter:
                         "momentum": "medium",
                     },
                     actor_facing_scenario_digest={
-                        "relationship_map_summary": "Alpha가 압박을 주도하고 Beta가 방어적으로 반응한다.",
-                        "current_pressures": ["비공개 압박이 다음 선택을 좌우할 수 있다."],
-                        "talking_points": ["다음에는 결정을 미루지 못하게 더 직접적으로 묻는다."],
-                        "avoid_repetition_notes": ["이미 한 요구를 같은 표현으로만 반복하지 않는다."],
-                        "recommended_tone": "짧고 단호한 설득 톤",
+                        "current_pressures": [
+                            "비공개 압박이 다음 선택을 좌우할 수 있다."
+                        ],
+                        "next_step_notes": [
+                            "다음에는 결정을 미루지 못하게 더 직접적으로 묻는다."
+                        ],
                     },
                 ),
                 FakeMeta(),
             )
-        if schema is RoundContinuationDecision:
+        raise AssertionError(f"unexpected schema: {schema}")
+
+    async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+        del role, prompt, kwargs
+        name = str(annotation)
+        self.calls[name] = self.calls.get(name, 0) + 1
+        if annotation == list[BackgroundUpdate]:
             return (
-                RoundContinuationDecision(stop_reason=self.continuation_stop_reason),
+                [
+                    BackgroundUpdate(
+                        round_index=1,
+                        cast_id="beta",
+                        summary="Beta는 아직 직접 응답을 아끼고 있다.",
+                        pressure_level="medium",
+                    )
+                ],
                 FakeMeta(),
             )
-        raise AssertionError(f"unexpected schema: {schema}")
+        if annotation == list[MajorEventUpdate]:
+            return ([], FakeMeta())
+        if annotation == list[ActorIntentSnapshot]:
+            return (
+                [
+                    ActorIntentSnapshot(
+                        cast_id="alpha",
+                        goal="Beta의 결정을 늦춘다.",
+                        target_cast_ids=["beta"],
+                        confidence=0.8,
+                        changed_from_previous=True,
+                    ),
+                    ActorIntentSnapshot(
+                        cast_id="beta",
+                        goal="상황을 더 본다.",
+                        target_cast_ids=[],
+                        confidence=0.5,
+                        changed_from_previous=False,
+                    ),
+                ],
+                FakeMeta(),
+            )
+        if annotation == ContinuationStopReason:
+            return (self.continuation_stop_reason, FakeMeta())
+        raise AssertionError(f"unexpected annotation: {annotation}")
 
 
 def _runtime_state(settings: AppSettings) -> dict[str, object]:
@@ -234,20 +226,19 @@ def _runtime_state(settings: AppSettings) -> dict[str, object]:
         scenario_controls={"num_cast": 2, "allow_additional_cast": True},
         settings=settings,
     )
-    state = expand_input_state_to_workflow_state(input_state=input_state, settings=settings)
+    state = expand_input_state_to_workflow_state(
+        input_state=input_state, settings=settings
+    )
     state["planning_analysis"] = {
         "brief_summary": "공개 압박과 비공개 조율이 겹친다.",
         "premise": "표면적 입장보다 실제 정렬 방향이 중요하다.",
         "time_scope": {"start": "초기 대면 직후", "end": "핵심 선택 직전"},
-        "public_context": ["공개 신호가 판세를 흔든다."],
-        "private_context": ["비공개 조율이 실제 선택을 움직인다."],
         "key_pressures": ["시간 압박"],
         "progression_plan": {
             "max_rounds": settings.runtime.max_rounds,
             "allowed_elapsed_units": ["minute", "hour"],
             "default_elapsed_unit": "minute",
-            "pacing_guidance": ["직접 반응은 짧게 본다."],
-            "selection_reason": "짧은 직접 반응이 중심이다.",
+            "reason": "짧은 직접 반응이 중심이다.",
         },
     }
     state["plan"] = {
@@ -274,25 +265,20 @@ def _runtime_state(settings: AppSettings) -> dict[str, object]:
                     "description": "직접 말로 방향을 조정한다.",
                     "supported_visibility": ["public", "private", "group"],
                     "requires_target": False,
-                    "supports_utterance": True,
                 }
             ],
-            "selection_guidance": ["짧고 직접적인 행동을 우선 본다."],
         },
         "coordination_frame": {
-            "focus_selection_rules": ["직접 반응 압력이 높은 actor를 우선 본다."],
-            "background_motion_rules": ["직접 추적하지 않은 actor는 배경 update로만 남긴다."],
-            "focus_archetypes": ["직접 압박"],
-            "attention_shift_rules": ["조용했던 actor도 압력이 올라가면 끌어올린다."],
-            "budget_guidance": ["한 round에는 소수 actor만 직접 호출한다."],
+            "focus_policy": "직접 반응 압력이 높은 actor를 우선 본다.",
+            "background_policy": "직접 추적하지 않은 actor는 배경 update로만 남긴다.",
+            "max_focus_actors": 3,
         },
         "major_events": [],
         "progression_plan": {
             "max_rounds": settings.runtime.max_rounds,
             "allowed_elapsed_units": ["minute", "hour"],
             "default_elapsed_unit": "minute",
-            "pacing_guidance": ["직접 반응은 짧게 본다."],
-            "selection_reason": "짧은 직접 반응이 중심이다.",
+            "reason": "짧은 직접 반응이 중심이다.",
         },
     }
     state["actors"] = [
@@ -340,12 +326,14 @@ def test_runtime_subgraph_stops_before_next_round_on_no_progress() -> None:
         llm_usage_tracker=LLMUsageTracker(),
     )
 
-    result = asyncio.run(RUNTIME_SUBGRAPH.ainvoke(_runtime_state(settings), context=context))
+    result = asyncio.run(
+        RUNTIME_SUBGRAPH.ainvoke(_runtime_state(settings), context=context)
+    )
 
     assert result["stop_reason"] == "no_progress"
     assert result["round_index"] == 1
     assert router.calls.get("RoundDirectiveFocusCore", 0) == 1
-    assert router.calls.get("RoundContinuationDecision", 0) == 1
+    assert router.calls.get(str(ContinuationStopReason), 0) == 1
     assert len(store.round_artifacts) == 1
 
 
@@ -361,10 +349,12 @@ def test_runtime_subgraph_finishes_immediately_on_simulation_done() -> None:
         llm_usage_tracker=LLMUsageTracker(),
     )
 
-    result = asyncio.run(RUNTIME_SUBGRAPH.ainvoke(_runtime_state(settings), context=context))
+    result = asyncio.run(
+        RUNTIME_SUBGRAPH.ainvoke(_runtime_state(settings), context=context)
+    )
 
     assert result["stop_reason"] == "simulation_done"
     assert result["round_index"] == 1
     assert router.calls.get("RoundDirectiveFocusCore", 0) == 1
-    assert router.calls.get("RoundContinuationDecision", 0) == 0
+    assert router.calls.get(str(ContinuationStopReason), 0) == 0
     assert len(store.round_artifacts) == 1

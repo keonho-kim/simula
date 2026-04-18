@@ -9,14 +9,16 @@ Generation turns the planning cast roster into concrete actor cards.
 ```mermaid
 flowchart LR
     Start([START]) --> Prepare["prepare_actor_slots"]
-    Prepare --> FanOut{"dispatch_actor_slots"}
-    FanOut --> Worker["generate_actor_slot"]
-    FanOut -->|no slots| Finalize["finalize_generated_actors"]
-    Worker --> Finalize
+    Prepare --> Route{"route_actor_slot_queue"}
+    Route -->|slots remain| Worker["generate_actor_slot_serial"]
+    Route -->|no slots| Finalize["finalize_generated_actors"]
+    Worker --> Route
     Finalize --> End([END])
 ```
 
-`dispatch_actor_slots` is the conditional fan-out edge used by the generation subgraph.
+This document describes the default serial generation graph. The parallel variant still uses
+`dispatch_actor_slots` plus `generate_actor_slot` fan-out when intra-run graph parallelism is
+enabled.
 
 ## Node Responsibilities
 
@@ -25,17 +27,7 @@ flowchart LR
 Builds one `CastSlotSpec` per planned cast item and resets generation-local buffers. It also
 records `generation_started_at` for latency tracking.
 
-### `dispatch_actor_slots`
-
-Creates one `Send` payload per pending slot.
-
-- if slots exist, the subgraph fans out to `generate_actor_slot`
-- if there are no slots, the subgraph jumps directly to `finalize_generated_actors`
-
-The no-slot path is mostly a defensive branch because planning validation should already prevent an
-empty cast roster.
-
-### `generate_actor_slot`
+### `generate_actor_slot_serial`
 
 Calls the `generator` role with one strict `GeneratedActorCardDraft` contract built from:
 
@@ -47,11 +39,11 @@ Calls the `generator` role with one strict `GeneratedActorCardDraft` contract bu
 - the requested cast-count controls
 
 The node then wraps the generated draft into a full `ActorCard` using the cast identity from the
-slot, not from free-form model output.
+slot, not from free-form model output, and then advances the pending slot queue by one.
 
 ### `finalize_generated_actors`
 
-Collects fan-out results and finalizes the actor list.
+Collects accumulated slot results and finalizes the actor list.
 
 Current checks and side effects:
 
@@ -72,3 +64,12 @@ After generation, workflow state has:
 - updated `parse_failures`
 
 Generation does not build activity feeds. Runtime initialization owns that step.
+
+## Parallel Variant
+
+When a run is started with CLI `--parallel`, generation switches to the parallel subgraph:
+
+- `prepare_actor_slots -> dispatch_actor_slots -> generate_actor_slot -> finalize_generated_actors`
+
+That variant preserves the same output and validation behavior while allowing concurrent slot-level
+LLM calls.

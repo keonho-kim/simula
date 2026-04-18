@@ -9,7 +9,7 @@ from typing import cast
 
 from langgraph.runtime import Runtime
 
-from simula.application.llm_logging import build_llm_log_context
+from simula.shared.logging.llm import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.coordinator.output_schema.bundles import (
     build_round_continuation_prompt_bundle,
@@ -20,7 +20,7 @@ from simula.application.workflow.graphs.coordinator.prompts.round_continuation_p
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
-from simula.application.workflow.utils.streaming import record_simulation_log_event
+from simula.shared.io.streaming import record_simulation_log_event
 from simula.application.workflow.utils.prompt_projections import build_event_memory_prompt_view
 from simula.application.workflow.utils.prompt_projections import (
     ACTION_SUMMARY_LIMIT,
@@ -28,7 +28,7 @@ from simula.application.workflow.utils.prompt_projections import (
     WORLD_STATE_SUMMARY_LIMIT,
     truncate_text,
 )
-from simula.domain.contracts import RoundContinuationDecision
+from simula.domain.contracts.shared import ContinuationStopReason
 from simula.domain.event_memory import (
     apply_event_updates,
     build_transition_event_updates,
@@ -37,7 +37,7 @@ from simula.domain.event_memory import (
     refresh_event_memory,
     should_stop_for_stale_required_events,
 )
-from simula.domain.log_events import build_round_event_memory_updated_event
+from simula.domain.reporting.events import build_round_event_memory_updated_event
 
 
 async def assess_round_continuation(
@@ -96,7 +96,7 @@ async def assess_round_continuation(
             )
         )
         runtime.context.logger.info(
-            "round %s continuation skipped | stop=%s",
+            "ROUND %s 종료 결정 | stop %s",
             round_index,
             "simulation_done",
         )
@@ -109,7 +109,7 @@ async def assess_round_continuation(
         }
     if round_index >= planned_max_rounds and not required_unresolved_events:
         runtime.context.logger.info(
-            "round %s continuation skipped | stop=simulation_done | planned_max=%s",
+            "ROUND %s 종료 결정 | stop simulation_done | planned_max %s",
             round_index,
             planned_max_rounds,
         )
@@ -156,7 +156,7 @@ async def assess_round_continuation(
                 )
             )
             runtime.context.logger.info(
-                "round %s continuation stopped | stop=no_progress | stale required events after planned max",
+                "ROUND %s 종료 결정 | stop no_progress | required event 정체",
                 round_index,
             )
             return {
@@ -167,7 +167,7 @@ async def assess_round_continuation(
                 + [history_entry],
             }
         runtime.context.logger.info(
-            "round %s continuation forced | unresolved required events remain",
+            "ROUND %s 연장 | unresolved required events remain",
             round_index,
         )
         return {
@@ -218,12 +218,12 @@ async def assess_round_continuation(
         ),
         **build_round_continuation_prompt_bundle(),
     )
-    decision, meta = await runtime.context.llms.ainvoke_structured_with_meta(
+    stop_reason, meta = await runtime.context.llms.ainvoke_simple_with_meta(
         "coordinator",
         prompt,
-        RoundContinuationDecision,
-        allow_default_on_failure=True,
-        default_payload=_build_default_round_continuation_payload(),
+        ContinuationStopReason,
+        failure_policy="default",
+        default_value=_build_default_round_continuation_default(),
         log_context=build_llm_log_context(
             scope="round-continuation",
             phase="runtime",
@@ -231,15 +231,15 @@ async def assess_round_continuation(
             task_label="라운드 지속 여부 판단",
             artifact_key="stop_reason",
             artifact_label="stop_reason",
-            schema=RoundContinuationDecision,
+            contract_kind="simple",
+            output_type_name='Literal["", "no_progress"]',
             round_index=round_index,
         ),
     )
-    stop_reason = decision.stop_reason
     if stop_reason == "no_progress" and required_unresolved_events:
         stop_reason = ""
     runtime.context.logger.info(
-        "round %s continuation assessed | stop=%s | stagnation=%s",
+        "ROUND %s 지속 판단 | stop %s | stagnation %s",
         round_index,
         stop_reason or "-",
         int(state["stagnation_rounds"]),
@@ -255,8 +255,8 @@ async def assess_round_continuation(
     }
 
 
-def _build_default_round_continuation_payload() -> dict[str, object]:
-    return {"stop_reason": ""}
+def _build_default_round_continuation_default() -> ContinuationStopReason:
+    return ""
 
 
 def _build_latest_observer_report_view(
@@ -303,8 +303,8 @@ def _build_latest_round_activities_view(
             "target_cast_ids": _string_list(item.get("target_cast_ids", [])),
             "visibility": str(item.get("visibility", "")),
             "action_type": str(item.get("action_type", "")),
-            "action_summary": truncate_text(
-                item.get("action_summary", ""),
+            "summary": truncate_text(
+                item.get("summary", ""),
                 ACTION_SUMMARY_LIMIT,
             ),
         }
@@ -321,7 +321,7 @@ def _build_latest_round_focus_view(
     return {
         "round_index": int(str(latest.get("round_index", 0))),
         "focus_summary": truncate_text(latest.get("focus_summary", ""), 120),
-        "selection_reason": truncate_text(latest.get("selection_reason", ""), 120),
+        "reason": truncate_text(latest.get("reason", ""), 120),
         "selected_cast_ids": _string_list(latest.get("selected_cast_ids", [])),
         "deferred_cast_ids": _string_list(latest.get("deferred_cast_ids", [])),
     }

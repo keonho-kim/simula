@@ -9,7 +9,7 @@ import logging
 from types import SimpleNamespace
 
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from simula.application.workflow.graphs.coordinator.nodes.assess_round_continuation import (
     assess_round_continuation,
@@ -30,17 +30,17 @@ from simula.application.workflow.graphs.runtime.nodes.lifecycle import (
 from simula.application.workflow.graphs.runtime.states.state import (
     empty_actor_proposal_task,
 )
-from simula.domain.activity_feeds import initialize_activity_feeds
+from simula.domain.activity.feeds import initialize_activity_feeds
 from simula.domain.contracts import (
-    ActorIntentStateBatch,
-    BackgroundUpdateBatch,
-    MajorEventUpdateBatch,
-    RoundContinuationDecision,
+    ActorIntentSnapshot,
+    BackgroundUpdate,
+    MajorEventUpdate,
     RoundDirectiveFocusCore,
     RoundResolutionCore,
     RoundResolutionNarrativeBodies,
     RoundResolution,
 )
+from simula.domain.contracts.shared import ContinuationStopReason
 from simula.domain.event_memory import build_event_memory, evaluate_round_event_updates
 
 
@@ -51,7 +51,7 @@ def _test_context(**kwargs: object) -> SimpleNamespace:
 def _focus_core_payload(*, focus_cast_ids: list[str], title: str = "압박 축") -> RoundDirectiveFocusCore:
     return RoundDirectiveFocusCore(
         focus_summary="직접 압박 축을 우선 추적한다.",
-        selection_reason="직접 반응 압력이 가장 높다.",
+        reason="직접 반응 압력이 가장 높다.",
         focus_slices=[
             {
                 "slice_id": "focus-1",
@@ -59,24 +59,21 @@ def _focus_core_payload(*, focus_cast_ids: list[str], title: str = "압박 축")
                 "focus_cast_ids": focus_cast_ids,
                 "visibility": "private" if len(focus_cast_ids) <= 2 else "public",
                 "stakes": "즉시 반응이 필요하다.",
-                "selection_reason": "핵심 압력이 몰렸다.",
+                "reason": "핵심 압력이 몰렸다.",
             }
         ],
     )
 
 
-def _background_update_batch_payload(*, round_index: int, cast_id: str, pressure_level: str = "medium") -> BackgroundUpdateBatch:
-    return BackgroundUpdateBatch(
-        background_updates=[
-            {
-                "round_index": round_index,
-                "cast_id": cast_id,
-                "summary": "배경 압력이 유지된다.",
-                "pressure_level": pressure_level,
-                "future_hook": "다음 round에서 직접 개입할 수 있다.",
-            }
-        ]
-    )
+def _background_update_batch_payload(*, round_index: int, cast_id: str, pressure_level: str = "medium") -> list[BackgroundUpdate]:
+    return [
+        BackgroundUpdate(
+            round_index=round_index,
+            cast_id=cast_id,
+            summary="배경 압력이 유지된다.",
+            pressure_level=pressure_level,
+        )
+    ]
 
 
 def _resolution_core_payload(
@@ -88,23 +85,22 @@ def _resolution_core_payload(
 ) -> RoundResolutionCore:
     return RoundResolutionCore(
         adopted_cast_ids=adopted_cast_ids,
-        round_time_advance={
+        time_advance={
             "elapsed_unit": "minute",
             "elapsed_amount": elapsed_amount,
-            "selection_reason": "짧은 직접 반응이 중심이다.",
-            "signals": ["직접 압박"],
+            "reason": "짧은 직접 반응이 중심이다.",
         },
         world_state_summary=world_state_summary,
         stop_reason=stop_reason,
     )
 
 
-def _event_update_batch_payload(event_updates: list[dict[str, object]] | None = None) -> MajorEventUpdateBatch:
-    return MajorEventUpdateBatch(event_updates=event_updates or [])
+def _event_update_batch_payload(event_updates: list[dict[str, object]] | None = None) -> list[MajorEventUpdate]:
+    return [MajorEventUpdate.model_validate(item) for item in (event_updates or [])]
 
 
-def _intent_state_batch_payload(items: list[dict[str, object]]) -> ActorIntentStateBatch:
-    return ActorIntentStateBatch(actor_intent_states=items)
+def _intent_state_batch_payload(items: list[dict[str, object]]) -> list[ActorIntentSnapshot]:
+    return [ActorIntentSnapshot.model_validate(item) for item in items]
 
 
 def _resolution_narrative_bodies_payload(
@@ -123,11 +119,8 @@ def _resolution_narrative_bodies_payload(
             "momentum": momentum,
         },
         actor_facing_scenario_digest={
-            "relationship_map_summary": world_pressure,
             "current_pressures": [world_pressure],
-            "talking_points": [talking_point],
-            "avoid_repetition_notes": ["같은 표현만 반복하지 않는다."],
-            "recommended_tone": "짧고 분명한 압박 톤",
+            "next_step_notes": [talking_point],
         },
     )
 
@@ -207,7 +200,7 @@ def test_prepare_focus_candidates_prioritizes_due_required_event_participants() 
                     "latest_round": 2,
                     "completion_action_types": ["speech"],
                     "completion_signals": ["선택"],
-                    "required_before_end": True,
+                    "must_resolve": True,
                 }
             ]
         ),
@@ -223,26 +216,25 @@ def test_prepare_focus_candidates_prioritizes_due_required_event_participants() 
     assert result["focus_candidates"][0]["cast_id"] == "b"
     assert any(
         "required due event" in reason
-        for reason in result["focus_candidates"][0]["selection_reasons"]
+        for reason in result["focus_candidates"][0]["reasons"]
     )
 
 
 def test_round_continuation_decision_rejects_simulation_done() -> None:
     with pytest.raises(ValidationError):
-        RoundContinuationDecision(stop_reason="simulation_done")
+        TypeAdapter(ContinuationStopReason).validate_python("simulation_done")
 
 
 def test_round_resolution_rejects_no_progress() -> None:
     with pytest.raises(ValidationError):
         RoundResolution(
             adopted_cast_ids=[],
-            updated_intent_states=[],
+            intent_states=[],
             event_updates=[],
-            round_time_advance={
+            time_advance={
                 "elapsed_unit": "hour",
                 "elapsed_amount": 1,
-                "selection_reason": "기본 진행",
-                "signals": [],
+                "reason": "기본 진행",
             },
             observer_report={
                 "round_index": 1,
@@ -254,11 +246,8 @@ def test_round_resolution_rejects_no_progress() -> None:
             },
             actor_facing_scenario_digest={
                 "round_index": 1,
-                "relationship_map_summary": "관계",
                 "current_pressures": ["압력"],
-                "talking_points": ["포인트"],
-                "avoid_repetition_notes": ["반복 금지"],
-                "recommended_tone": "톤",
+                "next_step_notes": ["포인트"],
                 "world_state_summary": "상태",
             },
             world_state_summary="상태",
@@ -272,17 +261,16 @@ def test_build_updated_clock_supports_week_elapsed_unit() -> None:
             "simulation_clock": {"total_elapsed_minutes": 0},
             "round_index": 3,
         },
-        round_time_advance={
+        time_advance={
             "elapsed_unit": "week",
             "elapsed_amount": 1,
-            "selection_reason": "다음 갈등 국면까지 장면 전환이 필요하다.",
-            "signals": ["오프스크린 경과"],
+            "reason": "다음 갈등 국면까지 장면 전환이 필요하다.",
         },
     )
 
-    assert result["round_time_advance"]["elapsed_minutes"] == 60 * 24 * 7
-    assert result["round_time_advance"]["elapsed_label"] == "1주"
-    assert result["round_time_advance"]["total_elapsed_label"] == "1주"
+    assert result["time_advance"]["elapsed_minutes"] == 60 * 24 * 7
+    assert result["time_advance"]["elapsed_label"] == "1주"
+    assert result["time_advance"]["total_elapsed_label"] == "1주"
     assert result["simulation_clock"]["last_elapsed_label"] == "1주"
 
 
@@ -293,19 +281,22 @@ def test_build_updated_clock_rejects_unsupported_elapsed_unit() -> None:
                 "simulation_clock": {"total_elapsed_minutes": 0},
                 "round_index": 1,
             },
-            round_time_advance={
+            time_advance={
                 "elapsed_unit": "month",
                 "elapsed_amount": 1,
-                "selection_reason": "잘못된 테스트 입력이다.",
-                "signals": [],
+                "reason": "잘못된 테스트 입력이다.",
             },
         )
 
 
 def test_assess_round_continuation_short_circuits_before_llm() -> None:
     class FailRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del role, prompt, schema, kwargs
+            raise AssertionError("LLM should not be called for short-circuit continuation cases")
+
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+            del role, prompt, annotation, kwargs
             raise AssertionError("LLM should not be called for short-circuit continuation cases")
 
     runtime = SimpleNamespace(
@@ -371,7 +362,7 @@ def test_assess_round_continuation_short_circuits_before_llm() -> None:
                             "latest_round": 2,
                             "completion_action_types": ["speech"],
                             "completion_signals": ["최종 선택"],
-                            "required_before_end": True,
+                            "must_resolve": True,
                         }
                     ]
                 ),
@@ -405,7 +396,7 @@ def test_assess_round_continuation_short_circuits_before_llm() -> None:
                             "latest_round": 2,
                             "completion_action_types": ["speech"],
                             "completion_signals": ["최종 선택"],
-                            "required_before_end": True,
+                            "must_resolve": True,
                         }
                     ]
                 ),
@@ -462,12 +453,11 @@ def test_initialize_runtime_state_preserves_run_level_error_counters() -> None:
 
 def test_assess_round_continuation_returns_no_progress_from_coordinator() -> None:
     class FakeRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
+            assert annotation == ContinuationStopReason
             return (
-                schema.model_validate(
-                    RoundContinuationDecision(stop_reason="no_progress")
-                ),
+                "no_progress",
                 SimpleNamespace(
                     duration_seconds=0.2,
                     parse_failure_count=0,
@@ -502,7 +492,7 @@ def test_assess_round_continuation_returns_no_progress_from_coordinator() -> Non
             {
                 "round_index": 2,
                 "focus_summary": "동일한 갈등 축을 반복 추적했다.",
-                "selection_reason": "압력이 유지됐다.",
+                "reason": "압력이 유지됐다.",
                 "selected_cast_ids": ["a"],
                 "deferred_cast_ids": ["b"],
             }
@@ -518,20 +508,23 @@ def test_assess_round_continuation_returns_no_progress_from_coordinator() -> Non
 
 def test_build_round_directive_sets_selected_cast_ids() -> None:
     class FakeRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
             if schema is RoundDirectiveFocusCore:
                 return (
                     _focus_core_payload(focus_cast_ids=["a", "b"]),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
                 )
-            if schema is BackgroundUpdateBatch:
-                return (
-                    _background_update_batch_payload(round_index=2, cast_id="c"),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
             return (
                 schema.model_validate({}),
+                SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+            )
+
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            assert annotation == list[BackgroundUpdate]
+            return (
+                _background_update_batch_payload(round_index=2, cast_id="c"),
                 SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
             )
 
@@ -553,7 +546,11 @@ def test_build_round_directive_sets_selected_cast_ids() -> None:
         "actors": [{"cast_id": "c", "display_name": "C"}],
         "focus_candidates": [{"cast_id": "a"}, {"cast_id": "b"}, {"cast_id": "c"}],
         "plan": {
-            "coordination_frame": {"focus_selection_rules": ["규칙"]},
+            "coordination_frame": {
+                "focus_policy": "규칙",
+                "background_policy": "배경은 짧게 요약한다.",
+                "max_focus_actors": 3,
+            },
             "situation": {"simulation_objective": "긴장 추적"},
         },
         "simulation_clock": {"total_elapsed_label": "1시간"},
@@ -571,20 +568,23 @@ def test_build_round_directive_sets_selected_cast_ids() -> None:
 
 def test_build_round_directive_injects_stagnation_background_hook() -> None:
     class FakeRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
             if schema is RoundDirectiveFocusCore:
                 return (
                     _focus_core_payload(focus_cast_ids=["a", "b"], title="핵심 축"),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
                 )
-            if schema is BackgroundUpdateBatch:
-                return (
-                    BackgroundUpdateBatch(background_updates=[]),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
             return (
                 schema.model_validate({}),
+                SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+            )
+
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            assert annotation == list[BackgroundUpdate]
+            return (
+                [],
                 SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
             )
 
@@ -615,7 +615,11 @@ def test_build_round_directive_injects_stagnation_background_hook() -> None:
             {"cast_id": "c", "candidate_score": 4.0},
         ],
         "plan": {
-            "coordination_frame": {"focus_selection_rules": ["규칙"]},
+            "coordination_frame": {
+                "focus_policy": "규칙",
+                "background_policy": "배경은 짧게 요약한다.",
+                "max_focus_actors": 2,
+            },
             "situation": {
                 "simulation_objective": "긴장 추적",
                 "initial_tensions": ["압력"],
@@ -635,7 +639,7 @@ def test_build_round_directive_injects_stagnation_background_hook() -> None:
                     "latest_round": 3,
                     "completion_action_types": ["speech"],
                     "completion_signals": ["최종 선택"],
-                    "required_before_end": True,
+                    "must_resolve": True,
                 }
             ]
         ),
@@ -654,20 +658,23 @@ def test_build_round_directive_injects_stagnation_background_hook() -> None:
 
 def test_build_round_directive_backfills_more_related_casts_when_pool_is_rich() -> None:
     class FakeRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
             if schema is RoundDirectiveFocusCore:
                 return (
                     _focus_core_payload(focus_cast_ids=["a", "b"], title="핵심 갈등"),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
                 )
-            if schema is BackgroundUpdateBatch:
-                return (
-                    BackgroundUpdateBatch(background_updates=[]),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
             return (
                 schema.model_validate({}),
+                SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+            )
+
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            assert annotation == list[BackgroundUpdate]
+            return (
+                [],
                 SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
             )
 
@@ -689,7 +696,11 @@ def test_build_round_directive_backfills_more_related_casts_when_pool_is_rich() 
         "actors": [{"cast_id": cast_id, "display_name": cast_id.upper()} for cast_id in ["a", "b", "c", "d", "e"]],
         "focus_candidates": [{"cast_id": cast_id} for cast_id in ["a", "b", "c", "d", "e"]],
         "plan": {
-            "coordination_frame": {"focus_selection_rules": ["규칙"]},
+            "coordination_frame": {
+                "focus_policy": "규칙",
+                "background_policy": "배경은 짧게 요약한다.",
+                "max_focus_actors": 3,
+            },
             "situation": {"simulation_objective": "긴장 추적"},
         },
         "simulation_clock": {"total_elapsed_label": "2시간"},
@@ -710,19 +721,22 @@ def test_build_round_directive_backfills_more_related_casts_when_pool_is_rich() 
 
 def test_build_round_directive_builds_background_prompt_from_post_focus_deferred_ids() -> None:
     class FakeRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
             if schema is RoundDirectiveFocusCore:
                 return (
                     _focus_core_payload(focus_cast_ids=["d"], title="비주류 축"),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
                 )
-            if schema is BackgroundUpdateBatch:
-                return (
-                    BackgroundUpdateBatch(background_updates=[]),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
             raise AssertionError(f"unexpected schema: {schema}")
+
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+            del role, kwargs
+            assert annotation == list[BackgroundUpdate]
+            return (
+                [],
+                SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+            )
 
     runtime = SimpleNamespace(
         context=_test_context(
@@ -745,7 +759,11 @@ def test_build_round_directive_builds_background_prompt_from_post_focus_deferred
         ],
         "focus_candidates": [{"cast_id": cast_id} for cast_id in ["a", "b", "c", "d", "e"]],
         "plan": {
-            "coordination_frame": {"focus_selection_rules": ["규칙"]},
+            "coordination_frame": {
+                "focus_policy": "규칙",
+                "background_policy": "배경은 짧게 요약한다.",
+                "max_focus_actors": 3,
+            },
             "situation": {"simulation_objective": "긴장 추적"},
         },
         "simulation_clock": {"total_elapsed_label": "2시간"},
@@ -763,19 +781,22 @@ def test_build_round_directive_builds_background_prompt_from_post_focus_deferred
 
 def test_build_round_directive_keeps_focus_when_background_stage_defaults() -> None:
     class FakeRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
             if schema is RoundDirectiveFocusCore:
                 return (
                     _focus_core_payload(focus_cast_ids=["a", "b"]),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
                 )
-            if schema is BackgroundUpdateBatch:
-                return (
-                    BackgroundUpdateBatch(background_updates=[]),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=2, forced_default=True),
-                )
             raise AssertionError(f"unexpected schema: {schema}")
+
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            assert annotation == list[BackgroundUpdate]
+            return (
+                [],
+                SimpleNamespace(duration_seconds=0.2, parse_failure_count=2, forced_default=True),
+            )
 
     runtime = SimpleNamespace(
         context=_test_context(
@@ -795,7 +816,11 @@ def test_build_round_directive_keeps_focus_when_background_stage_defaults() -> N
         "actors": [{"cast_id": "c", "display_name": "C"}],
         "focus_candidates": [{"cast_id": "a"}, {"cast_id": "b"}, {"cast_id": "c"}],
         "plan": {
-            "coordination_frame": {"focus_selection_rules": ["규칙"]},
+            "coordination_frame": {
+                "focus_policy": "규칙",
+                "background_policy": "배경은 짧게 요약한다.",
+                "max_focus_actors": 3,
+            },
             "situation": {"simulation_objective": "긴장 추적"},
         },
         "simulation_clock": {"total_elapsed_label": "1시간"},
@@ -816,44 +841,13 @@ def test_build_round_directive_keeps_focus_when_background_stage_defaults() -> N
 
 def test_resolve_round_persists_round_artifacts() -> None:
     class FakeRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
             if schema is RoundResolutionCore:
                 return (
                     _resolution_core_payload(
                         adopted_cast_ids=["a"],
                         world_state_summary="직접 압박 축은 좁게 유지되지만 반응 압력은 커졌다.",
-                    ),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
-            if schema is MajorEventUpdateBatch:
-                return (
-                    _event_update_batch_payload(),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
-            if schema is ActorIntentStateBatch:
-                return (
-                    _intent_state_batch_payload(
-                        [
-                            {
-                                "cast_id": "a",
-                                "current_intent": "b를 압박한다.",
-                                "thought": "지금 압박해야 다음 선택 주도권을 잡을 수 있다고 본다.",
-                                "target_cast_ids": ["b"],
-                                "supporting_action_type": "speech",
-                                "confidence": 0.8,
-                                "changed_from_previous": True,
-                            },
-                            {
-                                "cast_id": "b",
-                                "current_intent": "상황을 더 본다.",
-                                "thought": "바로 답하면 밀릴 수 있어 한 번 더 상황을 읽으려 한다.",
-                                "target_cast_ids": [],
-                                "supporting_action_type": "initial_state",
-                                "confidence": 0.5,
-                                "changed_from_previous": False,
-                            },
-                        ]
                     ),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
                 )
@@ -867,11 +861,8 @@ def test_resolve_round_persists_round_artifacts() -> None:
                             "momentum": "medium",
                         },
                         actor_facing_scenario_digest={
-                            "relationship_map_summary": "a의 직접 압박과 b의 신중한 후퇴가 대비된다.",
                             "current_pressures": ["a는 지금 주도권을 굳히고 싶다."],
-                            "talking_points": ["다음 대화에서는 답을 미루지 못하게 더 분명히 압박한다."],
-                            "avoid_repetition_notes": ["막연한 호감 표현만 반복하지 않는다."],
-                            "recommended_tone": "짧고 분명한 압박 톤",
+                            "next_step_notes": ["다음 대화에서는 답을 미루지 못하게 더 분명히 압박한다."],
                         },
                     ),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
@@ -880,6 +871,37 @@ def test_resolve_round_persists_round_artifacts() -> None:
                 schema.model_validate({}),
                 SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
             )
+
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            if annotation == list[MajorEventUpdate]:
+                return (
+                    _event_update_batch_payload(),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            if annotation == list[ActorIntentSnapshot]:
+                return (
+                    _intent_state_batch_payload(
+                        [
+                            {
+                                "cast_id": "a",
+                                "goal": "b를 압박한다.",
+                                "target_cast_ids": ["b"],
+                                "confidence": 0.8,
+                                "changed_from_previous": True,
+                            },
+                            {
+                                "cast_id": "b",
+                                "goal": "상황을 더 본다.",
+                                "target_cast_ids": [],
+                                "confidence": 0.5,
+                                "changed_from_previous": False,
+                            },
+                        ]
+                    ),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            raise AssertionError(f"unexpected annotation: {annotation}")
 
     saved: dict[str, object] = {}
 
@@ -920,8 +942,7 @@ def test_resolve_round_persists_round_artifacts() -> None:
                 "max_rounds": 4,
                 "allowed_elapsed_units": ["minute", "hour"],
                 "default_elapsed_unit": "hour",
-                "pacing_guidance": ["짧게 본다."],
-                "selection_reason": "짧은 상호작용 중심",
+                "reason": "짧은 상호작용 중심",
             },
             "action_catalog": {
                 "actions": [
@@ -931,10 +952,8 @@ def test_resolve_round_persists_round_artifacts() -> None:
                         "description": "말한다.",
                         "supported_visibility": ["public", "private", "group"],
                         "requires_target": False,
-                        "supports_utterance": True,
                     }
                 ],
-                "selection_guidance": ["상황에 맞게 고른다."],
             },
         },
         "pending_actor_proposals": [
@@ -943,10 +962,9 @@ def test_resolve_round_persists_round_artifacts() -> None:
                 "unread_activity_ids": [],
                 "proposal": {
                     "action_type": "speech",
-                    "intent": "b를 압박해 즉시 반응을 끌어낸다.",
-                    "intent_target_cast_ids": ["b"],
-                    "action_summary": "a가 압박 action을 보낸다.",
-                    "action_detail": "즉시 반응을 요구한다.",
+                    "goal": "b를 압박해 즉시 반응을 끌어낸다.",
+                    "summary": "a가 압박 action을 보낸다.",
+                    "detail": "즉시 반응을 요구한다.",
                     "utterance": "지금 답해야 한다.",
                     "visibility": "private",
                     "target_cast_ids": ["b"],
@@ -985,7 +1003,7 @@ def test_resolve_round_persists_round_artifacts() -> None:
 
 def test_resolve_round_merges_partial_intent_updates_and_preserves_full_roster() -> None:
     class FakeRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
             if schema is RoundResolutionCore:
                 return (
@@ -993,28 +1011,6 @@ def test_resolve_round_merges_partial_intent_updates_and_preserves_full_roster()
                         adopted_cast_ids=["a"],
                         world_state_summary="핵심 압박선만 더 또렷해지고 다른 축은 유지된다.",
                         elapsed_amount=20,
-                    ),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
-            if schema is MajorEventUpdateBatch:
-                return (
-                    _event_update_batch_payload(),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
-            if schema is ActorIntentStateBatch:
-                return (
-                    _intent_state_batch_payload(
-                        [
-                            {
-                                "cast_id": "a",
-                                "current_intent": "b를 다시 압박한다.",
-                                "thought": "지금 한 번 더 밀어야 흐름을 닫을 수 있다고 본다.",
-                                "target_cast_ids": ["b"],
-                                "supporting_action_type": "speech",
-                                "confidence": 0.85,
-                                "changed_from_previous": True,
-                            }
-                        ]
                     ),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
                 )
@@ -1035,6 +1031,30 @@ def test_resolve_round_merges_partial_intent_updates_and_preserves_full_roster()
                     forced_default=False,
                 ),
             )
+
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            if annotation == list[MajorEventUpdate]:
+                return (
+                    _event_update_batch_payload(),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            if annotation == list[ActorIntentSnapshot]:
+                return (
+                    _intent_state_batch_payload(
+                        [
+                            {
+                                "cast_id": "a",
+                                "goal": "b를 다시 압박한다.",
+                                "target_cast_ids": ["b"],
+                                "confidence": 0.85,
+                                "changed_from_previous": True,
+                            }
+                        ]
+                    ),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            raise AssertionError(f"unexpected annotation: {annotation}")
 
     runtime = SimpleNamespace(
         context=_test_context(
@@ -1066,19 +1086,15 @@ def test_resolve_round_merges_partial_intent_updates_and_preserves_full_roster()
         "actor_intent_states": [
             {
                 "cast_id": "a",
-                "current_intent": "b를 압박한다.",
-                "thought": "지금 압박해야 한다고 본다.",
+                "goal": "b를 압박한다.",
                 "target_cast_ids": ["b"],
-                "supporting_action_type": "speech",
                 "confidence": 0.8,
                 "changed_from_previous": False,
             },
             {
                 "cast_id": "b",
-                "current_intent": "답을 늦춘다.",
-                "thought": "조금 더 버텨야 한다고 본다.",
+                "goal": "답을 늦춘다.",
                 "target_cast_ids": ["a"],
-                "supporting_action_type": "initial_state",
                 "confidence": 0.6,
                 "changed_from_previous": False,
             },
@@ -1090,8 +1106,7 @@ def test_resolve_round_merges_partial_intent_updates_and_preserves_full_roster()
                 "max_rounds": 4,
                 "allowed_elapsed_units": ["minute", "hour"],
                 "default_elapsed_unit": "hour",
-                "pacing_guidance": ["짧게 본다."],
-                "selection_reason": "짧은 상호작용 중심",
+                "reason": "짧은 상호작용 중심",
             },
             "action_catalog": {
                 "actions": [
@@ -1101,10 +1116,8 @@ def test_resolve_round_merges_partial_intent_updates_and_preserves_full_roster()
                         "description": "말한다.",
                         "supported_visibility": ["public", "private", "group"],
                         "requires_target": False,
-                        "supports_utterance": True,
                     }
                 ],
-                "selection_guidance": ["상황에 맞게 고른다."],
             },
         },
         "pending_actor_proposals": [
@@ -1113,10 +1126,9 @@ def test_resolve_round_merges_partial_intent_updates_and_preserves_full_roster()
                 "unread_activity_ids": [],
                 "proposal": {
                     "action_type": "speech",
-                    "intent": "b를 압박해 즉시 반응을 끌어낸다.",
-                    "intent_target_cast_ids": ["b"],
-                    "action_summary": "a가 압박 action을 보낸다.",
-                    "action_detail": "즉시 반응을 요구한다.",
+                    "goal": "b를 압박해 즉시 반응을 끌어낸다.",
+                    "summary": "a가 압박 action을 보낸다.",
+                    "detail": "즉시 반응을 요구한다.",
                     "utterance": "지금 답해야 한다.",
                     "visibility": "private",
                     "target_cast_ids": ["b"],
@@ -1149,15 +1161,15 @@ def test_resolve_round_merges_partial_intent_updates_and_preserves_full_roster()
     result = asyncio.run(resolve_round(state, runtime))
 
     assert [item["cast_id"] for item in result["actor_intent_states"]] == ["a", "b", "c"]
-    assert result["actor_intent_states"][0]["current_intent"] == "b를 다시 압박한다."
-    assert result["actor_intent_states"][1]["current_intent"] == "답을 늦춘다."
-    assert result["actor_intent_states"][2]["current_intent"] == "관망한다."
+    assert result["actor_intent_states"][0]["goal"] == "b를 다시 압박한다."
+    assert result["actor_intent_states"][1]["goal"] == "답을 늦춘다."
+    assert result["actor_intent_states"][2]["goal"] == "관망한다."
     assert result["intent_history"][0]["actor_intent_states"] == result["actor_intent_states"]
 
 
 def test_resolve_round_completes_matching_major_event_from_applied_actions() -> None:
     class FakeRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
             if schema is RoundResolutionCore:
                 return (
@@ -1165,37 +1177,6 @@ def test_resolve_round_completes_matching_major_event_from_applied_actions() -> 
                         adopted_cast_ids=["a"],
                         world_state_summary="최종 선택 단계가 직접 가시화됐다.",
                         elapsed_amount=15,
-                    ),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
-            if schema is MajorEventUpdateBatch:
-                return (
-                    _event_update_batch_payload(),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
-            if schema is ActorIntentStateBatch:
-                return (
-                    _intent_state_batch_payload(
-                        [
-                            {
-                                "cast_id": "a",
-                                "current_intent": "b에게 최종 선택 의사를 직접 묻는다.",
-                                "thought": "이번에는 선택 확인을 분명히 끝내야 한다고 본다.",
-                                "target_cast_ids": ["b"],
-                                "supporting_action_type": "speech",
-                                "confidence": 0.9,
-                                "changed_from_previous": True,
-                            },
-                            {
-                                "cast_id": "b",
-                                "current_intent": "답을 정리한다.",
-                                "thought": "더는 미룰 수 없어 입장을 분명히 해야 한다고 본다.",
-                                "target_cast_ids": ["a"],
-                                "supporting_action_type": "speech",
-                                "confidence": 0.7,
-                                "changed_from_previous": True,
-                            },
-                        ]
                     ),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
                 )
@@ -1213,6 +1194,37 @@ def test_resolve_round_completes_matching_major_event_from_applied_actions() -> 
                 schema.model_validate({}),
                 SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
             )
+
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            if annotation == list[MajorEventUpdate]:
+                return (
+                    _event_update_batch_payload(),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            if annotation == list[ActorIntentSnapshot]:
+                return (
+                    _intent_state_batch_payload(
+                        [
+                            {
+                                "cast_id": "a",
+                                "goal": "b에게 최종 선택 의사를 직접 묻는다.",
+                                "target_cast_ids": ["b"],
+                                "confidence": 0.9,
+                                "changed_from_previous": True,
+                            },
+                            {
+                                "cast_id": "b",
+                                "goal": "답을 정리한다.",
+                                "target_cast_ids": ["a"],
+                                "confidence": 0.7,
+                                "changed_from_previous": True,
+                            },
+                        ]
+                    ),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            raise AssertionError(f"unexpected annotation: {annotation}")
 
     runtime = SimpleNamespace(
         context=_test_context(
@@ -1253,7 +1265,7 @@ def test_resolve_round_completes_matching_major_event_from_applied_actions() -> 
                     "latest_round": 3,
                     "completion_action_types": ["speech"],
                     "completion_signals": ["최종 선택"],
-                    "required_before_end": True,
+                    "must_resolve": True,
                 }
             ]
         ),
@@ -1262,8 +1274,7 @@ def test_resolve_round_completes_matching_major_event_from_applied_actions() -> 
                 "max_rounds": 4,
                 "allowed_elapsed_units": ["minute", "hour"],
                 "default_elapsed_unit": "hour",
-                "pacing_guidance": ["짧게 본다."],
-                "selection_reason": "짧은 상호작용 중심",
+                "reason": "짧은 상호작용 중심",
             },
             "action_catalog": {
                 "actions": [
@@ -1273,10 +1284,8 @@ def test_resolve_round_completes_matching_major_event_from_applied_actions() -> 
                         "description": "말한다.",
                         "supported_visibility": ["public", "private", "group"],
                         "requires_target": False,
-                        "supports_utterance": True,
                     }
                 ],
-                "selection_guidance": ["상황에 맞게 고른다."],
             },
         },
         "pending_actor_proposals": [
@@ -1285,10 +1294,9 @@ def test_resolve_round_completes_matching_major_event_from_applied_actions() -> 
                 "unread_activity_ids": [],
                 "proposal": {
                     "action_type": "speech",
-                    "intent": "b에게 최종 선택 의사를 직접 확인한다.",
-                    "intent_target_cast_ids": ["b"],
-                    "action_summary": "a가 b에게 최종 선택 의사를 직접 묻는다.",
-                    "action_detail": "이제 최종 선택을 말해 달라고 분명히 요구한다.",
+                    "goal": "b에게 최종 선택 의사를 직접 확인한다.",
+                    "summary": "a가 b에게 최종 선택 의사를 직접 묻는다.",
+                    "detail": "이제 최종 선택을 말해 달라고 분명히 요구한다.",
                     "utterance": "이제는 최종 선택을 분명히 말해줘.",
                     "visibility": "private",
                     "target_cast_ids": ["b"],
@@ -1337,7 +1345,7 @@ def test_evaluate_round_event_updates_matches_public_conversation_to_speech_even
                 "latest_round": 2,
                 "completion_action_types": ["speech"],
                 "completion_signals": ["선택 확인"],
-                "required_before_end": True,
+                "must_resolve": True,
             }
         ]
     )
@@ -1350,20 +1358,20 @@ def test_evaluate_round_event_updates_matches_public_conversation_to_speech_even
                 "source_cast_id": "a",
                 "target_cast_ids": ["b"],
                 "action_type": "public_conversation",
-                "action_summary": "A가 B에게 공개적으로 선택 의사를 묻는다.",
-                "action_detail": "공개 자리에서 선택 확인을 요구한다.",
+                "summary": "A가 B에게 공개적으로 선택 의사를 묻는다.",
+                "detail": "공개 자리에서 선택 확인을 요구한다.",
                 "utterance": "이제는 서로 선택을 확인하자.",
-                "intent": "선택 확인",
+                "goal": "선택 확인",
             },
             {
                 "activity_id": "act-2",
                 "source_cast_id": "b",
                 "target_cast_ids": ["a"],
                 "action_type": "public_dialogue",
-                "action_summary": "B가 A에게 공개적으로 답한다.",
-                "action_detail": "공개 자리에서 같은 선택 의사를 밝힌다.",
+                "summary": "B가 A에게 공개적으로 답한다.",
+                "detail": "공개 자리에서 같은 선택 의사를 밝힌다.",
                 "utterance": "나도 같은 선택이야.",
-                "intent": "선택 확인",
+                "goal": "선택 확인",
             },
         ],
         current_round_index=1,
@@ -1376,35 +1384,13 @@ def test_evaluate_round_event_updates_matches_public_conversation_to_speech_even
 
 def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
     class FakeRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
             if schema is RoundResolutionCore:
                 return (
                     _resolution_core_payload(
                         adopted_cast_ids=["a"],
                         world_state_summary="직접 행동은 보류됐다.",
-                    ),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
-            if schema is MajorEventUpdateBatch:
-                return (
-                    _event_update_batch_payload(),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
-            if schema is ActorIntentStateBatch:
-                return (
-                    _intent_state_batch_payload(
-                        [
-                            {
-                                "cast_id": "a",
-                                "current_intent": "b에게 비공개 고백을 시도한다.",
-                                "thought": "지금 감정을 밀어야 반응을 확인할 수 있다고 본다.",
-                                "target_cast_ids": ["b"],
-                                "supporting_action_type": "private_confide",
-                                "confidence": 0.8,
-                                "changed_from_previous": True,
-                            }
-                        ]
                     ),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
                 )
@@ -1421,6 +1407,30 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
                 schema.model_validate({}),
                 SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
             )
+
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            if annotation == list[MajorEventUpdate]:
+                return (
+                    _event_update_batch_payload(),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            if annotation == list[ActorIntentSnapshot]:
+                return (
+                    _intent_state_batch_payload(
+                        [
+                            {
+                                "cast_id": "a",
+                                "goal": "b에게 비공개 고백을 시도한다.",
+                                "target_cast_ids": ["b"],
+                                "confidence": 0.8,
+                                "changed_from_previous": True,
+                            }
+                        ]
+                    ),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            raise AssertionError(f"unexpected annotation: {annotation}")
 
     runtime = SimpleNamespace(
         context=_test_context(
@@ -1454,8 +1464,7 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
                 "max_rounds": 4,
                 "allowed_elapsed_units": ["minute", "hour"],
                 "default_elapsed_unit": "hour",
-                "pacing_guidance": ["짧게 본다."],
-                "selection_reason": "짧은 상호작용 중심",
+                "reason": "짧은 상호작용 중심",
             },
             "action_catalog": {
                 "actions": [
@@ -1465,10 +1474,8 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
                         "description": "상대에게 비공개로 감정을 털어놓는다.",
                         "supported_visibility": ["private"],
                         "requires_target": True,
-                        "supports_utterance": True,
                     }
                 ],
-                "selection_guidance": [],
             },
         },
         "pending_actor_proposals": [
@@ -1477,10 +1484,9 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
                 "unread_activity_ids": [],
                 "proposal": {
                     "action_type": "private_confide",
-                    "intent": "b에게 감정을 털어놓는다.",
-                    "intent_target_cast_ids": ["b"],
-                    "action_summary": "a가 비공개 고백을 시도한다.",
-                    "action_detail": "하지만 대상 actor를 비워 둔 잘못된 제안이다.",
+                    "goal": "b에게 감정을 털어놓는다.",
+                    "summary": "a가 비공개 고백을 시도한다.",
+                    "detail": "하지만 대상 actor를 비워 둔 잘못된 제안이다.",
                     "utterance": "사실 마음이 갑니다.",
                     "visibility": "private",
                     "target_cast_ids": [],
@@ -1518,7 +1524,7 @@ def test_resolve_round_drops_invalid_adopted_private_action_targets() -> None:
 
 def test_resolve_round_marks_simulation_done_stop() -> None:
     class FakeRouter:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
             if schema is RoundResolutionCore:
                 return (
@@ -1527,28 +1533,6 @@ def test_resolve_round_marks_simulation_done_stop() -> None:
                         world_state_summary="핵심 목적이 달성됐다.",
                         stop_reason="simulation_done",
                         elapsed_amount=15,
-                    ),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
-            if schema is MajorEventUpdateBatch:
-                return (
-                    _event_update_batch_payload(),
-                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
-                )
-            if schema is ActorIntentStateBatch:
-                return (
-                    _intent_state_batch_payload(
-                        [
-                            {
-                                "cast_id": "a",
-                                "current_intent": "목표를 마무리한다.",
-                                "thought": "이번 행동으로 목적이 사실상 달성됐다고 본다.",
-                                "target_cast_ids": ["b"],
-                                "supporting_action_type": "speech",
-                                "confidence": 0.9,
-                                "changed_from_previous": True,
-                            }
-                        ]
                     ),
                     SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
                 )
@@ -1567,6 +1551,30 @@ def test_resolve_round_marks_simulation_done_stop() -> None:
                 schema.model_validate({}),
                 SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
             )
+
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+            del role, prompt, kwargs
+            if annotation == list[MajorEventUpdate]:
+                return (
+                    _event_update_batch_payload(),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            if annotation == list[ActorIntentSnapshot]:
+                return (
+                    _intent_state_batch_payload(
+                        [
+                            {
+                                "cast_id": "a",
+                                "goal": "목표를 마무리한다.",
+                                "target_cast_ids": ["b"],
+                                "confidence": 0.9,
+                                "changed_from_previous": True,
+                            }
+                        ]
+                    ),
+                    SimpleNamespace(duration_seconds=0.2, parse_failure_count=0, forced_default=False),
+                )
+            raise AssertionError(f"unexpected annotation: {annotation}")
 
     runtime = SimpleNamespace(
         context=_test_context(
@@ -1600,8 +1608,7 @@ def test_resolve_round_marks_simulation_done_stop() -> None:
                 "max_rounds": 4,
                 "allowed_elapsed_units": ["minute", "hour"],
                 "default_elapsed_unit": "hour",
-                "pacing_guidance": ["짧게 본다."],
-                "selection_reason": "짧은 상호작용 중심",
+                "reason": "짧은 상호작용 중심",
             },
             "action_catalog": {
                 "actions": [
@@ -1611,10 +1618,8 @@ def test_resolve_round_marks_simulation_done_stop() -> None:
                         "description": "말한다.",
                         "supported_visibility": ["public", "private", "group"],
                         "requires_target": False,
-                        "supports_utterance": True,
                     }
                 ],
-                "selection_guidance": ["상황에 맞게 고른다."],
             },
         },
         "pending_actor_proposals": [
@@ -1623,10 +1628,9 @@ def test_resolve_round_marks_simulation_done_stop() -> None:
                 "unread_activity_ids": [],
                 "proposal": {
                     "action_type": "speech",
-                    "intent": "마무리 결론을 낸다.",
-                    "intent_target_cast_ids": ["b"],
-                    "action_summary": "a가 최종 결론을 제안한다.",
-                    "action_detail": "남은 쟁점을 닫는다.",
+                    "goal": "마무리 결론을 낸다.",
+                    "summary": "a가 최종 결론을 제안한다.",
+                    "detail": "남은 쟁점을 닫는다.",
                     "utterance": "이제 결론을 내립시다.",
                     "visibility": "private",
                     "target_cast_ids": ["b"],

@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import networkx as nx
-import numpy as np
 import matplotlib.pyplot as plt
 
 from simula.application.analysis.models import (
@@ -14,24 +13,23 @@ from simula.application.analysis.models import (
     NetworkGrowthReport,
     PlannedActionRecord,
 )
-from simula.application.analysis.plotting.network_animation import render_network_growth_video as _render_network_growth_video
-from simula.application.analysis.plotting.network_collision import (
-    resolve_node_collisions_pixel_space as _resolve_node_collisions_pixel_space,
+from simula.application.analysis.plotting.network_animation import (
+    render_network_growth_video as _render_network_growth_video,
 )
-from simula.application.analysis.plotting.network_collision import node_radius_pixels
+from simula.application.analysis.plotting.network_collision import (
+    node_radius_pixels,
+    resolve_node_collisions_pixel_space,
+)
 from simula.application.analysis.plotting.network_layout import (
     RenderLayout,
-    build_layout_kwargs as _build_layout_kwargs_impl,
-    normalize_layout_positions,
+    build_layout_kwargs,
+    compute_layout_positions,
     pixels_to_positions,
     positions_to_pixels,
     suggest_axis_limits,
 )
 from simula.application.analysis.plotting.network_render import (
-    build_edge_label_text as _build_edge_label_text,
-    build_edge_strengths as _build_edge_strengths,
-    build_edge_visual_style as _build_edge_visual_style,
-    build_node_visual_style as _build_node_visual_style,
+    build_node_visual_style,
     create_figure,
     render_network_plot as _render_network_plot_impl,
 )
@@ -43,8 +41,11 @@ def compute_render_layout(graph: nx.DiGraph) -> RenderLayout:
     if graph.number_of_nodes() == 0:
         return RenderLayout(positions={}, x_limits=(-1.0, 1.0), y_limits=(-1.0, 1.0))
 
-    base_positions = _compute_layout_positions(graph)
-    node_style = _build_node_visual_style(graph)
+    node_style = build_node_visual_style(graph)
+    base_positions = compute_layout_positions(
+        graph,
+        layout_kwargs=build_layout_kwargs(graph, node_sizes=node_style.sizes),
+    )
     figure, axis = create_figure()
     try:
         x_limits, y_limits = suggest_axis_limits(base_positions)
@@ -62,7 +63,7 @@ def compute_render_layout(graph: nx.DiGraph) -> RenderLayout:
             )
             for index, node in enumerate(node_order)
         }
-        bounded_pixels = _resolve_node_collisions_pixel_space(
+        bounded_pixels = resolve_node_collisions_pixel_space(
             pixel_positions=pixel_positions,
             radii_px=radii_px,
             padding_px=10.0,
@@ -126,48 +127,9 @@ def render_network_growth_video(
         has_round_actions_adopted_event=has_round_actions_adopted_event,
     )
 
-
-def render_network_growth_gif(**kwargs) -> None:
-    """Backward-compatible alias for the new MP4 renderer."""
-
-    render_network_growth_video(**kwargs)
-
-
-def _build_layout_kwargs(graph: nx.DiGraph) -> dict[str, object]:
-    """Return ForceAtlas2 settings for network rendering."""
-
-    return _build_layout_kwargs_impl(
-        graph,
-        node_sizes=_build_node_visual_style(graph).sizes,
-    )
-
-
-def _compute_layout_positions(graph: nx.DiGraph):
-    """Compute normalized ForceAtlas2 positions for the given graph."""
-
-    if graph.number_of_nodes() <= 1:
-        return {
-            node: np.zeros(2, dtype=float)
-            for node in graph.nodes()
-        }
-    raw_positions = nx.forceatlas2_layout(
-        graph,
-        **_build_layout_kwargs(graph),
-    )
-    return normalize_layout_positions(raw_positions)
-
-
 __all__ = [
     "RenderLayout",
-    "_build_edge_label_text",
-    "_build_edge_strengths",
-    "_build_edge_visual_style",
-    "_build_layout_kwargs",
-    "_build_node_visual_style",
-    "_compute_layout_positions",
-    "_resolve_node_collisions_pixel_space",
     "compute_render_layout",
-    "render_network_growth_gif",
     "render_network_growth_video",
     "render_network_plot",
 ]

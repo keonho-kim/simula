@@ -131,15 +131,23 @@ def test_orm_store_next_run_id_is_sequential(tmp_path) -> None:
     store = _build_sqlite_store(str(sqlite_path))
 
     try:
-        first = store.next_run_id()
+        first = store.next_run_id(
+            actor_model_id="qwen3:8b",
+            scenario_file_stem="scenario-01",
+        )
         store.save_run_started(
             run_id=first,
             scenario_text="시나리오",
             settings_json={"log_level": "INFO"},
         )
-        second = store.next_run_id()
+        second = store.next_run_id(
+            actor_model_id="qwen3:8b",
+            scenario_file_stem="scenario-01",
+        )
     finally:
         store.close()
 
-    assert first.endswith(".1")
-    assert second.endswith(".2")
+    assert first.endswith(".qwen3-8b.scenario-01")
+    assert second.endswith(".qwen3-8b.scenario-01")
+    assert first.split(".")[1] == "001"
+    assert second.split(".")[1] == "002"

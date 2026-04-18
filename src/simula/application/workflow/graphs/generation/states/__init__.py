@@ -1,0 +1,1 @@
+"""Generation graph state contracts."""

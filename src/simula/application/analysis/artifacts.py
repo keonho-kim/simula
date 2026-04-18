@@ -1,5 +1,5 @@
 """Purpose:
-- Write analyzer artifacts to the `analysis/<run-id>` output tree.
+- Write deterministic run artifacts to the output tree.
 """
 
 from __future__ import annotations

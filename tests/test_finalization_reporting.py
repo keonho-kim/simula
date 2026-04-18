@@ -25,7 +25,7 @@ from simula.application.workflow.graphs.finalization.nodes.build_report_projecti
 from simula.application.workflow.graphs.finalization.nodes.render_and_persist_final_report import (
     render_and_persist_final_report,
 )
-from simula.application.workflow.utils.finalization_sections import (
+from simula.application.workflow.graphs.finalization.sections import (
     build_report_prompt_inputs,
     normalize_conclusion_section,
     normalize_final_report_sections,
@@ -41,7 +41,7 @@ from simula.application.workflow.graphs.finalization.nodes.resolve_timeline_anch
     extract_explicit_anchor,
     extract_partial_anchor_hint,
 )
-from simula.prompts.shared.user_facing_language import build_user_facing_style_block
+from simula.shared.prompts.user_facing_language import build_user_facing_style_block
 
 
 def test_extract_explicit_anchor_parses_date_and_time() -> None:
@@ -95,14 +95,14 @@ def test_cluster_round_activities_prioritizes_thread_grouping() -> None:
                 "thread_id": "same-thread",
                 "source_cast_id": "alpha",
                 "target_cast_ids": ["beta"],
-                "action_summary": "첫 action",
+                "summary": "첫 action",
                 "visibility": "private",
             },
             {
                 "thread_id": "same-thread",
                 "source_cast_id": "alpha",
                 "target_cast_ids": ["beta"],
-                "action_summary": "둘째 action",
+                "summary": "둘째 action",
                 "visibility": "private",
             },
         ],
@@ -137,10 +137,7 @@ def test_validate_markdown_table_rows_allows_empty_body() -> None:
 
 
 def test_validate_markdown_table_rows_allows_more_than_fourteen_rows() -> None:
-    rows = "\n".join(
-        f"| A{i} | 결과{i} | B{i} | 우세 | 근거{i} |"
-        for i in range(15)
-    )
+    rows = "\n".join(f"| A{i} | 결과{i} | B{i} | 우세 | 근거{i} |" for i in range(15))
 
     assert validate_markdown_table_rows(rows) is None
 
@@ -205,7 +202,9 @@ def test_normalize_final_report_sections_drops_table_header_rows() -> None:
 
     assert normalized["actor_results_rows"] == "| A | 결과 | B | 우세 | 근거 |"
     assert normalized["timeline_section"].startswith("- ")
-    assert normalized["actor_dynamics_section"] == "### 현재 구도\n- A\n### 관계 변화\n- B"
+    assert (
+        normalized["actor_dynamics_section"] == "### 현재 구도\n- A\n### 관계 변화\n- B"
+    )
     assert normalized["major_events_section"].startswith("- ")
 
 
@@ -226,7 +225,9 @@ def test_build_user_facing_style_block_no_longer_mentions_forbidden_terms() -> N
     assert "Avoid expressions such as" not in style
 
 
-def test_validate_conclusion_section_allows_terms_previously_blocked_as_jargon() -> None:
+def test_validate_conclusion_section_allows_terms_previously_blocked_as_jargon() -> (
+    None
+):
     error = validate_conclusion_section(
         "### 최종 상태\n"
         "- 마지막 협상안은 브리지 조건 쪽으로 수렴했다.\n"
@@ -237,7 +238,9 @@ def test_validate_conclusion_section_allows_terms_previously_blocked_as_jargon()
     assert error is None
 
 
-def test_validate_actor_dynamics_section_allows_terms_previously_blocked_as_jargon() -> None:
+def test_validate_actor_dynamics_section_allows_terms_previously_blocked_as_jargon() -> (
+    None
+):
     error = validate_actor_dynamics_section(
         "### 현재 구도\n"
         "- CFO와 CEO는 숫자 기준 정렬을 다시 맞추고 있다.\n\n"
@@ -248,7 +251,9 @@ def test_validate_actor_dynamics_section_allows_terms_previously_blocked_as_jarg
     assert error is None
 
 
-def test_write_report_section_accepts_valid_timeline_with_previously_forbidden_term() -> None:
+def test_write_report_section_accepts_valid_timeline_with_previously_forbidden_term() -> (
+    None
+):
     class FakeLLM:
         async def ainvoke_text_with_meta(self, role, prompt, **kwargs):  # noqa: ANN001
             del role, prompt, kwargs
@@ -355,9 +360,10 @@ def test_build_report_projection_returns_compact_context() -> None:
     assert '"timeline_highlights"' in projection["report_projection_json"]
     assert '"major_event_outcomes"' in projection["report_projection_json"]
     assert '"major_event_history"' not in projection["report_projection_json"]
-    assert '"timeline_anchor":{"anchor_iso":"2027-06-18T03:20:00"}' in projection[
-        "report_projection_json"
-    ]
+    assert (
+        '"timeline_anchor":{"anchor_iso":"2027-06-18T03:20:00"}'
+        in projection["report_projection_json"]
+    )
 
 
 def test_build_report_prompt_inputs_compacts_long_scenario_and_summary() -> None:

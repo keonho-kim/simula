@@ -22,8 +22,8 @@ from simula.infrastructure.config.models import (
     BedrockProviderConfig,
     GoogleProviderConfig,
     ModelConfig,
+    OpenAICompatibleProviderConfig,
     OpenAIProviderConfig,
-    VllmProviderConfig,
 )
 from simula.infrastructure.llm.providers import build_provider_chat_model
 
@@ -35,6 +35,7 @@ def test_openai_gpt5_builder_uses_responses_api_and_reasoning_dict() -> None:
         max_tokens=2400,
         openai=OpenAIProviderConfig(
             api_key="x",
+            stream_usage=True,
             reasoning_effort="none",
             verbosity="medium",
         ),
@@ -49,6 +50,7 @@ def test_openai_gpt5_builder_uses_responses_api_and_reasoning_dict() -> None:
     assert getattr(model, "use_responses_api") is True
     assert getattr(model, "reasoning") == {"effort": "none"}
     assert getattr(model, "verbosity") == "medium"
+    assert getattr(model, "stream_usage") is True
     assert "stream_options" not in getattr(model, "model_kwargs")
     assert "stream_options" not in payload
 
@@ -68,22 +70,31 @@ def test_openai_non_gpt5_builder_keeps_standard_path() -> None:
     assert "stream_options" not in getattr(model, "model_kwargs")
 
 
-def test_vllm_builder_uses_langchain_stream_usage_without_raw_stream_options() -> None:
+def test_openai_compatible_builder_passes_extra_body_without_openai_only_options() -> (
+    None
+):
     config = ModelConfig(
-        provider="vllm",
+        provider="openai-compatible",
         model="meta-llama/Llama-3.1-8B-Instruct",
         max_tokens=1200,
         temperature=0.2,
-        vllm=VllmProviderConfig(
+        openai_compatible=OpenAICompatibleProviderConfig(
             api_key="x",
             base_url="http://127.0.0.1:8000/v1",
+            stream_usage=True,
+            extra_body={
+                "reasoning": {"effort": "medium"},
+            },
         ),
     )
 
     model = build_provider_chat_model(config)
 
+    assert getattr(model, "temperature") == 0.2
+    assert getattr(model, "max_tokens") == 1200
+    assert getattr(model, "request_timeout") == 60.0
     assert getattr(model, "stream_usage") is True
-    assert getattr(model, "extra_body") == {"stream_include_usage": True}
+    assert getattr(model, "extra_body") == {"reasoning": {"effort": "medium"}}
     assert "stream_options" not in getattr(model, "model_kwargs")
 
 

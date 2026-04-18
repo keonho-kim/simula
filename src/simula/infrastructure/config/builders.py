@@ -128,7 +128,7 @@ def build_settings_from_values(values: dict[str, str]) -> AppSettings:
             actor=build_model_config(
                 values,
                 role="ACTOR",
-                default_provider="ollama",
+                default_provider="openai-compatible",
                 default_model="qwen3:8b",
             ),
             observer=build_model_config(

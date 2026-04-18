@@ -12,7 +12,7 @@ LangGraph workflow, the shipped CLI surface, and the artifacts produced by the a
 | Understand system boundaries | [`architecture.md`](./architecture.md) | [`contracts.md`](./contracts.md) |
 | Understand one workflow stage | [`workflows/README.md`](./workflows/README.md) | the stage document you need |
 | Change prompts, routing, or retry behavior | [`llm.md`](./llm.md) | the matching workflow doc |
-| Inspect saved runs and analyzer output | [`analysis.md`](./analysis.md) | [`operations.md`](./operations.md) |
+| Inspect saved runs and integrated analysis output | [`analysis.md`](./analysis.md) | [`operations.md`](./operations.md) |
 
 ## Document Map
 
@@ -24,11 +24,11 @@ LangGraph workflow, the shipped CLI surface, and the artifacts produced by the a
 | [`architecture.md`](./architecture.md) | execution path, layer boundaries, LangGraph integration, persistence split |
 | [`contracts.md`](./contracts.md) | public state surfaces, runtime context, structured contracts, durable artifacts |
 | [`llm.md`](./llm.md) | role routing, provider support, prompt projections, parsing, retries, and raw call logging |
-| [`analysis.md`](./analysis.md) | analyzer input selection, processing pipeline, localized artifacts, failure behavior |
+| [`analysis.md`](./analysis.md) | integrated analysis pipeline, artifact layout, localized outputs, failure behavior |
 | [`workflows/README.md`](./workflows/README.md) | workflow hub and cross-stage handoffs |
 | [`workflows/simulation.md`](./workflows/simulation.md) | root graph boundary, hydration, and execution stream surface |
 | [`workflows/planning.md`](./workflows/planning.md) | scenario analysis, plan construction, and planning validation |
-| [`workflows/generation.md`](./workflows/generation.md) | actor generation fan-out/fan-in flow |
+| [`workflows/generation.md`](./workflows/generation.md) | actor generation flow and serial/parallel variants |
 | [`workflows/runtime.md`](./workflows/runtime.md) | round loop, branching, event gating, and runtime trace building |
 | [`workflows/finalization.md`](./workflows/finalization.md) | final report projection, section writing, and markdown assembly |
 
@@ -36,6 +36,7 @@ LangGraph workflow, the shipped CLI surface, and the artifacts produced by the a
 
 - These docs describe the active compiled graph, not historical experiments.
 - Workflow docs use the active node names from the graph definitions.
+- Unless noted otherwise, workflow docs describe the default serial graph variants.
 - `docs/` stays implementation-oriented. Product framing stays in the root `README.md`.
 - Configuration, storage, and artifact descriptions follow current code behavior even when that
   behavior is stricter than the sample scenario files or older notes.

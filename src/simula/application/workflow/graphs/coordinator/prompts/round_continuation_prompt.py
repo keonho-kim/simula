@@ -15,12 +15,9 @@ Decide whether the simulation should stop before starting the next round because
 - Return `"no_progress"` only when the current state suggests the next round would materially repeat the same stalemate or low-information drift.
 - Do not use `"no_progress"` to represent successful completion. Completion is handled elsewhere.
 - If unresolved required events remain in `event_memory_json`, do not return `"no_progress"` just because the pace slowed.
-- Every field is required.
-- Return only the JSON object that matches the required output schema.
-- Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
-- Do not add extra keys that are not in the output schema.
-- Do not omit any required keys from the output schema.
-- If a field is a string, return a JSON string and never wrap it in an array.
+- Return only the JSON string value that matches the required output schema.
+- Do not return any prose, labels, headings, markdown, or commentary outside the JSON string value.
+- Do not wrap the value in a JSON object or JSON array.
 
 # Inputs
 Completed round index:

@@ -19,9 +19,9 @@ from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
-from simula.application.workflow.utils.streaming import record_simulation_log_event
+from simula.shared.io.streaming import record_simulation_log_event
 from simula.domain.actors import finalize_actor_registry
-from simula.domain.log_events import build_actors_finalized_event
+from simula.domain.reporting.events import build_actors_finalized_event
 
 
 def finalize_generated_actors(
@@ -47,7 +47,11 @@ def finalize_generated_actors(
 
     latency = time.perf_counter() - float(state.get("generation_started_at", 0.0))
     parse_failures = sum(int(item["parse_failure_count"]) for item in sorted_results)
-    runtime.context.logger.info("등장 인물 생성 완료")
+    runtime.context.logger.info(
+        "등장 인물 생성 완료 | 확정 %s명 | 소요 %.2fs",
+        len(actors),
+        latency,
+    )
     runtime.context.store.save_actors(state["run_id"], actors)
     record_simulation_log_event(
         runtime.context,

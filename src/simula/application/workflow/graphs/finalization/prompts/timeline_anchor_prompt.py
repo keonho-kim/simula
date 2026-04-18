@@ -13,7 +13,7 @@ from __future__ import annotations
 import textwrap
 
 from langchain_core.prompts import PromptTemplate
-from simula.prompts.shared.user_facing_language import build_user_facing_style_block
+from simula.shared.prompts.user_facing_language import build_user_facing_style_block
 
 _USER_FACING_STYLE = build_user_facing_style_block()
 
@@ -54,11 +54,12 @@ _PROMPT = (
     - Do not omit any required keys from the output schema.
     - If a field is a string, return a JSON string and never wrap it in an array.
     - If a field is an array, return a JSON array even when it has only one item.
+    - Do not exceed the per-field sentence or item limits shown in the shape guide.
     - `anchor_iso` must be one absolute timestamp in `YYYY-MM-DDTHH:MM:SS` format.
     - Preserve any explicit date or time information found in the scenario whenever possible.
     - If the scenario gives only partial time information, fill the missing parts with the most plausible value from the scenario context.
     - If the scenario gives no absolute date or time, choose one internally consistent anchor that makes the report timeline readable.
-    - `selection_reason` should briefly explain which clues you used.
+    - `reason` should briefly explain which clues you used.
     """
     ).strip()
     + "\n"

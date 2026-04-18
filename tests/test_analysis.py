@@ -146,10 +146,13 @@ def test_load_run_analysis_exposes_task_and_artifact_metadata() -> None:
     assert planner_call.task_identifier == "planner.planning_analysis"
     assert planner_call.artifact_key == "planning_analysis"
     assert planner_call.schema_name == "PlanningAnalysis"
+    assert planner_call.provider_structured_mode == "prompt_parse"
+    assert planner_call.prompt_variant == "primary"
     assert fixer_call.task_identifier == "fixer.json_repair.actor.actor_action_proposal"
     assert fixer_call.target_role == "actor"
     assert fixer_call.target_task_key == "actor_action_proposal"
     assert fixer_call.target_artifact_key == "pending_actor_proposals"
+    assert fixer_call.fixer_schema_name == "ActorActionProposal"
 
 
 def test_load_run_analysis_parses_planned_actions_and_round_cap() -> None:
@@ -192,14 +195,14 @@ def test_network_growth_report_tracks_cumulative_round_metrics() -> None:
     )
 
     assert [item.round_index for item in report.rows] == [1, 2, 3]
-    assert report.rows[0].participating_actor_count == 3
-    assert report.rows[0].edge_count == 3
-    assert report.rows[0].new_actor_count == 3
-    assert report.rows[0].new_edge_count == 3
+    assert report.rows[0].participating_actor_count == 2
+    assert report.rows[0].edge_count == 1
+    assert report.rows[0].new_actor_count == 2
+    assert report.rows[0].new_edge_count == 1
     assert report.rows[0].top_degree_cast_id == "alpha"
     assert report.rows[0].top_degree_display_name == "Alpha"
-    assert report.rows[1].edge_count == 3
-    assert report.rows[2].edge_count == 3
+    assert report.rows[1].edge_count == 1
+    assert report.rows[2].edge_count == 1
 
 
 def test_network_report_counts_targets_and_intent_only_edges() -> None:
@@ -211,21 +214,11 @@ def test_network_report_counts_targets_and_intent_only_edges() -> None:
     )
 
     assert report.summary.node_count == 3
-    assert report.summary.edge_count == 3
+    assert report.summary.edge_count == 1
     alpha_beta = next(
         edge
         for edge in report.edges
         if edge.source_cast_id == "alpha" and edge.target_cast_id == "beta"
-    )
-    alpha_gamma = next(
-        edge
-        for edge in report.edges
-        if edge.source_cast_id == "alpha" and edge.target_cast_id == "gamma"
-    )
-    beta_alpha = next(
-        edge
-        for edge in report.edges
-        if edge.source_cast_id == "beta" and edge.target_cast_id == "alpha"
     )
 
     assert alpha_beta.action_count == 1
@@ -234,18 +227,10 @@ def test_network_report_counts_targets_and_intent_only_edges() -> None:
     assert alpha_beta.thread_event_count == 1
     assert alpha_beta.label_preview == "private_check_in"
     assert alpha_beta.label_variant_count == 1
-    assert alpha_gamma.action_count == 0
-    assert alpha_gamma.intent_only_count == 1
-    assert alpha_gamma.label_preview == "private_check_in"
-    assert beta_alpha.intent_only_count == 1
-    assert beta_alpha.public_count == 1
-    assert beta_alpha.label_preview == "public_signal"
     assert graph["alpha"]["beta"]["weight"] == 1
     assert graph["alpha"]["beta"]["action_count"] == 1
-    assert graph["alpha"]["gamma"]["weight"] == 1
-    assert graph["alpha"]["gamma"]["action_count"] == 0
-    assert report.summary.participating_actor_count == 3
-    assert report.summary.isolated_actor_count == 0
+    assert report.summary.participating_actor_count == 2
+    assert report.summary.isolated_actor_count == 1
 
 
 def test_network_report_builds_complexity_rankings() -> None:
@@ -400,11 +385,11 @@ def test_network_report_computes_action_type_diversity() -> None:
         (
             _actors("alpha", "beta", "gamma", "delta", "epsilon", "zeta"),
             [
-                PlannedActionRecord("private_check_in", "비공개 확인", "", ["private"], True, True),
-                PlannedActionRecord("public_signal", "공개 신호", "", ["public"], False, True),
-                PlannedActionRecord("unused_1", "미사용 1", "", ["group"], False, False),
-                PlannedActionRecord("unused_2", "미사용 2", "", ["group"], False, False),
-                PlannedActionRecord("unused_3", "미사용 3", "", ["group"], False, False),
+                PlannedActionRecord("private_check_in", "비공개 확인", "", ["private"], True),
+                PlannedActionRecord("public_signal", "공개 신호", "", ["public"], False),
+                PlannedActionRecord("unused_1", "미사용 1", "", ["group"], False),
+                PlannedActionRecord("unused_2", "미사용 2", "", ["group"], False),
+                PlannedActionRecord("unused_3", "미사용 3", "", ["group"], False),
             ],
             math.log(2) / math.log(5),
         ),
@@ -423,7 +408,6 @@ def test_network_report_computes_action_type_diversity() -> None:
                     round_index=1,
                     source_cast_id="alpha",
                     target_cast_ids=["beta"],
-                    intent_target_cast_ids=["beta"],
                     visibility="private",
                     thread_id="thread-1",
                     action_type="private_check_in",
@@ -432,7 +416,6 @@ def test_network_report_computes_action_type_diversity() -> None:
                     round_index=2,
                     source_cast_id="beta",
                     target_cast_ids=["gamma"],
-                    intent_target_cast_ids=["gamma"],
                     visibility="public",
                     thread_id="thread-2",
                     action_type="public_signal",
@@ -483,7 +466,6 @@ def test_network_report_tracks_top20_interaction_share_by_participating_actor_co
                 round_index=5,
                 source_cast_id="zeta",
                 target_cast_ids=["alpha"],
-                intent_target_cast_ids=["alpha"],
                 visibility="private",
                 thread_id="thread-5",
             ),
@@ -507,36 +489,33 @@ def test_interaction_digests_prefer_thread_grouping_and_latest_utterance() -> No
             round_index=1,
             source_cast_id="alpha",
             target_cast_ids=["beta"],
-            intent_target_cast_ids=["beta"],
             visibility="private",
             thread_id="pair-thread",
             action_type="private_check_in",
-            action_summary="Alpha가 Beta에게 비공개로 확인을 요청한다.",
-            action_detail="지금 감정선을 비공개로 먼저 확인하려고 한다.",
+            summary="Alpha가 Beta에게 비공개로 확인을 요청한다.",
+            detail="지금 감정선을 비공개로 먼저 확인하려고 한다.",
             utterance="지금 잠깐 따로 이야기할래?",
         ),
         AdoptedActivityRecord(
             round_index=2,
             source_cast_id="beta",
             target_cast_ids=["alpha"],
-            intent_target_cast_ids=["alpha"],
             visibility="private",
             thread_id="pair-thread",
             action_type="private_check_in",
-            action_summary="Beta가 Alpha에게 짧게 답한다.",
-            action_detail="조금 더 생각할 시간이 필요하다고 한다.",
+            summary="Beta가 Alpha에게 짧게 답한다.",
+            detail="조금 더 생각할 시간이 필요하다고 한다.",
             utterance="지금은 바로 답하기 어렵네요.",
         ),
         AdoptedActivityRecord(
             round_index=2,
             source_cast_id="alpha",
             target_cast_ids=["gamma"],
-            intent_target_cast_ids=["gamma"],
             visibility="public",
             thread_id="",
             action_type="public_signal",
-            action_summary="Alpha가 Gamma를 공개적으로 의식한다.",
-            action_detail="직접 묻지는 않지만 반응을 탐색한다.",
+            summary="Alpha가 Gamma를 공개적으로 의식한다.",
+            detail="직접 묻지는 않지만 반응을 탐색한다.",
             utterance="",
         ),
     ]
@@ -578,7 +557,6 @@ def _activities(*edges: tuple[str, str]) -> list[AdoptedActivityRecord]:
             round_index=index,
             source_cast_id=source_cast_id,
             target_cast_ids=[target_cast_id],
-            intent_target_cast_ids=[target_cast_id],
             visibility="private",
             thread_id=f"thread-{index}",
         )

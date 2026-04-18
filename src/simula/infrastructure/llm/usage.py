@@ -8,7 +8,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Literal
 
-from simula.application.llm_logging import task_counter_key
+from simula.shared.logging.llm import task_counter_key
 from simula.domain.contracts import LLMUsageSummary
 
 CallKind = Literal["structured", "text"]

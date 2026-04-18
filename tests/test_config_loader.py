@@ -16,11 +16,10 @@ def _clear_known_env(monkeypatch: pytest.MonkeyPatch) -> None:
     prefixes = (
         "SIM_",
         "OPENAI_",
+        "OPENAI_COMPATIBLE_",
         "ANTHROPIC_",
         "GOOGLE_",
         "BEDROCK_",
-        "OLLAMA_",
-        "VLLM_",
     )
     for key in list(__import__("os").environ):
         if key.startswith(prefixes):
@@ -81,6 +80,168 @@ def test_load_settings_reads_openai_defaults_and_role_override(
     assert settings.models.generator.verbosity == "medium"
 
 
+def test_load_settings_reads_openai_compatible_extra_body_and_role_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_known_env(monkeypatch)
+    env_file = _write_env_file(
+        tmp_path,
+        """
+        [db]
+        provider = "sqlite"
+
+        [db.sqlite]
+        path = "./runtime.sqlite"
+
+        [llm.openai-compatible]
+        base_url = "http://127.0.0.1:8000/v1"
+        stream_usage = true
+        extra_body = { reasoning = { effort = "medium" }, top_k = 40 }
+
+        [llm.planner]
+        provider = "openai-compatible"
+        model = "qwen3-32b"
+        extra_body = { reasoning = { effort = "low" } }
+        top_p = 0.7
+
+        [llm.generator]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.actor]
+        provider = "openai-compatible"
+        model = "qwen3-32b"
+
+        [llm.observer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.fixer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.openai]
+        API_KEY = "openai-key"
+        """,
+    )
+
+    settings = load_settings(env_file)
+
+    assert settings.models.planner.provider == "openai-compatible"
+    assert (
+        settings.models.planner.openai_compatible.base_url == "http://127.0.0.1:8000/v1"
+    )
+    assert settings.models.planner.openai_compatible.stream_usage is True
+    assert settings.models.planner.extra_body == {
+        "reasoning": {"effort": "low"},
+        "top_k": 40,
+        "top_p": 0.7,
+    }
+    assert settings.models.actor.openai_compatible.stream_usage is True
+    assert settings.models.actor.extra_body == {
+        "reasoning": {"effort": "medium"},
+        "top_k": 40,
+    }
+
+
+def test_load_settings_reads_openai_compatible_env_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_known_env(monkeypatch)
+    env_file = _write_env_file(
+        tmp_path,
+        """
+        [db]
+        provider = "sqlite"
+
+        [db.sqlite]
+        path = "./runtime.sqlite"
+
+        [llm.openai-compatible]
+        base_url = "http://127.0.0.1:8000/v1"
+
+        [llm.planner]
+        provider = "openai-compatible"
+        model = "qwen3-32b"
+
+        [llm.generator]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.actor]
+        model = "qwen3-32b"
+
+        [llm.observer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.fixer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.openai]
+        API_KEY = "openai-key"
+        """,
+    )
+    monkeypatch.setenv("OPENAI_COMPATIBLE_BASE_URL", "http://127.0.0.1:1234/v1")
+    monkeypatch.setenv("SIM_ACTOR_EXTRA_BODY", '{"top_p": 0.8}')
+
+    settings = load_settings(env_file)
+
+    assert settings.models.actor.provider == "openai-compatible"
+    assert settings.models.actor.base_url == "http://127.0.0.1:1234/v1"
+    assert settings.models.actor.extra_body == {"top_p": 0.8}
+
+
+def test_load_settings_reads_stream_usage_with_role_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_known_env(monkeypatch)
+    env_file = _write_env_file(
+        tmp_path,
+        """
+        [db]
+        provider = "sqlite"
+
+        [db.sqlite]
+        path = "./runtime.sqlite"
+
+        [llm.openai-compatible]
+        base_url = "http://127.0.0.1:8000/v1"
+        stream_usage = true
+
+        [llm.planner]
+        provider = "openai-compatible"
+        model = "qwen3-32b"
+        stream_usage = false
+
+        [llm.generator]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.actor]
+        provider = "openai-compatible"
+        model = "qwen3-32b"
+
+        [llm.observer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.fixer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.openai]
+        API_KEY = "openai-key"
+        """,
+    )
+
+    settings = load_settings(env_file)
+
+    assert settings.models.planner.openai_compatible.stream_usage is False
+    assert settings.models.actor.openai_compatible.stream_usage is True
+
+
 def test_load_settings_reads_google_vertex_role_config(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -131,7 +292,10 @@ def test_load_settings_reads_google_vertex_role_config(
 
     assert settings.models.planner.google.project_id == "planner-project"
     assert settings.models.planner.google.location == "us-central1"
-    assert settings.models.planner.google.credentials_path == "/tmp/google-credentials.json"
+    assert (
+        settings.models.planner.google.credentials_path
+        == "/tmp/google-credentials.json"
+    )
 
 
 def test_load_settings_rejects_partial_google_vertex_config(
@@ -313,6 +477,97 @@ def test_load_settings_reads_runtime_max_rounds_from_time_table(
     assert load_settings_bundle(env_file).settings.runtime.max_rounds == 6
 
 
+def test_load_settings_rejects_openai_compatible_without_base_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_known_env(monkeypatch)
+    env_file = _write_env_file(
+        tmp_path,
+        """
+        [db]
+        provider = "sqlite"
+
+        [db.sqlite]
+        path = "./runtime.sqlite"
+
+        [llm.openai-compatible]
+        base_url = ""
+
+        [llm.planner]
+        provider = "openai-compatible"
+        model = "qwen3-32b"
+
+        [llm.generator]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.actor]
+        provider = "openai-compatible"
+        model = "qwen3-32b"
+
+        [llm.observer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.fixer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.openai]
+        API_KEY = "openai-key"
+        """,
+    )
+
+    with pytest.raises(ValueError, match="base_url"):
+        load_settings(env_file)
+
+
+def test_load_settings_rejects_openai_compatible_reasoning_effort(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_known_env(monkeypatch)
+    env_file = _write_env_file(
+        tmp_path,
+        """
+        [db]
+        provider = "sqlite"
+
+        [db.sqlite]
+        path = "./runtime.sqlite"
+
+        [llm.openai-compatible]
+        base_url = "http://127.0.0.1:8000/v1"
+
+        [llm.planner]
+        provider = "openai-compatible"
+        model = "qwen3-32b"
+        reasoning_effort = "low"
+
+        [llm.generator]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.actor]
+        provider = "openai-compatible"
+        model = "qwen3-32b"
+
+        [llm.observer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.fixer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.openai]
+        API_KEY = "openai-key"
+        """,
+    )
+
+    with pytest.raises(ValueError, match="reasoning_effort"):
+        load_settings(env_file)
+
+
 def test_load_settings_rejects_nested_role_provider_table(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -415,5 +670,5 @@ def test_env_sample_can_be_loaded_after_placeholder_replacement(tmp_path: Path) 
     settings = load_settings(env_file)
 
     assert settings.models.planner.provider == "openai"
-    assert settings.models.actor.provider == "ollama"
+    assert settings.models.actor.provider == "openai-compatible"
     assert settings.models.fixer.provider == "openai"

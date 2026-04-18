@@ -74,12 +74,18 @@ def build_network_report(
                 sent_relations=item.sent_relations,
                 received_relations=item.received_relations,
                 total_weight=item.sent_relations + item.received_relations,
-                counterpart_count=len(aggregated.counterparties.get(item.cast_id, set())),
+                counterpart_count=len(
+                    aggregated.counterparties.get(item.cast_id, set())
+                ),
                 sent_action_counts=dict(sorted(item.sent_action_counts.items())),
-                received_action_counts=dict(sorted(item.received_action_counts.items())),
+                received_action_counts=dict(
+                    sorted(item.received_action_counts.items())
+                ),
                 in_degree_centrality=computed.in_degree_centrality.get(item.cast_id),
                 out_degree_centrality=computed.out_degree_centrality.get(item.cast_id),
-                betweenness_centrality=computed.betweenness_centrality.get(item.cast_id),
+                betweenness_centrality=computed.betweenness_centrality.get(
+                    item.cast_id
+                ),
                 hub_score=computed.hub_score.get(item.cast_id),
                 authority_score=computed.authority_score.get(item.cast_id),
                 pagerank=computed.pagerank.get(item.cast_id),
@@ -110,7 +116,9 @@ def build_network_report(
         participating_actor_ratio=computed.participating_actor_ratio,
         isolated_actor_count=computed.isolated_actor_count,
         isolated_actor_ratio=computed.isolated_actor_ratio,
-        max_edge_weight=max((item.total_weight for item in aggregated.edges), default=0),
+        max_edge_weight=max(
+            (item.total_weight for item in aggregated.edges), default=0
+        ),
         density=computed.density,
         weak_component_count=computed.weak_component_count,
         strong_component_count=computed.strong_component_count,
@@ -163,9 +171,7 @@ def build_network_report(
 
 def _planned_action_types(planned_actions: list[PlannedActionRecord]) -> set[str]:
     return {
-        item.action_type.strip()
-        for item in planned_actions
-        if item.action_type.strip()
+        item.action_type.strip() for item in planned_actions if item.action_type.strip()
     }
 
 
@@ -215,13 +221,7 @@ def _activity_pairs(activity: AdoptedActivityRecord) -> list[tuple[str, str]]:
         return []
 
     pairs: list[tuple[str, str]] = []
-    actual_targets = _dedupe_ids(activity.target_cast_ids)
-    intent_targets = [
-        cast_id
-        for cast_id in _dedupe_ids(activity.intent_target_cast_ids)
-        if cast_id not in set(actual_targets)
-    ]
-    for target_cast_id in [*actual_targets, *intent_targets]:
+    for target_cast_id in _dedupe_ids(activity.target_cast_ids):
         if not target_cast_id or target_cast_id == source_cast_id:
             continue
         pairs.append((source_cast_id, target_cast_id))
@@ -236,7 +236,4 @@ def _dedupe_ids(values: list[str]) -> list[str]:
     return deduped
 
 
-__all__ = [
-    "build_network_graph",
-    "build_network_report",
-]
+__all__ = ["build_network_report"]

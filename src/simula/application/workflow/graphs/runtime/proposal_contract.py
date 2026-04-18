@@ -21,8 +21,8 @@ from simula.domain.contracts import (
 _ACTOR_PROPOSAL_TARGET_RULES: tuple[str, ...] = (
     "For `group` visibility, `target_cast_ids` must contain at least one real visible other actor `cast_id`.",
     "For `private` visibility, `target_cast_ids` may be empty only for a solo self-directed action. If the action is aimed at a concrete visible other actor, include that real `cast_id`.",
-    "Never include your own `cast_id` in `target_cast_ids` or `intent_target_cast_ids`.",
-    "`target_cast_ids` and `intent_target_cast_ids` may contain only real visible other actor `cast_id` values from `visible actors JSON`.",
+    "Never include your own `cast_id` in `target_cast_ids`.",
+    "`target_cast_ids` may contain only real visible other actor `cast_id` values from `visible actors JSON`.",
     "If no valid visible other actor is involved, you may use `private` visibility and leave both target arrays empty for a solo action. Use `public` with empty targets only for room-wide or broadcast actions.",
 )
 
@@ -40,7 +40,7 @@ def validate_actor_action_proposal_semantics(
     available_actions: list[dict[str, object]],
     valid_target_cast_ids: list[str],
     visible_actors: list[dict[str, object]],
-    current_intent_snapshot: dict[str, object],
+    goal_snapshot: dict[str, object],
     max_target_count: int,
 ) -> list[str]:
     """Return semantic contract violations for one actor proposal."""
@@ -57,7 +57,6 @@ def validate_actor_action_proposal_semantics(
 
     supported_visibility = _string_list(action_spec.get("supported_visibility", []))
     requires_target = bool(action_spec.get("requires_target", False))
-    supports_utterance = bool(action_spec.get("supports_utterance", False))
     valid_target_set = {
         target_id for target_id in valid_target_cast_ids if target_id != cast_id
     }
@@ -65,12 +64,8 @@ def validate_actor_action_proposal_semantics(
         proposal=proposal,
         source_cast_id=cast_id,
         visible_actors=visible_actors,
-        current_intent_snapshot=current_intent_snapshot,
+        goal_snapshot=goal_snapshot,
     )
-    effective_intent_target_cast_ids = (
-        proposal.intent_target_cast_ids or list(effective_target_cast_ids)
-    )
-
     if proposal.visibility not in supported_visibility:
         issues.append(
             f"visibility `{proposal.visibility}` 는 action_type `{proposal.action_type}` 에서 지원되지 않습니다."
@@ -82,10 +77,6 @@ def validate_actor_action_proposal_semantics(
     if proposal.visibility == "group" and not effective_target_cast_ids:
         issues.append(
             "visibility `group` 는 target_cast_ids가 비어 있으면 안 됩니다."
-        )
-    if proposal.utterance.strip() and not supports_utterance:
-        issues.append(
-            f"action_type `{proposal.action_type}` 는 utterance를 지원하지 않습니다."
         )
     if len(effective_target_cast_ids) > max_target_count:
         issues.append(
@@ -105,17 +96,6 @@ def validate_actor_action_proposal_semantics(
             + ", ".join(invalid_targets)
         )
 
-    invalid_intent_targets = [
-        target_id
-        for target_id in effective_intent_target_cast_ids
-        if target_id not in valid_target_set
-    ]
-    if invalid_intent_targets:
-        issues.append(
-            "intent_target_cast_ids 는 visible actor 중 실제 상대 cast_id만 써야 합니다: "
-            + ", ".join(invalid_intent_targets)
-        )
-
     return issues
 
 
@@ -126,7 +106,7 @@ def validate_actor_action_shell_semantics(
     available_actions: list[dict[str, object]],
     valid_target_cast_ids: list[str],
     visible_actors: list[dict[str, object]],
-    current_intent_snapshot: dict[str, object],
+    goal_snapshot: dict[str, object],
     max_target_count: int,
 ) -> list[str]:
     """Return semantic contract violations for one actor action shell."""
@@ -135,13 +115,12 @@ def validate_actor_action_shell_semantics(
         action_type=shell.action_type,
         visibility=shell.visibility,
         target_cast_ids=shell.target_cast_ids,
-        intent_target_cast_ids=[],
         utterance="",
         cast_id=cast_id,
         available_actions=available_actions,
         valid_target_cast_ids=valid_target_cast_ids,
         visible_actors=visible_actors,
-        current_intent_snapshot=current_intent_snapshot,
+        goal_snapshot=goal_snapshot,
         max_target_count=max_target_count,
     )
 
@@ -154,7 +133,7 @@ def validate_actor_action_narrative_semantics(
     available_actions: list[dict[str, object]],
     valid_target_cast_ids: list[str],
     visible_actors: list[dict[str, object]],
-    current_intent_snapshot: dict[str, object],
+    goal_snapshot: dict[str, object],
     max_target_count: int,
 ) -> list[str]:
     """Return semantic contract violations for one actor narrative."""
@@ -163,13 +142,12 @@ def validate_actor_action_narrative_semantics(
         action_type=shell.action_type,
         visibility=shell.visibility,
         target_cast_ids=shell.target_cast_ids,
-        intent_target_cast_ids=narrative.intent_target_cast_ids,
         utterance=narrative.utterance,
         cast_id=cast_id,
         available_actions=available_actions,
         valid_target_cast_ids=valid_target_cast_ids,
         visible_actors=visible_actors,
-        current_intent_snapshot=current_intent_snapshot,
+        goal_snapshot=goal_snapshot,
         max_target_count=max_target_count,
     )
 
@@ -181,7 +159,7 @@ def build_actor_proposal_repair_context(
     available_actions: list[dict[str, object]],
     valid_target_cast_ids: list[str],
     visible_actors: list[dict[str, object]],
-    current_intent_target_cast_ids: list[str],
+    goal_target_cast_ids: list[str],
     recent_visible_actions: list[dict[str, object]],
     max_target_count: int,
 ) -> dict[str, object]:
@@ -194,14 +172,8 @@ def build_actor_proposal_repair_context(
     ]
     current_valid_intent_targets = [
         target_id
-        for target_id in current_intent_target_cast_ids
+        for target_id in goal_target_cast_ids
         if target_id in valid_visible_other_targets
-    ]
-    action_types_requiring_target = [
-        str(item.get("action_type", "")).strip()
-        for item in available_actions
-        if bool(item.get("requires_target", False))
-        and str(item.get("action_type", "")).strip()
     ]
     solo_private_action_types = [
         str(item.get("action_type", "")).strip()
@@ -238,19 +210,13 @@ def build_actor_proposal_repair_context(
             + ", ".join(current_valid_intent_targets)
             + "."
         )
-    elif current_intent_target_cast_ids:
+    elif goal_target_cast_ids:
         repair_guidance.append(
             "Current intent target ids are not valid for this turn. Do not copy them into the repaired JSON."
         )
     else:
         repair_guidance.append(
             "Current intent does not provide a valid visible other target for this turn."
-        )
-    if action_types_requiring_target:
-        repair_guidance.append(
-            "These action types still require a valid target: "
-            + ", ".join(action_types_requiring_target)
-            + "."
         )
     repair_guidance.append(
         f"Do not return more than {max_target_count} target cast_id value(s)."
@@ -262,14 +228,8 @@ def build_actor_proposal_repair_context(
         "available_actions": available_actions,
         "valid_target_cast_ids": valid_visible_other_targets,
         "visible_actors": visible_actors,
-        "current_intent_target_cast_ids": current_valid_intent_targets,
+        "goal_target_cast_ids": current_valid_intent_targets,
         "recent_visible_actions": recent_visible_actions,
-        "thread_family_guidance": {
-            "date_selection": "same pair/group date line",
-            "private_confession": "same confession or private emotional line",
-            "choice_pressure": "same choice or commitment pressure line",
-            "public_conversation": "same ongoing public conversation line",
-        },
         "max_target_count": max_target_count,
         "repair_guidance": repair_guidance,
     }
@@ -282,7 +242,7 @@ def build_actor_action_shell_repair_context(
     available_actions: list[dict[str, object]],
     valid_target_cast_ids: list[str],
     visible_actors: list[dict[str, object]],
-    current_intent_target_cast_ids: list[str],
+    goal_target_cast_ids: list[str],
     recent_visible_actions: list[dict[str, object]],
     max_target_count: int,
 ) -> dict[str, object]:
@@ -294,7 +254,7 @@ def build_actor_action_shell_repair_context(
         available_actions=available_actions,
         valid_target_cast_ids=valid_target_cast_ids,
         visible_actors=visible_actors,
-        current_intent_target_cast_ids=current_intent_target_cast_ids,
+        goal_target_cast_ids=goal_target_cast_ids,
         recent_visible_actions=recent_visible_actions,
         max_target_count=max_target_count,
     )
@@ -305,7 +265,7 @@ def build_actor_action_shell_repair_context(
         else []
     )
     repair_guidance.append(
-        "In this shell step, return only action_type, visibility, target_cast_ids, and thread_id."
+        "In this shell step, return only action_type, visibility, and target_cast_ids."
     )
     repair_guidance.append(
         "Do not change the chosen action later by inventing a different action_type during repair."
@@ -326,21 +286,12 @@ def build_actor_action_narrative_repair_context(
 ) -> dict[str, object]:
     """Build repair context for the action narrative stage."""
 
-    supports_utterance = bool(selected_action_spec.get("supports_utterance", False))
     repair_guidance = [
-        "Do not change the selected action shell. Keep the fixed action_type, visibility, target_cast_ids, and thread_id.",
+        "Do not change the selected action shell. Keep the fixed action_type, visibility, and target_cast_ids.",
         "Do not swap to a different action_type just to make the JSON pass validation.",
     ]
-    if supports_utterance:
-        repair_guidance.append(
-            "This action may include a spoken line, but `utterance` may still be an empty string if no line is needed."
-        )
-    else:
-        repair_guidance.append(
-            "This action does not support utterance. Return `utterance` as an empty string."
-        )
     repair_guidance.append(
-        "intent_target_cast_ids may contain only cast ids already present in the selected shell target_cast_ids."
+        "Return a spoken line only when it is naturally needed. Otherwise keep `utterance` empty."
     )
     return {
         "cast_id": cast_id,
@@ -357,25 +308,22 @@ def _validate_action_core_semantics(
     action_type: str,
     visibility: VisibilityType,
     target_cast_ids: list[str],
-    intent_target_cast_ids: list[str],
     utterance: str,
     cast_id: str,
     available_actions: list[dict[str, object]],
     valid_target_cast_ids: list[str],
     visible_actors: list[dict[str, object]],
-    current_intent_snapshot: dict[str, object],
+    goal_snapshot: dict[str, object],
     max_target_count: int,
 ) -> list[str]:
     proposal = ActorActionProposal(
         action_type=action_type,
-        intent="semantic placeholder",
-        intent_target_cast_ids=list(intent_target_cast_ids),
-        action_summary="semantic placeholder",
-        action_detail="semantic placeholder",
+        goal="semantic placeholder",
+        summary="semantic placeholder",
+        detail="semantic placeholder",
         utterance=utterance,
         visibility=visibility,
         target_cast_ids=list(target_cast_ids),
-        thread_id="",
     )
     return validate_actor_action_proposal_semantics(
         proposal=proposal,
@@ -383,7 +331,7 @@ def _validate_action_core_semantics(
         available_actions=available_actions,
         valid_target_cast_ids=valid_target_cast_ids,
         visible_actors=visible_actors,
-        current_intent_snapshot=current_intent_snapshot,
+        goal_snapshot=goal_snapshot,
         max_target_count=max_target_count,
     )
 

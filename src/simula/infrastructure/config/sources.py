@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import tomllib
 from pathlib import Path
@@ -21,15 +22,20 @@ from typing import Any
 SUPPORTED_PREFIXES = (
     "SIM_",
     "OPENAI_",
+    "OPENAI_COMPATIBLE_",
     "ANTHROPIC_",
     "GOOGLE_",
     "BEDROCK_",
-    "OLLAMA_",
-    "VLLM_",
 )
 
 ROLE_NAMES = ("planner", "generator", "coordinator", "actor", "observer", "fixer")
-PROVIDER_NAMES = ("openai", "anthropic", "google", "ollama", "vllm", "bedrock")
+PROVIDER_NAMES = (
+    "openai",
+    "openai-compatible",
+    "anthropic",
+    "google",
+    "bedrock",
+)
 _LEGACY_KEY_PREFIXES = SUPPORTED_PREFIXES
 
 
@@ -103,6 +109,8 @@ def coerce_env_value(value: Any) -> str:
 
     if isinstance(value, bool):
         return "true" if value else "false"
+    if isinstance(value, (dict, list)):
+        return json.dumps(value)
     return str(value)
 
 
@@ -244,8 +252,17 @@ def _flatten_llm_shared_table(table: dict[str, Any]) -> dict[str, str]:
             {
                 "API_KEY": "OPENAI_API_KEY",
                 "base_url": "OPENAI_BASE_URL",
+                "stream_usage": "OPENAI_STREAM_USAGE",
                 "reasoning_effort": "OPENAI_REASONING_EFFORT",
                 "verbosity": "OPENAI_VERBOSITY",
+            },
+        ),
+        "openai-compatible": (
+            "[llm.openai-compatible]",
+            {
+                "API_KEY": "OPENAI_COMPATIBLE_API_KEY",
+                "base_url": "OPENAI_COMPATIBLE_BASE_URL",
+                "stream_usage": "OPENAI_COMPATIBLE_STREAM_USAGE",
             },
         ),
         "anthropic": (
@@ -276,20 +293,6 @@ def _flatten_llm_shared_table(table: dict[str, Any]) -> dict[str, str]:
                 "endpoint_url": "BEDROCK_ENDPOINT_URL",
             },
         ),
-        "ollama": (
-            "[llm.ollama]",
-            {
-                "base_url": "OLLAMA_BASE_URL",
-                "reasoning": "OLLAMA_REASONING",
-            },
-        ),
-        "vllm": (
-            "[llm.vllm]",
-            {
-                "API_KEY": "VLLM_API_KEY",
-                "base_url": "VLLM_BASE_URL",
-            },
-        ),
     }
 
     for provider_name in PROVIDER_NAMES:
@@ -305,6 +308,13 @@ def _flatten_llm_shared_table(table: dict[str, Any]) -> dict[str, str]:
         table_name, key_map = provider_tables[provider_name]
         _reject_legacy_keys(provider_table, table_name=table_name)
         values.update(_map_scalar_keys(provider_table, key_map))
+        if provider_name == "openai-compatible":
+            extra_body = _collect_extra_body(
+                provider_table,
+                reserved_keys={"API_KEY", "base_url", "stream_usage"},
+            )
+            if extra_body:
+                values["OPENAI_COMPATIBLE_EXTRA_BODY"] = coerce_env_value(extra_body)
     return values
 
 
@@ -321,6 +331,7 @@ def _flatten_llm_role_table(role: str, table: dict[str, Any]) -> dict[str, str]:
             "timeout_seconds": f"SIM_{role_prefix}_TIMEOUT_SECONDS",
             "API_KEY": f"SIM_{role_prefix}_API_KEY",
             "base_url": f"SIM_{role_prefix}_BASE_URL",
+            "stream_usage": f"SIM_{role_prefix}_STREAM_USAGE",
             "reasoning_effort": f"SIM_{role_prefix}_REASONING_EFFORT",
             "verbosity": f"SIM_{role_prefix}_VERBOSITY",
             "effort": f"SIM_{role_prefix}_ANTHROPIC_EFFORT",
@@ -332,11 +343,37 @@ def _flatten_llm_role_table(role: str, table: dict[str, Any]) -> dict[str, str]:
             "region_name": f"SIM_{role_prefix}_BEDROCK_REGION_NAME",
             "credentials_profile_name": f"SIM_{role_prefix}_BEDROCK_CREDENTIALS_PROFILE_NAME",
             "endpoint_url": f"SIM_{role_prefix}_BEDROCK_ENDPOINT_URL",
-            "reasoning": f"SIM_{role_prefix}_REASONING",
         },
     )
 
     _reject_role_provider_subtables(role, table)
+
+    extra_body = _collect_extra_body(
+        table,
+        reserved_keys={
+            "provider",
+            "model",
+            "temperature",
+            "max_tokens",
+            "timeout_seconds",
+            "API_KEY",
+            "base_url",
+            "stream_usage",
+            "reasoning_effort",
+            "verbosity",
+            "effort",
+            "project_id",
+            "location",
+            "credentials_path",
+            "thinking_budget",
+            "thinking_level",
+            "region_name",
+            "credentials_profile_name",
+            "endpoint_url",
+        },
+    )
+    if extra_body:
+        values[f"SIM_{role_prefix}_EXTRA_BODY"] = coerce_env_value(extra_body)
 
     return values
 
@@ -347,6 +384,28 @@ def _map_scalar_keys(table: dict[str, Any], key_map: dict[str, str]) -> dict[str
         if key in table and not isinstance(table[key], dict):
             values[env_key] = coerce_env_value(table[key])
     return values
+
+
+def _collect_extra_body(
+    table: dict[str, Any],
+    *,
+    reserved_keys: set[str],
+) -> dict[str, Any]:
+    extra_body: dict[str, Any] = {}
+
+    explicit_extra_body = table.get("extra_body")
+    if explicit_extra_body is not None:
+        if not isinstance(explicit_extra_body, dict):
+            raise ValueError(
+                "`extra_body` 값은 TOML table 또는 inline table이어야 합니다."
+            )
+        extra_body.update(explicit_extra_body)
+
+    for key, value in table.items():
+        if key in reserved_keys or key == "extra_body" or key in PROVIDER_NAMES:
+            continue
+        extra_body[key] = value
+    return extra_body
 
 
 def _reject_legacy_keys(table: dict[str, Any], *, table_name: str) -> None:

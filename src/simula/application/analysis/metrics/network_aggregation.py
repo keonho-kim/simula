@@ -79,13 +79,7 @@ def aggregate_relationship_network(
                 node_state[source_cast_id].sent_action_counts.get(action_type, 0) + 1
             )
 
-        target_cast_ids = _dedupe_ids(activity.target_cast_ids)
-        intent_only_cast_ids = [
-            cast_id
-            for cast_id in _dedupe_ids(activity.intent_target_cast_ids)
-            if cast_id not in set(target_cast_ids)
-        ]
-        for target_cast_id in target_cast_ids:
+        for target_cast_id in _dedupe_ids(activity.target_cast_ids):
             if not target_cast_id or target_cast_id == source_cast_id:
                 continue
             _ensure_node(node_state, actors_by_id=actors_by_id, cast_id=target_cast_id)
@@ -106,22 +100,6 @@ def aggregate_relationship_network(
                 target_cast_id=target_cast_id,
                 activity=activity,
                 is_intent_only=False,
-            )
-        for target_cast_id in intent_only_cast_ids:
-            if not target_cast_id or target_cast_id == source_cast_id:
-                continue
-            _ensure_node(node_state, actors_by_id=actors_by_id, cast_id=target_cast_id)
-            node_state[source_cast_id].sent_relations += 1
-            node_state[target_cast_id].received_relations += 1
-            counterparties[source_cast_id].add(target_cast_id)
-            counterparties[target_cast_id].add(source_cast_id)
-            _update_edge(
-                edge_state=edge_state,
-                actors_by_id=actors_by_id,
-                source_cast_id=source_cast_id,
-                target_cast_id=target_cast_id,
-                activity=activity,
-                is_intent_only=True,
             )
 
     edges = sorted(
@@ -232,9 +210,9 @@ def _dedupe_ids(values: list[str]) -> list[str]:
 def _activity_label_of(activity: AdoptedActivityRecord) -> str:
     for value in (
         activity.action_type,
-        activity.action_summary,
+        activity.summary,
         activity.utterance,
-        activity.intent,
+        activity.goal,
     ):
         text = value.strip()
         if text:

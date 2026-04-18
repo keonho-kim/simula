@@ -33,6 +33,7 @@ _PROMPT = textwrap.dedent(
     - Do not omit any required keys from the output schema.
     - If a field is a string, return a JSON string and never wrap it in an array.
     - If a field is an array, return a JSON array even when it has only one item.
+    - Do not exceed the per-field sentence or item limits shown in the shape guide.
     - Create exactly one actor card.
     - `baseline_attention_tier` must be one of `lead`, `driver`, `support`, `background`.
     - `public_profile` and `private_goal` must not say the same thing.

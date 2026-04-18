@@ -126,14 +126,6 @@ def render_network_growth_video(
                 + (f" ffmpeg stderr={stderr}" if stderr else "")
             ) from exc
 
-
-def render_network_growth_gif(**kwargs) -> None:
-    """Backward-compatible alias that now renders MP4 when called."""
-
-    render_network_growth_video(**kwargs)
-
-
 __all__ = [
-    "render_network_growth_gif",
     "render_network_growth_video",
 ]

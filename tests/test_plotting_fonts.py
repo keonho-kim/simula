@@ -21,17 +21,13 @@ def _reset_matplotlib_font_state() -> Iterator[None]:
     """Restore Matplotlib font settings after each test."""
 
     fonts.configure_korean_font.cache_clear()
-    original_family = list(plt.rcParams["font.family"])
-    original_sans_serif = list(plt.rcParams["font.sans-serif"])
-    original_unicode_minus = plt.rcParams["axes.unicode_minus"]
+    original_rcparams = plt.rcParams.copy()
 
     try:
         yield
     finally:
         fonts.configure_korean_font.cache_clear()
-        plt.rcParams["font.family"] = original_family
-        plt.rcParams["font.sans-serif"] = original_sans_serif
-        plt.rcParams["axes.unicode_minus"] = original_unicode_minus
+        plt.rcParams.update(original_rcparams)
 
 
 def test_configure_korean_font_prefers_hangul_capable_family(monkeypatch) -> None:
@@ -45,7 +41,9 @@ def test_configure_korean_font_prefers_hangul_capable_family(monkeypatch) -> Non
     monkeypatch.setattr(
         fonts,
         "_font_supports_text",
-        lambda font_path, text=fonts._HANGUL_SAMPLE_TEXT: font_path != "/fonts/noto-sans.ttf",
+        lambda font_path, text=fonts._HANGUL_SAMPLE_TEXT: (
+            font_path != "/fonts/noto-sans.ttf"
+        ),
     )
     plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Verdana"]
 
@@ -56,6 +54,8 @@ def test_configure_korean_font_prefers_hangul_capable_family(monkeypatch) -> Non
     assert plt.rcParams["font.sans-serif"][0] == "Noto Sans CJK JP"
     assert "NanumGothic" in plt.rcParams["font.sans-serif"]
     assert plt.rcParams["axes.unicode_minus"] is False
+    assert plt.rcParams["axes.facecolor"] == "#E5E5E5"
+    assert plt.rcParams["axes.grid"] is True
 
 
 def test_configure_korean_font_falls_back_to_dejavu_when_needed(monkeypatch) -> None:
@@ -72,6 +72,8 @@ def test_configure_korean_font_falls_back_to_dejavu_when_needed(monkeypatch) -> 
     assert plt.rcParams["font.family"] == ["sans-serif"]
     assert plt.rcParams["font.sans-serif"][0] == "DejaVu Sans"
     assert plt.rcParams["axes.unicode_minus"] is False
+    assert plt.rcParams["axes.facecolor"] == "#E5E5E5"
+    assert plt.rcParams["axes.grid"] is True
 
 
 def test_render_network_plot_avoids_missing_hangul_glyph_warnings(
@@ -88,8 +90,11 @@ def test_render_network_plot_avoids_missing_hangul_glyph_warnings(
     graph.add_edge("alpha", "beta", total_weight=1)
     monkeypatch.setattr(
         plotting_network,
-        "_compute_layout_positions",
-        lambda graph: {"alpha": (-1.0, 0.0), "beta": (1.0, 0.0)},
+        "compute_layout_positions",
+        lambda graph, layout_kwargs=None: {  # noqa: ARG005
+            "alpha": (-1.0, 0.0),
+            "beta": (1.0, 0.0),
+        },
     )
 
     with warnings.catch_warnings(record=True) as captured:

@@ -19,8 +19,8 @@ from simula.application.workflow.graphs.planning.states.state import (
 from simula.application.workflow.graphs.runtime.states.state import (
     empty_actor_proposal_task,
 )
-from simula.domain.runtime_policy import derive_rng_seed
-from simula.domain.scenario_controls import ScenarioControls
+from simula.domain.runtime.policy import derive_rng_seed
+from simula.domain.scenario.controls import ScenarioControls
 from simula.infrastructure.config.models import AppSettings
 
 
@@ -30,6 +30,7 @@ def build_simulation_input_state(
     scenario_text: str,
     scenario_controls: ScenarioControls,
     settings: AppSettings,
+    parallel_graph_calls: bool = False,
 ) -> SimulationInputState:
     """Build the public graph input payload."""
 
@@ -42,6 +43,7 @@ def build_simulation_input_state(
             run_id=run_id,
             configured_seed=settings.runtime.rng_seed,
         ),
+        "parallel_graph_calls": parallel_graph_calls,
     }
 
 
@@ -62,8 +64,9 @@ def expand_input_state_to_workflow_state(
             "planned_max_rounds": input_state["max_rounds"],
             "checkpoint_enabled": settings.runtime.enable_checkpointing,
             "rng_seed": input_state["rng_seed"],
+            "parallel_graph_calls": bool(input_state.get("parallel_graph_calls", False)),
             "planning_analysis": {},
-            "cast_roster_outline": {},
+            "cast_roster_outline": [],
             "execution_plan_frame": {},
             "plan": {},
             "actors": [],
@@ -89,7 +92,7 @@ def expand_input_state_to_workflow_state(
             "actor_intent_states": [],
             "intent_history": [],
             "round_focus_plan": {},
-            "round_time_advance": {},
+            "time_advance": {},
             "simulation_clock": {
                 "total_elapsed_minutes": 0,
                 "total_elapsed_label": "0분",
@@ -106,6 +109,7 @@ def expand_input_state_to_workflow_state(
             "cast_slot": empty_cast_slot_spec(),
             "generated_actor_results": [],
             "actor_proposal_task": empty_actor_proposal_task(),
+            "pending_actor_cast_ids": [],
             "pending_actor_proposals": [],
             "parse_failures": 0,
             "forced_idles": 0,

@@ -2,7 +2,7 @@
 - Provide local semantic normalization helpers for actor proposals.
 
 Description:
-- Infer missing targets from explicit name mentions or current intent.
+- Infer missing targets from explicit name mentions or current goal.
 - Reuse or synthesize stable thread identifiers for targeted actions.
 """
 
@@ -33,10 +33,9 @@ def normalize_actor_action_proposal(
     proposal: ActorActionProposal,
     source_cast_id: str,
     visible_actors: list[dict[str, object]],
-    visible_action_context: list[dict[str, object]],
-    current_intent_snapshot: dict[str, object],
+    goal_snapshot: dict[str, object],
 ) -> ActorActionProposal:
-    """Normalize one actor proposal with local target/thread inference."""
+    """Normalize one actor proposal with local target inference."""
 
     normalized_target_cast_ids = _sanitize_ordered_unique(
         proposal.target_cast_ids,
@@ -50,38 +49,17 @@ def normalize_actor_action_proposal(
             proposal=proposal,
             source_cast_id=source_cast_id,
             visible_actors=visible_actors,
-            current_intent_snapshot=current_intent_snapshot,
-        )
-
-    normalized_intent_target_cast_ids = _sanitize_ordered_unique(
-        proposal.intent_target_cast_ids,
-        valid_target_cast_ids=_valid_visible_target_cast_ids(
-            source_cast_id=source_cast_id,
-            visible_actors=visible_actors,
-        ),
-    )
-    if not normalized_intent_target_cast_ids and normalized_target_cast_ids:
-        normalized_intent_target_cast_ids = list(normalized_target_cast_ids)
-
-    thread_id = proposal.thread_id.strip()
-    if not thread_id and normalized_target_cast_ids:
-        thread_id = infer_thread_id(
-            proposal=proposal,
-            source_cast_id=source_cast_id,
-            target_cast_ids=normalized_target_cast_ids,
-            visible_action_context=visible_action_context,
+            goal_snapshot=goal_snapshot,
         )
 
     return ActorActionProposal(
         action_type=proposal.action_type,
-        intent=proposal.intent,
-        intent_target_cast_ids=normalized_intent_target_cast_ids,
-        action_summary=proposal.action_summary,
-        action_detail=proposal.action_detail,
+        goal=proposal.goal,
+        summary=proposal.summary,
+        detail=proposal.detail,
         utterance=proposal.utterance,
         visibility=proposal.visibility,
         target_cast_ids=normalized_target_cast_ids,
-        thread_id=thread_id,
     )
 
 
@@ -90,9 +68,9 @@ def infer_target_cast_ids(
     proposal: ActorActionProposal,
     source_cast_id: str,
     visible_actors: list[dict[str, object]],
-    current_intent_snapshot: dict[str, object],
+    goal_snapshot: dict[str, object],
 ) -> list[str]:
-    """Infer missing targets from explicit mentions or current intent."""
+    """Infer missing targets from explicit mentions or current goal."""
 
     valid_target_cast_ids = _valid_visible_target_cast_ids(
         source_cast_id=source_cast_id,
@@ -109,15 +87,15 @@ def infer_target_cast_ids(
             valid_target_cast_ids=valid_target_cast_ids,
         )
 
-    current_intent_targets = _sanitize_ordered_unique(
-        _string_list(current_intent_snapshot.get("target_cast_ids", [])),
+    goal_targets = _sanitize_ordered_unique(
+        _string_list(goal_snapshot.get("target_cast_ids", [])),
         valid_target_cast_ids=valid_target_cast_ids,
     )
     if (
-        len(current_intent_targets) == 1
+        len(goal_targets) == 1
         and _looks_interpersonal_action(proposal=proposal)
     ):
-        return current_intent_targets
+        return goal_targets
     return []
 
 
@@ -180,9 +158,9 @@ def _infer_explicit_mentions(
 ) -> list[str]:
     combined_text = "\n".join(
         [
-            proposal.intent,
-            proposal.action_summary,
-            proposal.action_detail,
+            proposal.goal,
+            proposal.summary,
+            proposal.detail,
             proposal.utterance,
         ]
     )
@@ -206,9 +184,9 @@ def _looks_interpersonal_action(*, proposal: ActorActionProposal) -> bool:
         return True
     combined_text = " ".join(
         [
-            proposal.intent,
-            proposal.action_summary,
-            proposal.action_detail,
+            proposal.goal,
+            proposal.summary,
+            proposal.detail,
             proposal.utterance,
         ]
     )

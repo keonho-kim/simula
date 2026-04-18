@@ -15,13 +15,14 @@ Resolve only the core decisions for this round: adoption, elapsed time, global s
 - `world_state_summary` must be a non-empty Korean sentence grounded in this round.
 - `stop_reason` must be `""` when the simulation should continue.
 - `stop_reason` may be `"simulation_done"` only when this round clearly completes the simulation objective.
-- `round_time_advance.selection_reason` must be grounded in the adopted actions, background updates, or event progress from this round.
+- `time_advance.reason` must be grounded in the adopted actions, background updates, or event progress from this round.
 - Return only the JSON object that matches the required output schema.
 - Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
 - Do not add extra keys that are not in the output schema.
 - Do not omit any required keys from the output schema.
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
+- Do not exceed the per-field sentence or item limits shown in the shape guide.
 
 # Inputs
 Round index:

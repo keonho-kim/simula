@@ -12,9 +12,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from simula.prompts.shared.output_schema_utils import (
+from simula.shared.prompts.output_schema_utils import (
     ExampleMode,
-    build_json_prompt_bundle,
+    build_object_prompt_bundle,
 )
 
 
@@ -22,7 +22,7 @@ def build_actor_action_proposal_prompt_bundle(
     *,
     example_mode: ExampleMode = "minimal",
 ) -> dict[str, str]:
-    return build_json_prompt_bundle(
+    return build_object_prompt_bundle(
         example=_ACTOR_ACTION_PROPOSAL_EXAMPLE,
         example_mode=example_mode,
     )
@@ -32,7 +32,7 @@ def build_actor_action_shell_prompt_bundle(
     *,
     example_mode: ExampleMode = "minimal",
 ) -> dict[str, str]:
-    return build_json_prompt_bundle(
+    return build_object_prompt_bundle(
         example=_ACTOR_ACTION_SHELL_EXAMPLE,
         example_mode=example_mode,
     )
@@ -42,7 +42,7 @@ def build_actor_action_narrative_prompt_bundle(
     *,
     example_mode: ExampleMode = "minimal",
 ) -> dict[str, str]:
-    return build_json_prompt_bundle(
+    return build_object_prompt_bundle(
         example=_ACTOR_ACTION_NARRATIVE_EXAMPLE,
         example_mode=example_mode,
     )
@@ -52,7 +52,7 @@ def build_observer_report_prompt_bundle(
     *,
     example_mode: ExampleMode = "minimal",
 ) -> dict[str, str]:
-    return build_json_prompt_bundle(
+    return build_object_prompt_bundle(
         example=_OBSERVER_REPORT_EXAMPLE,
         example_mode=example_mode,
     )
@@ -60,36 +60,32 @@ def build_observer_report_prompt_bundle(
 
 _ACTOR_ACTION_PROPOSAL_EXAMPLE: dict[str, Any] = {
     "action_type": "<choose one action_type from runtime_guidance.available_actions>",
-    "intent": "<one Korean sentence describing the intended change>",
-    "intent_target_cast_ids": ["<cast_id string or an empty list>"],
-    "action_summary": "<one Korean sentence summarizing the action>",
-    "action_detail": "<one Korean sentence describing the concrete action in more detail>",
-    "utterance": "<one Korean spoken line or an empty string>",
+    "goal": "<1 Korean sentence describing the intended change>",
+    "summary": "<1 Korean sentence summarizing the action>",
+    "detail": "<within 2 Korean sentences describing the concrete action in more detail>",
+    "utterance": "<1 Korean spoken line or an empty string>",
     "visibility": "<choose exactly one of public, private, group>",
     "target_cast_ids": ["<real visible other cast_id values, or an empty list for solo private/public actions>"],
-    "thread_id": "<stable thread identifier or an empty string>",
 }
 
 _ACTOR_ACTION_SHELL_EXAMPLE: dict[str, Any] = {
     "action_type": "<choose one action_type from runtime_guidance.available_actions>",
     "visibility": "<choose exactly one of public, private, group>",
     "target_cast_ids": ["<real visible other cast_id values, or an empty list for solo private/public actions>"],
-    "thread_id": "<stable thread identifier or an empty string>",
 }
 
 _ACTOR_ACTION_NARRATIVE_EXAMPLE: dict[str, Any] = {
-    "intent": "<one Korean sentence describing the intended change>",
-    "intent_target_cast_ids": ["<cast_id string or an empty list>"],
-    "action_summary": "<one Korean sentence summarizing the action>",
-    "action_detail": "<one Korean sentence describing the concrete action in more detail>",
-    "utterance": "<one Korean spoken line or an empty string; return an empty string when the selected action does not support utterance>",
+    "goal": "<1 Korean sentence describing the intended change>",
+    "summary": "<1 Korean sentence summarizing the action>",
+    "detail": "<within 2 Korean sentences describing the concrete action in more detail>",
+    "utterance": "<1 Korean spoken line or an empty string>",
 }
 
 _OBSERVER_REPORT_EXAMPLE: dict[str, Any] = {
     "round_index": "<copy the current round index as an integer>",
-    "summary": "<one Korean sentence summarizing the round outcome>",
-    "notable_events": ["<one notable event from this round>"],
-    "atmosphere": "<short Korean atmosphere label>",
+    "summary": "<1 Korean sentence summarizing the round outcome>",
+    "notable_events": ["<1 Korean sentence about one notable event from this round>"],
+    "atmosphere": "<1 short Korean atmosphere label>",
     "momentum": "<choose exactly one of high, medium, low>",
-    "world_state_summary": "<one Korean sentence describing the updated world state>",
+    "world_state_summary": "<1 Korean sentence describing the updated world state>",
 }

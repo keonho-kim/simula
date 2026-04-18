@@ -21,13 +21,11 @@ PROMPT = PromptTemplate.from_template(
         - Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
         - Do not add extra keys that are not in the output schema.
         - Do not omit any required keys from the output schema.
-        - Do not change the chosen `action_type`, `visibility`, `target_cast_ids`, or `thread_id`. Those are already fixed outside this step.
-        - `intent`, `action_summary`, and `action_detail` must stay concrete and immediately playable.
-        - If `selected_action_spec_json.supports_utterance` is false, `utterance` must be an empty string.
-        - Use `runtime_guidance.actor_facing_scenario_digest.talking_points` as spoken guidance only when `selected_action_spec_json.supports_utterance` is true.
-        - If no spoken line is needed or plausible, return `utterance` as an empty string even when utterance is allowed.
-        - `intent_target_cast_ids` may contain only cast ids from `selected_action_shell_json.target_cast_ids`, or be an empty array for a solo action.
+        - Do not change the chosen `action_type`, `visibility`, or `target_cast_ids`. Those are already fixed outside this step.
+        - `goal`, `summary`, and `detail` must stay concrete and immediately playable.
+        - If no spoken line is needed or plausible, return `utterance` as an empty string.
         - Keep the narrative realistic for the selected visibility and chosen action type.
+        - Do not exceed the per-field sentence or item limits shown in the shape guide.
 
         # Input
         - round_index: {round_index}

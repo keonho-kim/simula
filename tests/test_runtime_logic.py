@@ -8,16 +8,16 @@
 - 순수 함수 단위 테스트 패턴
 
 연관된 다른 모듈/구조:
-- simula.domain.activity_feeds
-- simula.domain.activities
-- simula.domain.reporting
-- simula.domain.runtime_actions
+- simula.domain.activity.feeds
+- simula.domain.activity.actions
+- simula.domain.reporting.reports
+- simula.domain.runtime.actions
 """
 
 from __future__ import annotations
 
-from simula.domain.activities import create_canonical_action, recent_actions
-from simula.domain.activity_feeds import (
+from simula.domain.activity.actions import create_canonical_action, recent_actions
+from simula.domain.activity.feeds import (
     build_visibility_scope,
     initialize_activity_feeds,
     list_recent_visible_activities,
@@ -25,14 +25,14 @@ from simula.domain.activity_feeds import (
     route_activity,
     sanitize_targets,
 )
-from simula.domain.reporting import (
+from simula.domain.reporting.reports import (
     build_final_report,
     latest_observer_summary,
     latest_world_state_summary,
 )
 from simula.domain.event_memory import hard_stop_round
-from simula.domain.runtime_policy import derive_rng_seed
-from simula.domain.runtime_actions import apply_actor_proposals
+from simula.domain.runtime.actions import apply_actor_proposals
+from simula.domain.runtime.policy import derive_rng_seed
 
 
 def test_public_activity_targets_no_specific_actor() -> None:
@@ -68,10 +68,9 @@ def test_route_activity_updates_visible_feeds() -> None:
         visibility="private",
         target_cast_ids=["b"],
         action_type="coordination",
-        intent="b와 비공개 정렬을 맞춘다.",
-        intent_target_cast_ids=["b"],
-        action_summary="비공개 정렬 action",
-        action_detail="비공개로 우선순위를 맞춘다.",
+        goal="b와 비공개 정렬을 맞춘다.",
+        summary="비공개 정렬 action",
+        detail="비공개로 우선순위를 맞춘다.",
         visibility_scope=["a", "b"],
     ).model_dump(mode="json")
 
@@ -95,10 +94,9 @@ def test_route_activity_keeps_solo_private_action_on_source_only() -> None:
         visibility="private",
         target_cast_ids=[],
         action_type="product_inspection",
-        intent="혼자 성분표를 다시 확인한다.",
-        intent_target_cast_ids=[],
-        action_summary="혼자 성분표를 본다.",
-        action_detail="광고 문구와 실제 수치를 혼자 대조한다.",
+        goal="혼자 성분표를 다시 확인한다.",
+        summary="혼자 성분표를 본다.",
+        detail="광고 문구와 실제 수치를 혼자 대조한다.",
         utterance="",
         visibility_scope=build_visibility_scope("a", [], "private"),
     ).model_dump(mode="json")
@@ -123,10 +121,9 @@ def test_list_unseen_activities_does_not_consume_feed() -> None:
         visibility="private",
         target_cast_ids=["a"],
         action_type="speech",
-        intent="a의 입장을 바로 확인한다.",
-        intent_target_cast_ids=["a"],
-        action_summary="확인 요청 action",
-        action_detail="지금 의견을 바로 확인해야 한다.",
+        goal="a의 입장을 바로 확인한다.",
+        summary="확인 요청 action",
+        detail="지금 의견을 바로 확인해야 한다.",
         utterance="지금 의견이 필요합니다.",
         visibility_scope=["a", "b"],
     ).model_dump(mode="json")
@@ -151,10 +148,9 @@ def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> Non
         visibility="private",
         target_cast_ids=["a"],
         action_type="speech",
-        intent="a의 답을 바로 듣는다.",
-        intent_target_cast_ids=["a"],
-        action_summary="질문 action",
-        action_detail="답변이 바로 필요하다.",
+        goal="a의 답을 바로 듣는다.",
+        summary="질문 action",
+        detail="답변이 바로 필요하다.",
         utterance="답변이 필요합니다.",
         visibility_scope=["a", "b"],
     ).model_dump(mode="json")
@@ -172,15 +168,10 @@ def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> Non
                     "action_type": "speech",
                     "label": "직접 발화",
                     "description": "직접 말로 의도를 전달한다.",
-                    "role_hints": [],
-                    "group_hints": [],
                     "supported_visibility": ["public", "private", "group"],
                     "requires_target": True,
-                    "supports_utterance": True,
-                    "examples_or_usage_notes": [],
                 }
-            ],
-            "selection_guidance": [],
+            ]
         },
         pending_actor_proposals=[
             {
@@ -188,14 +179,12 @@ def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> Non
                 "unread_activity_ids": [inbound_activity["activity_id"]],
                 "proposal": {
                     "action_type": "speech",
-                    "intent": "b에게 답을 돌려준다.",
-                    "intent_target_cast_ids": ["b"],
-                    "action_summary": "A가 응답 action을 한다.",
-                    "action_detail": "질문에 바로 반응해 답을 준다.",
+                    "goal": "b에게 답을 돌려준다.",
+                    "summary": "A가 응답 action을 한다.",
+                    "detail": "질문에 바로 반응해 답을 준다.",
                     "utterance": "확인했습니다.",
                     "visibility": "private",
                     "target_cast_ids": ["b"],
-                    "thread_id": "",
                 },
                 "forced_idle": False,
                 "parse_failure_count": 0,

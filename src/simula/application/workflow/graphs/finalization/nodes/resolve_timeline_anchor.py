@@ -16,7 +16,7 @@ from typing import cast
 
 from langgraph.runtime import Runtime
 
-from simula.application.llm_logging import build_llm_log_context
+from simula.shared.logging.llm import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.finalization.output_schema.bundles import (
     build_timeline_anchor_decision_prompt_bundle,
@@ -51,7 +51,7 @@ async def resolve_timeline_anchor(
     if explicit_anchor is not None:
         payload = TimelineAnchorDecision(
             anchor_iso=explicit_anchor.isoformat(timespec="seconds"),
-            selection_reason="시나리오 본문에 절대 날짜와 시각이 명시되어 있어 이를 그대로 시작 anchor로 사용했다.",
+            reason="시나리오 본문에 절대 날짜와 시각이 명시되어 있어 이를 그대로 시작 anchor로 사용했다.",
         )
         return {"report_timeline_anchor_json": payload.model_dump(mode="json")}
 
@@ -70,7 +70,7 @@ async def resolve_timeline_anchor(
         max_rounds=state["max_rounds"],
         **build_timeline_anchor_decision_prompt_bundle(),
     )
-    anchor, _ = await runtime.context.llms.ainvoke_structured_with_meta(
+    anchor, _ = await runtime.context.llms.ainvoke_object_with_meta(
         "observer",
         prompt,
         TimelineAnchorDecision,

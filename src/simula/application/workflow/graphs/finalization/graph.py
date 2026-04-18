@@ -28,32 +28,61 @@ from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
 
-_graph = StateGraph(
-    state_schema=cast(Any, SimulationWorkflowState),
-    context_schema=WorkflowRuntimeContext,
-)
-_graph.add_node("resolve_timeline_anchor", resolve_timeline_anchor)
-_graph.add_node("build_report_artifacts", build_report_artifacts)
-_graph.add_node("write_conclusion_section", write_conclusion_section)
-_graph.add_node("write_timeline_section", write_timeline_section)
-_graph.add_node("write_actor_dynamics_section", write_actor_dynamics_section)
-_graph.add_node("write_major_events_section", write_major_events_section)
-_graph.add_node("render_and_persist_final_report", render_and_persist_final_report)
-_graph.add_edge(START, "resolve_timeline_anchor")
-_graph.add_edge("resolve_timeline_anchor", "build_report_artifacts")
-_graph.add_edge("build_report_artifacts", "write_conclusion_section")
-_graph.add_edge("build_report_artifacts", "write_timeline_section")
-_graph.add_edge("build_report_artifacts", "write_actor_dynamics_section")
-_graph.add_edge("build_report_artifacts", "write_major_events_section")
-_graph.add_edge(
-    [
-        "write_conclusion_section",
-        "write_timeline_section",
-        "write_actor_dynamics_section",
-        "write_major_events_section",
-    ],
-    "render_and_persist_final_report",
-)
-_graph.add_edge("render_and_persist_final_report", END)
+def _build_parallel_finalization_graph() -> StateGraph:
+    graph = StateGraph(
+        state_schema=cast(Any, SimulationWorkflowState),
+        context_schema=WorkflowRuntimeContext,
+    )
+    graph.add_node("resolve_timeline_anchor", resolve_timeline_anchor)
+    graph.add_node("build_report_artifacts", build_report_artifacts)
+    graph.add_node("write_conclusion_section", write_conclusion_section)
+    graph.add_node("write_timeline_section", write_timeline_section)
+    graph.add_node("write_actor_dynamics_section", write_actor_dynamics_section)
+    graph.add_node("write_major_events_section", write_major_events_section)
+    graph.add_node("render_and_persist_final_report", render_and_persist_final_report)
+    graph.add_edge(START, "resolve_timeline_anchor")
+    graph.add_edge("resolve_timeline_anchor", "build_report_artifacts")
+    graph.add_edge("build_report_artifacts", "write_conclusion_section")
+    graph.add_edge("build_report_artifacts", "write_timeline_section")
+    graph.add_edge("build_report_artifacts", "write_actor_dynamics_section")
+    graph.add_edge("build_report_artifacts", "write_major_events_section")
+    graph.add_edge(
+        [
+            "write_conclusion_section",
+            "write_timeline_section",
+            "write_actor_dynamics_section",
+            "write_major_events_section",
+        ],
+        "render_and_persist_final_report",
+    )
+    graph.add_edge("render_and_persist_final_report", END)
+    return graph
 
-FINALIZATION_SUBGRAPH = _graph.compile(name="finalization")
+
+def _build_serial_finalization_graph() -> StateGraph:
+    graph = StateGraph(
+        state_schema=cast(Any, SimulationWorkflowState),
+        context_schema=WorkflowRuntimeContext,
+    )
+    graph.add_node("resolve_timeline_anchor", resolve_timeline_anchor)
+    graph.add_node("build_report_artifacts", build_report_artifacts)
+    graph.add_node("write_conclusion_section", write_conclusion_section)
+    graph.add_node("write_timeline_section", write_timeline_section)
+    graph.add_node("write_actor_dynamics_section", write_actor_dynamics_section)
+    graph.add_node("write_major_events_section", write_major_events_section)
+    graph.add_node("render_and_persist_final_report", render_and_persist_final_report)
+    graph.add_edge(START, "resolve_timeline_anchor")
+    graph.add_edge("resolve_timeline_anchor", "build_report_artifacts")
+    graph.add_edge("build_report_artifacts", "write_conclusion_section")
+    graph.add_edge("write_conclusion_section", "write_timeline_section")
+    graph.add_edge("write_timeline_section", "write_actor_dynamics_section")
+    graph.add_edge("write_actor_dynamics_section", "write_major_events_section")
+    graph.add_edge("write_major_events_section", "render_and_persist_final_report")
+    graph.add_edge("render_and_persist_final_report", END)
+    return graph
+
+
+FINALIZATION_SUBGRAPH_GRAPH = _build_parallel_finalization_graph()
+FINALIZATION_SUBGRAPH_SERIAL_GRAPH = _build_serial_finalization_graph()
+FINALIZATION_SUBGRAPH = FINALIZATION_SUBGRAPH_GRAPH.compile(name="finalization")
+FINALIZATION_SUBGRAPH_SERIAL = FINALIZATION_SUBGRAPH_SERIAL_GRAPH.compile(name="finalization")

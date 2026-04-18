@@ -1,5 +1,5 @@
 """목적:
-- 구조화 LLM 응답을 사람이 읽기 좋은 로그 텍스트로 변환한다.
+- machine-readable LLM 응답을 사람이 읽기 좋은 로그 텍스트로 변환한다.
 
 설명:
 - schema별 핵심 정보를 뽑아 CLI에서 읽기 쉬운 요약 로그를 만든다.
@@ -8,12 +8,13 @@
 - renderer 유틸 패턴
 
 연관된 다른 모듈/구조:
-- simula.infrastructure.llm.router
+- simula.infrastructure.llm.runtime.router
 - simula.domain.contracts
 """
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from typing import cast
 
@@ -24,8 +25,6 @@ from simula.domain.contracts import (
     ActorFacingScenarioDigest,
     ActorActionProposal,
     ActorCard,
-    ActorIntentStateBatch,
-    BackgroundUpdateBatch,
     CastRoster,
     CoordinationFrame,
     ObserverReport,
@@ -34,23 +33,22 @@ from simula.domain.contracts import (
     RuntimeProgressionPlan,
     ScenarioTimeScope,
     SimulationClockSnapshot,
-    RoundContinuationDecision,
     RoundDirective,
     RoundResolution,
     RoundTimeAdvanceProposal,
     SituationBundle,
 )
-from simula.domain.time_units import duration_label
+from simula.domain.scenario.time import duration_label
 
 
-def render_structured_response(
+def render_object_response(
     *,
     role: str,
     parsed: BaseModel | None,
     content: str,
     log_context: dict[str, object] | None,
 ) -> str:
-    """구조화 응답을 사람이 읽기 좋은 로그 텍스트로 변환한다."""
+    """Object 응답을 사람이 읽기 좋은 로그 텍스트로 변환한다."""
 
     if parsed is None:
         if not content.strip():
@@ -140,28 +138,10 @@ def render_structured_response(
             model=parsed,
         )
 
-    if isinstance(parsed, RoundContinuationDecision):
-        return _render_model_block(
-            subject="coordinator | ROUND 지속",
-            model=parsed,
-        )
-
-    if isinstance(parsed, BackgroundUpdateBatch):
-        return _render_model_block(
-            subject="coordinator | 배경 상태 변화",
-            model=parsed,
-        )
-
     if isinstance(parsed, ActorActionProposal):
         actor_name = _actor_name(log_context)
         return _render_model_block(
             subject=f"{actor_name} | 행동 제안",
-            model=parsed,
-        )
-
-    if isinstance(parsed, ActorIntentStateBatch):
-        return _render_model_block(
-            subject="coordinator | 등장인물 의향 상태",
             model=parsed,
         )
 
@@ -192,8 +172,35 @@ def render_structured_response(
             model=parsed,
         )
     return _render_block(
-        subject=f"{role} | STRUCTURED",
+        subject=f"{role} | OBJECT",
         body="content: ",
+    )
+
+
+def render_simple_response(
+    *,
+    role: str,
+    parsed: object | None,
+    content: str,
+    output_type_name: str,
+    log_context: dict[str, object] | None,
+) -> str:
+    """Simple 응답을 사람이 읽기 좋은 로그 텍스트로 변환한다."""
+
+    if parsed is None:
+        stripped = content.strip()
+        if not stripped:
+            return _render_block(
+                subject=f"{role} | SIMPLE {output_type_name}",
+                body="content: ",
+            )
+        return _render_block(
+            subject=f"{role} | SIMPLE {output_type_name}",
+            body=f"content:\n{_indent_block(stripped)}",
+        )
+    return _render_block(
+        subject=f"{role} | SIMPLE {output_type_name}",
+        body=_render_simple_value(parsed),
     )
 
 
@@ -228,6 +235,20 @@ def render_text_response(
     )
 
 
+def _render_simple_value(value: object) -> str:
+    if isinstance(value, BaseModel):
+        return _render_mapping(value.model_dump(mode="json"))
+    if isinstance(value, list):
+        rendered = [
+            item.model_dump(mode="json") if isinstance(item, BaseModel) else item
+            for item in value
+        ]
+        return _indent_block(json.dumps(rendered, ensure_ascii=False, indent=2))
+    if isinstance(value, Mapping):
+        return _render_mapping(dict(cast(Mapping[str, object], value)))
+    return _indent_block(json.dumps(value, ensure_ascii=False, indent=2))
+
+
 def _actor_name(log_context: dict[str, object] | None) -> str:
     if not log_context:
         return "actor"
@@ -238,33 +259,6 @@ def _actor_name(log_context: dict[str, object] | None) -> str:
     if cast_id is not None:
         return str(cast_id)
     return "actor"
-
-
-def _actor_thought(log_context: dict[str, object] | None) -> str:
-    if not log_context:
-        return ""
-    thought = log_context.get("actor_thought")
-    if thought is None:
-        return ""
-    return str(thought)
-
-
-def _actor_talking_points(log_context: dict[str, object] | None) -> list[str]:
-    if not log_context:
-        return []
-    value = log_context.get("actor_talking_points")
-    if not isinstance(value, list):
-        return []
-    return [str(item) for item in value]
-
-
-def _actor_recommended_tone(log_context: dict[str, object] | None) -> str:
-    if not log_context:
-        return ""
-    tone = log_context.get("actor_recommended_tone")
-    if tone is None:
-        return ""
-    return str(tone)
 
 
 def _list_preview(value: object, *, limit: int) -> str:
@@ -350,10 +344,14 @@ def _render_mapping(mapping: dict[str, object]) -> str:
 def _render_field_lines(key: str, value: object) -> list[str]:
     if _is_empty_value(value):
         return [f"{key}: {_render_empty_value(key, value)}"]
-    return [f"{key}: {_format_scalar(value)}"] if _is_scalar(value) else [
-        f"{key}:",
-        *_render_nested(value, indent=4, parent_key=key),
-    ]
+    return (
+        [f"{key}: {_format_scalar(value)}"]
+        if _is_scalar(value)
+        else [
+            f"{key}:",
+            *_render_nested(value, indent=4, parent_key=key),
+        ]
+    )
 
 
 def _indent_block(text: str) -> str:
@@ -449,7 +447,9 @@ def _render_dict_list_item(item: Mapping[object, object], *, indent: int) -> lis
     first_key, first_value = entries[0]
     lines: list[str] = []
     if _is_empty_value(first_value):
-        lines.append(f"{prefix}- {first_key}: {_render_empty_value(first_key, first_value)}")
+        lines.append(
+            f"{prefix}- {first_key}: {_render_empty_value(first_key, first_value)}"
+        )
     elif _is_scalar(first_value):
         lines.append(f"{prefix}- {first_key}: {_format_scalar(first_value)}")
     else:

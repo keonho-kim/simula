@@ -98,7 +98,7 @@ def render_network_summary_markdown(
             "## 계산 메모",
             "- 성장 추이는 라운드별 누적 연결을 다시 계산해 요약합니다.",
             "- 직접 연결, 중간 다리 역할, 간접 영향력은 각각 상대 수, 중개 중심성, 페이지랭크를 바탕으로 읽습니다.",
-            "- 더 자세한 숫자는 `network/growth.csv`, `network/nodes.csv`, `network/edges.csv`에서 확인할 수 있습니다.",
+            "- 더 자세한 숫자는 `data/network.growth.csv`, `data/network.nodes.csv`, `data/network.edges.csv`에서 확인할 수 있습니다.",
         ]
     )
 

@@ -10,7 +10,7 @@ from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
-from simula.domain.reporting import render_llm_usage_lines
+from simula.domain.reporting.reports import render_llm_usage_lines
 
 
 def render_and_persist_final_report(
@@ -40,7 +40,7 @@ def render_and_persist_final_report(
     ]
     final_report_markdown = "# 시뮬레이션 결과\n\n" + "\n\n".join(rendered_sections)
     runtime.context.store.save_final_report(state["run_id"], state["final_report"])
-    runtime.context.logger.info("최종 정리 완료")
+    runtime.context.logger.info("최종 정리 완료 | 보고서 작성 완료")
     return {
         "final_report_sections": sections,
         "final_report_markdown": final_report_markdown,

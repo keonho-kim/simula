@@ -14,13 +14,11 @@
 
 from __future__ import annotations
 
-import concurrent.futures
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
 from simula.application.services.executor import SimulationExecutor
-from simula.domain.scenario_controls import ScenarioControls
+from simula.application.services.scenario_inputs import ScenarioInput
 from simula.infrastructure.config.loader import load_settings_bundle
 from simula.infrastructure.config.models import AppSettings
 
@@ -80,9 +78,9 @@ def resolve_single_run_log_level(
 def execute_single_run(
     *,
     env_file: str | None,
-    scenario_text: str,
-    scenario_controls: ScenarioControls,
+    scenario_input: ScenarioInput,
     cli_overrides: dict[str, str],
+    parallel: bool = False,
 ) -> SingleRunOutcome:
     """단일 실행 유스케이스를 수행한다."""
 
@@ -93,14 +91,16 @@ def execute_single_run(
     settings = settings_bundle.settings
     executor = SimulationExecutor(
         settings,
-        scenario_controls=scenario_controls,
+        scenario_controls=scenario_input.scenario_controls,
+        scenario_file_path=scenario_input.scenario_file_path,
+        scenario_file_stem=scenario_input.scenario_file_stem,
         env_file_hint=env_file,
         trial_index=None,
         total_trials=None,
-        parallel=False,
+        parallel=parallel,
     )
     try:
-        result = executor.run(scenario_text)
+        result = executor.run(scenario_input.scenario_text)
         if (
             not result.success
             or result.final_report is None
@@ -124,8 +124,7 @@ def execute_single_run(
 def execute_multi_run(
     *,
     env_file: str | None,
-    scenario_text: str,
-    scenario_controls: ScenarioControls,
+    scenario_input: ScenarioInput,
     cli_overrides: dict[str, str],
     trials: int,
     parallel: bool,
@@ -143,9 +142,9 @@ def execute_multi_run(
     if trials == 1:
         outcome = execute_single_run(
             env_file=env_file,
-            scenario_text=scenario_text,
-            scenario_controls=scenario_controls,
+            scenario_input=scenario_input,
             cli_overrides=cli_overrides,
+            parallel=parallel,
         )
         return MultiRunOutcome(
             trials=[
@@ -161,29 +160,20 @@ def execute_multi_run(
             ],
             output_dir=outcome.output_dir,
             log_level=outcome.log_level,
-            parallel=False,
+            parallel=parallel,
         )
 
-    if parallel:
-        trial_outcomes = _run_trials_parallel(
-            settings=settings,
+    trial_outcomes = [
+        _execute_trial(
+            base_settings=settings,
             env_file=env_file,
-            scenario_text=scenario_text,
-            scenario_controls=scenario_controls,
-            trials=trials,
+            scenario_input=scenario_input,
+            trial_index=trial_index,
+            total_trials=trials,
+            parallel=parallel,
         )
-    else:
-        trial_outcomes = [
-            _execute_trial(
-                base_settings=settings,
-                env_file=env_file,
-                scenario_text=scenario_text,
-                scenario_controls=scenario_controls,
-                trial_index=trial_index,
-                total_trials=trials,
-            )
-            for trial_index in range(1, trials + 1)
-        ]
+        for trial_index in range(1, trials + 1)
+    ]
 
     return MultiRunOutcome(
         trials=trial_outcomes,
@@ -191,51 +181,14 @@ def execute_multi_run(
         log_level=settings.log_level,
         parallel=parallel,
     )
-
-
-def _run_trials_parallel(
-    *,
-    settings: AppSettings,
-    env_file: str | None,
-    scenario_text: str,
-    scenario_controls: ScenarioControls,
-    trials: int,
-) -> list[TrialRunOutcome]:
-    futures: list[concurrent.futures.Future[TrialRunOutcome]] = []
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=_parallel_worker_count(trials)
-    ) as executor:
-        for trial_index in range(1, trials + 1):
-            futures.append(
-                executor.submit(
-                    _execute_trial,
-                    base_settings=settings,
-                    env_file=env_file,
-                    scenario_text=scenario_text,
-                    scenario_controls=scenario_controls,
-                    trial_index=trial_index,
-                    total_trials=trials,
-                )
-            )
-    return sorted(
-        (future.result() for future in futures), key=lambda item: item.trial_index
-    )
-
-
-def _parallel_worker_count(trials: int) -> int:
-    """병렬 trial 실행에 사용할 worker 수를 계산한다."""
-
-    return min(trials, max(1, (os.cpu_count() or 4) - 1))
-
-
 def _execute_trial(
     *,
     base_settings: AppSettings,
     env_file: str | None,
-    scenario_text: str,
-    scenario_controls: ScenarioControls,
+    scenario_input: ScenarioInput,
     trial_index: int,
     total_trials: int,
+    parallel: bool,
 ) -> TrialRunOutcome:
     """개별 trial 하나를 실행한다."""
 
@@ -247,14 +200,16 @@ def _execute_trial(
     )
     executor = SimulationExecutor(
         trial_settings,
-        scenario_controls=scenario_controls,
+        scenario_controls=scenario_input.scenario_controls,
+        scenario_file_path=scenario_input.scenario_file_path,
+        scenario_file_stem=scenario_input.scenario_file_stem,
         env_file_hint=env_file,
         trial_index=trial_index,
         total_trials=total_trials,
-        parallel=total_trials > 1,
+        parallel=parallel,
     )
     try:
-        result = executor.run(scenario_text)
+        result = executor.run(scenario_input.scenario_text)
         return TrialRunOutcome(
             trial_index=trial_index,
             run_id=result.run_id,

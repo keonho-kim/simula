@@ -37,8 +37,9 @@ flowchart LR
 ## Notes
 
 - the runtime stage is the only looping stage
-- generation and runtime both use explicit fan-out/fan-in patterns
-- finalization writes section strings in parallel and renders markdown after all sections finish
+- the default compiled workflow uses serial stage variants
+- `--parallel` switches the run onto the parallel stage variants
+- generation, runtime, and finalization keep explicit parallel variants, but they are opt-in
 
 Related docs:
 

@@ -125,14 +125,20 @@ Each role resolves to one `ModelConfig` containing:
 The top-level provider tables supply shared defaults for matching roles:
 
 - `[llm.openai]`
+- `[llm.openai-compatible]`
 - `[llm.anthropic]`
 - `[llm.google]`
 - `[llm.bedrock]`
-- `[llm.ollama]`
-- `[llm.vllm]`
 
 For example, a role with `provider = "openai"` inherits shared `API_KEY`, `base_url`,
-`reasoning_effort`, and `verbosity` from `[llm.openai]` unless `[llm.<role>]` overrides them.
+`stream_usage`, `reasoning_effort`, and `verbosity` from `[llm.openai]` unless `[llm.<role>]` overrides them.
+`provider = "openai-compatible"` inherits shared `API_KEY`, `base_url`, and `stream_usage` from
+`[llm.openai-compatible]`, and any other keys from that table are forwarded through `extra_body`.
+Role-level shared fields such as `temperature`, `max_tokens`, and `timeout_seconds` still apply
+normally to OpenAI-compatible models.
+For example, `reasoning = { effort = "medium" }` inside `[llm.openai-compatible]` or `[llm.<role>]`
+is forwarded to the server as part of `extra_body`, but whether that field is honored depends on
+the specific OpenAI-compatible server.
 
 ### Role tables
 
@@ -143,7 +149,22 @@ Each `[llm.<role>]` table sets routing and optional provider-specific overrides 
 - `temperature`
 - `max_tokens`
 - `timeout_seconds`
-- provider-specific fields such as `API_KEY`, `base_url`, `thinking_budget`, or `region_name`
+- provider-specific fields such as `API_KEY`, `base_url`, `stream_usage`, `thinking_budget`, or `region_name`
+
+For `provider = "openai-compatible"`, only `API_KEY`, `base_url`, and `stream_usage` are reserved provider keys.
+Any additional keys in `[llm.openai-compatible]` or `[llm.<role>]` are forwarded through
+`extra_body`. You can also use `extra_body = { ... }` as an inline table.
+
+Examples:
+
+- LM Studio-style:
+  `reasoning = { effort = "medium" }`
+- vLLM-style:
+  `extra_body = { chat_template_kwargs = { enable_thinking = false } }`
+
+`stream_usage = true` requests token usage in streaming responses when the provider supports it.
+LM Studio supports this on OpenAI-compatible endpoints. Servers that do not support streaming
+usage may still leave token counts empty while TTFT and duration continue to be recorded.
 
 Nested role provider tables such as `[llm.actor.openai]` are no longer supported. Put
 provider-specific keys directly inside `[llm.actor]`.
@@ -152,7 +173,7 @@ provider-specific keys directly inside `[llm.actor]`.
 
 - `planner`, `generator`, and `observer` default to OpenAI-style routing when no role config is
   present.
-- `actor` defaults to Ollama-style routing when no role config is present.
+- `actor` defaults to OpenAI-compatible routing when no role config is present.
 - `coordinator` inherits the planner config when no coordinator-specific role config is present.
 - `fixer` has OpenAI-style built-in defaults at the model-builder layer, but the loader still
   requires explicit fixer role configuration to exist. It rejects a config that does not define
@@ -163,9 +184,9 @@ provider-specific keys directly inside `[llm.actor]`.
 The config validator is intentionally strict.
 
 - OpenAI and Anthropic roles require an API key.
+- OpenAI-compatible roles require `base_url`.
 - Google requires either a Gemini API key or a complete Vertex path
   (`project_id` plus `location`).
-- Ollama and vLLM require `base_url`.
 - Bedrock requires `region_name`.
 - OpenAI `reasoning_effort` and `verbosity` are only valid for GPT-5 model names.
 - Provider-specific fields are rejected when they are attached to the wrong provider.
@@ -174,11 +195,10 @@ The loader reads environment variables with these prefixes:
 
 - `SIM_`
 - `OPENAI_`
+- `OPENAI_COMPATIBLE_`
 - `ANTHROPIC_`
 - `GOOGLE_`
 - `BEDROCK_`
-- `OLLAMA_`
-- `VLLM_`
 
 ## Storage and Checkpoints
 

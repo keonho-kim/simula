@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import TypeAdapter
 from pydantic import ValidationError
 
 from simula.application.workflow.graphs.coordinator.nodes.assess_round_continuation import (
-    _build_default_round_continuation_payload,
+    _build_default_round_continuation_default,
 )
 from simula.application.workflow.graphs.coordinator.nodes.build_round_directive import (
     _build_default_round_directive_payload,
@@ -19,14 +20,15 @@ from simula.application.workflow.graphs.runtime.nodes.actor_turn import (
 )
 from simula.domain.contracts import (
     ActorActionProposal,
-    RoundContinuationDecision,
     RoundDirective,
     RoundResolution,
 )
+from simula.domain.contracts.shared import ContinuationStopReason
 
 
 def test_round_continuation_default_payload_matches_schema() -> None:
-    RoundContinuationDecision.model_validate(_build_default_round_continuation_payload())
+    adapter = TypeAdapter(ContinuationStopReason)
+    assert adapter.validate_python(_build_default_round_continuation_default()) == ""
 
 
 def test_round_directive_default_payload_matches_schema() -> None:
@@ -53,24 +55,23 @@ def test_actor_action_proposal_default_payload_matches_schema() -> None:
             visible_actors=[{"cast_id": "beta", "display_name": "Beta"}],
             runtime_guidance={
                 "available_actions": [
-                    {
-                        "action_type": "speech",
-                        "supported_visibility": ["public", "private"],
-                        "requires_target": False,
-                        "supports_utterance": True,
-                    }
-                ],
-                "current_intent_snapshot": {
-                    "current_intent": "Beta의 반응을 본다.",
-                    "thought": "지금은 신호를 더 읽어야 한다고 본다.",
-                    "target_cast_ids": ["beta"],
-                },
-                "actor_facing_scenario_digest": {
-                    "talking_points": ["질문을 더 분명하게 던진다."],
-                    "avoid_repetition_notes": ["같은 표현만 반복하지 않는다."],
-                },
+                {
+                    "action_type": "speech",
+                    "supported_visibility": ["public", "private"],
+                    "requires_target": False,
+                }
+            ],
+            "goal_snapshot": {
+                "goal": "Beta의 반응을 본다.",
+                "target_cast_ids": ["beta"],
             },
-        )
+            "actor_facing_scenario_digest": {
+                "current_pressures": ["베타의 반응이 아직 열려 있다."],
+                "next_step_notes": ["질문을 더 분명하게 던진다."],
+                "world_state_summary": "직접 반응 전 압력이 남아 있다.",
+            },
+        },
+    )
     )
 
 
@@ -84,19 +85,17 @@ def test_actor_action_proposal_default_payload_recovers_from_blank_intent_snapsh
                     "action_type": "",
                     "supported_visibility": ["public"],
                     "requires_target": False,
-                    "supports_utterance": False,
                 }
             ],
-            "current_intent_snapshot": {
-                "current_intent": "",
-                "thought": "",
+            "goal_snapshot": {
+                "goal": "",
                 "target_cast_ids": [],
             },
         },
     )
 
     assert payload["action_type"] == "observe"
-    assert payload["intent"] == "현재 상황을 조금 더 파악한다."
+    assert payload["goal"] == "현재 상황을 조금 더 파악한다."
     ActorActionProposal.model_validate(payload)
 
 
@@ -110,12 +109,10 @@ def test_actor_action_proposal_default_payload_prefers_private_for_solo_action()
                     "action_type": "inspect",
                     "supported_visibility": ["public", "private"],
                     "requires_target": False,
-                    "supports_utterance": False,
                 }
             ],
-            "current_intent_snapshot": {
-                "current_intent": "혼자 상황을 더 본다.",
-                "thought": "지금은 조용히 확인하는 편이 낫다.",
+            "goal_snapshot": {
+                "goal": "혼자 상황을 더 본다.",
                 "target_cast_ids": [],
             },
         },
@@ -137,17 +134,15 @@ def test_round_resolution_default_payload_matches_schema() -> None:
                         "cast_id": "alpha",
                         "forced_idle": False,
                         "proposal": {
-                            "action_summary": "Alpha가 Beta에게 답을 요구한다.",
+                            "summary": "Alpha가 Beta에게 답을 요구한다.",
                         },
                     }
                 ],
                 "actor_intent_states": [
                     {
                         "cast_id": "alpha",
-                        "current_intent": "Beta의 답을 요구한다.",
-                        "thought": "이번에는 반응을 분명히 받아야 한다고 본다.",
+                        "goal": "Beta의 답을 요구한다.",
                         "target_cast_ids": ["beta"],
-                        "supporting_action_type": "speech",
                         "confidence": 0.8,
                         "changed_from_previous": True,
                     }
@@ -167,8 +162,7 @@ def test_round_resolution_default_payload_matches_schema() -> None:
                         "max_rounds": 4,
                         "allowed_elapsed_units": ["minute", "hour"],
                         "default_elapsed_unit": "minute",
-                        "pacing_guidance": ["짧게 본다."],
-                        "selection_reason": "짧은 직접 반응이 중심이다.",
+                        "reason": "짧은 직접 반응이 중심이다.",
                     }
                 },
             },
@@ -187,20 +181,18 @@ def test_round_resolution_rejects_duplicate_intent_state_cast_ids() -> None:
                     "cast_id": "alpha",
                     "forced_idle": False,
                     "proposal": {
-                        "action_summary": "Alpha가 Beta에게 답을 요구한다.",
+                        "summary": "Alpha가 Beta에게 답을 요구한다.",
                     },
                 }
             ],
-            "actor_intent_states": [
-                {
-                    "cast_id": "alpha",
-                    "current_intent": "Beta의 답을 요구한다.",
-                    "thought": "이번에는 반응을 분명히 받아야 한다고 본다.",
-                    "target_cast_ids": ["beta"],
-                    "supporting_action_type": "speech",
-                    "confidence": 0.8,
-                    "changed_from_previous": True,
-                }
+                "actor_intent_states": [
+                    {
+                        "cast_id": "alpha",
+                        "goal": "Beta의 답을 요구한다.",
+                        "target_cast_ids": ["beta"],
+                        "confidence": 0.8,
+                        "changed_from_previous": True,
+                    }
             ],
             "actors": [
                 {
@@ -212,19 +204,18 @@ def test_round_resolution_rejects_duplicate_intent_state_cast_ids() -> None:
             "world_state_summary": "직접 압박이 유지되고 있다.",
             "event_memory": {"events": []},
             "actor_facing_scenario_digest": {},
-            "plan": {
-                "progression_plan": {
-                    "max_rounds": 4,
-                    "allowed_elapsed_units": ["minute", "hour"],
-                    "default_elapsed_unit": "minute",
-                    "pacing_guidance": ["짧게 본다."],
-                    "selection_reason": "짧은 직접 반응이 중심이다.",
-                }
-            },
+                "plan": {
+                    "progression_plan": {
+                        "max_rounds": 4,
+                        "allowed_elapsed_units": ["minute", "hour"],
+                        "default_elapsed_unit": "minute",
+                        "reason": "짧은 직접 반응이 중심이다.",
+                    }
+                },
         },
         event_updates=[],
     )
-    payload["updated_intent_states"].append(payload["updated_intent_states"][0].copy())
+    payload["intent_states"].append(payload["intent_states"][0].copy())
 
-    with pytest.raises(ValidationError, match="updated_intent_states must use unique cast_id"):
+    with pytest.raises(ValidationError, match="intent_states must use unique cast_id"):
         RoundResolution.model_validate(payload)

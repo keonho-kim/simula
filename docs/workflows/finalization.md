@@ -11,17 +11,16 @@ flowchart LR
     Start([START]) --> Anchor["resolve_timeline_anchor"]
     Anchor --> Artifacts["build_report_artifacts"]
     Artifacts --> Conclusion["write_conclusion_section"]
-    Artifacts --> Timeline["write_timeline_section"]
-    Artifacts --> Dynamics["write_actor_dynamics_section"]
-    Artifacts --> Events["write_major_events_section"]
-    Conclusion --> Render["render_and_persist_final_report"]
-    Timeline --> Render
-    Dynamics --> Render
-    Events --> Render
+    Conclusion --> Timeline["write_timeline_section"]
+    Timeline --> Dynamics["write_actor_dynamics_section"]
+    Dynamics --> Events["write_major_events_section"]
+    Events --> Render["render_and_persist_final_report"]
     Render --> End([END])
 ```
 
-Section writers run in parallel after the report artifacts are prepared.
+This document describes the default serial finalization graph. The parallel variant still fans out
+the four section writers after `build_report_artifacts` when intra-run graph parallelism is
+enabled.
 
 ## Node Responsibilities
 
@@ -84,7 +83,7 @@ Builds the final markdown document from validated section strings and saves the 
 Important boundary:
 
 - this node renders markdown text into workflow state
-- the presentation layer writes `final_report.md` to disk after the workflow completes
+- the executor's integrated output writer writes `report.final.md` to disk after the workflow completes
 
 ## Final Outputs
 
@@ -104,3 +103,16 @@ By the end of finalization, workflow state contains:
 
 `simulation_log_jsonl` becomes part of the public output surface only after the executor reads the
 completed JSONL file back from disk.
+
+## Parallel Variant
+
+When a run is started with CLI `--parallel`, finalization switches to the parallel branch:
+
+- `build_report_artifacts`
+- `write_conclusion_section`
+- `write_timeline_section`
+- `write_actor_dynamics_section`
+- `write_major_events_section`
+- `render_and_persist_final_report`
+
+The rendered outputs stay the same; only the section-writing concurrency changes.

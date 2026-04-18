@@ -54,14 +54,10 @@ _PROMPT = (
     - Use `public` with empty target arrays only for a room-wide or broadcast action.
     - If there is no spoken line, set `utterance` to an empty string.
     - For solo observation or internal reasoning, prefer `utterance` as an empty string unless the line is plausibly spoken aloud in the scene.
-    - If there is no stable thread identifier, set `thread_id` to an empty string.
-    - If this action continues an existing conversation, confession, date line, or choice-pressure line with the same participant set, reuse or continue the stable `thread_id`.
-    - Only leave `thread_id` empty when the action is truly standalone and not part of an ongoing interaction line.
-    - It is valid to leave both `target_cast_ids` and `thread_id` empty for a standalone solo `private` action or a genuine room-wide `public` broadcast.
+    - It is valid to leave `target_cast_ids` empty for a standalone solo `private` action or a genuine room-wide `public` broadcast.
     - If the action is not directed at a concrete actor or subset, prefer `private` for solo/self-directed behavior and `public` for broadcast behavior.
-    - Use `runtime_guidance.current_intent_snapshot.current_intent` for what to do and `runtime_guidance.current_intent_snapshot.thought` for why this actor is choosing it now.
-    - Use `runtime_guidance.actor_facing_scenario_digest.talking_points` to decide what should be pushed verbally.
-    - Use `runtime_guidance.actor_facing_scenario_digest.avoid_repetition_notes` to avoid flat repetition or generic filler.
+    - Use `runtime_guidance.goal_snapshot.goal` for what to do now.
+    - Use `runtime_guidance.actor_facing_scenario_digest.next_step_notes` only as short next-step pressure, not as a script to copy.
     - Treat `runtime_guidance.current_constraints` and `runtime_guidance.channel_guidance` as hard realism rails for this scene.
     - Prefer immediately playable, socially plausible actions over formal plans, written documents, legal frameworks, or institutional procedures unless those are explicitly grounded in the scenario or recent visible actions.
     - Do not suddenly introduce contracts, clause edits, policy documents, legal ratios, or other off-screen artifacts unless they already exist in the scenario or recent context.
@@ -99,7 +95,7 @@ _PROMPT = (
 
     # Priority
     - Use focus slice, visible action context, visible actors, and runtime guidance together.
-    - `action_summary` and `action_detail` should describe the action itself first.
+    - `summary` and `detail` should describe the action itself first.
     - A `round` is one outer simulation cycle. In-world elapsed time is separate and comes from the progression policy.
     """
     ).strip().replace("<<TARGET_RULE_LINES>>", _TARGET_RULE_LINES)

@@ -56,6 +56,11 @@ settings.
 Nodes read these services through LangGraph runtime context instead of smuggling them through the
 state dictionary.
 
+Implementation notes:
+
+- log-context normalization lives in `simula.shared.logging.llm`
+- run-scoped JSONL append writes live in `simula.shared.io.run_jsonl`
+
 ## Internal Workflow State
 
 `SimulationWorkflowState` is required-only. Empty values are represented explicitly with `""`,
@@ -95,7 +100,7 @@ state dictionary.
 - `latest_background_updates`
 - `background_updates`
 - `round_focus_plan`
-- `round_time_advance`
+- `time_advance`
 - `simulation_clock`
 - `round_time_history`
 - `round_index`
@@ -240,7 +245,7 @@ Current event families are:
 - `actors_finalized`
 - `round_focus_selected`
 - `round_background_updated`
-- `round_time_advanced`
+- `time_advanced`
 - `round_actions_adopted`
 - `round_observer_report`
 - `round_event_memory_updated`

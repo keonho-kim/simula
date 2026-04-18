@@ -9,21 +9,26 @@
 
 연관된 다른 모듈/구조:
 - simula.infrastructure.config.loader
-- simula.infrastructure.llm.router
+- simula.infrastructure.llm.runtime.router
 - simula.entrypoints.bootstrap
 """
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-Provider = Literal["openai", "anthropic", "google", "ollama", "vllm", "bedrock"]
+Provider = Literal[
+    "openai",
+    "openai-compatible",
+    "anthropic",
+    "google",
+    "bedrock",
+]
 DatabaseProvider = Literal["sqlite", "postgresql"]
 ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
 Verbosity = Literal["low", "medium", "high"]
-OllamaReasoning = bool | Literal["low", "medium", "high"]
 AnthropicEffort = Literal["low", "medium", "high", "max"]
 GoogleThinkingLevel = Literal["minimal", "low", "medium", "high"]
 
@@ -33,8 +38,18 @@ class OpenAIProviderConfig(BaseModel):
 
     api_key: str | None = None
     base_url: str | None = None
+    stream_usage: bool | None = None
     reasoning_effort: ReasoningEffort | None = None
     verbosity: Verbosity | None = None
+
+
+class OpenAICompatibleProviderConfig(BaseModel):
+    """OpenAI-compatible provider 전용 설정이다."""
+
+    api_key: str | None = None
+    base_url: str | None = None
+    stream_usage: bool | None = None
+    extra_body: dict[str, Any] = Field(default_factory=dict)
 
 
 class AnthropicProviderConfig(BaseModel):
@@ -65,20 +80,6 @@ class BedrockProviderConfig(BaseModel):
     endpoint_url: str | None = None
 
 
-class OllamaProviderConfig(BaseModel):
-    """Ollama provider 전용 설정이다."""
-
-    base_url: str | None = None
-    reasoning: OllamaReasoning | None = None
-
-
-class VllmProviderConfig(BaseModel):
-    """vLLM provider 전용 설정이다."""
-
-    api_key: str | None = None
-    base_url: str | None = None
-
-
 class ModelConfig(BaseModel):
     """역할별 LLM 연결 정보와 provider별 옵션을 함께 정의한다."""
 
@@ -88,35 +89,33 @@ class ModelConfig(BaseModel):
     max_tokens: int = 2400
     timeout_seconds: float = 60.0
     openai: OpenAIProviderConfig = Field(default_factory=OpenAIProviderConfig)
+    openai_compatible: OpenAICompatibleProviderConfig = Field(
+        default_factory=OpenAICompatibleProviderConfig
+    )
     anthropic: AnthropicProviderConfig = Field(default_factory=AnthropicProviderConfig)
     google: GoogleProviderConfig = Field(default_factory=GoogleProviderConfig)
     bedrock: BedrockProviderConfig = Field(default_factory=BedrockProviderConfig)
-    ollama: OllamaProviderConfig = Field(default_factory=OllamaProviderConfig)
-    vllm: VllmProviderConfig = Field(default_factory=VllmProviderConfig)
 
     def active_provider_config(
         self,
     ) -> (
         OpenAIProviderConfig
+        | OpenAICompatibleProviderConfig
         | AnthropicProviderConfig
         | GoogleProviderConfig
         | BedrockProviderConfig
-        | OllamaProviderConfig
-        | VllmProviderConfig
     ):
         """현재 provider에 대응하는 설정 객체를 반환한다."""
 
         if self.provider == "openai":
             return self.openai
+        if self.provider == "openai-compatible":
+            return self.openai_compatible
         if self.provider == "anthropic":
             return self.anthropic
         if self.provider == "google":
             return self.google
-        if self.provider == "bedrock":
-            return self.bedrock
-        if self.provider == "ollama":
-            return self.ollama
-        return self.vllm
+        return self.bedrock
 
     @property
     def api_key(self) -> str | None:
@@ -145,10 +144,12 @@ class ModelConfig(BaseModel):
         return self.openai.verbosity if self.provider == "openai" else None
 
     @property
-    def reasoning(self) -> OllamaReasoning | None:
-        """Ollama reasoning 설정을 반환한다."""
+    def extra_body(self) -> dict[str, Any]:
+        """OpenAI-compatible extra_body 설정을 반환한다."""
 
-        return self.ollama.reasoning if self.provider == "ollama" else None
+        if self.provider != "openai-compatible":
+            return {}
+        return self.openai_compatible.extra_body
 
 
 class RuntimeConfig(BaseModel):
@@ -226,7 +227,12 @@ class AppSettings(BaseModel):
             "fixer",
         ):
             role_cfg = data["models"][role]
-            for provider_name in ("openai", "anthropic", "google", "vllm"):
+            for provider_name in (
+                "openai",
+                "openai_compatible",
+                "anthropic",
+                "google",
+            ):
                 provider_cfg = role_cfg.get(provider_name)
                 if isinstance(provider_cfg, dict) and provider_cfg.get("api_key"):
                     provider_cfg["api_key"] = "***"

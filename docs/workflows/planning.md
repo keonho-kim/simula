@@ -24,8 +24,6 @@ Generates `PlanningAnalysis` in one strict structured call. The bundle includes:
 - `brief_summary`
 - `premise`
 - `time_scope`
-- `public_context`
-- `private_context`
 - `key_pressures`
 - `progression_plan`
 
@@ -49,6 +47,15 @@ The bundle contributes:
 - `coordination_frame`
 - `cast_roster`
 - `major_events`
+
+The planner now keeps these bundles deliberately compact:
+
+- `action_catalog` stores only broad action options with `action_type`, `label`,
+  `description`, `supported_visibility`, and `requires_target`
+- `coordination_frame` stores only `focus_policy`, `background_policy`, and
+  `max_focus_actors`
+- `major_events` stores compact checkpoints with `must_resolve` instead of older
+  scenario-specific completion flags
 
 `major_events` may be empty when the scenario does not imply a shared event track worth carrying
 through runtime.
@@ -83,6 +90,13 @@ The final `plan` stored in workflow state contains:
 - `coordination_frame`
 - `cast_roster`
 - `major_events`
+
+Inside `interpretation`, the planning summary remains compact:
+
+- `brief_summary`
+- `premise`
+- `time_scope`
+- `key_pressures`
 
 Important distinctions:
 

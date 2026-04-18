@@ -4,30 +4,34 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 import pytest
 from langchain_core.exceptions import OutputParserException
 
 from simula.domain.contracts import (
     ActorActionProposal,
     ActorCard,
+    BackgroundUpdate,
     PlanningAnalysis,
 )
-from simula.infrastructure.llm.output_parsers import JsonRepairOutputParser
+from simula.infrastructure.llm.output_parsers import (
+    build_object_output_parser,
+    parse_simple_output,
+)
 
 
 def test_json_repair_parser_recovers_broken_actor_proposal_json() -> None:
-    parser = JsonRepairOutputParser(target_schema=ActorActionProposal)
+    parser = build_object_output_parser(ActorActionProposal)
     broken = """
     {
       action_type: "speech",
-      intent: "우선순위를 다시 정리하게 만든다.",
-      intent_target_cast_ids: ["ally-1"],
-      action_summary: "운영 총괄이 조율 action을 제안한다.",
-      action_detail: "우선순위를 다시 정리해야 한다.",
+      goal: "우선순위를 다시 정리하게 만든다.",
+      summary: "운영 총괄이 조율 action을 제안한다.",
+      detail: "우선순위를 다시 정리해야 한다.",
       utterance: "",
       visibility: "group",
       target_cast_ids: ["ally-1"],
-      thread_id: "",
     }
     """
 
@@ -39,10 +43,10 @@ def test_json_repair_parser_recovers_broken_actor_proposal_json() -> None:
 
 
 def test_json_repair_parser_rejects_schema_mismatch() -> None:
-    parser = JsonRepairOutputParser(target_schema=ActorActionProposal)
+    parser = build_object_output_parser(ActorActionProposal)
     bad_json = (
-        '{"action_type":"","intent":"","intent_target_cast_ids":[],"action_summary":"",'
-        '"action_detail":"","utterance":"","visibility":"group","target_cast_ids":[],"thread_id":""}'
+        '{"action_type":"","goal":"","summary":"",'
+        '"detail":"","utterance":"","visibility":"group","target_cast_ids":[]}'
     )
 
     with pytest.raises(OutputParserException):
@@ -50,7 +54,7 @@ def test_json_repair_parser_rejects_schema_mismatch() -> None:
 
 
 def test_json_repair_parser_normalizes_single_item_string_list_fields() -> None:
-    parser = JsonRepairOutputParser(target_schema=ActorCard)
+    parser = build_object_output_parser(ActorCard)
     payload = """
     {
       "cast_id": "jeongsuk_female",
@@ -74,7 +78,7 @@ def test_json_repair_parser_normalizes_single_item_string_list_fields() -> None:
 
 
 def test_json_repair_parser_normalizes_single_item_list_into_string_field() -> None:
-    parser = JsonRepairOutputParser(target_schema=PlanningAnalysis)
+    parser = build_object_output_parser(PlanningAnalysis)
     payload = """
     {
       "brief_summary": "요약",
@@ -83,19 +87,40 @@ def test_json_repair_parser_normalizes_single_item_list_into_string_field() -> N
         "start": "처음",
         "end": "끝"
       },
-      "public_context": ["공개 압박"],
-      "private_context": ["비공개 조율"],
       "key_pressures": ["시간 압박"],
       "progression_plan": {
         "max_rounds": 4,
         "allowed_elapsed_units": ["day"],
         "default_elapsed_unit": "day",
-        "pacing_guidance": ["하루 단위로 진행한다."],
-        "selection_reason": ["시나리오가 일 단위 일정으로 보인다."]
+        "reason": ["시나리오가 일 단위 일정으로 보인다."]
       }
     }
     """
 
     parsed = parser.parse(payload)
 
-    assert parsed.progression_plan.selection_reason == "시나리오가 일 단위 일정으로 보인다."
+    assert parsed.progression_plan.reason == "시나리오가 일 단위 일정으로 보인다."
+
+
+def test_simple_parser_reads_top_level_array_of_models() -> None:
+    parsed = parse_simple_output(
+        """
+        [
+          {
+            "round_index": 2,
+            "cast_id": "beta",
+            "summary": "배경 압력이 유지된다.",
+            "pressure_level": "medium"
+          }
+        ]
+        """,
+        list[BackgroundUpdate],
+    )
+
+    assert parsed[0].cast_id == "beta"
+
+
+def test_simple_parser_reads_top_level_scalar_literal() -> None:
+    parsed = parse_simple_output('"no_progress"', Literal["", "no_progress"])
+
+    assert parsed == "no_progress"

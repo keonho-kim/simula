@@ -27,7 +27,6 @@ _SCHEMA_ROLE_MAP = {
     "GeneratedActorCardDraft": "generator",
     "RoundDirective": "coordinator",
     "RoundResolution": "coordinator",
-    "RoundContinuationDecision": "coordinator",
     "ActorActionProposal": "actor",
     "TimelineAnchorDecision": "observer",
 }
@@ -56,7 +55,7 @@ def build_fixer_report(llm_calls: list[LLMCallRecord]) -> FixerReport:
 
 
 def _build_attempt(call: LLMCallRecord) -> FixerAttemptRecord:
-    schema_name = _extract_schema_name(call.prompt)
+    schema_name = call.fixer_schema_name or _extract_schema_name(call.prompt)
     return FixerAttemptRecord(
         sequence=call.sequence,
         attempt=_attempt_number(call),

@@ -50,7 +50,7 @@ def validate_settings(settings: AppSettings) -> None:
                 f"{role_name} provider `{config.provider}` 는 API key가 필요합니다."
             )
 
-        if config.provider in {"ollama", "vllm"} and not config.base_url:
+        if config.provider == "openai-compatible" and not config.base_url:
             raise ValueError(
                 f"{role_name} provider `{config.provider}` 는 base_url이 필요합니다."
             )
@@ -96,11 +96,6 @@ def validate_settings(settings: AppSettings) -> None:
                 raise ValueError(
                     f"{role_name} model `{config.model}` 은 verbosity 대상이 아닙니다."
                 )
-
-        if config.reasoning is not None and config.provider != "ollama":
-            raise ValueError(
-                f"{role_name} provider `{config.provider}` 는 ollama reasoning 설정을 지원하지 않습니다."
-            )
 
         if config.anthropic.effort is not None and config.provider != "anthropic":
             raise ValueError(

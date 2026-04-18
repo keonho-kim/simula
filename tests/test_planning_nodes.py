@@ -24,10 +24,10 @@ from simula.application.workflow.graphs.planning.nodes.planner import (
 from simula.domain.contracts import (
     ActionCatalog,
     CastRoster,
-    CastRosterOutlineBundle,
+    CastRosterOutlineItem,
     CoordinationFrame,
     ExecutionPlanFrameBundle,
-    MajorEventPlanBatch,
+    MajorEventPlanItem,
     PlanningAnalysis,
     SituationBundle,
 )
@@ -58,7 +58,7 @@ def _build_runtime(llms: object) -> SimpleNamespace:
 
 def test_build_planning_analysis_returns_required_bundle() -> None:
     class FakeLLM:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del prompt, kwargs
             assert role == "planner"
             assert schema is PlanningAnalysis
@@ -67,15 +67,12 @@ def test_build_planning_analysis_returns_required_bundle() -> None:
                     brief_summary="공개 압박과 비공개 조율이 함께 움직인다.",
                     premise="표면적 입장보다 실제 정렬 방향이 중요하다.",
                     time_scope={"start": "초기", "end": "종결 직전"},
-                    public_context=["공개 압박"],
-                    private_context=["비공개 계산"],
                     key_pressures=["시간 압박"],
                     progression_plan={
                         "max_rounds": 6,
                         "allowed_elapsed_units": ["hour"],
                         "default_elapsed_unit": "hour",
-                        "pacing_guidance": ["짧게 본다."],
-                        "selection_reason": "짧은 조율이 중심이다.",
+                        "reason": "짧은 조율이 중심이다.",
                     },
                 ),
                 _FakeMeta(),
@@ -95,28 +92,26 @@ def test_build_planning_analysis_returns_required_bundle() -> None:
 
 def test_build_cast_roster_outline_returns_required_outline() -> None:
     class FakeLLM:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
             del prompt
             assert role == "planner"
-            assert schema is CastRosterOutlineBundle
+            assert annotation == list[CastRosterOutlineItem]
+            assert kwargs["failure_policy"] == "fixer"
+            assert kwargs["repair_context"]["num_cast"] == 2
             semantic_validator = kwargs["semantic_validator"]
-            repair_context = kwargs["repair_context"]
-            parsed = CastRosterOutlineBundle(
-                items=[
-                    {
-                        "slot_index": 1,
-                        "cast_id": "cast-alpha",
-                        "display_name": "알파",
-                    },
-                    {
-                        "slot_index": 2,
-                        "cast_id": "cast-beta",
-                        "display_name": "베타",
-                    },
-                ]
-            )
+            parsed = [
+                CastRosterOutlineItem(
+                    slot_index=1,
+                    cast_id="cast-alpha",
+                    display_name="알파",
+                ),
+                CastRosterOutlineItem(
+                    slot_index=2,
+                    cast_id="cast-beta",
+                    display_name="베타",
+                ),
+            ]
             assert semantic_validator(parsed) == []
-            assert repair_context["num_cast"] == 2
             return parsed, _FakeMeta()
 
     state = {
@@ -126,15 +121,12 @@ def test_build_cast_roster_outline_returns_required_outline() -> None:
             "brief_summary": "요약",
             "premise": "전제",
             "time_scope": {"start": "초기", "end": "종결"},
-            "public_context": ["공개"],
-            "private_context": ["비공개"],
             "key_pressures": ["압박"],
             "progression_plan": {
                 "max_rounds": 6,
                 "allowed_elapsed_units": ["hour"],
                 "default_elapsed_unit": "hour",
-                "pacing_guidance": ["짧게 본다."],
-                "selection_reason": "짧은 조율이 중심이다.",
+                "reason": "짧은 조율이 중심이다.",
             },
         },
         "planning_latency_seconds": 0.0,
@@ -142,13 +134,13 @@ def test_build_cast_roster_outline_returns_required_outline() -> None:
 
     result = asyncio.run(build_cast_roster_outline(state, _build_runtime(FakeLLM())))
 
-    assert len(result["cast_roster_outline"]["items"]) == 2
-    assert result["cast_roster_outline"]["items"][0]["cast_id"] == "cast-alpha"
+    assert len(result["cast_roster_outline"]) == 2
+    assert result["cast_roster_outline"][0]["cast_id"] == "cast-alpha"
 
 
 def test_build_execution_plan_frame_returns_required_frame() -> None:
     class FakeLLM:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del prompt
             assert role == "planner"
             if schema is SituationBundle:
@@ -177,10 +169,8 @@ def test_build_execution_plan_frame_returns_required_frame() -> None:
                             "description": "말한다.",
                             "supported_visibility": ["public", "private", "group"],
                             "requires_target": False,
-                            "supports_utterance": True,
                         }
-                    ],
-                    selection_guidance=["상황에 맞게 고른다."],
+                    ]
                 )
                 assert semantic_validator(parsed) == []
                 assert repair_context["max_actions"] == 5
@@ -188,22 +178,24 @@ def test_build_execution_plan_frame_returns_required_frame() -> None:
             if schema is CoordinationFrame:
                 return (
                     CoordinationFrame(
-                        focus_selection_rules=["직접 압박을 본다."],
-                        background_motion_rules=["배경은 요약한다."],
-                        focus_archetypes=["직접 충돌"],
-                        attention_shift_rules=["조용한 actor도 끌어올린다."],
-                        budget_guidance=["소수만 직접 본다."],
+                        focus_policy="직접 압박을 본다.",
+                        background_policy="배경은 요약한다.",
+                        max_focus_actors=3,
                     ),
                     _FakeMeta(),
                 )
-            if schema is MajorEventPlanBatch:
-                semantic_validator = kwargs["semantic_validator"]
-                repair_context = kwargs["repair_context"]
-                parsed = MajorEventPlanBatch(major_events=[])
-                assert semantic_validator(parsed) == []
-                assert repair_context["max_major_events"] == 6
-                return parsed, _FakeMeta()
             raise AssertionError(f"unexpected schema: {schema}")
+
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
+            del prompt
+            assert role == "planner"
+            assert annotation == list[MajorEventPlanItem]
+            assert kwargs["failure_policy"] == "fixer"
+            assert kwargs["repair_context"]["planned_max_rounds"] == 6
+            semantic_validator = kwargs["semantic_validator"]
+            parsed: list[MajorEventPlanItem] = []
+            assert semantic_validator(parsed) == []
+            return parsed, _FakeMeta()
 
     state = {
         "scenario": "등장인물 1명이 있는 테스트 시나리오",
@@ -215,26 +207,21 @@ def test_build_execution_plan_frame_returns_required_frame() -> None:
             "brief_summary": "요약",
             "premise": "전제",
             "time_scope": {"start": "초기", "end": "종결"},
-            "public_context": ["공개"],
-            "private_context": ["비공개"],
             "key_pressures": ["압박"],
             "progression_plan": {
                 "max_rounds": 6,
                 "allowed_elapsed_units": ["hour"],
                 "default_elapsed_unit": "hour",
-                "pacing_guidance": ["짧게 본다."],
-                "selection_reason": "짧은 조율이 중심이다.",
+                "reason": "짧은 조율이 중심이다.",
             },
         },
-        "cast_roster_outline": {
-            "items": [
-                {
-                    "slot_index": 1,
-                    "cast_id": "cast-alpha",
-                    "display_name": "알파",
-                }
-            ]
-        },
+        "cast_roster_outline": [
+            {
+                "slot_index": 1,
+                "cast_id": "cast-alpha",
+                "display_name": "알파",
+            }
+        ],
     }
 
     result = asyncio.run(build_execution_plan_frame(state, _build_runtime(FakeLLM())))
@@ -242,7 +229,7 @@ def test_build_execution_plan_frame_returns_required_frame() -> None:
     assert result["execution_plan_frame"]["action_catalog"]["actions"][0]["requires_target"] is False
 
 
-def test_validate_execution_plan_frame_semantics_rejects_speaking_action_without_utterance_support() -> None:
+def test_validate_execution_plan_frame_semantics_rejects_requires_target_without_addressable_visibility() -> None:
     issues = validate_execution_plan_frame_semantics(
         execution_plan_frame=ExecutionPlanFrameBundle(
             situation={
@@ -262,50 +249,60 @@ def test_validate_execution_plan_frame_semantics_rejects_speaking_action_without
                         "action_type": "review_sharing",
                         "label": "후기 공유",
                         "description": "체험 후 느낀 점을 공개적으로 공유한다.",
-                        "supported_visibility": ["public", "private"],
-                        "requires_target": False,
-                        "supports_utterance": False,
+                        "supported_visibility": ["public"],
+                        "requires_target": True,
                     }
-                ],
-                "selection_guidance": ["상황에 맞게 고른다."],
+                ]
             },
             coordination_frame={
-                "focus_selection_rules": ["직접 압박을 본다."],
-                "background_motion_rules": ["배경은 요약한다."],
-                "focus_archetypes": ["직접 충돌"],
-                "attention_shift_rules": ["조용한 actor도 끌어올린다."],
-                "budget_guidance": ["소수만 직접 본다."],
+                "focus_policy": "직접 압박을 본다.",
+                "background_policy": "배경은 요약한다.",
+                "max_focus_actors": 3,
             },
             major_events=[],
         ),
-        cast_roster_outline=CastRosterOutlineBundle(
-            items=[
-                {
-                    "slot_index": 1,
-                    "cast_id": "cast-alpha",
-                    "display_name": "알파",
-                }
-            ]
-        ),
+        cast_roster_outline=[
+            CastRosterOutlineItem(
+                slot_index=1,
+                cast_id="cast-alpha",
+                display_name="알파",
+            )
+        ],
         planned_max_rounds=6,
     )
 
-    assert "supports_utterance=true" in issues[0]
+    assert "requires_target=true" in issues[0]
+
+
+def test_validate_execution_plan_frame_semantics_accepts_compact_action_catalog() -> None:
+    catalog = ActionCatalog.model_validate(
+        {
+            "actions": [
+                {
+                    "action_type": "board_vote",
+                    "label": "이사회 표결",
+                    "description": "핵심 상대를 지목해 소규모 표결 압박을 만든다.",
+                    "supported_visibility": ["group"],
+                    "requires_target": True,
+                }
+            ]
+        }
+    )
+
+    assert catalog.actions[0].action_type == "board_vote"
 
 
 def test_prepare_plan_cast_chunks_groups_outline_by_fixed_size() -> None:
     runtime = _build_runtime(object())
     state = {
-        "cast_roster_outline": {
-            "items": [
-                {
-                    "slot_index": index,
-                    "cast_id": f"cast-{index}",
-                    "display_name": f"배역 {index}",
-                }
-                for index in range(1, 15)
-            ]
-        }
+        "cast_roster_outline": [
+            {
+                "slot_index": index,
+                "cast_id": f"cast-{index}",
+                "display_name": f"배역 {index}",
+            }
+            for index in range(1, 15)
+        ]
     }
 
     result = prepare_plan_cast_chunks(state, runtime)
@@ -316,7 +313,7 @@ def test_prepare_plan_cast_chunks_groups_outline_by_fixed_size() -> None:
 
 def test_build_plan_cast_chunk_returns_assigned_cast_only() -> None:
     class FakeLLM:
-        async def ainvoke_structured_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del prompt
             assert role == "planner"
             assert schema is CastRoster
@@ -352,15 +349,12 @@ def test_build_plan_cast_chunk_returns_assigned_cast_only() -> None:
             "brief_summary": "요약",
             "premise": "전제",
             "time_scope": {"start": "초기", "end": "종결"},
-            "public_context": ["공개"],
-            "private_context": ["비공개"],
             "key_pressures": ["압박"],
             "progression_plan": {
                 "max_rounds": 6,
                 "allowed_elapsed_units": ["hour"],
                 "default_elapsed_unit": "hour",
-                "pacing_guidance": ["짧게 본다."],
-                "selection_reason": "짧은 조율이 중심이다.",
+                "reason": "짧은 조율이 중심이다.",
             },
         },
         "execution_plan_frame": {
@@ -400,21 +394,22 @@ def test_assemble_execution_plan_merges_chunk_results_in_slot_order() -> None:
             "brief_summary": "요약",
             "premise": "전제",
             "time_scope": {"start": "초기", "end": "종결"},
-            "public_context": ["공개"],
-            "private_context": ["비공개"],
             "key_pressures": ["압박"],
             "progression_plan": {
                 "max_rounds": 6,
                 "allowed_elapsed_units": ["hour"],
                 "default_elapsed_unit": "hour",
-                "pacing_guidance": ["짧게 본다."],
-                "selection_reason": "짧은 조율이 중심이다.",
+                "reason": "짧은 조율이 중심이다.",
             },
         },
         "execution_plan_frame": {
             "situation": {"simulation_objective": "위기 추적"},
             "action_catalog": {"actions": []},
-            "coordination_frame": {"focus_selection_rules": []},
+            "coordination_frame": {
+                "focus_policy": "직접 압박을 우선 본다.",
+                "background_policy": "배경은 짧게 요약한다.",
+                "max_focus_actors": 3,
+            },
             "major_events": [],
         },
         "generated_plan_cast_results": [
@@ -564,7 +559,7 @@ def test_finalize_plan_rejects_major_event_with_unknown_participant() -> None:
                     "latest_round": 4,
                     "completion_action_types": ["speech"],
                     "completion_signals": ["최종 선택"],
-                    "required_before_end": True,
+                    "must_resolve": True,
                 }
             ],
         },

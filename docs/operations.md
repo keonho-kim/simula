@@ -20,12 +20,7 @@ uv run simula \
 
 You can also pass the scenario inline:
 
-```bash
-uv run simula --scenario-text "$(cat ./senario.samples/03_startup_boardroom_crisis.md)"
-```
-
-Both `--scenario-file` and `--scenario-text` must provide the full scenario document, including
-YAML frontmatter. The parser requires:
+The parser requires:
 
 - a frontmatter block at the top of the document
 - flat `key: value` lines only
@@ -45,9 +40,9 @@ Scenario body starts here.
 
 ## Repeated Trials
 
-The simulator can run the same scenario multiple times.
+The simulator can run the same scenario multiple times. Trials are always executed sequentially.
 
-Sequential trials:
+Repeated trials:
 
 ```bash
 uv run simula \
@@ -55,7 +50,15 @@ uv run simula \
   --trials 3
 ```
 
-Parallel trials:
+Intra-run graph parallelism:
+
+```bash
+uv run simula \
+  --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
+  --parallel
+```
+
+You can combine both:
 
 ```bash
 uv run simula \
@@ -67,30 +70,25 @@ uv run simula \
 Operational notes:
 
 - `--trials` must be `>= 1`
-- `--parallel` only changes execution strategy when `--trials > 1`
+- `--parallel` enables parallel graph branches inside one run
+- without `--parallel`, the default compiled workflow uses the serial graph variants
 - for SQLite storage, repeated trials rewrite the SQLite database path to sibling files under a
-  `trial-runs/` directory so trials do not share one runtime database
+  `trial-runs/` directory so repeated trials do not share one runtime database
 - the file output root still comes from `storage.output_dir`
 
-## Analyze One Saved Run
+Parallel behavior by area:
 
-Analyze a run from its directory:
+| Area | Default run | `--parallel` run |
+| --- | --- | --- |
+| trials | sequential | sequential |
+| planning cast chunks | serial queue | parallel fan-out |
+| generation actor slots | serial queue | parallel fan-out |
+| runtime actor proposals | serial queue | parallel fan-out |
+| coordinator round planning and resolution | serial staged calls | serial staged calls |
+| finalization report sections | serial section writers | parallel branch writers |
 
-```bash
-uv run analysis --run-dir ./output/2026-04-14.10
-```
-
-Compatibility selector by `run_id`:
-
-```bash
-uv run analysis --run-id 2026-04-14.10 --env ./env.toml
-```
-
-Resolution rules:
-
-- `--run-dir` reads `<run-dir>/simulation.log.jsonl`
-- `--run-id` resolves `<storage.output_dir>/<run_id>/simulation.log.jsonl`
-- when `--env` is omitted for `--run-id`, the analyzer falls back to the default `./output`
+The `--parallel` flag does not make every LLM call concurrent. Coordinator stages such as round
+directive building, round resolution, and continuation checks remain sequential inside each run.
 
 For Korean plot labels on Ubuntu, install the recommended system packages first:
 
@@ -104,45 +102,50 @@ Each completed simulation run writes:
 
 ```text
 <storage.output_dir>/<run_id>/
-  final_report.md
+  manifest.json
+  report.final.md
+  summary.overview.md
   simulation.log.jsonl
+  data/
+  summaries/
+  assets/
+```
+
+`run_id` now follows:
+
+```text
+YYYYMMDD.001.<actor-model-id>.<scenario-file-stem>
 ```
 
 The responsibilities are split deliberately:
 
-- `RunJsonlAppender` writes `simulation.log.jsonl` incrementally during execution
+- `simula.shared.io.RunJsonlAppender` writes `simulation.log.jsonl` incrementally during execution
 - the workflow builds structured report payloads and markdown text in memory
-- the executor reads the completed JSONL file back into `simulation_log_jsonl`
-- the presentation layer writes `final_report.md`
+- the executor reuses the completed JSONL file as the source-of-truth for derived analysis
+- the integrated output writer writes `report.final.md`, `summary.overview.md`, `data/*`,
+  `summaries/*`, `assets/*`, and one unified `manifest.json`
 
-The analyzer always writes to a local analysis directory rooted at the current working directory:
+The integrated analysis artifacts include:
 
 ```text
-analysis/<run_id>/
-  summary.md
-  manifest.json
-  llm_calls.csv
-  actions/
-    summary.csv
-  performance/
-    summary.png
-    summary.csv
-  token_usage/
-    summary.csv
-    summary.md
-  fixer/
-    summary.csv
-  network/
-    nodes.csv
-    edges.csv
-    growth.csv
-    summary.json
-    summary.md
-    graph.graphml
-    graph.png
-    growth_metrics.png
-    concentration.png
-    growth.mp4
+<storage.output_dir>/<run_id>/
+  data/llm_calls.csv
+  data/performance.summary.csv
+  data/fixer.summary.csv
+  data/token_usage.summary.csv
+  data/actions.summary.csv
+  data/network.nodes.csv
+  data/network.edges.csv
+  data/network.growth.csv
+  data/network.summary.json
+  summaries/token_usage.summary.md
+  summaries/network.summary.md
+  assets/performance.summary.png
+  assets/network.graph.png
+  assets/network.graph.graphml
+  assets/network.growth_metrics.png
+  assets/network.concentration.png
+  assets/network.growth.mp4
 ```
 
 Some analyzer artifacts are conditional:
@@ -182,5 +185,9 @@ uv run ruff clean
 
 - Keep docs aligned with the compiled graph, not with stale prompt drafts or deleted modules.
 - Treat `simulation.log.jsonl` as the source artifact for analysis, not as a derived export.
-- Treat `analysis/<run_id>/summary.md` as the default human-readable entrypoint for analyzer output.
+- Treat `<run_dir>/summary.overview.md` as the default human-readable entrypoint for derived analysis.
 - Update the workflow docs when active node names, branch points, or stage outputs change.
+- Keep shared logging and runtime-output helpers under `simula.shared.*` rather than scattering
+  them across application and workflow packages.
+- Prefer domain subpackages such as `simula.domain.activity`, `simula.domain.runtime`, and
+  `simula.domain.reporting` over adding more flat modules directly under `simula.domain`.

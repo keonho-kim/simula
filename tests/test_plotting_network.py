@@ -10,17 +10,29 @@ import pytest
 from types import SimpleNamespace
 
 import simula.application.analysis.plotting.network as plotting_network
-from simula.application.analysis.models import ActorRecord, AdoptedActivityRecord, NetworkGrowthRecord, NetworkGrowthReport
+import simula.application.analysis.plotting.network_layout as plotting_network_layout
+from simula.application.analysis.models import (
+    ActorRecord,
+    AdoptedActivityRecord,
+    NetworkGrowthRecord,
+    NetworkGrowthReport,
+)
 from simula.application.analysis.plotting.network import (
-    _build_edge_label_text,
-    _build_edge_strengths,
-    _build_edge_visual_style,
-    _build_layout_kwargs,
-    _compute_layout_positions,
-    _resolve_node_collisions_pixel_space,
-    _build_node_visual_style,
     compute_render_layout,
     render_network_growth_video,
+)
+from simula.application.analysis.plotting.network_collision import (
+    resolve_node_collisions_pixel_space,
+)
+from simula.application.analysis.plotting.network_layout import (
+    build_layout_kwargs,
+    compute_layout_positions,
+)
+from simula.application.analysis.plotting.network_render import (
+    build_edge_label_text,
+    build_edge_strengths,
+    build_edge_visual_style,
+    build_node_visual_style,
 )
 
 
@@ -41,7 +53,7 @@ def test_node_visual_style_emphasizes_influence_metrics() -> None:
         betweenness_centrality=0.02,
     )
 
-    style = _build_node_visual_style(graph)
+    style = build_node_visual_style(graph)
 
     assert style.sizes[0] > style.sizes[1]
     assert style.colors[0] > style.colors[1]
@@ -53,7 +65,7 @@ def test_node_visual_style_falls_back_to_activity_metrics() -> None:
     graph.add_node("active", display_name="Active", total_weight=7)
     graph.add_node("quiet", display_name="Quiet", total_weight=1)
 
-    style = _build_node_visual_style(graph)
+    style = build_node_visual_style(graph)
 
     assert style.sizes[0] > style.sizes[1]
     assert style.colors[0] > style.colors[1]
@@ -68,7 +80,7 @@ def test_layout_kwargs_select_forceatlas2_parameters() -> None:
     graph.add_node("isolated-a")
     graph.add_node("isolated-b")
 
-    kwargs = _build_layout_kwargs(graph)
+    kwargs = build_layout_kwargs(graph, node_sizes=build_node_visual_style(graph).sizes)
 
     assert kwargs["max_iter"] == 300
     assert kwargs["jitter_tolerance"] == pytest.approx(0.7)
@@ -98,12 +110,17 @@ def test_compute_layout_positions_uses_forceatlas2_layout(monkeypatch) -> None:
         }
 
     monkeypatch.setattr(
-        plotting_network.nx,
+        plotting_network_layout.nx,
         "forceatlas2_layout",
         _fake_forceatlas2_layout,
     )
 
-    positions = _compute_layout_positions(graph)
+    positions = compute_layout_positions(
+        graph,
+        layout_kwargs=build_layout_kwargs(
+            graph, node_sizes=build_node_visual_style(graph).sizes
+        ),
+    )
 
     assert captured["graph"] is graph
     assert captured["kwargs"]["max_iter"] == 300
@@ -118,7 +135,7 @@ def test_compute_layout_positions_does_not_use_graphviz_layout(monkeypatch) -> N
     graph.add_edge("alpha", "beta", total_weight=2)
 
     monkeypatch.setattr(
-        plotting_network.nx,
+        plotting_network_layout.nx,
         "nx_agraph",
         SimpleNamespace(
             graphviz_layout=lambda *args, **kwargs: (_ for _ in ()).throw(
@@ -136,12 +153,17 @@ def test_compute_layout_positions_does_not_use_graphviz_layout(monkeypatch) -> N
         }
 
     monkeypatch.setattr(
-        plotting_network.nx,
+        plotting_network_layout.nx,
         "forceatlas2_layout",
         _fake_forceatlas2_layout,
     )
 
-    positions = _compute_layout_positions(graph)
+    positions = compute_layout_positions(
+        graph,
+        layout_kwargs=build_layout_kwargs(
+            graph, node_sizes=build_node_visual_style(graph).sizes
+        ),
+    )
 
     assert set(positions) == {"alpha", "beta"}
 
@@ -151,7 +173,7 @@ def test_edge_visual_style_normalizes_weight_with_minimum_width_one() -> None:
     graph.add_edge("alpha", "beta", total_weight=1)
     graph.add_edge("beta", "gamma", total_weight=9)
 
-    style = _build_edge_visual_style(graph)
+    style = build_edge_visual_style(graph)
 
     assert style.widths[0] >= 1.0
     assert style.widths[1] > style.widths[0]
@@ -169,7 +191,7 @@ def test_edge_strengths_are_normalized_between_zero_and_one() -> None:
     )
     graph.add_edge("beta", "gamma", total_weight=6)
 
-    strengths = _build_edge_strengths(graph)
+    strengths = build_edge_strengths(graph)
 
     assert strengths[("alpha", "beta")] == pytest.approx(0.5)
     assert strengths[("beta", "gamma")] == pytest.approx(1.0)
@@ -180,7 +202,7 @@ def test_edge_label_text_uses_interaction_count_when_present() -> None:
     graph.add_edge("alpha", "beta", total_weight=3, weight=0.3, action_count=1)
     graph.add_edge("beta", "gamma", total_weight=6, weight=0.6, action_count=5)
 
-    labels = _build_edge_label_text(graph)
+    labels = build_edge_label_text(graph)
 
     assert labels[("alpha", "beta")] == "1회"
     assert labels[("beta", "gamma")] == "5회"
@@ -191,7 +213,7 @@ def test_edge_label_text_hides_edges_without_interactions() -> None:
     graph.add_edge("alpha", "beta", total_weight=4, weight=0.4)
     graph.add_edge("beta", "gamma", total_weight=6, weight=0.6, action_count=0)
 
-    labels = _build_edge_label_text(graph)
+    labels = build_edge_label_text(graph)
 
     assert labels == {}
 
@@ -206,7 +228,7 @@ def test_edge_label_text_shows_all_candidates_for_sparse_graph() -> None:
             action_count=1,
         )
 
-    labels = _build_edge_label_text(graph)
+    labels = build_edge_label_text(graph)
 
     assert len(labels) == 10
     assert ("source-0", "target-0") in labels
@@ -223,7 +245,7 @@ def test_edge_label_text_limits_to_top_actionable_edges_for_dense_graph() -> Non
             action_count=index + 1,
         )
 
-    labels = _build_edge_label_text(graph)
+    labels = build_edge_label_text(graph)
 
     assert len(labels) == 8
     assert ("source-10", "target-10") in labels
@@ -240,7 +262,7 @@ def test_resolve_node_collisions_pixel_space_separates_overlapping_nodes() -> No
     }
     radii = {"alpha": 20.0, "beta": 20.0, "gamma": 20.0}
 
-    resolved = _resolve_node_collisions_pixel_space(
+    resolved = resolve_node_collisions_pixel_space(
         pixel_positions=positions,
         radii_px=radii,
         padding_px=4.0,
@@ -251,7 +273,10 @@ def test_resolve_node_collisions_pixel_space_separates_overlapping_nodes() -> No
             if left_name >= right_name:
                 continue
             minimum_distance = radii[left_name] + radii[right_name] + 4.0
-            assert np.linalg.norm(left_position - right_position) >= minimum_distance - 1e-6
+            assert (
+                np.linalg.norm(left_position - right_position)
+                >= minimum_distance - 1e-6
+            )
 
 
 def test_compute_render_layout_returns_resolved_positions(monkeypatch) -> None:
@@ -262,8 +287,11 @@ def test_compute_render_layout_returns_resolved_positions(monkeypatch) -> None:
 
     monkeypatch.setattr(
         plotting_network,
-        "_compute_layout_positions",
-        lambda graph: {"alpha": np.asarray([0.0, 0.0]), "beta": np.asarray([0.0, 0.0])},
+        "compute_layout_positions",
+        lambda graph, layout_kwargs=None: {  # noqa: ARG005
+            "alpha": np.asarray([0.0, 0.0]),
+            "beta": np.asarray([0.0, 0.0]),
+        },
     )
 
     layout = compute_render_layout(graph)
@@ -282,8 +310,11 @@ def test_render_network_growth_video_writes_output(monkeypatch, tmp_path) -> Non
 
     monkeypatch.setattr(
         plotting_network,
-        "_compute_layout_positions",
-        lambda graph: {"alpha": np.asarray([-1.0, 0.0]), "beta": np.asarray([1.0, 0.0])},
+        "compute_layout_positions",
+        lambda graph, layout_kwargs=None: {  # noqa: ARG005
+            "alpha": np.asarray([-1.0, 0.0]),
+            "beta": np.asarray([1.0, 0.0]),
+        },
     )
     layout = compute_render_layout(graph)
     growth_report = NetworkGrowthReport(
@@ -322,7 +353,6 @@ def test_render_network_growth_video_writes_output(monkeypatch, tmp_path) -> Non
                 round_index=1,
                 source_cast_id="alpha",
                 target_cast_ids=["beta"],
-                intent_target_cast_ids=["beta"],
                 visibility="private",
                 thread_id="thread-1",
                 action_type="private_check_in",

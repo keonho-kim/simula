@@ -12,9 +12,9 @@ Choose the direct focus for this round without generating deferred background mo
 
 # Rules
 - Keep the number of focused actors within the provided budget.
-- `focus_summary` and `selection_reason` must be non-empty, concrete Korean strings.
+- `focus_summary` and `reason` must be non-empty, concrete Korean strings.
 - `focus_slices` must contain only cast ids from `focus_candidates_json`.
-- Each `focus_slices` item must keep `stakes` and `selection_reason` non-empty and concrete.
+- Each `focus_slices` item must keep `stakes` and `reason` non-empty and concrete.
 - Keep the directive realistic for the scenario and the current moment.
 - Return only the JSON object that matches the required output schema.
 - Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
@@ -22,6 +22,7 @@ Choose the direct focus for this round without generating deferred background mo
 - Do not omit any required keys from the output schema.
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
+- Do not exceed the per-field sentence or item limits shown in the shape guide.
 
 # Inputs
 Round index:

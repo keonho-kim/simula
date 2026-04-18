@@ -24,15 +24,10 @@ def build_parser() -> argparse.ArgumentParser:
         prog="simula",
         description="LangGraph 기반 mailbox-first 시뮬레이션 프로토타입",
     )
-    scenario_group = parser.add_mutually_exclusive_group(required=True)
-
-    scenario_group.add_argument(
+    parser.add_argument(
         "--scenario-file",
+        required=True,
         help="시나리오 Markdown 또는 텍스트 파일 경로",
-    )
-    scenario_group.add_argument(
-        "--scenario-text",
-        help="직접 전달할 시나리오 텍스트",
     )
 
     parser.add_argument(
@@ -62,7 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--parallel",
         action="store_true",
-        help="--trials 횟수만큼 시뮬레이션을 병렬 실행한다.",
+        help="하나의 run 내부 graph fan-out과 분기 호출을 병렬 허용한다.",
     )
 
     return parser

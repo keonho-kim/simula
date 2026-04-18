@@ -174,7 +174,9 @@ def test_executor_returns_successful_run_result(
                 self._run_id = run_id
                 self.statuses: list[tuple[str, str, str | None]] = []
 
-            def next_run_id(self) -> str:
+            def next_run_id(self, *, actor_model_id: str, scenario_file_stem: str) -> str:
+                assert actor_model_id == "gpt-test"
+                assert scenario_file_stem == "scenario-01"
                 return self._run_id
 
             def save_run_started(self, **kwargs):  # noqa: ANN003
@@ -210,11 +212,18 @@ def test_executor_returns_successful_run_result(
             "create_async_checkpointer_context",
             lambda settings: _NoCheckpointer(),
         )
+        monkeypatch.setattr(
+            executor_module,
+            "write_run_outputs",
+            lambda **kwargs: None,
+        )
 
         settings = _settings(output_dir=tmp_path / f"output-{run_id}")
         executor = executor_module.SimulationExecutor(
             settings,
             scenario_controls={"num_cast": 2, "allow_additional_cast": True},
+            scenario_file_path="/tmp/Scenario 01.md",
+            scenario_file_stem="scenario-01",
         )
         try:
             result = asyncio.run(executor.run_async("scenario"))
@@ -263,7 +272,9 @@ def test_executor_logs_original_failure_traceback(
             self._run_id = "20260413.3"
             self.statuses: list[tuple[str, str, str | None]] = []
 
-        def next_run_id(self) -> str:
+        def next_run_id(self, *, actor_model_id: str, scenario_file_stem: str) -> str:
+            assert actor_model_id == "gpt-test"
+            assert scenario_file_stem == "scenario-01"
             return self._run_id
 
         def save_run_started(self, **kwargs):  # noqa: ANN003
@@ -298,11 +309,18 @@ def test_executor_logs_original_failure_traceback(
         "create_async_checkpointer_context",
         lambda settings: _NoCheckpointer(),
     )
+    monkeypatch.setattr(
+        executor_module,
+        "write_run_outputs",
+        lambda **kwargs: None,
+    )
 
     settings = _settings(output_dir=tmp_path / "output")
     executor = executor_module.SimulationExecutor(
         settings,
         scenario_controls={"num_cast": 2, "allow_additional_cast": True},
+        scenario_file_path="/tmp/Scenario 01.md",
+        scenario_file_stem="scenario-01",
     )
     try:
         with caplog.at_level(logging.ERROR, logger="simula"):

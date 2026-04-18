@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
+from pathlib import Path
 
 from simula.application.commands.simulation_runs import (
     SimulationRunFailedError,
@@ -24,11 +25,10 @@ from simula.application.commands.simulation_runs import (
     execute_single_run,
     resolve_single_run_log_level,
 )
-from simula.application.services.logging_setup import configure_logging
+from simula.shared.logging.setup import configure_logging
 from simula.application.services.presentation import (
     print_final_report,
     print_trial_run_summary,
-    write_single_run_outputs,
 )
 from simula.application.services.scenario_inputs import read_scenario_input
 
@@ -64,17 +64,15 @@ def run_from_cli(args: argparse.Namespace) -> int:
         )
         scenario_input = read_scenario_input(args)
         if args.trials == 1:
-            logger.info("시뮬레이션 실행 시작 | trials=1 parallel=False")
+            logger.info(
+                "시뮬레이션 시작 | trials=1 | graph_parallel=%s",
+                args.parallel,
+            )
             outcome = execute_single_run(
                 env_file=args.env,
-                scenario_text=scenario_input.scenario_text,
-                scenario_controls=scenario_input.scenario_controls,
+                scenario_input=scenario_input,
                 cli_overrides=cli_overrides,
-            )
-            saved_outputs = write_single_run_outputs(
-                output_dir=outcome.output_dir,
-                run_id=outcome.run_id,
-                final_state=outcome.final_state,
+                parallel=args.parallel,
             )
             final_report_markdown = outcome.final_state.get("final_report_markdown")
             print_final_report(
@@ -83,20 +81,26 @@ def run_from_cli(args: argparse.Namespace) -> int:
                 if isinstance(final_report_markdown, str)
                 else None,
             )
-            print(f"시뮬레이션 로그: {saved_outputs.simulation_log_path}")
-            print(f"최종 보고서: {saved_outputs.final_report_path}")
-            logger.info("시뮬레이션 실행 완료 | run_id=%s", outcome.run_id)
+            print(
+                f"시뮬레이션 로그: {Path(outcome.output_dir) / outcome.run_id / 'simulation.log.jsonl'}"
+            )
+            print(
+                f"최종 보고서: {Path(outcome.output_dir) / outcome.run_id / 'report.final.md'}"
+            )
+            print(
+                f"manifest: {Path(outcome.output_dir) / outcome.run_id / 'manifest.json'}"
+            )
+            logger.info("시뮬레이션 종료 | run_id=%s", outcome.run_id)
             return 0
 
         logger.info(
-            "반복 시뮬레이션 실행 시작 | trials=%s parallel=%s",
+            "반복 시뮬레이션 시작 | trials=%s | graph_parallel=%s",
             args.trials,
             args.parallel,
         )
         summary = execute_multi_run(
             env_file=args.env,
-            scenario_text=scenario_input.scenario_text,
-            scenario_controls=scenario_input.scenario_controls,
+            scenario_input=scenario_input,
             cli_overrides=cli_overrides,
             trials=args.trials,
             parallel=args.parallel,
@@ -107,19 +111,16 @@ def run_from_cli(args: argparse.Namespace) -> int:
                 and trial.final_state is not None
                 and trial.final_report is not None
             ):
-                saved_outputs = write_single_run_outputs(
-                    output_dir=trial.output_dir,
-                    run_id=trial.run_id,
-                    final_state=trial.final_state,
+                print(
+                    f"trial {trial.trial_index} 로그: "
+                    f"{Path(trial.output_dir) / trial.run_id / 'simulation.log.jsonl'}"
                 )
                 print(
-                    f"trial {trial.trial_index} 로그: {saved_outputs.simulation_log_path}"
-                )
-                print(
-                    f"trial {trial.trial_index} 보고서: {saved_outputs.final_report_path}"
+                    f"trial {trial.trial_index} 보고서: "
+                    f"{Path(trial.output_dir) / trial.run_id / 'report.final.md'}"
                 )
         print_trial_run_summary(summary.trials, parallel=summary.parallel)
-        logger.info("반복 시뮬레이션 실행 완료 | trials=%s", len(summary.trials))
+        logger.info("반복 시뮬레이션 종료 | trials=%s", len(summary.trials))
         return 0 if all(trial.success for trial in summary.trials) else 1
     except Exception as exc:  # noqa: BLE001
         if isinstance(exc, SimulationRunFailedError):

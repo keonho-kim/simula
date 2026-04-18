@@ -20,10 +20,9 @@ The router keeps these role boundaries stable even when the configured provider 
 The current provider adapters support:
 
 - OpenAI
+- OpenAI-compatible
 - Anthropic
 - Google
-- Ollama
-- vLLM
 - Bedrock
 
 Configuration is described in [`configuration.md`](./configuration.md), but the important runtime

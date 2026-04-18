@@ -32,7 +32,7 @@ class AppStore(Protocol):
     ) -> None:
         """실행 시작 메타데이터를 저장한다."""
 
-    def next_run_id(self) -> str:
+    def next_run_id(self, *, actor_model_id: str, scenario_file_stem: str) -> str:
         """현재 저장소 기준 다음 run_id 를 생성한다."""
 
     def save_plan(self, run_id: str, plan: dict[str, object]) -> None:

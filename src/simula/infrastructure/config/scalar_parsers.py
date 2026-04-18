@@ -10,12 +10,12 @@
 
 from __future__ import annotations
 
+import json
 from typing import cast
 
 from simula.infrastructure.config.models import (
     AnthropicEffort,
     GoogleThinkingLevel,
-    OllamaReasoning,
     ReasoningEffort,
     Verbosity,
 )
@@ -74,6 +74,48 @@ def env_bool(values: dict[str, str], key: str, default: bool) -> bool:
     raise ValueError(f"불리언 설정을 해석할 수 없습니다: {key}={raw}")
 
 
+def env_optional_bool(
+    values: dict[str, str],
+    key: str,
+    *,
+    default: bool | None = None,
+) -> bool | None:
+    """선택 불리언 값을 읽는다."""
+
+    raw = values.get(key)
+    if raw is None or raw.strip() == "":
+        return default
+
+    normalized = raw.strip().lower()
+    if normalized in BOOLEAN_TRUE_VALUES:
+        return True
+    if normalized in BOOLEAN_FALSE_VALUES:
+        return False
+    raise ValueError(f"불리언 설정을 해석할 수 없습니다: {key}={raw}")
+
+
+def env_json_object(
+    values: dict[str, str],
+    key: str,
+    *,
+    default: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """JSON object 문자열을 읽는다."""
+
+    raw = values.get(key)
+    if raw is None or raw.strip() == "":
+        return {} if default is None else dict(default)
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"JSON object 설정을 해석할 수 없습니다: {key}={raw}") from exc
+
+    if not isinstance(parsed, dict):
+        raise ValueError(f"JSON object 설정을 해석할 수 없습니다: {key}={raw}")
+    return cast(dict[str, object], parsed)
+
+
 def env_enum(
     *,
     key: str,
@@ -129,28 +171,6 @@ def env_verbosity(
             label="verbosity",
         ),
     )
-
-
-def env_ollama_reasoning(
-    values: dict[str, str],
-    key: str,
-    *,
-    default: OllamaReasoning | None = None,
-) -> OllamaReasoning | None:
-    """Ollama reasoning 옵션을 읽는다."""
-
-    raw = values.get(key)
-    if raw is None:
-        return default
-
-    normalized = raw.strip().lower()
-    if normalized in BOOLEAN_TRUE_VALUES:
-        return True
-    if normalized in BOOLEAN_FALSE_VALUES:
-        return False
-    if normalized in {"low", "medium", "high"}:
-        return cast(OllamaReasoning, normalized)
-    raise ValueError(f"ollama reasoning 설정을 해석할 수 없습니다: {key}={raw}")
 
 
 def env_anthropic_effort(

@@ -120,9 +120,9 @@ def _what_happened_lines(
     )
     most_common_action_type, most_common_action_count = action_type_counts.most_common(1)[0]
     latest_summaries = [
-        item.action_summary
+        item.summary
         for item in loaded.adopted_activities[-3:]
-        if item.action_summary
+        if item.summary
     ]
     lines = [
         "- "
@@ -269,15 +269,15 @@ def _fixer_lines(fixer_report: FixerReport) -> list[str]:
 
 def _where_to_look_lines() -> list[str]:
     return [
-        "- `actions/summary.csv`: 후보 action과 실제 채택 횟수를 비교할 때",
-        "- `performance/summary.png`: 전체 호출 성능 분포를 한눈에 볼 때",
-        "- `performance/summary.csv`: input/output 토큰 크기 조합별 TTFT·소요 시간 p90/p95/p99를 볼 때",
-        "- `network/growth.csv`: 라운드별 연결 변화 수치를 직접 확인할 때",
-        "- `network/growth_metrics.png`: 연결이 늘어나는 흐름을 빠르게 볼 때",
-        "- `network/concentration.png`: 연결이 어느 쪽에 몰렸는지 볼 때",
-        "- `network/growth.mp4`: 연결이 늘어나는 순서를 정지 가능한 영상으로 볼 때",
-        "- `token_usage/summary.md`: 역할별 토큰 사용량을 확인할 때",
-        "- `llm_calls.csv`: 개별 호출과 원문 응답을 직접 추적할 때",
+        "- `data/actions.summary.csv`: 후보 action과 실제 채택 횟수를 비교할 때",
+        "- `assets/performance.summary.png`: 전체 호출 성능 분포를 한눈에 볼 때",
+        "- `data/performance.summary.csv`: input/output 토큰 크기 조합별 TTFT·소요 시간 p90/p95/p99를 볼 때",
+        "- `data/network.growth.csv`: 라운드별 연결 변화 수치를 직접 확인할 때",
+        "- `assets/network.growth_metrics.png`: 연결이 늘어나는 흐름을 빠르게 볼 때",
+        "- `assets/network.concentration.png`: 연결이 어느 쪽에 몰렸는지 볼 때",
+        "- `assets/network.growth.mp4`: 연결이 늘어나는 순서를 정지 가능한 영상으로 볼 때",
+        "- `summaries/token_usage.summary.md`: 역할별 토큰 사용량을 확인할 때",
+        "- `data/llm_calls.csv`: 개별 호출과 원문 응답을 직접 추적할 때",
     ]
 
 

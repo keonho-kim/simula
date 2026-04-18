@@ -15,9 +15,9 @@ Turn the planning analysis and cast outline into the minimum execution-plan fram
 - Avoid near-duplicate action entries that only rename the same move.
 - `action_catalog.actions` must contain at most 5 items.
 - Each `action_catalog.actions` item must use a unique `action_type`.
-- Set `supports_utterance` to true when the action naturally includes a spoken reaction, question, comment, sharing beat, or conversation turn.
-- Set `supports_utterance` to false when the action is mainly silent or non-verbal, such as a solo inspection, silent sampling, purchase click, or quiet observation.
-- Each `action_catalog.selection_guidance` item should explain how to choose among the broad actions in this scenario.
+- Each action must include only `action_type`, `label`, `description`, `supported_visibility`, and `requires_target`.
+- Use broad action categories that can be reused across rounds.
+- Set `requires_target=true` only when the action normally needs a concrete other participant.
 - Generate `major_events` only when the scenario text implies concrete turning points, staged choices, checkpoints, or end conditions worth tracking.
 - `major_events` may be an empty array when the scenario does not imply any specific shared event track.
 - `major_events` must contain at most 6 items.

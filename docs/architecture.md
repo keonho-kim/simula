@@ -9,15 +9,16 @@ simulation state transitions. The surrounding application is responsible for:
 - supplying services through runtime context
 - persisting SQL-backed artifacts
 - streaming JSONL runtime events
-- writing human-facing files after the graph completes
+- writing human-facing output artifacts after the graph completes
 
 ## Layers
 
 | Layer | Responsibility | Representative modules |
 | --- | --- | --- |
 | Entry | CLI parsing and process bootstrap | `simula.entrypoints.*` |
-| Application | commands, workflow execution, presentation, analysis orchestration | `simula.application.*` |
-| Domain | typed contracts, reducers, runtime policy, reporting, event builders | `simula.domain.*` |
+| Common | cross-layer logging and runtime-output helpers | `simula.shared.*` |
+| Application | commands, workflow execution, presentation, output writing, analysis orchestration | `simula.application.*` |
+| Domain | typed contracts, event memory, activity/runtime/reporting/scenario rules | `simula.domain.*` |
 | Infrastructure | config loading, provider adapters, storage engines, checkpointers | `simula.infrastructure.*` |
 
 ## Execution Path
@@ -30,17 +31,17 @@ flowchart LR
     Executor --> Input["SimulationInputState"]
     Executor --> Context["WorkflowRuntimeContext"]
     Input --> Hydrate["hydrate_initial_state"]
-    Hydrate --> Workflow["SIMULATION_WORKFLOW"]
+    Hydrate --> Workflow["SIMULATION_WORKFLOW or SIMULATION_WORKFLOW_PARALLEL"]
     Context --> Workflow
     Workflow --> Output["SimulationOutputState"]
-    Output --> Presentation["application.services.presentation"]
-    Presentation --> Files["final_report.md"]
+    Output --> Writer["application.services.output_writer"]
+    Writer --> Files["report.final.md + manifest.json + analysis artifacts"]
     Executor --> Jsonl["simulation.log.jsonl"]
     Executor --> Store["SQL store"]
 ```
 
-The executor is the boundary that combines graph execution, output streaming, storage, and final
-presentation.
+The executor is the boundary that combines graph execution, output streaming, storage, and
+integrated output writing.
 
 ## LangGraph Boundary
 
@@ -54,6 +55,9 @@ public output schemas:
 
 This keeps the public API narrow while allowing the internal workflow state to stay fully hydrated
 and required-only.
+
+The shipped default is the serial root workflow. When CLI `--parallel` is enabled, the executor
+switches to the parallel root workflow variant instead of changing trial execution.
 
 ## Hydrated Internal State
 
@@ -78,9 +82,15 @@ The current context includes:
 - `logger`
 - `llm_usage_tracker`
 - `run_jsonl_appender`
+- `parallel_graph_calls`
 
 That split matters because LangGraph state should model simulation data, not database handles,
 provider clients, or loggers.
+
+Those runtime-scoped logging and JSONL helpers are implemented under:
+
+- `simula.shared.logging.*`
+- `simula.shared.io.*`
 
 ## Stream Surface
 
@@ -116,8 +126,9 @@ The application store persists:
 
 File output is separate from the SQL store:
 
-- `RunJsonlAppender` writes `simulation.log.jsonl` incrementally during execution
-- the presentation layer writes `final_report.md` after the workflow completes
+- `simula.shared.io.RunJsonlAppender` writes `simulation.log.jsonl` incrementally during execution
+- the integrated output writer uses that JSONL file to build `report.final.md`, `manifest.json`,
+  and analysis artifacts inside the same run directory
 
 This keeps append-heavy event logging separate from relational storage and keeps markdown rendering
 out of the graph nodes that manage simulation state.
@@ -131,6 +142,17 @@ The workflow uses several progressively narrower data shapes.
 - `report_projection_json` is a durable finalization artifact built only for report writing
 
 The same raw state is therefore not reused blindly across planning, runtime, and final reporting.
+
+## Domain Package Shape
+
+The domain layer is no longer a flat collection of unrelated modules.
+
+- `simula.domain.contracts` contains typed contracts
+- `simula.domain.event_memory` contains event-memory lifecycle, matching, and update rules
+- `simula.domain.activity` contains canonical action and feed rules
+- `simula.domain.runtime` contains runtime action, runtime policy, and coordinator policy
+- `simula.domain.reporting` contains durable event builders and final-report helpers
+- `simula.domain.scenario` contains scenario controls and shared time utilities
 
 ## Related Docs
 

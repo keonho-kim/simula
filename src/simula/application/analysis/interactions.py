@@ -69,18 +69,18 @@ def build_interaction_digests(
         if activity.round_index > state.round_end:
             state.round_end = activity.round_index
         representative_interaction = _non_empty_text(
-            activity.action_summary,
+            activity.summary,
             activity.action_type,
         )
         representative_message = _non_empty_text(
             activity.utterance,
-            activity.action_summary,
-            activity.action_detail,
+            activity.summary,
+            activity.detail,
         )
         latest_message = _non_empty_text(
             activity.utterance,
-            activity.action_summary,
-            activity.action_detail,
+            activity.summary,
+            activity.detail,
         )
         if representative_interaction:
             state.representative_interaction = representative_interaction

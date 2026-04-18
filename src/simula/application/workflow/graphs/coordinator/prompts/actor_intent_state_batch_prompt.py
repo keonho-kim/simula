@@ -13,14 +13,16 @@ Generate only the updated intent snapshots for actors whose direction changed or
 # Rules
 - `actor_intent_states` may contain a partial set, but each `cast_id` must be unique.
 - Use only cast ids that exist in `actors_json`.
-- Each item must keep `current_intent` concrete and add `thought` that explains why this actor chose that direction now.
+- Each item must keep `goal` concrete.
+- Allowed keys are only `cast_id`, `goal`, `target_cast_ids`, `confidence`, and `changed_from_previous`.
 - Keep each updated intent only one plausible beat ahead of the adopted actions and background pressure.
-- Return only the JSON object that matches the required output schema.
-- Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
+- Return only the JSON array that matches the required output schema.
+- Do not return any prose, labels, headings, markdown, or commentary outside the JSON array.
 - Do not add extra keys that are not in the output schema.
 - Do not omit any required keys from the output schema.
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
+- Each item must stay within the sentence or item limits shown in the shape guide.
 
 # Inputs
 Round index:

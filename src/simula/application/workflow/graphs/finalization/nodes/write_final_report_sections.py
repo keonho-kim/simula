@@ -22,7 +22,7 @@ from simula.application.workflow.graphs.finalization.prompts.write_timeline_sect
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
-from simula.application.workflow.utils.finalization_sections import (
+from simula.application.workflow.graphs.finalization.sections import (
     build_report_prompt_inputs,
     normalize_actor_dynamics_section,
     normalize_bullet_only_section,

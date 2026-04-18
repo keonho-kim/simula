@@ -20,13 +20,14 @@ Compress the raw scenario into one reusable planning analysis object.
 - Do not omit any required keys from the output schema.
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
+- Do not exceed the per-field sentence or item limits shown in the shape guide.
 - Do not invent actors beyond what the scenario implies.
 - Ground every fact in the scenario text. If a duration, participant count, episode count, or format detail is not stated, do not infer a concrete value.
 - Do not import outside genre knowledge, show conventions, or likely defaults.
 - Do not turn the scenario into observation questions, analyst prompts, or viewer checklists.
 - Keep the analysis realistic and in-world. Preserve the kind of people, constraints, and actions that could actually happen in the described setting.
 - Do not introduce off-screen systems, formal procedures, legal instruments, or expert frameworks unless the scenario text already implies them.
-- `brief_summary`, `premise`, and `progression_plan.selection_reason` must be non-empty, scenario-grounded strings.
+- `brief_summary`, `premise`, and `progression_plan.reason` must be non-empty, scenario-grounded strings.
 - `progression_plan.max_rounds` is the maximum number of simulation rounds, not an elapsed-time unit.
 - Choose `progression_plan.max_rounds` from the scenario pacing itself. Do not copy a fixed default if the scenario implies a shorter or longer arc.
 - `progression_plan.allowed_elapsed_units` and `progression_plan.default_elapsed_unit` describe in-world elapsed time only.

@@ -14,7 +14,7 @@ import json
 
 from langgraph.runtime import Runtime
 
-from simula.application.llm_logging import build_llm_log_context
+from simula.shared.logging.llm import build_llm_log_context
 from simula.application.workflow.context import WorkflowRuntimeContext
 from simula.application.workflow.graphs.generation.prompts.generate_actor_prompt import (
     PROMPT as GENERATE_ACTOR_PROMPT,
@@ -78,7 +78,7 @@ async def generate_actor_slot(
         cast_item_json=json.dumps(cast_item, ensure_ascii=False, separators=(",", ":")),
         **build_actor_card_prompt_bundle(),
     )
-    actor, meta = await runtime.context.llms.ainvoke_structured_with_meta(
+    actor, meta = await runtime.context.llms.ainvoke_object_with_meta(
         "generator",
         prompt,
         GeneratedActorCardDraft,

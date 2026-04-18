@@ -18,12 +18,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, cast
 
-from sqlalchemy import Integer, cast as sql_cast, func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from simula.application.ports.storage import AppStore
-from simula.domain.activities import iso_timestamp
+from simula.shared.text import slugify_path_token
+from simula.domain.activity.actions import iso_timestamp
 from simula.infrastructure.config.models import StorageConfig
 from simula.infrastructure.storage.connection import (
     create_storage_engine,
@@ -109,28 +110,32 @@ class SqlAlchemyAppStore(AppStore):
                 session.rollback()
                 raise RunIdConflictError(run_id) from exc
 
-    def next_run_id(self) -> str:
-        prefix = datetime.now().astimezone().date().isoformat()
-        prefix_pattern = f"{prefix}.%"
-        suffix_start_index = len(prefix) + 2
+    def next_run_id(self, *, actor_model_id: str, scenario_file_stem: str) -> str:
+        date_prefix = datetime.now().astimezone().strftime("%Y%m%d")
+        prefix_pattern = f"{date_prefix}.%"
+        normalized_model_id = slugify_path_token(actor_model_id)
+        normalized_scenario_stem = slugify_path_token(scenario_file_stem)
+        if not normalized_model_id:
+            raise ValueError("actor_model_id를 slug로 정규화할 수 없습니다.")
+        if not normalized_scenario_stem:
+            raise ValueError("scenario_file_stem을 slug로 정규화할 수 없습니다.")
+
         with self.session_factory() as session:
             run_table = cast(Any, self.models.run_record.__table__)
-            if self.storage.provider == "sqlite":
-                suffix_expr = sql_cast(
-                    func.substr(run_table.c.run_id, suffix_start_index),
-                    Integer,
-                )
-            else:
-                suffix_expr = sql_cast(
-                    func.substring(run_table.c.run_id, suffix_start_index),
-                    Integer,
-                )
-            max_number = session.scalar(
-                select(func.max(suffix_expr)).where(
-                    run_table.c.run_id.like(prefix_pattern)
-                )
-            )
-        return f"{prefix}.{int(max_number or 0) + 1}"
+            existing_run_ids = session.scalars(
+                select(run_table.c.run_id).where(run_table.c.run_id.like(prefix_pattern))
+            ).all()
+
+        max_number = 0
+        for run_id in existing_run_ids:
+            number = _extract_run_number(str(run_id), expected_date_prefix=date_prefix)
+            if number is not None:
+                max_number = max(max_number, number)
+
+        return (
+            f"{date_prefix}.{max_number + 1:03d}."
+            f"{normalized_model_id}.{normalized_scenario_stem}"
+        )
 
     def save_plan(self, run_id: str, plan: dict[str, object]) -> None:
         with self.session_factory() as session:
@@ -219,3 +224,12 @@ class SqlAlchemyAppStore(AppStore):
 
 def _parse_timestamp(value: str) -> datetime:
     return datetime.fromisoformat(value)
+
+
+def _extract_run_number(run_id: str, *, expected_date_prefix: str) -> int | None:
+    parts = run_id.split(".", 3)
+    if len(parts) < 2 or parts[0] != expected_date_prefix:
+        return None
+    if not parts[1].isdigit():
+        return None
+    return int(parts[1])

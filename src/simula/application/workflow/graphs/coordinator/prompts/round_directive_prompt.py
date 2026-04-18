@@ -12,13 +12,12 @@ Choose the direct focus for this round and summarize deferred motion in the same
 
 # Rules
 - Keep the number of selected actors within the provided budget.
-- `focus_summary` and top-level `selection_reason` must be non-empty, concrete strings that explain why this round focus matters now.
+- `focus_summary` and top-level `reason` must be non-empty, concrete strings that explain why this round focus matters now.
 - `selected_cast_ids` and `deferred_cast_ids` must stay unique.
 - `selected_cast_ids` must match the union of every `focus_cast_ids`.
 - Only actors from `focus_candidates_json` may appear in `selected_cast_ids`.
-- Each `focus_slices` item must keep `stakes` and `selection_reason` non-empty and concrete.
+- Each `focus_slices` item must keep `stakes` and `reason` non-empty and concrete.
 - `background_updates` should only describe deferred actors.
-- Each `background_updates` item must keep `future_hook` non-empty and concrete.
 - Every field is required.
 - Return only the JSON object that matches the required output schema.
 - Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
@@ -32,7 +31,7 @@ Choose the direct focus for this round and summarize deferred motion in the same
 - Avoid overly narrow two-person loops when the current conflict clearly implicates additional related candidates.
 - If the candidate pool is rich enough and the direct-call budget allows it, prefer selecting 3 to 4 closely related cast members rather than only 1 to 2.
 - If `event_memory_json` shows overdue or due unresolved events, prefer focus slices that can materially advance those events this round.
-- If the previous round felt repetitive, use `background_updates` to create one concrete deferred hook that could visibly change the next round instead of merely restating the same stalemate.
+- If the previous round felt repetitive, use `background_updates` to create one concrete deferred pressure update instead of merely restating the same stalemate.
 
 # Inputs
 Round index:

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Runtime is the only looping stage. It selects the next focus, fans out actor proposals, resolves
+Runtime is the only looping stage. It selects the next focus, builds actor proposals, resolves
 the round, updates event tracking, and decides whether another round is still useful.
 
 ## Active Path
@@ -14,17 +14,19 @@ flowchart TD
     Continue -->|continue| Prepare["prepare_round"]
     Continue -->|stop| End([END])
     Prepare --> Plan["plan_round"]
-    Plan --> Dispatch{"dispatch_selected_actor_proposals"}
-    Dispatch -->|selected actors| FanOut["generate_actor_proposal*"]
-    Dispatch -->|no selected actors| Resolve["resolve_round"]
-    FanOut --> Reduce["reduce_actor_proposals"]
-    Reduce --> Resolve
-    Resolve --> Route{"route_after_resolution"}
-    Route -->|simulation_done| End
-    Route -->|continue| Continue
+    Plan --> Queue["prepare_actor_proposal_queue"]
+    Queue --> ProposalRoute{"route_actor_proposal_queue"}
+    ProposalRoute -->|actors remain| Worker["generate_actor_proposal_serial"]
+    ProposalRoute -->|queue empty| Resolve["resolve_round"]
+    Worker --> ProposalRoute
+    Resolve --> ResolutionRoute{"route_after_resolution"}
+    ResolutionRoute -->|simulation_done| End
+    ResolutionRoute -->|continue| Continue
 ```
 
-`generate_actor_proposal*` fans out once per selected actor in the current round.
+This document describes the default serial runtime graph. The parallel variant still uses
+`dispatch_selected_actor_proposals -> generate_actor_proposal -> reduce_actor_proposals` when
+intra-run graph parallelism is enabled.
 
 ## Node Responsibilities
 
@@ -92,17 +94,18 @@ After local normalization, the node:
 - writes `round_focus_selected`
 - writes `round_background_updated` when background updates exist
 
-### `dispatch_selected_actor_proposals`
+### `prepare_actor_proposal_queue`
 
-Decides the next branch after the directive:
+Copies `selected_cast_ids` into a round-local proposal queue for serial execution.
 
-- when selected cast ids exist, fan out actor proposal work
-- when none exist, jump directly to `resolve_round`
+### `route_actor_proposal_queue`
 
-This keeps the round resolver as the single place that finalizes the round, even when no actor
-gets direct focus.
+Chooses the next branch:
 
-### `generate_actor_proposal`
+- when actor ids remain, continue with `generate_actor_proposal_serial`
+- when the queue is empty, jump to `resolve_round`
+
+### `generate_actor_proposal_serial`
 
 Builds one `ActorActionProposal` for one selected actor using:
 
@@ -114,11 +117,8 @@ Builds one `ActorActionProposal` for one selected actor using:
 - runtime guidance, including allowed actions and current intent state
 
 The node also applies semantic validation and may fall back to an explicit forced-idle default
-payload when parsing or validation fails.
-
-### `reduce_actor_proposals`
-
-Restores deterministic actor order after fan-in.
+payload when parsing or validation fails. In the serial graph, proposal order is already
+deterministic, so no separate reduce step is needed.
 
 ### `resolve_round`
 
@@ -177,3 +177,11 @@ Runtime leaves behind the trace consumed by finalization:
 - `intent_history`
 - `world_state_summary`
 - `stop_reason`
+
+## Parallel Variant
+
+When a run is started with CLI `--parallel`, runtime switches to the parallel actor-proposal path:
+
+- `plan_round -> dispatch_selected_actor_proposals -> generate_actor_proposal -> reduce_actor_proposals -> resolve_round`
+
+That variant keeps the same round semantics but allows concurrent selected-actor proposal calls.

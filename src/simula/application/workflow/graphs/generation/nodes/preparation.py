@@ -42,7 +42,7 @@ def prepare_actor_slots(
         for index, cast_item in enumerate(cast_roster, start=1)
     ]
 
-    runtime.context.logger.info("등장 인물 생성 시작 | slots=%s", len(slot_specs))
+    runtime.context.logger.info("등장 인물 생성 시작 | 대상 %s명", len(slot_specs))
     return {
         "pending_cast_slots": slot_specs,
         "generated_actor_results": Overwrite(value=[]),

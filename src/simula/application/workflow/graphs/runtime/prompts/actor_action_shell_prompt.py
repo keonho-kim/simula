@@ -31,17 +31,17 @@ _PROMPT = (
     - Do not omit any required keys from the output schema.
     - Propose exactly one action shell for this round.
     - Choose `action_type` from `runtime_guidance.available_actions`.
-    - Choose only `action_type`, `visibility`, `target_cast_ids`, and `thread_id` in this step.
+    - Choose only `action_type`, `visibility`, and `target_cast_ids` in this step.
 <<TARGET_RULE_LINES>>
     - `public` visibility may leave `target_cast_ids` empty.
     - If a `public` action is clearly aimed at one or more specific visible people, include those real `cast_id` values in `target_cast_ids`.
     - `group` visibility always requires one or more concrete visible other actor targets.
     - `private` visibility may leave `target_cast_ids` empty only for a solo self-directed action.
-    - If this action continues an existing conversation, confession, date line, or choice-pressure line with the same participant set, reuse or continue the stable `thread_id`.
-    - Only leave `thread_id` empty when the action is truly standalone and not part of an ongoing interaction line.
+    - Respect the per-action targeting guidance in `action policy table JSON`.
     - Use `private` for solo or self-directed behavior that is not being broadcast to the room.
     - Use `public` with empty target arrays only for a room-wide or broadcast action.
     - Do not generate intent wording, spoken lines, summaries, or action details in this step.
+    - Do not exceed the per-field sentence or item limits shown in the shape guide.
 
     # Input
     - round_index: {round_index}
@@ -53,6 +53,10 @@ _PROMPT = (
     {visible_action_context_json}
     - visible actors JSON:
     {visible_actors_json}
+    - action policy table JSON:
+    {action_policy_table_json}
+    - valid visible target cast ids JSON:
+    {valid_visible_target_ids_json}
     - unread backlog digest JSON:
     {unread_backlog_digest_json}
     - runtime guidance JSON:
@@ -65,6 +69,10 @@ _PROMPT = (
 
     # Shape Guide
     {output_example}
+
+    # Validity Examples
+    - Invalid: {{"action_type":"ceo_board_meeting","visibility":"group","target_cast_ids":[]}}
+    - Valid: {{"action_type":"ceo_board_meeting","visibility":"group","target_cast_ids":["a","b"]}}
     """
     ).strip().replace("<<TARGET_RULE_LINES>>", _TARGET_RULE_LINES)
 )

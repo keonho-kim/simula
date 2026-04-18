@@ -19,7 +19,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from simula.domain.scenario_controls import (
+from simula.shared.text import slugify_path_token
+from simula.domain.scenario.controls import (
     ScenarioControls,
     build_scenario_controls,
 )
@@ -34,6 +35,8 @@ _FRONTMATTER_PATTERN = re.compile(
 class ScenarioInput:
     """Parsed scenario input passed into the application layer."""
 
+    scenario_file_path: str
+    scenario_file_stem: str
     scenario_text: str
     scenario_controls: ScenarioControls
 
@@ -41,19 +44,15 @@ class ScenarioInput:
 def read_scenario_input(args: argparse.Namespace) -> ScenarioInput:
     """CLI 인자에서 시나리오 본문과 제어값을 읽는다."""
 
-    raw_text = _read_raw_scenario_text(args)
-    return parse_scenario_document(raw_text)
+    scenario_path = _resolve_scenario_path(args)
+    raw_text = scenario_path.read_text(encoding="utf-8").strip()
+    return parse_scenario_document(raw_text, source_path=scenario_path)
 
 
-def read_scenario_text(args: argparse.Namespace) -> str:
-    """CLI 인자에서 정리된 시나리오 본문만 읽는다."""
-
-    return read_scenario_input(args).scenario_text
-
-
-def parse_scenario_document(text: str) -> ScenarioInput:
+def parse_scenario_document(text: str, *, source_path: str | Path) -> ScenarioInput:
     """원시 시나리오 문서를 frontmatter와 본문으로 분리한다."""
 
+    scenario_path = Path(source_path).expanduser()
     raw_text = text.strip()
     if not raw_text:
         raise ValueError("시나리오 입력이 비어 있습니다.")
@@ -69,23 +68,24 @@ def parse_scenario_document(text: str) -> ScenarioInput:
     if not body:
         raise ValueError("frontmatter를 제거한 뒤 시나리오 본문이 비어 있습니다.")
 
+    scenario_file_stem = slugify_path_token(scenario_path.stem)
+    if not scenario_file_stem:
+        raise ValueError("시나리오 파일명 stem을 slug로 정규화할 수 없습니다.")
+
     return ScenarioInput(
+        scenario_file_path=str(scenario_path),
+        scenario_file_stem=scenario_file_stem,
         scenario_text=body,
         scenario_controls=controls,
     )
 
 
-def _read_raw_scenario_text(args: argparse.Namespace) -> str:
-    """CLI 인자에서 원시 시나리오 텍스트를 읽는다."""
-
-    if args.scenario_text:
-        return args.scenario_text.strip()
+def _resolve_scenario_path(args: argparse.Namespace) -> Path:
+    """CLI 인자에서 시나리오 파일 경로를 읽는다."""
 
     if args.scenario_file:
-        scenario_path = Path(args.scenario_file)
-        return scenario_path.read_text(encoding="utf-8").strip()
-
-    raise ValueError("시나리오 입력이 비어 있습니다.")
+        return Path(args.scenario_file)
+    raise ValueError("시나리오 파일 경로가 비어 있습니다.")
 
 
 def _parse_frontmatter(frontmatter: str) -> ScenarioControls:

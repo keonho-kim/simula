@@ -21,6 +21,7 @@ Generate only the observer-report body and actor-facing digest body for this rou
 - Do not omit any required keys from the output schema.
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
+- Do not exceed the per-field sentence or item limits shown in the shape guide.
 
 # Inputs
 Round index:
@@ -33,7 +34,7 @@ Event updates JSON:
 {event_updates_json}
 
 Updated intent states JSON:
-{updated_intent_states_json}
+{intent_states_json}
 
 Latest background updates JSON:
 {latest_background_updates_json}

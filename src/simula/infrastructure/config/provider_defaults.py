@@ -13,7 +13,6 @@ from __future__ import annotations
 from simula.infrastructure.config.models import (
     AnthropicEffort,
     GoogleThinkingLevel,
-    OllamaReasoning,
     Provider,
     ReasoningEffort,
     Verbosity,
@@ -21,7 +20,6 @@ from simula.infrastructure.config.models import (
 from simula.infrastructure.config.scalar_parsers import (
     env_anthropic_effort,
     env_google_thinking_level,
-    env_ollama_reasoning,
     env_optional_int,
     env_reasoning_effort,
     env_verbosity,
@@ -37,12 +35,15 @@ DEFAULT_MAX_TOKENS = {
 }
 COMMON_PROVIDER_API_KEYS = {
     "openai": "OPENAI_API_KEY",
+    "openai-compatible": "OPENAI_COMPATIBLE_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
     "google": "GOOGLE_API_KEY",
 }
 COMMON_PROVIDER_BASE_URLS = {
-    "ollama": ("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
-    "vllm": ("VLLM_BASE_URL", "http://127.0.0.1:8000/v1"),
+    "openai-compatible": (
+        "OPENAI_COMPATIBLE_BASE_URL",
+        "http://127.0.0.1:8000/v1",
+    ),
     "openai": ("OPENAI_BASE_URL", None),
     "anthropic": ("ANTHROPIC_BASE_URL", None),
     "google": ("GOOGLE_BASE_URL", None),
@@ -95,9 +96,6 @@ def provider_default_api_key(
     if role_override:
         return role_override
 
-    if provider == "vllm":
-        return values.get("VLLM_API_KEY", "EMPTY")
-
     common_key = COMMON_PROVIDER_API_KEYS.get(provider)
     if common_key is not None:
         return values.get(common_key)
@@ -123,6 +121,47 @@ def provider_default_base_url(
     if default is None:
         return values.get(env_key)
     return values.get(env_key, default)
+
+
+def provider_default_stream_usage(
+    values: dict[str, str],
+    provider: Provider,
+    *,
+    role: str,
+) -> bool | None:
+    """provider별 기본 stream_usage를 결정한다."""
+
+    role_override = values.get(f"SIM_{role}_STREAM_USAGE")
+    if role_override is not None:
+        normalized = role_override.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+        raise ValueError(
+            f"불리언 설정을 해석할 수 없습니다: SIM_{role}_STREAM_USAGE={role_override}"
+        )
+
+    if provider == "openai":
+        raw = values.get("OPENAI_STREAM_USAGE")
+    elif provider == "openai-compatible":
+        raw = values.get("OPENAI_COMPATIBLE_STREAM_USAGE")
+    else:
+        raw = None
+
+    if raw is None:
+        return None
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    env_key = (
+        "OPENAI_STREAM_USAGE"
+        if provider == "openai"
+        else "OPENAI_COMPATIBLE_STREAM_USAGE"
+    )
+    raise ValueError(f"불리언 설정을 해석할 수 없습니다: {env_key}={raw}")
 
 
 def provider_default_openai_reasoning_effort(
@@ -281,15 +320,3 @@ def provider_default_bedrock_endpoint_url(
     return values.get(f"SIM_{role}_BEDROCK_ENDPOINT_URL") or values.get(
         "BEDROCK_ENDPOINT_URL"
     )
-
-
-def provider_default_ollama_reasoning(
-    values: dict[str, str],
-    *,
-    provider: Provider,
-) -> OllamaReasoning | None:
-    """Ollama 공통 reasoning 기본값을 결정한다."""
-
-    if provider != "ollama":
-        return None
-    return env_ollama_reasoning(values, "OLLAMA_REASONING")

@@ -129,6 +129,14 @@ def _parse_llm_call(entry: dict[str, object]) -> LLMCallRecord:
         sequence=_int_value(entry.get("sequence", 0)),
         role=role,
         call_kind=str(entry.get("call_kind", "")).strip(),
+        contract_kind=str(
+            entry.get("contract_kind", "")
+            or normalized_log_context.get("contract_kind", "")
+        ).strip(),
+        output_type_name=str(
+            entry.get("output_type_name", "")
+            or normalized_log_context.get("output_type_name", "")
+        ).strip(),
         prompt=str(entry.get("prompt", "")),
         raw_response=str(entry.get("raw_response", "")),
         log_context=normalized_log_context,
@@ -137,6 +145,35 @@ def _parse_llm_call(entry: dict[str, object]) -> LLMCallRecord:
         input_tokens=_optional_int_value(entry.get("input_tokens")),
         output_tokens=_optional_int_value(entry.get("output_tokens")),
         total_tokens=_optional_int_value(entry.get("total_tokens")),
+        parse_failure_count=_int_value(entry.get("parse_failure_count", 0)),
+        forced_default=bool(entry.get("forced_default", False)),
+        fixer_used=bool(entry.get("fixer_used", False)),
+        provider_structured_mode=str(
+            entry.get("provider_structured_mode", "")
+            or normalized_log_context.get("provider_structured_mode", "")
+        ).strip(),
+        prompt_variant=str(
+            entry.get("prompt_variant", "")
+            or normalized_log_context.get("prompt_variant", "")
+        ).strip(),
+        semantic_coercion_used=bool(entry.get("semantic_coercion_used", False)),
+        semantic_coercion_reasons=_string_list(
+            entry.get("semantic_coercion_reasons", [])
+        ),
+        post_coercion_valid=(
+            bool(entry.get("post_coercion_valid"))
+            if entry.get("post_coercion_valid") is not None
+            else None
+        ),
+        retry_stage=str(entry.get("retry_stage", "")).strip(),
+        retry_route=str(entry.get("retry_route", "")).strip(),
+        retry_attempt=_int_value(entry.get("retry_attempt", 0)),
+        retry_budget=_int_value(entry.get("retry_budget", 0)),
+        retry_reason=str(entry.get("retry_reason", "")).strip(),
+        missing_field_paths=_string_list(entry.get("missing_field_paths", [])),
+        transport_retry_attempt=_int_value(entry.get("transport_retry_attempt", 1)),
+        transport_retry_budget=_int_value(entry.get("transport_retry_budget", 1)),
+        transport_error_type=str(entry.get("transport_error_type", "")).strip(),
     )
 
 
@@ -177,15 +214,12 @@ def _parse_adopted_activities(
                 round_index=_int_value(activity_dict.get("round_index", event_round_index)),
                 source_cast_id=source_cast_id,
                 target_cast_ids=_string_list(activity_dict.get("target_cast_ids", [])),
-                intent_target_cast_ids=_string_list(
-                    activity_dict.get("intent_target_cast_ids", [])
-                ),
                 visibility=str(activity_dict.get("visibility", "")).strip(),
                 thread_id=str(activity_dict.get("thread_id", "")).strip(),
                 action_type=str(activity_dict.get("action_type", "")).strip(),
-                intent=str(activity_dict.get("intent", "")).strip(),
-                action_summary=str(activity_dict.get("action_summary", "")).strip(),
-                action_detail=str(activity_dict.get("action_detail", "")).strip(),
+                goal=str(activity_dict.get("goal", "")).strip(),
+                summary=str(activity_dict.get("summary", "")).strip(),
+                detail=str(activity_dict.get("detail", "")).strip(),
                 utterance=str(activity_dict.get("utterance", "")).strip(),
             )
         )
@@ -222,7 +256,6 @@ def _parse_planned_actions(entry: dict[str, object]) -> list[PlannedActionRecord
                     action_dict.get("supported_visibility", [])
                 ),
                 requires_target=bool(action_dict.get("requires_target", False)),
-                supports_utterance=bool(action_dict.get("supports_utterance", False)),
             )
         )
     return results

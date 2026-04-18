@@ -58,7 +58,9 @@ def _preferred_sans_serif_fonts(selected_font: str) -> list[str]:
 
 @lru_cache(maxsize=1)
 def configure_korean_font() -> str:
-    """Select one available Korean-friendly font for Matplotlib."""
+    """Apply the shared analysis plot style and select one Korean-friendly font."""
+
+    plt.style.use("ggplot")
 
     for candidate in _FONT_CANDIDATES:
         font_path = _resolve_font_path(candidate)

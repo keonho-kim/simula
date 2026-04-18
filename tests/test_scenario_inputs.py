@@ -19,12 +19,14 @@ allow_additional_cast: false
 # Scenario
 
 Body
-"""
+""",
+        source_path="fixtures/Scenario 01.md",
     )
 
     assert parsed.scenario_controls["num_cast"] == 14
     assert parsed.scenario_controls["allow_additional_cast"] is False
     assert parsed.scenario_text == "# Scenario\n\nBody"
+    assert parsed.scenario_file_stem == "scenario-01"
 
 
 def test_parse_scenario_document_defaults_allow_additional_cast_to_true() -> None:
@@ -36,7 +38,8 @@ num_cast: 8
 # Scenario
 
 Body
-"""
+""",
+        source_path="fixtures/demo.md",
     )
 
     assert parsed.scenario_controls["num_cast"] == 8
@@ -86,7 +89,7 @@ def test_parse_scenario_document_rejects_invalid_frontmatter(
     expected: str,
 ) -> None:
     with pytest.raises(ValueError, match=expected):
-        parse_scenario_document(text)
+        parse_scenario_document(text, source_path="fixtures/demo.md")
 
 
 def test_parse_scenario_document_requires_frontmatter() -> None:
@@ -94,4 +97,4 @@ def test_parse_scenario_document_requires_frontmatter() -> None:
         ValueError,
         match="scenario frontmatter에 `num_cast`를 반드시 선언해야 합니다.",
     ):
-        parse_scenario_document("# Scenario\n\nBody")
+        parse_scenario_document("# Scenario\n\nBody", source_path="fixtures/demo.md")

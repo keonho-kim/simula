@@ -39,6 +39,7 @@ It expands:
 - `scenario_controls`
 - `max_rounds`
 - `rng_seed`
+- `parallel_graph_calls`
 
 into a fully initialized workflow state, including:
 
@@ -62,6 +63,16 @@ The graph also receives `WorkflowRuntimeContext`, which currently provides:
 - `run_jsonl_appender`
 
 These dependencies stay outside the graph state.
+
+## Serial And Parallel Variants
+
+The shipped default root workflow uses the serial stage variants.
+
+- `SIMULATION_WORKFLOW` is the default serial root workflow
+- `SIMULATION_WORKFLOW_PARALLEL` is selected only when CLI `--parallel` is enabled
+
+The public input and output schemas stay the same across both variants. Only intra-run branch
+concurrency changes.
 
 ## Execution Stream Surface
 

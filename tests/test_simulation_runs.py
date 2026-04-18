@@ -19,6 +19,7 @@ from typing import Any
 
 import simula.application.commands.simulation_runs as simulation_runs
 from simula.application.services.executor import SimulationExecutionResult
+from simula.application.services.scenario_inputs import ScenarioInput
 
 
 class FakeExecutor:
@@ -29,6 +30,8 @@ class FakeExecutor:
         settings: object,
         *,
         scenario_controls: dict[str, object],
+        scenario_file_path: str,
+        scenario_file_stem: str,
         env_file_hint: str | None = None,
         trial_index: int | None = None,
         total_trials: int | None = None,
@@ -36,6 +39,8 @@ class FakeExecutor:
     ) -> None:
         self.settings = settings
         self.scenario_controls = scenario_controls
+        self.scenario_file_path = scenario_file_path
+        self.scenario_file_stem = scenario_file_stem
         self.env_file_hint = env_file_hint
         self.trial_index = trial_index
         self.total_trials = total_trials
@@ -71,7 +76,7 @@ class FakeExecutor:
                         "elapsed_label": "30분",
                         "total_elapsed_minutes": 30,
                         "total_elapsed_label": "30분",
-                        "selection_reason": "테스트용 기본 경과다.",
+                        "reason": "테스트용 기본 경과다.",
                         "signals": [],
                     }
                 ],
@@ -153,8 +158,8 @@ def _write_env_file(path: Path) -> None:
             [llm.openai]
             API_KEY = "openai-key"
 
-            [llm.ollama]
-            base_url = "http://127.0.0.1:11434"
+            [llm.openai-compatible]
+            base_url = "http://127.0.0.1:8000/v1"
 
             [llm.planner]
             provider = "openai"
@@ -169,7 +174,7 @@ def _write_env_file(path: Path) -> None:
             model = "gpt-5.4-mini"
 
             [llm.actor]
-            provider = "ollama"
+            provider = "openai-compatible"
             model = "qwen3:8b"
 
             [llm.observer]
@@ -185,6 +190,15 @@ def _write_env_file(path: Path) -> None:
     )
 
 
+def _scenario_input() -> ScenarioInput:
+    return ScenarioInput(
+        scenario_file_path="./scenarios/demo-01.md",
+        scenario_file_stem="demo-01",
+        scenario_text="테스트 시나리오",
+        scenario_controls={"num_cast": 8, "allow_additional_cast": True},
+    )
+
+
 def test_execute_multi_run_runs_trials_sequentially(monkeypatch, tmp_path) -> None:
     env_file = tmp_path / "env.toml"
     _write_env_file(env_file)
@@ -192,8 +206,7 @@ def test_execute_multi_run_runs_trials_sequentially(monkeypatch, tmp_path) -> No
 
     outcome = simulation_runs.execute_multi_run(
         env_file=str(env_file),
-        scenario_text="테스트 시나리오",
-        scenario_controls={"num_cast": 8, "allow_additional_cast": True},
+        scenario_input=_scenario_input(),
         cli_overrides={},
         trials=3,
         parallel=False,
@@ -208,15 +221,14 @@ def test_execute_multi_run_runs_trials_sequentially(monkeypatch, tmp_path) -> No
     ]
 
 
-def test_execute_multi_run_runs_trials_in_parallel(monkeypatch, tmp_path) -> None:
+def test_execute_multi_run_parallel_enables_graph_parallel_only(monkeypatch, tmp_path) -> None:
     env_file = tmp_path / "env.toml"
     _write_env_file(env_file)
     monkeypatch.setattr(simulation_runs, "SimulationExecutor", FakeExecutor)
 
     outcome = simulation_runs.execute_multi_run(
         env_file=str(env_file),
-        scenario_text="테스트 시나리오",
-        scenario_controls={"num_cast": 8, "allow_additional_cast": True},
+        scenario_input=_scenario_input(),
         cli_overrides={},
         trials=3,
         parallel=True,
@@ -230,59 +242,3 @@ def test_execute_multi_run_runs_trials_in_parallel(monkeypatch, tmp_path) -> Non
         "runtime.trial-2",
         "runtime.trial-3",
     ]
-
-
-def test_parallel_worker_count_keeps_one_cpu_in_reserve(monkeypatch) -> None:
-    monkeypatch.setattr(simulation_runs.os, "cpu_count", lambda: 8)
-
-    assert simulation_runs._parallel_worker_count(10) == 7
-    assert simulation_runs._parallel_worker_count(3) == 3
-
-
-def test_execute_multi_run_parallel_uses_cpu_capped_workers(
-    monkeypatch, tmp_path
-) -> None:
-    env_file = tmp_path / "env.toml"
-    _write_env_file(env_file)
-    monkeypatch.setattr(simulation_runs, "SimulationExecutor", FakeExecutor)
-    monkeypatch.setattr(simulation_runs.os, "cpu_count", lambda: 4)
-
-    captured: dict[str, Any] = {}
-
-    class FakeFuture:
-        def __init__(self, value: simulation_runs.TrialRunOutcome) -> None:
-            self._value = value
-
-        def result(self) -> simulation_runs.TrialRunOutcome:
-            return self._value
-
-    class FakePool:
-        def __init__(self, *, max_workers: int) -> None:
-            captured["max_workers"] = max_workers
-
-        def __enter__(self) -> "FakePool":
-            return self
-
-        def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
-            return None
-
-        def submit(self, fn, **kwargs):  # noqa: ANN001
-            return FakeFuture(fn(**kwargs))
-
-    monkeypatch.setattr(
-        simulation_runs.concurrent.futures,
-        "ThreadPoolExecutor",
-        FakePool,
-    )
-
-    outcome = simulation_runs.execute_multi_run(
-        env_file=str(env_file),
-        scenario_text="테스트 시나리오",
-        scenario_controls={"num_cast": 8, "allow_additional_cast": True},
-        cli_overrides={},
-        trials=5,
-        parallel=True,
-    )
-
-    assert captured["max_workers"] == 3
-    assert len(outcome.trials) == 5

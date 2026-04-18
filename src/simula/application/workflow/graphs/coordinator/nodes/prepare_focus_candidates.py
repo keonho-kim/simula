@@ -22,7 +22,7 @@ from simula.application.workflow.graphs.runtime.states.state import (
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
-from simula.domain.coordinator_policy import build_focus_candidates
+from simula.domain.runtime.coordinator import build_focus_candidates
 from simula.domain.event_memory import refresh_event_memory
 
 
@@ -50,7 +50,7 @@ def prepare_focus_candidates(
         rng_seed=int(state["rng_seed"]),
     )
     runtime.context.logger.info(
-        "round %s 후보 actor 압축 완료 | 후보 %s명 / 전체 %s명",
+        "ROUND %s 시작\n후보 actor: %s명 / 전체 %s명",
         next_round_index,
         len(candidates),
         len(list(state.get("actors", []))),
@@ -64,9 +64,10 @@ def prepare_focus_candidates(
         "latest_background_updates": [],
         "event_memory": refreshed_event_memory,
         "pending_actor_proposals": Overwrite(value=[]),
-        "round_time_advance": {},
+        "time_advance": {},
         "latest_round_activities": [],
         "actor_proposal_task": empty_actor_proposal_task(),
+        "pending_actor_cast_ids": [],
         "stop_requested": False,
         "stop_reason": "",
         "current_round_started_at": time.perf_counter(),

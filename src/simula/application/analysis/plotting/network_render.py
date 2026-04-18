@@ -74,6 +74,7 @@ class EdgeVisualStyle:
 def create_figure() -> tuple[plt.Figure, plt.Axes]:
     """Create a standard network figure."""
 
+    configure_korean_font()
     figure, axis = plt.subplots(figsize=_PLOT_FIGSIZE)
     return figure, axis
 
@@ -233,7 +234,9 @@ def build_node_visual_style(graph: nx.DiGraph) -> NodeVisualStyle:
     activity_norm = normalize_metric(activity_scores)
 
     emphasis = 0.55 * influence_norm + 0.25 * brokerage_norm + 0.20 * activity_norm
-    color_strength = 0.50 * influence_norm + 0.25 * brokerage_norm + 0.25 * activity_norm
+    color_strength = (
+        0.50 * influence_norm + 0.25 * brokerage_norm + 0.25 * activity_norm
+    )
 
     return NodeVisualStyle(
         sizes=(_NODE_BASE_SIZE + _NODE_SIZE_RANGE * emphasis).tolist(),
@@ -276,7 +279,11 @@ def build_edge_label_text(graph: nx.DiGraph) -> dict[tuple[str, str], str]:
             )
         )
     candidates.sort(key=lambda item: (-item[2], -item[3], item[0], item[1]))
-    limit = len(candidates) if len(candidates) <= _EDGE_LABEL_SPARSE_LIMIT else _EDGE_LABEL_LIMIT
+    limit = (
+        len(candidates)
+        if len(candidates) <= _EDGE_LABEL_SPARSE_LIMIT
+        else _EDGE_LABEL_LIMIT
+    )
     return {
         (source, target): f"{interaction_count}회"
         for source, target, interaction_count, _ in candidates[:limit]
@@ -296,10 +303,7 @@ def build_edge_strengths(graph: nx.DiGraph) -> dict[tuple[str, str], float]:
     maximum_weight = max(weights.values(), default=0.0)
     if maximum_weight <= 0.0:
         return {edge: 0.0 for edge in weights}
-    return {
-        edge: weight / maximum_weight
-        for edge, weight in weights.items()
-    }
+    return {edge: weight / maximum_weight for edge, weight in weights.items()}
 
 
 def draw_frame_overlay(
@@ -435,7 +439,9 @@ def _draw_node_labels(
         if np.allclose(direction, 0.0):
             direction = np.asarray([0.0, 1.0], dtype=float)
         direction = direction / max(float(np.linalg.norm(direction)), 1e-6)
-        label_px = pixel_positions[node] + direction * (radius_px + _NODE_LABEL_OFFSET_PX)
+        label_px = pixel_positions[node] + direction * (
+            radius_px + _NODE_LABEL_OFFSET_PX
+        )
         label_xy = axis.transData.inverted().transform(label_px)
         axis.text(
             float(label_xy[0]),
@@ -463,10 +469,7 @@ def _draw_edge_labels(
         return
 
     pixel_positions = positions_to_pixels(axis, positions)
-    edge_index = {
-        edge: index
-        for index, edge in enumerate(graph.edges())
-    }
+    edge_index = {edge: index for index, edge in enumerate(graph.edges())}
     for edge, text in edge_labels.items():
         source, target = edge
         start = pixel_positions[source]

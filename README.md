@@ -1,9 +1,9 @@
 # simula
 
-`simula` is a scenario-to-report simulation engine built on LangGraph. It takes one scenario,
-hydrates a compact public input into a richer workflow state, runs a staged multi-agent
-simulation, and produces two outputs you can actually inspect: a final Markdown report and a
-machine-friendly `simulation.log.jsonl`.
+`simula` is a scenario-to-report simulation engine built on LangGraph. It takes one scenario
+file, hydrates a compact public input into a richer workflow state, runs a staged multi-agent
+simulation, and writes one inspectable run directory that includes the final Markdown report,
+`simulation.log.jsonl`, and derived analysis artifacts.
 
 [Documentation](./docs/README.md) · [Workflow Docs](./docs/workflows/README.md) · [Sample Scenarios](./senario.samples/README.md)
 
@@ -18,15 +18,18 @@ Most simulation prototypes collapse setup, actor generation, runtime pacing, and
 one opaque loop. `simula` keeps them separate.
 
 - Planning turns raw scenario text into one compact analysis bundle and one execution-plan bundle.
-- Generation turns the cast roster into actor cards through fan-out worker calls.
+- Generation turns the cast roster into actor cards through explicit slot-by-slot generation.
 - Runtime loops through directed rounds instead of free-running until token exhaustion.
 - Finalization turns the finished state into a report bundle and a JSONL log.
 
 The result is easier to inspect, test, and evolve than a single prompt chain.
 
-The analyzer also exposes benchmark-friendly network metrics so saved runs can be compared on
+The integrated analysis pipeline also exposes benchmark-friendly network metrics so saved runs can be compared on
 participation spread, action diversity, path depth, concentration, community structure, and
 cumulative growth.
+
+Cross-layer helpers are kept out of the application and domain packages where possible.
+Shared logging and JSONL runtime-output helpers now live under `simula.shared.*`.
 
 ## Why This Design
 
@@ -41,6 +44,7 @@ cumulative growth.
 ```bash
 uv sync
 cp env.sample.toml env.toml
+# UPDATE YOUR ENV.TOML
 uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md
 ```
 
@@ -50,51 +54,62 @@ For detailed local workflow logs:
 uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md --log-level DEBUG
 ```
 
+Repeat the same scenario three times:
+
+```bash
+uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md --trials 3
+```
+
+Allow intra-run graph parallelism for one run:
+
+```bash
+uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md --parallel
+```
+
 Outputs land in:
 
 ```text
 output/
   <run_id>/
-    final_report.md
+    manifest.json
+    report.final.md
+    summary.overview.md
     simulation.log.jsonl
+    data/
+    summaries/
+    assets/
 ```
 
-Analyze one saved run artifact:
-
-```bash
-uv run analysis --run-dir ./output/2026-04-14.10
-```
-
-Analyzer outputs land in:
+Run ids follow:
 
 ```text
-analysis/
+YYYYMMDD.001.<actor-model-id>.<scenario-file-stem>
+```
+
+For example:
+
+```text
+20260418.001.qwen3-8b.03-startup-boardroom-crisis
+```
+
+The integrated analysis artifacts land in the same run directory:
+
+```text
+output/
   <run_id>/
-    manifest.json
-    llm_calls.csv
-    distributions/
-    token_usage/
-      summary.json
-      summary.csv
-      summary.md
-    fixer/
-    network/
-      nodes.csv
-      edges.csv
-      growth.csv
-      summary.json
-      summary.md
-      graph.graphml
-      graph.png
-      growth_metrics.png
-      concentration.png
+    data/llm_calls.csv
+    data/performance.summary.csv
+    summaries/token_usage.summary.md
+    summaries/network.summary.md
+    assets/network.graph.png
+    assets/network.growth.mp4
 ```
 
 ## One End-to-End Flow
 
 ```mermaid
 flowchart LR
-    Scenario["Scenario file or inline scenario"] --> CLI["CLI / bootstrap"]
+    Scenario["Scenario file"] --> CLI["CLI / bootstrap"]
     CLI --> Executor["SimulationExecutor"]
     Executor --> Input["SimulationInputState"]
     Input --> Hydrate["hydrate_initial_state"]
@@ -103,7 +118,7 @@ flowchart LR
     Generation --> Runtime["runtime"]
     Runtime --> Finalization["finalization"]
     Finalization --> Output["SimulationOutputState"]
-    Output --> Report["final_report.md"]
+    Output --> Report["report.final.md"]
     Output --> Log["simulation.log.jsonl"]
 ```
 
@@ -115,15 +130,16 @@ This is the only flow described by the current documentation set.
 | --- | --- | --- |
 | `planning` | `build_planning_analysis -> build_execution_plan -> finalize_plan` | compact execution plan |
 | `generation` | `prepare_actor_slots -> generate_actor_slot -> finalize_generated_actors` | actor cards |
-| `runtime` | `initialize_runtime_state -> prepare_round -> plan_round -> generate_actor_proposal -> reduce_actor_proposals -> resolve_round` | adopted activities, observer reports, stop state |
-| `finalization` | `resolve_timeline_anchor -> build_report_artifacts -> write_final_report_bundle -> render_and_persist_final_report` | final report payloads and markdown |
+| `runtime` | `initialize_runtime_state -> prepare_round -> plan_round -> actor proposal stage -> resolve_round` | adopted activities, observer reports, stop state |
+| `finalization` | `resolve_timeline_anchor -> build_report_artifacts -> section writers -> render_and_persist_final_report` | final report payloads and markdown |
 
-`generate_actor_slot` and `generate_actor_proposal` both use fan-out/fan-in execution, but the
-graph shape stays explicit.
+By default the shipped workflow runs serial graph variants for planning, generation, runtime, and
+finalization. `--parallel` switches one run onto the parallel graph variants, which re-enable the
+explicit fan-out and multi-branch paths inside the workflow.
 
 ## Outputs
 
-`final_report.md` contains:
+`report.final.md` contains:
 
 - simulation conclusion
 - actor results table
@@ -162,7 +178,25 @@ Common runtime controls:
 - `runtime.max_recipients_per_message`
 - `runtime.enable_checkpointing`
 - `runtime.rng_seed`
+- `--max-rounds` for CLI round-cap override
+- `--trials` for sequential repeated runs
+- `--parallel` for intra-run graph parallelism
 - `--log-level` for CLI-visible logging verbosity
+
+`--parallel` changes only one run's internal graph behavior. Trials stay sequential even when the
+flag is enabled.
+
+| Area | Default run | `--parallel` run |
+| --- | --- | --- |
+| trials | sequential | sequential |
+| planning cast chunks | serial queue | parallel fan-out |
+| generation actor slots | serial queue | parallel fan-out |
+| runtime actor proposals | serial queue | parallel fan-out |
+| coordinator nodes | serial staged calls | serial staged calls |
+| finalization sections | serial section writers | parallel branch writers |
+
+Coordinator logic still issues its own LLM stages sequentially. The current parallel switch only
+re-enables explicit graph fan-out and multi-branch execution points.
 
 Scenario files must declare YAML frontmatter. The active authoring controls are:
 
@@ -194,7 +228,7 @@ The repository includes scenario seeds in [`senario.samples/`](./senario.samples
 | [`docs/architecture.md`](./docs/architecture.md) | layers, execution path, and runtime boundaries |
 | [`docs/contracts.md`](./docs/contracts.md) | public state surfaces, internal state groups, and artifacts |
 | [`docs/llm.md`](./docs/llm.md) | role routing, prompt projections, and structured-output policy |
-| [`docs/analysis.md`](./docs/analysis.md) | JSONL analyzer CLI, artifact layout, and analysis pipeline |
+| [`docs/analysis.md`](./docs/analysis.md) | integrated analysis pipeline and output artifact layout |
 | [`docs/workflows/README.md`](./docs/workflows/README.md) | workflow hub and stage handoffs |
 | [`docs/operations.md`](./docs/operations.md) | local execution, validation, and maintenance |
 

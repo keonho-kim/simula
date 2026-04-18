@@ -20,7 +20,7 @@ from simula.application.workflow.graphs.runtime.states.state import (
 )
 from simula.application.workflow.reducer.collections import extend_list, extend_str_list
 from simula.domain.contracts import StopReason
-from simula.domain.scenario_controls import ScenarioControls
+from simula.domain.scenario.controls import ScenarioControls
 
 
 class SimulationInputState(TypedDict):
@@ -31,6 +31,7 @@ class SimulationInputState(TypedDict):
     scenario_controls: ScenarioControls
     max_rounds: int
     rng_seed: int
+    parallel_graph_calls: bool
 
 
 class SimulationOutputState(TypedDict):
@@ -55,8 +56,9 @@ class SimulationWorkflowState(TypedDict):
     planned_max_rounds: int
     checkpoint_enabled: bool
     rng_seed: int
+    parallel_graph_calls: bool
     planning_analysis: dict[str, Any]
-    cast_roster_outline: dict[str, Any]
+    cast_roster_outline: list[dict[str, Any]]
     execution_plan_frame: dict[str, Any]
     plan: dict[str, Any]
     actors: list[dict[str, Any]]
@@ -75,7 +77,7 @@ class SimulationWorkflowState(TypedDict):
     actor_intent_states: list[dict[str, Any]]
     intent_history: list[dict[str, Any]]
     round_focus_plan: dict[str, Any]
-    round_time_advance: dict[str, Any]
+    time_advance: dict[str, Any]
     simulation_clock: dict[str, Any]
     round_time_history: list[dict[str, Any]]
     actor_facing_scenario_digest: dict[str, Any]
@@ -86,6 +88,7 @@ class SimulationWorkflowState(TypedDict):
     cast_slot: CastSlotSpec
     generated_actor_results: Annotated[list[GeneratedActorResult], extend_list]
     actor_proposal_task: ActorProposalTask
+    pending_actor_cast_ids: list[str]
     pending_actor_proposals: Annotated[list[ActorProposalResult], extend_list]
     parse_failures: int
     forced_idles: int

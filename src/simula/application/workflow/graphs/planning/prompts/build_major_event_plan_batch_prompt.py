@@ -20,13 +20,15 @@ Generate only the major event batch for this scenario.
 - `participant_cast_ids`, `completion_action_types`, and `completion_signals` must stay non-empty arrays whenever the event exists.
 - `participant_cast_ids` and `completion_action_types` must stay unique.
 - `earliest_round` and `latest_round` must fit within the provided planned max rounds.
+- `must_resolve` must be present on every event item and must be either true or false.
 - Every field is required.
-- Return only the JSON object that matches the required output schema.
-- Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
+- Return only the JSON array that matches the required output schema.
+- Do not return any prose, labels, headings, markdown, or commentary outside the JSON array.
 - Do not add extra keys that are not in the output schema.
 - Do not omit any required keys from the output schema.
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
+- Each item must stay within the sentence or item limits shown in the shape guide.
 - Only create major events that are explicitly stated or strongly implied by the scenario text.
 
 # Input

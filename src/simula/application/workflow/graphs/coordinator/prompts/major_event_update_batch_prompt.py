@@ -15,12 +15,13 @@ Generate only the event updates for this round.
 - Use `event_match_hints_json` as the code-first baseline for which major events may have advanced this round.
 - Do not mark a major event as `completed` unless the round activities plausibly satisfy its participants and completion signals.
 - Each item must keep `progress_summary` non-empty and concrete.
-- Return only the JSON object that matches the required output schema.
-- Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
+- Return only the JSON array that matches the required output schema.
+- Do not return any prose, labels, headings, markdown, or commentary outside the JSON array.
 - Do not add extra keys that are not in the output schema.
 - Do not omit any required keys from the output schema.
 - If a field is a string, return a JSON string and never wrap it in an array.
 - If a field is an array, return a JSON array even when it has only one item.
+- Each item must stay within the sentence or item limits shown in the shape guide.
 
 # Inputs
 Round index:

@@ -15,9 +15,9 @@ from simula.application.workflow.graphs.finalization.nodes.build_report_projecti
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
-from simula.application.workflow.utils.streaming import record_simulation_log_event
-from simula.domain.log_events import build_final_report_event
-from simula.domain.reporting import build_final_report
+from simula.shared.io.streaming import record_simulation_log_event
+from simula.domain.reporting.events import build_final_report_event
+from simula.domain.reporting.reports import build_final_report
 
 
 def build_report_artifacts(

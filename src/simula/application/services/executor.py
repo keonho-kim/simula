@@ -18,26 +18,31 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, cast
 
 from simula.application.ports.storage import StorageSchemaError
-from simula.application.services.logging_setup import build_run_logger_name
-from simula.application.services.run_jsonl import RunJsonlAppender
 from simula.application.workflow.context import WorkflowRuntimeContext
-from simula.application.workflow.graphs.simulation.graph import (
+from simula.shared.io.run_jsonl import RunJsonlAppender
+from simula.shared.logging.setup import build_run_logger_name
+from simula.shared.text import slugify_path_token
+from simula.application.services.output_writer import write_run_outputs
+from simula.application.workflow.graphs.simulation import (
     SIMULATION_WORKFLOW,
+    SIMULATION_WORKFLOW_GRAPH_PARALLEL,
+    SIMULATION_WORKFLOW_PARALLEL,
     SIMULATION_WORKFLOW_GRAPH,
 )
 from simula.application.workflow.graphs.simulation.states.initial_state import (
     build_simulation_input_state,
 )
-from simula.domain.log_events import (
+from simula.domain.reporting.events import (
     build_llm_usage_summary_event,
     build_simulation_started_event,
 )
-from simula.domain.scenario_controls import ScenarioControls
+from simula.domain.scenario.controls import ScenarioControls
 from simula.infrastructure.config.models import AppSettings
-from simula.infrastructure.llm.service import build_model_router
+from simula.infrastructure.llm.runtime import build_model_router
 from simula.infrastructure.llm.usage import LLMUsageTracker
 from simula.infrastructure.storage.app_store import RunIdConflictError
 from simula.infrastructure.storage.factory import (
@@ -66,6 +71,8 @@ class SimulationExecutor:
         settings: AppSettings,
         *,
         scenario_controls: ScenarioControls,
+        scenario_file_path: str,
+        scenario_file_stem: str,
         env_file_hint: str | None = None,
         trial_index: int | None = None,
         total_trials: int | None = None,
@@ -73,6 +80,8 @@ class SimulationExecutor:
     ) -> None:
         self.settings = settings
         self.scenario_controls = scenario_controls
+        self.scenario_file_path = scenario_file_path
+        self.scenario_file_stem = scenario_file_stem
         self.store = create_app_store(settings, env_file_hint=env_file_hint)
         self.logger = logging.getLogger("simula.application.executor")
         self.llm_usage_tracker = LLMUsageTracker()
@@ -96,8 +105,14 @@ class SimulationExecutor:
 
         run_id = ""
         settings_snapshot = self.settings.redacted_dump()
+        actor_model_id = slugify_path_token(self.settings.models.actor.model)
+        if not actor_model_id:
+            raise ValueError("actor model id를 slug로 정규화할 수 없습니다.")
         for _ in range(10):
-            candidate_run_id = self.store.next_run_id()
+            candidate_run_id = self.store.next_run_id(
+                actor_model_id=actor_model_id,
+                scenario_file_stem=self.scenario_file_stem,
+            )
             try:
                 self.store.save_run_started(
                     run_id=candidate_run_id,
@@ -133,7 +148,7 @@ class SimulationExecutor:
         if hasattr(self.llms, "logger"):
             setattr(self.llms, "logger", llm_logger)
 
-        run_logger.info("run 시작")
+        run_logger.info("RUN 시작 | run_id=%s", run_id)
 
         context = WorkflowRuntimeContext(
             settings=self.settings,
@@ -145,6 +160,7 @@ class SimulationExecutor:
                 output_dir=self.settings.storage.output_dir,
                 run_id=run_id,
             ),
+            parallel_graph_calls=self.parallel,
         )
         if hasattr(self.llms, "configure_run_logging"):
             getattr(self.llms, "configure_run_logging")(
@@ -160,8 +176,10 @@ class SimulationExecutor:
             scenario_text=scenario_text,
             scenario_controls=self.scenario_controls,
             settings=self.settings,
+            parallel_graph_calls=self.parallel,
         )
         started_at = time.perf_counter()
+        started_at_utc = datetime.now().astimezone()
         if context.run_jsonl_appender is not None:
             context.run_jsonl_appender.append(
                 build_simulation_started_event(
@@ -175,12 +193,20 @@ class SimulationExecutor:
         try:
             async with create_async_checkpointer_context(self.settings) as checkpointer:
                 app = (
-                    SIMULATION_WORKFLOW_GRAPH.compile(
+                    (
+                        SIMULATION_WORKFLOW_GRAPH_PARALLEL
+                        if self.parallel
+                        else SIMULATION_WORKFLOW_GRAPH
+                    ).compile(
                         checkpointer=checkpointer,
                         name="simula",
                     )
                     if checkpointer is not None
-                    else SIMULATION_WORKFLOW
+                    else (
+                        SIMULATION_WORKFLOW_PARALLEL
+                        if self.parallel
+                        else SIMULATION_WORKFLOW
+                    )
                 )
                 final_state: dict[str, Any] | None = None
                 async for chunk in app.astream(
@@ -205,12 +231,30 @@ class SimulationExecutor:
                         llm_usage_summary=llm_usage_summary,
                     )
                 )
-                final_state["simulation_log_jsonl"] = context.run_jsonl_appender.path.read_text(
-                    encoding="utf-8"
-                ).rstrip()
+                final_state["simulation_log_jsonl"] = (
+                    context.run_jsonl_appender.path.read_text(encoding="utf-8").rstrip()
+                )
             wall_clock = time.perf_counter() - started_at
+            ended_at = datetime.now().astimezone()
             self.store.mark_run_status(run_id, "completed")
-            run_logger.info("run 완료 | wall_clock=%.2fs", wall_clock)
+            write_run_outputs(
+                settings=self.settings,
+                run_id=run_id,
+                scenario_file_path=self.scenario_file_path,
+                scenario_file_stem=self.scenario_file_stem,
+                actor_model_id=actor_model_id,
+                started_at=started_at_utc,
+                ended_at=ended_at,
+                wall_clock_seconds=wall_clock,
+                status="completed",
+                error=None,
+                final_state=final_state,
+            )
+            run_logger.info(
+                "RUN 완료 | run_id=%s | wall_clock=%.2fs",
+                run_id,
+                wall_clock,
+            )
             return SimulationExecutionResult(
                 run_id=run_id,
                 success=True,
@@ -221,8 +265,33 @@ class SimulationExecutor:
             )
         except Exception as exc:  # noqa: BLE001
             wall_clock = time.perf_counter() - started_at
-            run_logger.exception("run 실패 | wall_clock=%.2fs", wall_clock)
+            ended_at = datetime.now().astimezone()
+            run_logger.exception(
+                "RUN 실패 | run_id=%s | wall_clock=%.2fs",
+                run_id,
+                wall_clock,
+            )
             self.store.mark_run_status(run_id, "failed", str(exc))
+            if run_id:
+                try:
+                    write_run_outputs(
+                        settings=self.settings,
+                        run_id=run_id,
+                        scenario_file_path=self.scenario_file_path,
+                        scenario_file_stem=self.scenario_file_stem,
+                        actor_model_id=actor_model_id,
+                        started_at=started_at_utc,
+                        ended_at=ended_at,
+                        wall_clock_seconds=wall_clock,
+                        status="failed",
+                        error=str(exc),
+                        final_state=None,
+                    )
+                except Exception:  # noqa: BLE001
+                    run_logger.exception(
+                        "RUN 실패 산출물 저장 실패 | run_id=%s",
+                        run_id,
+                    )
             return SimulationExecutionResult(
                 run_id=run_id,
                 success=False,
