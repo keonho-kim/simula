@@ -1,23 +1,22 @@
 # LLM Design
 
-## Role Model
+## Overview
 
-`simula` routes all model calls through six stable logical roles.
+`simula` routes model calls through a small set of named roles. Each role owns one part of the
+workflow, and configuration decides which provider and model back that role.
 
-| Role | Owns |
+| Role | Responsibility |
 | --- | --- |
-| `planner` | scenario analysis and execution plan creation |
+| `planner` | scenario analysis and plan creation |
 | `generator` | actor card generation |
-| `coordinator` | round continuation checks, round directives, and round resolution |
+| `coordinator` | round planning, continuation checks, and round resolution |
 | `actor` | one actor action proposal |
-| `observer` | timeline anchor inference and final report section writing |
-| `fixer` | JSON-only repair for malformed structured responses |
-
-The router keeps these role boundaries stable even when the configured provider changes.
+| `observer` | timeline anchoring and final report sections |
+| `fixer` | JSON repair for malformed structured responses |
 
 ## Provider Support
 
-The current provider adapters support:
+The application supports:
 
 - OpenAI
 - OpenAI-compatible
@@ -25,133 +24,57 @@ The current provider adapters support:
 - Google
 - Bedrock
 
-Configuration is described in [`configuration.md`](./configuration.md), but the important runtime
-idea is simple: the workflow chooses roles, and the settings choose which provider/model backs each
-role.
+Provider and model settings are described in [`configuration.md`](./configuration.md).
 
-## Prompt Projection Policy
+## Model Inputs
 
-The workflow never dumps the full internal state into prompts. Each role receives a compact,
-purpose-built projection.
+Model calls use compact, stage-specific inputs.
 
-### Planning
+- Planning receives the scenario text plus planning context.
+- Generation receives one planned cast item plus the context needed to turn it into an actor card.
+- Runtime coordinator calls receive round state, event state, and recent summaries.
+- Runtime actor calls receive one actor card plus the current round context.
+- Finalization receives the completed run state and report inputs.
 
-- raw scenario text
-- runtime round cap
-- planning-analysis context
+The goal is simple: each stage gets the information it needs without carrying the entire workflow
+state into every call.
 
-### Generation
+## Structured Outputs
 
-- compact interpretation view
-- compact situation view
-- compact action catalog view
-- compact coordination frame view
-- one cast roster item
+Most model calls use local parsing and validation. Structured responses are checked in code before
+they are accepted into workflow state.
 
-### Runtime coordinator
+The common path is:
 
-- compact focus candidates
-- deferred actor views
-- compact situation and coordination-frame views
-- recent observer summaries and recent activity summaries
-- pending actor proposals and background updates
-- event memory state and round-level event hints
-- previous actor-facing digest and stagnation counters
+1. call the configured model for a role
+2. parse the response locally
+3. validate the result against the expected schema or contract
+4. apply local normalization when the stage requires it
 
-### Runtime actor
+When parsing fails, the runtime may retry, repair malformed JSON through the `fixer` role, or use
+an explicit default value when that stage defines one.
 
-- one actor card
-- one selected focus slice
-- visible action context
-- unread backlog digest
-- visible actors
-- runtime guidance, including allowed actions, constraints, and current intent snapshot
+## Failure Handling
 
-### Finalization
+Different stages use different policies, but the rules are consistent:
 
-- timeline anchor inference uses scenario text plus parser-extracted time hints
-- section writers use shared report prompt inputs plus local validators rather than structured
-  output schemas
+- planning and generation fail when their required structured outputs cannot be recovered
+- selected runtime stages can use explicit defaults
+- final report sections use text validators and a bounded retry
+- repair stays visible through logs and analysis artifacts
 
-## Structured Output Policy
-
-All active structured responses use local parsing and Pydantic validation. Native provider
-structured-output APIs are not used as the source of truth.
-
-The normal path is:
-
-1. call the role model
-2. parse locally
-3. validate against the contract
-4. normalize if needed
-
-If parsing fails:
-
-1. retry the original prompt with a stricter JSON suffix
-2. if still invalid, call the `fixer` role with the malformed response and schema context
-3. re-validate the repaired JSON locally
-
-Runtime nodes that define `default_payload` values keep that explicit observable fallback path.
-
-## Retry and Default Strategy
-
-| Stage | Strategy |
-| --- | --- |
-| planning analysis | strict structured call |
-| execution plan | strict structured call |
-| actor generation | strict structured call |
-| round continuation | structured call with explicit default payload |
-| round directive | structured call with explicit default payload |
-| actor proposal | structured call with explicit default payload and semantic validation |
-| round resolution | structured call with explicit default payload |
-| timeline anchor | strict structured call after parser-first hints |
-| final report sections | text call with one validation-driven retry |
-| fixer | JSON-only repair with bounded retries |
+The system prefers explicit failure or explicit defaults over silent degradation.
 
 ## Logging and Observability
 
-The LLM router does more than just pick a model.
+Every run records model-call activity in `simulation.log.jsonl`. The log includes role, timings,
+token counts when available, and per-call context for later analysis.
 
-It also:
-
-- streams provider responses so TTFT and total duration can be measured
-- extracts token counts when the provider exposes them
-- records role-specific usage into `llm_usage_tracker`
-- emits raw `llm_call` events into `simulation.log.jsonl`
-- logs readable summaries for operators
-
-Each raw `llm_call` event contains:
-
-- `role`
-- `call_kind`
-- `prompt`
-- `raw_response`
-- `log_context`
-- `duration_seconds`
-- `ttft_seconds`
-- `input_tokens`
-- `output_tokens`
-- `total_tokens`
-
-This makes the JSONL log the primary evidence source for later analysis.
-
-## Validation Rules
-
-- prompt-facing structured schemas are required-only
-- runtime actor proposals receive semantic validation after JSON parsing
-- final report sections are checked by local validators after text generation
-- prompt projections intentionally cap list sizes and text lengths to keep token growth bounded
-- stop decisions use explicit enums instead of free-form prose
-
-## Practical Guidance
-
-- add a new role only when there is a genuinely separate responsibility
-- tighten prompt projections before expanding schemas
-- prefer explicit default payloads over silent degradation
-- keep raw-call logging stable because the analyzer depends on it
+This log is also the source for derived analysis artifacts such as token summaries, performance
+tables, and fixer usage reports.
 
 ## Related Docs
 
 - configuration and provider rules: [`configuration.md`](./configuration.md)
-- structured artifact contracts: [`contracts.md`](./contracts.md)
-- stage-level prompt consumers: [`workflows/README.md`](./workflows/README.md)
+- state and artifact contracts: [`contracts.md`](./contracts.md)
+- stage-level workflow docs: [`workflows/README.md`](./workflows/README.md)

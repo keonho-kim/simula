@@ -4,6 +4,8 @@ Derived analysis is no longer a separate CLI or a separate `analysis/<run_id>/` 
 Instead, every successful simulation run writes analysis artifacts into the same run directory
 that already contains `simulation.log.jsonl`.
 
+For repository examples, committed run directories live under `output.samples/<run_id>/`.
+
 ## Source of Truth
 
 The analysis pipeline still uses `simulation.log.jsonl` as its only durable input.
@@ -44,6 +46,8 @@ Each run directory now follows this shape:
     network.growth.mp4
 ```
 
+That same shape is what the repository sample runs preserve under `output.samples/`.
+
 ## Run Metadata
 
 `manifest.json` is the only manifest file.
@@ -72,5 +76,4 @@ The analysis computation still lives under `src/simula/application/analysis/`.
 - `plotting/*` renders visual artifacts
 - `runner/bundle.py` assembles the computed report bundle
 - `runner/writing.py` writes the integrated analysis files into the run directory
-
-The removed pieces are the standalone analyzer entrypoint and standalone input-resolution flow.
+- committed examples in `output.samples/` are snapshots of that same output layout

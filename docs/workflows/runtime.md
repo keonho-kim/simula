@@ -1,7 +1,5 @@
 # Runtime Workflow
 
-## Purpose
-
 Runtime is the only looping stage. It selects the next focus, builds actor proposals, resolves
 the round, updates event tracking, and decides whether another round is still useful.
 
@@ -24,11 +22,10 @@ flowchart TD
     ResolutionRoute -->|continue| Continue
 ```
 
-This document describes the default serial runtime graph. The parallel variant still uses
-`dispatch_selected_actor_proposals -> generate_actor_proposal -> reduce_actor_proposals` when
-intra-run graph parallelism is enabled.
+This document describes the default serial runtime graph. When `--parallel` is enabled, selected
+actor proposals may be generated concurrently.
 
-## Node Responsibilities
+## Stage Responsibilities
 
 ### `initialize_runtime_state`
 
@@ -53,7 +50,7 @@ Deterministic checks happen first:
 - stale-required-event stop when required unresolved events have gone overdue without evidence and
   stagnation has accumulated after the planner target
 
-Only after those checks does the node ask the `coordinator` role whether the run should stop for
+Only after those checks does the node ask the coordinator whether the run should stop for
 `no_progress`.
 
 If required unresolved events remain, a coordinator-produced `no_progress` stop is suppressed and
@@ -74,7 +71,7 @@ Prepares the next round by:
 
 ### `plan_round`
 
-Builds one `RoundDirective` bundle through the `coordinator` role.
+Builds one `RoundDirective` bundle.
 
 It receives:
 
@@ -117,15 +114,14 @@ Builds one `ActorActionProposal` for one selected actor using:
 - runtime guidance, including allowed actions and current intent state
 
 The node also applies semantic validation and may fall back to an explicit forced-idle default
-payload when parsing or validation fails. In the serial graph, proposal order is already
-deterministic, so no separate reduce step is needed.
+payload when parsing or validation fails. In the serial graph, proposal order is deterministic, so
+no separate reduce step is needed.
 
 ### `resolve_round`
 
-Resolves the round in one `RoundResolution` bundle and then performs the code-side updates that the
-LLM is not trusted to do directly.
+Resolves the round in one `RoundResolution` bundle and then applies the code-side state updates.
 
-Current responsibilities:
+Responsibilities:
 
 - filter invalid adopted cast ids
 - apply adopted activities
@@ -148,7 +144,7 @@ The runtime loop ends when one of these happens:
 - `assess_round_continuation` returns `no_progress`
 - `resolve_round` returns `simulation_done`
 
-The active stop policy combines:
+The stop policy combines:
 
 - configured hard ceiling: `max_rounds`
 - planner target: `planned_max_rounds`

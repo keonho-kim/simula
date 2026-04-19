@@ -1,8 +1,6 @@
 # Simulation Root Graph
 
-## Purpose
-
-The root graph defines the public workflow boundary, hydration step, and stage order.
+The root graph defines the public workflow boundary, state initialization step, and stage order.
 
 ## Active Path
 
@@ -26,7 +24,7 @@ The root builder is a `StateGraph` configured with:
 - `context_schema=WorkflowRuntimeContext`
 
 That keeps the public boundary narrow while allowing downstream nodes to communicate through a
-fully hydrated required-only internal state.
+single shared workflow state.
 
 ## Hydration
 
@@ -41,7 +39,7 @@ It expands:
 - `rng_seed`
 - `parallel_graph_calls`
 
-into a fully initialized workflow state, including:
+into an initialized workflow state, including:
 
 - empty planning and runtime scratch fields
 - initial simulation clock fields
@@ -49,7 +47,7 @@ into a fully initialized workflow state, including:
 - empty `errors`
 - internal-only `checkpoint_enabled`
 
-Downstream nodes assume those keys already exist and do not defend against missing state shape.
+Downstream nodes read that initialized state rather than rebuilding these fields.
 
 ## Runtime Context
 
@@ -76,7 +74,7 @@ concurrency changes.
 
 ## Execution Stream Surface
 
-The graph itself defines the workflow shape. The executor defines how it is consumed.
+The graph defines the workflow shape. The executor defines how it is consumed.
 
 During execution, the executor streams:
 

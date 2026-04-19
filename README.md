@@ -1,9 +1,8 @@
 # simula
 
 `simula` is a scenario-to-report simulation engine built on LangGraph. It takes one scenario
-file, hydrates a compact public input into a richer workflow state, runs a staged multi-agent
-simulation, and writes one inspectable run directory that includes the final Markdown report,
-`simulation.log.jsonl`, and derived analysis artifacts.
+file, runs a staged multi-agent simulation, and writes one inspectable run directory with the
+final Markdown report, `simulation.log.jsonl`, and derived analysis artifacts.
 
 [Documentation](./docs/README.md) · [Workflow Docs](./docs/workflows/README.md) · [Sample Scenarios](./senario.samples/README.md)
 
@@ -14,30 +13,27 @@ simulation, and writes one inspectable run directory that includes the final Mar
 
 ## What It Does
 
-Most simulation prototypes collapse setup, actor generation, runtime pacing, and reporting into
-one opaque loop. `simula` keeps them separate.
+`simula` keeps planning, actor generation, runtime rounds, and report writing as separate stages.
 
 - Planning turns raw scenario text into one compact analysis bundle and one execution-plan bundle.
 - Generation turns the cast roster into actor cards through explicit slot-by-slot generation.
 - Runtime loops through directed rounds instead of free-running until token exhaustion.
 - Finalization turns the finished state into a report bundle and a JSONL log.
 
-The result is easier to inspect, test, and evolve than a single prompt chain.
+The result is easier to inspect, test, and extend than a single opaque generation loop.
 
 The integrated analysis pipeline also exposes benchmark-friendly network metrics so saved runs can be compared on
 participation spread, action diversity, path depth, concentration, community structure, and
 cumulative growth.
 
-Cross-layer helpers are kept out of the application and domain packages where possible.
-Shared logging and JSONL runtime-output helpers now live under `simula.shared.*`.
+Shared logging and runtime-output helpers live under `simula.shared.*`.
 
 ## Why This Design
 
-- Small public API, rich internal state: the root graph accepts `SimulationInputState`, then
-  hydrates it once into `SimulationWorkflowState`.
-- Required-only structured outputs: active LLM contracts do not rely on optional fields.
-- Narrow prompt projections: each role receives only the data required for its task.
-- Durable artifacts: runtime state, final report data, and JSONL output are explicit products.
+- Small public API: the root graph accepts a compact input and returns a compact output.
+- Staged execution: planning, generation, runtime, and finalization are independent steps.
+- Durable artifacts: each successful run leaves a report, a JSONL log, and analysis files.
+- Inspectable runs: saved outputs can be compared across models and repeated trials.
 
 ## Quick Start
 
@@ -80,6 +76,20 @@ output/
     assets/
 ```
 
+Committed sample outputs live in:
+
+```text
+output.samples/
+  <run_id>/
+    manifest.json
+    report.final.md
+    summary.overview.md
+    simulation.log.jsonl
+    data/
+    summaries/
+    assets/
+```
+
 Run ids follow:
 
 ```text
@@ -104,6 +114,9 @@ output/
     assets/network.graph.png
     assets/network.growth.mp4
 ```
+
+The repository keeps example saved runs under [`output.samples/`](./output.samples/).
+Treat `output/` as the live runtime output root and `output.samples/` as committed reference data.
 
 ## One End-to-End Flow
 
@@ -133,9 +146,8 @@ This is the only flow described by the current documentation set.
 | `runtime` | `initialize_runtime_state -> prepare_round -> plan_round -> actor proposal stage -> resolve_round` | adopted activities, observer reports, stop state |
 | `finalization` | `resolve_timeline_anchor -> build_report_artifacts -> section writers -> render_and_persist_final_report` | final report payloads and markdown |
 
-By default the shipped workflow runs serial graph variants for planning, generation, runtime, and
-finalization. `--parallel` switches one run onto the parallel graph variants, which re-enable the
-explicit fan-out and multi-branch paths inside the workflow.
+By default the shipped workflow runs serial variants for planning, generation, runtime, and
+finalization. `--parallel` enables concurrent work inside a single run where the workflow supports it.
 
 ## Outputs
 
@@ -150,7 +162,7 @@ explicit fan-out and multi-branch paths inside the workflow.
 `simulation.log.jsonl` records:
 
 - simulation start
-- raw LLM calls with prompt and merged raw response text
+- raw LLM call logs
 - finalized plan
 - finalized actors
 - round focus selection
@@ -183,22 +195,22 @@ Common runtime controls:
 - `--parallel` for intra-run graph parallelism
 - `--log-level` for CLI-visible logging verbosity
 
-`--parallel` changes only one run's internal graph behavior. Trials stay sequential even when the
-flag is enabled.
+`--parallel` changes only work inside a single run. Trials stay sequential even when the flag is
+enabled.
 
 | Area | Default run | `--parallel` run |
 | --- | --- | --- |
 | trials | sequential | sequential |
-| planning cast chunks | serial queue | parallel fan-out |
-| generation actor slots | serial queue | parallel fan-out |
-| runtime actor proposals | serial queue | parallel fan-out |
+| planning cast chunks | serial queue | concurrent chunk generation |
+| generation actor slots | serial queue | concurrent slot generation |
+| runtime actor proposals | serial queue | concurrent proposal generation |
 | coordinator nodes | serial staged calls | serial staged calls |
-| finalization sections | serial section writers | parallel branch writers |
+| finalization sections | serial section writers | concurrent section writing |
 
-Coordinator logic still issues its own LLM stages sequentially. The current parallel switch only
-re-enables explicit graph fan-out and multi-branch execution points.
+Coordinator logic remains sequential. The current parallel switch only affects parts of the run
+that can be processed concurrently.
 
-Scenario files must declare YAML frontmatter. The active authoring controls are:
+Scenario files use YAML frontmatter with the following controls:
 
 - `num_cast`
   - required positive integer

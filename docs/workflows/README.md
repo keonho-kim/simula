@@ -1,6 +1,6 @@
 # Workflow Docs
 
-This section documents the active compiled workflow only.
+This section documents the workflow stages used by the application.
 
 ## Stage Order
 
@@ -28,16 +28,16 @@ flowchart LR
 
 | Stage | Consumes | Produces |
 | --- | --- | --- |
-| simulation root | public input plus runtime context | hydrated workflow state |
+| simulation root | public input plus runtime context | initialized workflow state |
 | planning | scenario text and scenario controls | compact execution plan plus planned round target |
 | generation | plan cast roster | finalized actor cards |
 | runtime | plan, actors, and accumulated trace | completed runtime trace plus event history |
-| finalization | completed runtime trace | structured final report, report projection, markdown sections |
+| finalization | completed runtime trace | final report, report projection, markdown sections |
 
 ## Notes
 
 - the runtime stage is the only looping stage
-- the default compiled workflow uses serial stage variants
+- the default workflow uses serial stage variants
 - `--parallel` switches the run onto the parallel stage variants
 - generation, runtime, and finalization keep explicit parallel variants, but they are opt-in
 

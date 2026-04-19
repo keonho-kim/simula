@@ -1,7 +1,5 @@
 # Generation Workflow
 
-## Purpose
-
 Generation turns the planning cast roster into concrete actor cards.
 
 ## Active Path
@@ -16,9 +14,8 @@ flowchart LR
     Finalize --> End([END])
 ```
 
-This document describes the default serial generation graph. The parallel variant still uses
-`dispatch_actor_slots` plus `generate_actor_slot` fan-out when intra-run graph parallelism is
-enabled.
+This document describes the default serial generation graph. When `--parallel` is enabled,
+generation may process multiple cast slots at the same time.
 
 ## Node Responsibilities
 
@@ -29,7 +26,7 @@ records `generation_started_at` for latency tracking.
 
 ### `generate_actor_slot_serial`
 
-Calls the `generator` role with one strict `GeneratedActorCardDraft` contract built from:
+Generates one actor card from:
 
 - compact interpretation view
 - compact situation view
@@ -39,13 +36,13 @@ Calls the `generator` role with one strict `GeneratedActorCardDraft` contract bu
 - the requested cast-count controls
 
 The node then wraps the generated draft into a full `ActorCard` using the cast identity from the
-slot, not from free-form model output, and then advances the pending slot queue by one.
+planned slot and advances the pending slot queue by one.
 
 ### `finalize_generated_actors`
 
 Collects accumulated slot results and finalizes the actor list.
 
-Current checks and side effects:
+Checks and side effects:
 
 - restore slot order by `slot_index`
 - validate that generated `cast_id` order still matches the plan
@@ -67,7 +64,7 @@ Generation does not build activity feeds. Runtime initialization owns that step.
 
 ## Parallel Variant
 
-When a run is started with CLI `--parallel`, generation switches to the parallel subgraph:
+When a run is started with CLI `--parallel`, generation switches to the parallel path:
 
 - `prepare_actor_slots -> dispatch_actor_slots -> generate_actor_slot -> finalize_generated_actors`
 

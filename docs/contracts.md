@@ -7,11 +7,11 @@ The root graph exposes three state surfaces.
 | Surface | Purpose |
 | --- | --- |
 | `SimulationInputState` | compact public input accepted by the root graph |
-| `SimulationWorkflowState` | fully hydrated internal state used between nodes |
+| `SimulationWorkflowState` | internal workflow state used between nodes |
 | `SimulationOutputState` | compact public output returned by the root graph |
 
-This separation matches the current LangGraph graph API pattern of narrow input/output schemas with
-a richer internal state.
+This separation keeps the public graph boundary compact while allowing the workflow to carry the
+state it needs between stages.
 
 ## Public Input
 
@@ -25,8 +25,7 @@ a richer internal state.
 | `max_rounds` | configured runtime hard ceiling |
 | `rng_seed` | deterministic seed derived before graph execution |
 
-`checkpoint_enabled` is not part of public input. It is injected during hydration from runtime
-settings.
+`checkpoint_enabled` is not part of public input. It is derived from runtime settings.
 
 ## Public Output
 
@@ -44,7 +43,7 @@ settings.
 
 ## Runtime Context Contract
 
-`WorkflowRuntimeContext` carries services that should not live in graph state:
+`WorkflowRuntimeContext` carries services that do not belong in graph state:
 
 - `settings`
 - `store`
@@ -53,18 +52,13 @@ settings.
 - `llm_usage_tracker`
 - `run_jsonl_appender`
 
-Nodes read these services through LangGraph runtime context instead of smuggling them through the
-state dictionary.
-
-Implementation notes:
-
-- log-context normalization lives in `simula.shared.logging.llm`
-- run-scoped JSONL append writes live in `simula.shared.io.run_jsonl`
+Nodes read these services through LangGraph runtime context rather than storing them in workflow
+state.
 
 ## Internal Workflow State
 
-`SimulationWorkflowState` is required-only. Empty values are represented explicitly with `""`,
-`[]`, and `{}` rather than optional keys.
+`SimulationWorkflowState` stores the accumulated state for planning, generation, runtime, and
+finalization.
 
 ### Core execution
 
@@ -144,8 +138,7 @@ Implementation notes:
 
 ## Structured LLM Contracts
 
-All active structured outputs are required-only. Missing data is represented through explicit empty
-values in workflow state, not through optional response fields.
+Most model-backed stages use structured outputs validated in code.
 
 | Stage | Contract |
 | --- | --- |
@@ -157,8 +150,7 @@ values in workflow state, not through optional response fields.
 | runtime resolution | `RoundResolution` |
 | finalization anchor | `TimelineAnchorDecision` |
 
-Finalization section writers are text outputs with validators, not active structured Pydantic
-schemas.
+Finalization section writers return text and are validated separately.
 
 ## Durable Artifacts
 
@@ -212,9 +204,8 @@ round count, activity totals, notable events, explicit errors, and LLM usage sum
 
 ### `report_projection_json`
 
-Persistent finalization projection used by report-section writers. It is built after the final
-structured report exists and includes the final event state plus the recorded history needed to
-explain how the run arrived there.
+Persistent finalization projection used by report-section writers. It combines final state with
+the history needed to explain how the run reached that outcome.
 
 ### `final_report_sections`
 
@@ -256,20 +247,18 @@ Notes:
 
 - `event_key` is used to avoid duplicate append writes
 - `round_actions_adopted` is written only when a round actually adopts activities
-- raw LLM call rows include prompt text, merged raw response text, timing, token counts, and
-  structured `log_context`
+- raw LLM call rows include timings, token counts when available, and structured `log_context`
 
 ## Failure and Default Policy
 
-- planning and generation are strict structured calls and fail when the contract cannot be satisfied
+- planning and generation fail when the required contract cannot be satisfied
 - runtime continuation, directive, actor proposal, and resolution nodes may use explicit default
   payloads when parsing or validation fails
 - defaulted runtime behavior remains observable through `errors`
 - invalid adopted proposals are dropped explicitly and recorded in `errors`
 - required unresolved major events can keep the runtime alive past the planner target until the
   hard ceiling is reached
-- final report section writing retries once with validation feedback instead of silently inserting
-  synthetic filler text
+- final report section writing retries once with validation feedback
 
 ## Related Docs
 

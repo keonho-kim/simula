@@ -1,7 +1,5 @@
 # Configuration
 
-## Purpose
-
 `simula` loads a typed `AppSettings` object from four layers:
 
 1. built-in defaults
@@ -15,8 +13,8 @@ The preferred operator path is still:
 cp env.sample.toml env.toml
 ```
 
-The sample file is not the only supported path, but it is the clearest one because the final
-settings model is stricter than a typical toy prototype.
+The sample file is not the only supported path, but it is the clearest starting point for local
+setup.
 
 ## Resolution Rules
 
@@ -52,7 +50,7 @@ TOML file are rejected.
 | `[db]` | storage provider selection | choose `sqlite` or `postgresql` |
 | `[db.sqlite]` | SQLite path settings | required when `db.provider = "sqlite"` |
 | `[db.postgresql]` | PostgreSQL connection and table names | required when `db.provider = "postgresql"` |
-| `[fs]` | file output directory | controls the simulation run directory root |
+| `[fs]` | file output directory | controls the live simulation run directory root, typically `output/` |
 | `[llm.<provider>]` | provider-wide defaults | shared credentials and provider-specific defaults |
 | `[llm.<role>]` | role routing and per-role overrides | one of `planner`, `generator`, `coordinator`, `actor`, `observer`, `fixer` |
 
@@ -99,6 +97,9 @@ TOML file are rejected.
 `[fs]` accepts:
 
 - `output_dir`
+
+The committed repository examples under `output.samples/` are not controlled by `output_dir`.
+They are checked-in snapshots, not live runtime outputs.
 
 ## LLM Routing Model
 

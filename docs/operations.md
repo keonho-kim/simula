@@ -70,8 +70,8 @@ uv run simula \
 Operational notes:
 
 - `--trials` must be `>= 1`
-- `--parallel` enables parallel graph branches inside one run
-- without `--parallel`, the default compiled workflow uses the serial graph variants
+- `--parallel` enables concurrent work inside one run
+- without `--parallel`, the default workflow uses the serial variants
 - for SQLite storage, repeated trials rewrite the SQLite database path to sibling files under a
   `trial-runs/` directory so repeated trials do not share one runtime database
 - the file output root still comes from `storage.output_dir`
@@ -81,11 +81,11 @@ Parallel behavior by area:
 | Area | Default run | `--parallel` run |
 | --- | --- | --- |
 | trials | sequential | sequential |
-| planning cast chunks | serial queue | parallel fan-out |
-| generation actor slots | serial queue | parallel fan-out |
-| runtime actor proposals | serial queue | parallel fan-out |
+| planning cast chunks | serial queue | concurrent chunk generation |
+| generation actor slots | serial queue | concurrent slot generation |
+| runtime actor proposals | serial queue | concurrent proposal generation |
 | coordinator round planning and resolution | serial staged calls | serial staged calls |
-| finalization report sections | serial section writers | parallel branch writers |
+| finalization report sections | serial section writers | concurrent section writing |
 
 The `--parallel` flag does not make every LLM call concurrent. Coordinator stages such as round
 directive building, round resolution, and continuation checks remain sequential inside each run.
@@ -110,6 +110,19 @@ Each completed simulation run writes:
   summaries/
   assets/
 ```
+
+The repository also keeps committed sample runs under:
+
+```text
+output.samples/<run_id>/
+```
+
+Use the two directories differently:
+
+| Path | Meaning |
+| --- | --- |
+| `<storage.output_dir>/` | live runtime output written by the simulator |
+| `output.samples/` | committed reference runs checked into the repository |
 
 `run_id` now follows:
 
@@ -154,6 +167,9 @@ Some analyzer artifacts are conditional:
 - `network/growth.csv` is written only when growth rows exist
 - `network/growth.mp4` is recorded only when video rendering produces a file
 
+When you need an example output tree for inspection, prefer `output.samples/` over `output/`
+because `output/` is intentionally treated as a local runtime workspace.
+
 ## Storage Bootstrap
 
 For PostgreSQL-backed runs, initialize storage explicitly when the schema or checkpoint tables do
@@ -183,7 +199,7 @@ uv run ruff clean
 
 ## Maintenance Notes
 
-- Keep docs aligned with the compiled graph, not with stale prompt drafts or deleted modules.
+- Keep docs aligned with the current graph and code paths.
 - Treat `simulation.log.jsonl` as the source artifact for analysis, not as a derived export.
 - Treat `<run_dir>/summary.overview.md` as the default human-readable entrypoint for derived analysis.
 - Update the workflow docs when active node names, branch points, or stage outputs change.

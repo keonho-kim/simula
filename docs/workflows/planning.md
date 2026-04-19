@@ -1,7 +1,5 @@
 # Planning Workflow
 
-## Purpose
-
 Planning turns raw scenario text plus scenario controls into one compact execution plan that later
 stages can reuse without reopening the full scenario every time.
 
@@ -10,16 +8,19 @@ stages can reuse without reopening the full scenario every time.
 ```mermaid
 flowchart LR
     Start([START]) --> Analysis["build_planning_analysis"]
-    Analysis --> Plan["build_execution_plan"]
-    Plan --> Finalize["finalize_plan"]
+    Analysis --> Outline["build_cast_roster_outline"]
+    Outline --> Frame["build_execution_plan_frame"]
+    Frame --> Chunks["plan cast chunk expansion"]
+    Chunks --> Assemble["assemble_execution_plan"]
+    Assemble --> Finalize["finalize_plan"]
     Finalize --> End([END])
 ```
 
-## Node Responsibilities
+## Stage Responsibilities
 
 ### `build_planning_analysis`
 
-Generates `PlanningAnalysis` in one strict structured call. The bundle includes:
+Builds the planning summary:
 
 - `brief_summary`
 - `premise`
@@ -27,12 +28,15 @@ Generates `PlanningAnalysis` in one strict structured call. The bundle includes:
 - `key_pressures`
 - `progression_plan`
 
-It also writes `planned_max_rounds` into workflow state from
-`planning_analysis.progression_plan.max_rounds`.
+It also sets `planned_max_rounds` from `planning_analysis.progression_plan.max_rounds`.
 
-### `build_execution_plan`
+### `build_cast_roster_outline`
 
-Generates `ExecutionPlanBundle` from:
+Builds the minimal cast outline used by the rest of planning.
+
+### `build_execution_plan_frame`
+
+Builds the shared planning frame from:
 
 - raw scenario text
 - the planning analysis JSON
@@ -40,15 +44,14 @@ Generates `ExecutionPlanBundle` from:
 - `scenario_controls.num_cast`
 - `scenario_controls.allow_additional_cast`
 
-The bundle contributes:
+The frame contributes:
 
 - `situation`
 - `action_catalog`
 - `coordination_frame`
-- `cast_roster`
 - `major_events`
 
-The planner now keeps these bundles deliberately compact:
+These bundles stay deliberately compact:
 
 - `action_catalog` stores only broad action options with `action_type`, `label`,
   `description`, `supported_visibility`, and `requires_target`
@@ -60,10 +63,18 @@ The planner now keeps these bundles deliberately compact:
 `major_events` may be empty when the scenario does not imply a shared event track worth carrying
 through runtime.
 
+### `plan cast chunk expansion`
+
+Expands the cast outline into full cast-roster items, one chunk at a time in serial mode or
+concurrently when `--parallel` is enabled.
+
+### `assemble_execution_plan`
+
+Merges the execution-plan frame and generated cast chunks into the final plan payload.
+
 ### `finalize_plan`
 
-Builds the persisted `plan` payload and performs code-side validation before the runtime ever sees
-the plan.
+Validates the final plan and saves it before runtime starts.
 
 Current validation includes:
 
@@ -103,10 +114,6 @@ Important distinctions:
 - `planned_max_rounds` is the planner-recommended target
 - `max_rounds` is the configured hard ceiling from runtime settings
 
-## Failure Policy
+## Failure Behavior
 
-- planning analysis is strict
-- execution plan generation is strict
-- plan finalization fails fast on invalid cast or major-event structure
-
-There is no silent fallback plan.
+Planning fails if the required plan structure cannot be produced or validated.

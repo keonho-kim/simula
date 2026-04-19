@@ -1,7 +1,5 @@
 # Finalization Workflow
 
-## Purpose
-
 Finalization turns the completed runtime trace into stable report artifacts and rendered markdown.
 
 ## Active Path
@@ -18,11 +16,10 @@ flowchart LR
     Render --> End([END])
 ```
 
-This document describes the default serial finalization graph. The parallel variant still fans out
-the four section writers after `build_report_artifacts` when intra-run graph parallelism is
-enabled.
+This document describes the default serial finalization graph. When `--parallel` is enabled,
+the four report sections may be written concurrently.
 
-## Node Responsibilities
+## Stage Responsibilities
 
 ### `resolve_timeline_anchor`
 
@@ -32,11 +29,11 @@ Uses a parser-first strategy:
 2. extract partial hints from incomplete scenario wording
 3. call the `observer` role only when inference is still needed
 
-The output is always one strict `TimelineAnchorDecision`.
+The output is always one `TimelineAnchorDecision`.
 
 ### `build_report_artifacts`
 
-Pure code-side node. It does not call an LLM.
+Pure code-side node. It does not call a model.
 
 It builds:
 
@@ -46,32 +43,27 @@ It builds:
 
 It also writes a `final_report` runtime log event before markdown rendering begins.
 
-Important boundary:
-
-- this node does not build `simulation_log_jsonl`
-- the executor backfills `simulation_log_jsonl` after graph execution finishes
-
 ### `write_conclusion_section`
 
-Uses the `observer` role to write the conclusion section from shared report prompt inputs.
+Writes the conclusion section.
 
 ### `write_timeline_section`
 
-Uses the `observer` role to write the timeline section from shared report prompt inputs.
+Writes the timeline section.
 
 ### `write_actor_dynamics_section`
 
-Uses the `observer` role to write the actor-dynamics section from shared report prompt inputs.
+Writes the actor-dynamics section.
 
 ### `write_major_events_section`
 
-Uses the `observer` role to write the major-events section from shared report prompt inputs.
+Writes the major-events section.
 
 ### Validation behavior for all section writers
 
 Each section writer:
 
-- uses a text prompt, not a structured schema
+- uses text generation rather than a structured schema
 - validates the returned text locally
 - retries once with validation feedback when the first answer violates the section rules
 
@@ -79,11 +71,6 @@ Each section writer:
 
 Builds the final markdown document from validated section strings and saves the structured
 `final_report` through the store.
-
-Important boundary:
-
-- this node renders markdown text into workflow state
-- the executor's integrated output writer writes `report.final.md` to disk after the workflow completes
 
 ## Final Outputs
 
@@ -101,8 +88,8 @@ By the end of finalization, workflow state contains:
 - `stop_reason`
 - `errors`
 
-`simulation_log_jsonl` becomes part of the public output surface only after the executor reads the
-completed JSONL file back from disk.
+`simulation_log_jsonl` becomes part of the public output after the executor reads the completed
+JSONL file back from disk.
 
 ## Parallel Variant
 
