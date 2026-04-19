@@ -1,0 +1,17 @@
+출발 행위자 ID,출발 행위자 이름,대상 행위자 ID,대상 행위자 이름,실제 대상 액션 수,의도 전용 연결 수,공개 연결 수,그룹 연결 수,비공개 연결 수,스레드 연결 수,첫 라운드,마지막 라운드,누적 연결 횟수,엣지 라벨 요약,엣지 라벨 변형 수
+founder_ceo,Founder CEO,cto_cofounder,Co-founder CTO,16,0,0,10,6,16,1,17,16,secure_support,1
+cto_cofounder,Co-founder CTO,founder_ceo,Founder CEO,10,0,0,8,2,10,1,16,10,investigate_truth,2
+lead_investor_partner,Lead Investor Partner,cto_cofounder,Co-founder CTO,10,0,0,10,0,10,1,17,10,propose_restructuring,1
+lead_investor_partner,Lead Investor Partner,founder_ceo,Founder CEO,10,0,0,10,0,10,1,17,10,propose_restructuring,1
+cto_cofounder,Co-founder CTO,staff_engineer,Staff Engineer,9,0,0,8,1,9,2,14,9,investigate_truth,1
+client_cto,Client CTO,founder_ceo,Founder CEO,7,0,0,7,0,7,8,17,7,investigate_truth,2
+cfo,CFO,independent_director,Independent Director,6,0,0,5,1,6,4,15,6,negotiate_terms,1
+founder_ceo,Founder CEO,lead_investor_partner,Lead Investor Partner,6,0,0,6,0,6,4,17,6,secure_support,1
+independent_director,Independent Director,cfo,CFO,6,0,0,5,1,6,4,16,6,investigate_truth,2
+independent_director,Independent Director,lead_investor_partner,Lead Investor Partner,5,0,0,5,0,5,6,16,5,propose_restructuring,2
+staff_engineer,Staff Engineer,cto_cofounder,Co-founder CTO,5,0,0,5,0,5,3,13,5,investigate_truth,1
+staff_engineer,Staff Engineer,founder_ceo,Founder CEO,5,0,0,5,0,5,3,13,5,investigate_truth,1
+tech_journalist,Tech Journalist,founder_ceo,Founder CEO,5,0,0,5,0,5,1,17,5,investigate_truth,1
+cfo,CFO,lead_investor_partner,Lead Investor Partner,4,0,0,4,0,4,7,15,4,negotiate_terms,1
+tech_journalist,Tech Journalist,client_cto,Client CTO,3,0,0,3,0,3,8,17,3,investigate_truth,1
+tech_journalist,Tech Journalist,cto_cofounder,Co-founder CTO,2,0,0,2,0,2,1,2,2,investigate_truth,1

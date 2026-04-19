@@ -1,0 +1,426 @@
+<?xml version='1.0' encoding='utf-8'?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="d28" for="edge" attr.name="label_variant_count" attr.type="long" />
+  <key id="d27" for="edge" attr.name="label_preview" attr.type="string" />
+  <key id="d26" for="edge" attr.name="total_weight" attr.type="long" />
+  <key id="d25" for="edge" attr.name="last_round" attr.type="long" />
+  <key id="d24" for="edge" attr.name="first_round" attr.type="long" />
+  <key id="d23" for="edge" attr.name="thread_event_count" attr.type="long" />
+  <key id="d22" for="edge" attr.name="private_count" attr.type="long" />
+  <key id="d21" for="edge" attr.name="group_count" attr.type="long" />
+  <key id="d20" for="edge" attr.name="public_count" attr.type="long" />
+  <key id="d19" for="edge" attr.name="intent_only_count" attr.type="long" />
+  <key id="d18" for="edge" attr.name="action_count" attr.type="long" />
+  <key id="d17" for="edge" attr.name="weight" attr.type="long" />
+  <key id="d16" for="edge" attr.name="target_display_name" attr.type="string" />
+  <key id="d15" for="edge" attr.name="source_display_name" attr.type="string" />
+  <key id="d14" for="node" attr.name="effective_size" attr.type="double" />
+  <key id="d13" for="node" attr.name="core_number" attr.type="long" />
+  <key id="d12" for="node" attr.name="pagerank" attr.type="double" />
+  <key id="d11" for="node" attr.name="authority_score" attr.type="double" />
+  <key id="d10" for="node" attr.name="hub_score" attr.type="double" />
+  <key id="d9" for="node" attr.name="betweenness_centrality" attr.type="double" />
+  <key id="d8" for="node" attr.name="out_degree_centrality" attr.type="double" />
+  <key id="d7" for="node" attr.name="in_degree_centrality" attr.type="double" />
+  <key id="d6" for="node" attr.name="counterpart_count" attr.type="long" />
+  <key id="d5" for="node" attr.name="total_weight" attr.type="long" />
+  <key id="d4" for="node" attr.name="received_relations" attr.type="long" />
+  <key id="d3" for="node" attr.name="sent_relations" attr.type="long" />
+  <key id="d2" for="node" attr.name="received_actions" attr.type="long" />
+  <key id="d1" for="node" attr.name="initiated_actions" attr.type="long" />
+  <key id="d0" for="node" attr.name="display_name" attr.type="string" />
+  <graph edgedefault="directed">
+    <node id="founder_ceo">
+      <data key="d0">Founder CEO</data>
+      <data key="d1">16</data>
+      <data key="d2">37</data>
+      <data key="d3">22</data>
+      <data key="d4">37</data>
+      <data key="d5">59</data>
+      <data key="d6">5</data>
+      <data key="d7">0.7142857142857142</data>
+      <data key="d8">0.2857142857142857</data>
+      <data key="d9">0.19047619047619047</data>
+      <data key="d10">0.11054148478103795</data>
+      <data key="d11">0.3988166287865161</data>
+      <data key="d12">0.3016681070834603</data>
+      <data key="d13">2</data>
+      <data key="d14">4.169491525423729</data>
+    </node>
+    <node id="cto_cofounder">
+      <data key="d0">Co-founder CTO</data>
+      <data key="d1">11</data>
+      <data key="d2">33</data>
+      <data key="d3">19</data>
+      <data key="d4">33</data>
+      <data key="d5">52</data>
+      <data key="d6">4</data>
+      <data key="d7">0.5714285714285714</data>
+      <data key="d8">0.2857142857142857</data>
+      <data key="d9">0.14285714285714285</data>
+      <data key="d10">0.1207865674762601</data>
+      <data key="d11">0.34411571539104446</data>
+      <data key="d12">0.320147980176946</data>
+      <data key="d13">2</data>
+      <data key="d14">3.173076923076923</data>
+    </node>
+    <node id="lead_investor_partner">
+      <data key="d0">Lead Investor Partner</data>
+      <data key="d1">10</data>
+      <data key="d2">15</data>
+      <data key="d3">20</data>
+      <data key="d4">15</data>
+      <data key="d5">35</data>
+      <data key="d6">4</data>
+      <data key="d7">0.42857142857142855</data>
+      <data key="d8">0.2857142857142857</data>
+      <data key="d9">0.14285714285714285</data>
+      <data key="d10">0.19687220305381292</data>
+      <data key="d11">0.07303227779109465</data>
+      <data key="d12">0.11522922662765907</data>
+      <data key="d13">2</data>
+      <data key="d14">3.0</data>
+    </node>
+    <node id="staff_engineer">
+      <data key="d0">Staff Engineer</data>
+      <data key="d1">6</data>
+      <data key="d2">9</data>
+      <data key="d3">10</data>
+      <data key="d4">9</data>
+      <data key="d5">19</data>
+      <data key="d6">2</data>
+      <data key="d7">0.14285714285714285</data>
+      <data key="d8">0.2857142857142857</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.19687220305381292</data>
+      <data key="d11">0.05699300979293617</data>
+      <data key="d12">0.1476509412201646</data>
+      <data key="d13">2</data>
+      <data key="d14">1.0</data>
+    </node>
+    <node id="independent_director">
+      <data key="d0">Independent Director</data>
+      <data key="d1">6</data>
+      <data key="d2">6</data>
+      <data key="d3">11</data>
+      <data key="d4">6</data>
+      <data key="d5">17</data>
+      <data key="d6">2</data>
+      <data key="d7">0.14285714285714285</data>
+      <data key="d8">0.2857142857142857</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.022118732050365485</data>
+      <data key="d11">0.01043669953284812</data>
+      <data key="d12">0.037080510328649036</data>
+      <data key="d13">2</data>
+      <data key="d14">1.6911764705882355</data>
+    </node>
+    <node id="cfo">
+      <data key="d0">CFO</data>
+      <data key="d1">6</data>
+      <data key="d2">6</data>
+      <data key="d3">10</data>
+      <data key="d4">6</data>
+      <data key="d5">16</data>
+      <data key="d6">2</data>
+      <data key="d7">0.14285714285714285</data>
+      <data key="d8">0.2857142857142857</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.022118732050365485</data>
+      <data key="d11">0.010436699532848131</data>
+      <data key="d12">0.035941984563120755</data>
+      <data key="d13">2</data>
+      <data key="d14">1.609375</data>
+    </node>
+    <node id="client_cto">
+      <data key="d0">Client CTO</data>
+      <data key="d1">7</data>
+      <data key="d2">3</data>
+      <data key="d3">7</data>
+      <data key="d4">3</data>
+      <data key="d5">10</data>
+      <data key="d6">2</data>
+      <data key="d7">0.14285714285714285</data>
+      <data key="d8">0.14285714285714285</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.10568379333466044</data>
+      <data key="d11">0.10616896917271229</data>
+      <data key="d12">0.023531250000000004</data>
+      <data key="d13">2</data>
+      <data key="d14">1.5653846153846154</data>
+    </node>
+    <node id="tech_journalist">
+      <data key="d0">Tech Journalist</data>
+      <data key="d1">5</data>
+      <data key="d2">0</data>
+      <data key="d3">10</data>
+      <data key="d4">0</data>
+      <data key="d5">10</data>
+      <data key="d6">3</data>
+      <data key="d7">0.0</data>
+      <data key="d8">0.42857142857142855</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.2250062841996847</data>
+      <data key="d11">-0.0</data>
+      <data key="d12">0.018750000000000003</data>
+      <data key="d13">2</data>
+      <data key="d14">1.8653846153846154</data>
+    </node>
+    <edge source="founder_ceo" target="cto_cofounder">
+      <data key="d15">Founder CEO</data>
+      <data key="d16">Co-founder CTO</data>
+      <data key="d17">16</data>
+      <data key="d18">16</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">10</data>
+      <data key="d22">6</data>
+      <data key="d23">16</data>
+      <data key="d24">1</data>
+      <data key="d25">17</data>
+      <data key="d26">16</data>
+      <data key="d27">secure_support</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="founder_ceo" target="lead_investor_partner">
+      <data key="d15">Founder CEO</data>
+      <data key="d16">Lead Investor Partner</data>
+      <data key="d17">6</data>
+      <data key="d18">6</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">6</data>
+      <data key="d22">0</data>
+      <data key="d23">6</data>
+      <data key="d24">4</data>
+      <data key="d25">17</data>
+      <data key="d26">6</data>
+      <data key="d27">secure_support</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="cto_cofounder" target="founder_ceo">
+      <data key="d15">Co-founder CTO</data>
+      <data key="d16">Founder CEO</data>
+      <data key="d17">10</data>
+      <data key="d18">10</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">8</data>
+      <data key="d22">2</data>
+      <data key="d23">10</data>
+      <data key="d24">1</data>
+      <data key="d25">16</data>
+      <data key="d26">10</data>
+      <data key="d27">investigate_truth</data>
+      <data key="d28">2</data>
+    </edge>
+    <edge source="cto_cofounder" target="staff_engineer">
+      <data key="d15">Co-founder CTO</data>
+      <data key="d16">Staff Engineer</data>
+      <data key="d17">9</data>
+      <data key="d18">9</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">8</data>
+      <data key="d22">1</data>
+      <data key="d23">9</data>
+      <data key="d24">2</data>
+      <data key="d25">14</data>
+      <data key="d26">9</data>
+      <data key="d27">investigate_truth</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="lead_investor_partner" target="cto_cofounder">
+      <data key="d15">Lead Investor Partner</data>
+      <data key="d16">Co-founder CTO</data>
+      <data key="d17">10</data>
+      <data key="d18">10</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">10</data>
+      <data key="d22">0</data>
+      <data key="d23">10</data>
+      <data key="d24">1</data>
+      <data key="d25">17</data>
+      <data key="d26">10</data>
+      <data key="d27">propose_restructuring</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="lead_investor_partner" target="founder_ceo">
+      <data key="d15">Lead Investor Partner</data>
+      <data key="d16">Founder CEO</data>
+      <data key="d17">10</data>
+      <data key="d18">10</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">10</data>
+      <data key="d22">0</data>
+      <data key="d23">10</data>
+      <data key="d24">1</data>
+      <data key="d25">17</data>
+      <data key="d26">10</data>
+      <data key="d27">propose_restructuring</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="staff_engineer" target="cto_cofounder">
+      <data key="d15">Staff Engineer</data>
+      <data key="d16">Co-founder CTO</data>
+      <data key="d17">5</data>
+      <data key="d18">5</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">5</data>
+      <data key="d22">0</data>
+      <data key="d23">5</data>
+      <data key="d24">3</data>
+      <data key="d25">13</data>
+      <data key="d26">5</data>
+      <data key="d27">investigate_truth</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="staff_engineer" target="founder_ceo">
+      <data key="d15">Staff Engineer</data>
+      <data key="d16">Founder CEO</data>
+      <data key="d17">5</data>
+      <data key="d18">5</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">5</data>
+      <data key="d22">0</data>
+      <data key="d23">5</data>
+      <data key="d24">3</data>
+      <data key="d25">13</data>
+      <data key="d26">5</data>
+      <data key="d27">investigate_truth</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="independent_director" target="cfo">
+      <data key="d15">Independent Director</data>
+      <data key="d16">CFO</data>
+      <data key="d17">6</data>
+      <data key="d18">6</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">5</data>
+      <data key="d22">1</data>
+      <data key="d23">6</data>
+      <data key="d24">4</data>
+      <data key="d25">16</data>
+      <data key="d26">6</data>
+      <data key="d27">investigate_truth</data>
+      <data key="d28">2</data>
+    </edge>
+    <edge source="independent_director" target="lead_investor_partner">
+      <data key="d15">Independent Director</data>
+      <data key="d16">Lead Investor Partner</data>
+      <data key="d17">5</data>
+      <data key="d18">5</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">5</data>
+      <data key="d22">0</data>
+      <data key="d23">5</data>
+      <data key="d24">6</data>
+      <data key="d25">16</data>
+      <data key="d26">5</data>
+      <data key="d27">propose_restructuring</data>
+      <data key="d28">2</data>
+    </edge>
+    <edge source="cfo" target="independent_director">
+      <data key="d15">CFO</data>
+      <data key="d16">Independent Director</data>
+      <data key="d17">6</data>
+      <data key="d18">6</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">5</data>
+      <data key="d22">1</data>
+      <data key="d23">6</data>
+      <data key="d24">4</data>
+      <data key="d25">15</data>
+      <data key="d26">6</data>
+      <data key="d27">negotiate_terms</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="cfo" target="lead_investor_partner">
+      <data key="d15">CFO</data>
+      <data key="d16">Lead Investor Partner</data>
+      <data key="d17">4</data>
+      <data key="d18">4</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">4</data>
+      <data key="d22">0</data>
+      <data key="d23">4</data>
+      <data key="d24">7</data>
+      <data key="d25">15</data>
+      <data key="d26">4</data>
+      <data key="d27">negotiate_terms</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="client_cto" target="founder_ceo">
+      <data key="d15">Client CTO</data>
+      <data key="d16">Founder CEO</data>
+      <data key="d17">7</data>
+      <data key="d18">7</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">7</data>
+      <data key="d22">0</data>
+      <data key="d23">7</data>
+      <data key="d24">8</data>
+      <data key="d25">17</data>
+      <data key="d26">7</data>
+      <data key="d27">investigate_truth</data>
+      <data key="d28">2</data>
+    </edge>
+    <edge source="tech_journalist" target="founder_ceo">
+      <data key="d15">Tech Journalist</data>
+      <data key="d16">Founder CEO</data>
+      <data key="d17">5</data>
+      <data key="d18">5</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">5</data>
+      <data key="d22">0</data>
+      <data key="d23">5</data>
+      <data key="d24">1</data>
+      <data key="d25">17</data>
+      <data key="d26">5</data>
+      <data key="d27">investigate_truth</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="tech_journalist" target="client_cto">
+      <data key="d15">Tech Journalist</data>
+      <data key="d16">Client CTO</data>
+      <data key="d17">3</data>
+      <data key="d18">3</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">3</data>
+      <data key="d22">0</data>
+      <data key="d23">3</data>
+      <data key="d24">8</data>
+      <data key="d25">17</data>
+      <data key="d26">3</data>
+      <data key="d27">investigate_truth</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="tech_journalist" target="cto_cofounder">
+      <data key="d15">Tech Journalist</data>
+      <data key="d16">Co-founder CTO</data>
+      <data key="d17">2</data>
+      <data key="d18">2</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">2</data>
+      <data key="d22">0</data>
+      <data key="d23">2</data>
+      <data key="d24">1</data>
+      <data key="d25">2</data>
+      <data key="d26">2</data>
+      <data key="d27">investigate_truth</data>
+      <data key="d28">1</data>
+    </edge>
+  </graph>
+</graphml>

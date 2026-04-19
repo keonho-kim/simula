@@ -1,0 +1,196 @@
+{
+  "summary": {
+    "node_count": 8,
+    "edge_count": 16,
+    "activity_count": 67,
+    "total_actor_count": 8,
+    "participating_actor_count": 8,
+    "participating_actor_ratio": 1.0,
+    "isolated_actor_count": 0,
+    "isolated_actor_ratio": 0.0,
+    "max_edge_weight": 16,
+    "density": 0.2857142857142857,
+    "weak_component_count": 1,
+    "strong_component_count": 4,
+    "largest_weak_component_size": 8,
+    "largest_weak_component_ratio": 1.0,
+    "largest_strong_component_size": 4,
+    "largest_strong_component_ratio": 0.5,
+    "reciprocity": 0.5,
+    "average_clustering": 0.22351233343870253,
+    "transitivity": 0.5172413793103449,
+    "max_core_number": 2,
+    "community_count": 3,
+    "skipped_metrics": {},
+    "empty_reason": null,
+    "input_warnings": []
+  },
+  "benchmark_metrics": {
+    "participation_entropy": 0.9620124232087861,
+    "action_type_diversity": 0.8746356750353118,
+    "density": 0.2857142857142857,
+    "average_path_depth": 1.5806451612903225,
+    "network_diameter": 3,
+    "centralization": 0.5714285714285714,
+    "community_count": 3,
+    "modularity": 0.18479084252167316,
+    "mean_edge_growth_rate": 0.625,
+    "mean_active_actor_growth_rate": 0.25,
+    "top20_interaction_share": 0.5091743119266054
+  },
+  "leaderboards": {
+    "authorities": [
+      {
+        "cast_id": "founder_ceo",
+        "display_name": "Founder CEO",
+        "score": 0.3988166287865161
+      },
+      {
+        "cast_id": "cto_cofounder",
+        "display_name": "Co-founder CTO",
+        "score": 0.34411571539104446
+      },
+      {
+        "cast_id": "client_cto",
+        "display_name": "Client CTO",
+        "score": 0.10616896917271229
+      },
+      {
+        "cast_id": "lead_investor_partner",
+        "display_name": "Lead Investor Partner",
+        "score": 0.07303227779109465
+      },
+      {
+        "cast_id": "staff_engineer",
+        "display_name": "Staff Engineer",
+        "score": 0.05699300979293617
+      }
+    ],
+    "brokers": [
+      {
+        "cast_id": "founder_ceo",
+        "display_name": "Founder CEO",
+        "score": 0.19047619047619047
+      },
+      {
+        "cast_id": "cto_cofounder",
+        "display_name": "Co-founder CTO",
+        "score": 0.14285714285714285
+      },
+      {
+        "cast_id": "lead_investor_partner",
+        "display_name": "Lead Investor Partner",
+        "score": 0.14285714285714285
+      },
+      {
+        "cast_id": "cfo",
+        "display_name": "CFO",
+        "score": 0.0
+      },
+      {
+        "cast_id": "client_cto",
+        "display_name": "Client CTO",
+        "score": 0.0
+      }
+    ],
+    "hubs": [
+      {
+        "cast_id": "tech_journalist",
+        "display_name": "Tech Journalist",
+        "score": 0.2250062841996847
+      },
+      {
+        "cast_id": "lead_investor_partner",
+        "display_name": "Lead Investor Partner",
+        "score": 0.19687220305381292
+      },
+      {
+        "cast_id": "staff_engineer",
+        "display_name": "Staff Engineer",
+        "score": 0.19687220305381292
+      },
+      {
+        "cast_id": "cto_cofounder",
+        "display_name": "Co-founder CTO",
+        "score": 0.1207865674762601
+      },
+      {
+        "cast_id": "founder_ceo",
+        "display_name": "Founder CEO",
+        "score": 0.11054148478103795
+      }
+    ],
+    "influence": [
+      {
+        "cast_id": "cto_cofounder",
+        "display_name": "Co-founder CTO",
+        "score": 0.320147980176946
+      },
+      {
+        "cast_id": "founder_ceo",
+        "display_name": "Founder CEO",
+        "score": 0.3016681070834603
+      },
+      {
+        "cast_id": "staff_engineer",
+        "display_name": "Staff Engineer",
+        "score": 0.1476509412201646
+      },
+      {
+        "cast_id": "lead_investor_partner",
+        "display_name": "Lead Investor Partner",
+        "score": 0.11522922662765907
+      },
+      {
+        "cast_id": "independent_director",
+        "display_name": "Independent Director",
+        "score": 0.037080510328649036
+      }
+    ]
+  },
+  "communities": [
+    {
+      "community_index": 1,
+      "actor_count": 4,
+      "internal_weight": 71.0,
+      "member_cast_ids": [
+        "cto_cofounder",
+        "founder_ceo",
+        "lead_investor_partner",
+        "staff_engineer"
+      ],
+      "member_display_names": [
+        "Co-founder CTO",
+        "Founder CEO",
+        "Lead Investor Partner",
+        "Staff Engineer"
+      ]
+    },
+    {
+      "community_index": 2,
+      "actor_count": 2,
+      "internal_weight": 12.0,
+      "member_cast_ids": [
+        "cfo",
+        "independent_director"
+      ],
+      "member_display_names": [
+        "CFO",
+        "Independent Director"
+      ]
+    },
+    {
+      "community_index": 3,
+      "actor_count": 2,
+      "internal_weight": 3.0,
+      "member_cast_ids": [
+        "client_cto",
+        "tech_journalist"
+      ],
+      "member_display_names": [
+        "Client CTO",
+        "Tech Journalist"
+      ]
+    }
+  ]
+}

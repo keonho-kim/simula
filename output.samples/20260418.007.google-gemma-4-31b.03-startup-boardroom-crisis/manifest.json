@@ -1,0 +1,337 @@
+{
+  "run_id": "20260418.007.google-gemma-4-31b.03-startup-boardroom-crisis",
+  "status": "completed",
+  "started_at": "2026-04-18T13:27:04+00:00",
+  "ended_at": "2026-04-19T01:12:19+00:00",
+  "wall_clock_seconds": 42314.978418,
+  "scenario_file": "senario.samples/03_startup_boardroom_crisis.md",
+  "scenario_file_stem": "03-startup-boardroom-crisis",
+  "actor_model_id": "google-gemma-4-31b",
+  "settings": {
+    "log_level": "DEBUG",
+    "runtime": {
+      "max_rounds": 20,
+      "max_actor_calls_per_step": 6,
+      "max_focus_slices_per_step": 3,
+      "max_recipients_per_message": 2,
+      "enable_checkpointing": false,
+      "rng_seed": null
+    },
+    "storage": {
+      "provider": "sqlite",
+      "output_dir": "./output",
+      "sqlite_dir": "./data/db",
+      "sqlite_path": "./data/db/runtime.sqlite",
+      "postgresql": {
+        "host": "127.0.0.1",
+        "port": 5432,
+        "user": "postgres",
+        "password": "1234",
+        "database": "simula",
+        "db_schema": "simula",
+        "tables": {
+          "runs": "runs",
+          "actors": "actors",
+          "activities": "activities",
+          "observer_reports": "observer_reports",
+          "final_reports": "final_reports"
+        }
+      }
+    },
+    "models": {
+      "planner": {
+        "provider": "openai-compatible",
+        "model": "google/gemma-4-31b",
+        "temperature": 0.5,
+        "max_tokens": 25600,
+        "timeout_seconds": 3600.0,
+        "openai": {
+          "api_key": null,
+          "base_url": null,
+          "stream_usage": null,
+          "reasoning_effort": null,
+          "verbosity": null
+        },
+        "openai_compatible": {
+          "api_key": "***",
+          "base_url": "http://127.0.0.1:1234/v1",
+          "stream_usage": true,
+          "extra_body": {
+            "reasoning": {
+              "effort": "medium"
+            }
+          }
+        },
+        "anthropic": {
+          "api_key": null,
+          "base_url": null,
+          "effort": null
+        },
+        "google": {
+          "api_key": null,
+          "base_url": null,
+          "project_id": null,
+          "location": null,
+          "credentials_path": null,
+          "thinking_budget": null,
+          "thinking_level": null
+        },
+        "bedrock": {
+          "region_name": null,
+          "credentials_profile_name": null,
+          "endpoint_url": null
+        }
+      },
+      "generator": {
+        "provider": "openai-compatible",
+        "model": "google/gemma-4-31b",
+        "temperature": 0.5,
+        "max_tokens": 25600,
+        "timeout_seconds": 3600.0,
+        "openai": {
+          "api_key": null,
+          "base_url": null,
+          "stream_usage": null,
+          "reasoning_effort": null,
+          "verbosity": null
+        },
+        "openai_compatible": {
+          "api_key": "***",
+          "base_url": "http://127.0.0.1:1234/v1",
+          "stream_usage": true,
+          "extra_body": {
+            "reasoning": {
+              "effort": "medium"
+            }
+          }
+        },
+        "anthropic": {
+          "api_key": null,
+          "base_url": null,
+          "effort": null
+        },
+        "google": {
+          "api_key": null,
+          "base_url": null,
+          "project_id": null,
+          "location": null,
+          "credentials_path": null,
+          "thinking_budget": null,
+          "thinking_level": null
+        },
+        "bedrock": {
+          "region_name": null,
+          "credentials_profile_name": null,
+          "endpoint_url": null
+        }
+      },
+      "coordinator": {
+        "provider": "openai-compatible",
+        "model": "google/gemma-4-31b",
+        "temperature": 0.5,
+        "max_tokens": 25600,
+        "timeout_seconds": 3600.0,
+        "openai": {
+          "api_key": null,
+          "base_url": null,
+          "stream_usage": null,
+          "reasoning_effort": null,
+          "verbosity": null
+        },
+        "openai_compatible": {
+          "api_key": "***",
+          "base_url": "http://127.0.0.1:1234/v1",
+          "stream_usage": true,
+          "extra_body": {
+            "reasoning": {
+              "effort": "medium"
+            }
+          }
+        },
+        "anthropic": {
+          "api_key": null,
+          "base_url": null,
+          "effort": null
+        },
+        "google": {
+          "api_key": null,
+          "base_url": null,
+          "project_id": null,
+          "location": null,
+          "credentials_path": null,
+          "thinking_budget": null,
+          "thinking_level": null
+        },
+        "bedrock": {
+          "region_name": null,
+          "credentials_profile_name": null,
+          "endpoint_url": null
+        }
+      },
+      "actor": {
+        "provider": "openai-compatible",
+        "model": "google/gemma-4-31b",
+        "temperature": 0.7,
+        "max_tokens": 25600,
+        "timeout_seconds": 60.0,
+        "openai": {
+          "api_key": null,
+          "base_url": null,
+          "stream_usage": null,
+          "reasoning_effort": null,
+          "verbosity": null
+        },
+        "openai_compatible": {
+          "api_key": "***",
+          "base_url": "http://127.0.0.1:1234/v1",
+          "stream_usage": true,
+          "extra_body": {
+            "reasoning": {
+              "effort": "medium"
+            }
+          }
+        },
+        "anthropic": {
+          "api_key": null,
+          "base_url": null,
+          "effort": null
+        },
+        "google": {
+          "api_key": null,
+          "base_url": null,
+          "project_id": null,
+          "location": null,
+          "credentials_path": null,
+          "thinking_budget": null,
+          "thinking_level": null
+        },
+        "bedrock": {
+          "region_name": null,
+          "credentials_profile_name": null,
+          "endpoint_url": null
+        }
+      },
+      "observer": {
+        "provider": "openai-compatible",
+        "model": "google/gemma-4-31b",
+        "temperature": 0.3,
+        "max_tokens": 25600,
+        "timeout_seconds": 3600.0,
+        "openai": {
+          "api_key": null,
+          "base_url": null,
+          "stream_usage": null,
+          "reasoning_effort": null,
+          "verbosity": null
+        },
+        "openai_compatible": {
+          "api_key": "***",
+          "base_url": "http://127.0.0.1:1234/v1",
+          "stream_usage": true,
+          "extra_body": {
+            "reasoning": {
+              "effort": "medium"
+            }
+          }
+        },
+        "anthropic": {
+          "api_key": null,
+          "base_url": null,
+          "effort": null
+        },
+        "google": {
+          "api_key": null,
+          "base_url": null,
+          "project_id": null,
+          "location": null,
+          "credentials_path": null,
+          "thinking_budget": null,
+          "thinking_level": null
+        },
+        "bedrock": {
+          "region_name": null,
+          "credentials_profile_name": null,
+          "endpoint_url": null
+        }
+      },
+      "fixer": {
+        "provider": "openai-compatible",
+        "model": "google/gemma-4-31b",
+        "temperature": 0.2,
+        "max_tokens": 25600,
+        "timeout_seconds": 3600.0,
+        "openai": {
+          "api_key": null,
+          "base_url": null,
+          "stream_usage": null,
+          "reasoning_effort": null,
+          "verbosity": null
+        },
+        "openai_compatible": {
+          "api_key": "***",
+          "base_url": "http://127.0.0.1:1234/v1",
+          "stream_usage": true,
+          "extra_body": {
+            "reasoning": {
+              "effort": "xhigh"
+            }
+          }
+        },
+        "anthropic": {
+          "api_key": null,
+          "base_url": null,
+          "effort": null
+        },
+        "google": {
+          "api_key": null,
+          "base_url": null,
+          "project_id": null,
+          "location": null,
+          "credentials_path": null,
+          "thinking_budget": null,
+          "thinking_level": null
+        },
+        "bedrock": {
+          "region_name": null,
+          "credentials_profile_name": null,
+          "endpoint_url": null
+        }
+      }
+    }
+  },
+  "artifact_paths": [
+    "assets/network.concentration.png",
+    "assets/network.graph.graphml",
+    "assets/network.graph.png",
+    "assets/network.growth.mp4",
+    "assets/network.growth_metrics.png",
+    "assets/performance.summary.png",
+    "data/actions.summary.csv",
+    "data/fixer.summary.csv",
+    "data/llm_calls.csv",
+    "data/network.edges.csv",
+    "data/network.growth.csv",
+    "data/network.nodes.csv",
+    "data/network.summary.json",
+    "data/performance.summary.csv",
+    "data/token_usage.summary.csv",
+    "manifest.json",
+    "report.final.md",
+    "simulation.log.jsonl",
+    "summaries/network.summary.md",
+    "summaries/token_usage.summary.md",
+    "summary.overview.md"
+  ],
+  "error": null,
+  "analysis": {
+    "total_events": 381,
+    "llm_call_count": 273,
+    "roles": [
+      "actor",
+      "coordinator",
+      "generator",
+      "observer",
+      "planner"
+    ]
+  }
+}

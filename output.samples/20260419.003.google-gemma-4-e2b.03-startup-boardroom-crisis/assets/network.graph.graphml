@@ -1,0 +1,327 @@
+<?xml version='1.0' encoding='utf-8'?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="d28" for="edge" attr.name="label_variant_count" attr.type="long" />
+  <key id="d27" for="edge" attr.name="label_preview" attr.type="string" />
+  <key id="d26" for="edge" attr.name="total_weight" attr.type="long" />
+  <key id="d25" for="edge" attr.name="last_round" attr.type="long" />
+  <key id="d24" for="edge" attr.name="first_round" attr.type="long" />
+  <key id="d23" for="edge" attr.name="thread_event_count" attr.type="long" />
+  <key id="d22" for="edge" attr.name="private_count" attr.type="long" />
+  <key id="d21" for="edge" attr.name="group_count" attr.type="long" />
+  <key id="d20" for="edge" attr.name="public_count" attr.type="long" />
+  <key id="d19" for="edge" attr.name="intent_only_count" attr.type="long" />
+  <key id="d18" for="edge" attr.name="action_count" attr.type="long" />
+  <key id="d17" for="edge" attr.name="weight" attr.type="long" />
+  <key id="d16" for="edge" attr.name="target_display_name" attr.type="string" />
+  <key id="d15" for="edge" attr.name="source_display_name" attr.type="string" />
+  <key id="d14" for="node" attr.name="effective_size" attr.type="double" />
+  <key id="d13" for="node" attr.name="core_number" attr.type="long" />
+  <key id="d12" for="node" attr.name="pagerank" attr.type="double" />
+  <key id="d11" for="node" attr.name="authority_score" attr.type="double" />
+  <key id="d10" for="node" attr.name="hub_score" attr.type="double" />
+  <key id="d9" for="node" attr.name="betweenness_centrality" attr.type="double" />
+  <key id="d8" for="node" attr.name="out_degree_centrality" attr.type="double" />
+  <key id="d7" for="node" attr.name="in_degree_centrality" attr.type="double" />
+  <key id="d6" for="node" attr.name="counterpart_count" attr.type="long" />
+  <key id="d5" for="node" attr.name="total_weight" attr.type="long" />
+  <key id="d4" for="node" attr.name="received_relations" attr.type="long" />
+  <key id="d3" for="node" attr.name="sent_relations" attr.type="long" />
+  <key id="d2" for="node" attr.name="received_actions" attr.type="long" />
+  <key id="d1" for="node" attr.name="initiated_actions" attr.type="long" />
+  <key id="d0" for="node" attr.name="display_name" attr.type="string" />
+  <graph edgedefault="directed">
+    <node id="independent_director">
+      <data key="d0">독립 사외이사</data>
+      <data key="d1">4</data>
+      <data key="d2">5</data>
+      <data key="d3">8</data>
+      <data key="d4">5</data>
+      <data key="d5">13</data>
+      <data key="d6">4</data>
+      <data key="d7">0.2857142857142857</data>
+      <data key="d8">0.5714285714285714</data>
+      <data key="d9">0.09523809523809523</data>
+      <data key="d10">0.43040292655585166</data>
+      <data key="d11">0.13919414688829673</data>
+      <data key="d12">0.09945168595077661</data>
+      <data key="d13">2</data>
+      <data key="d14">3.076923076923077</data>
+    </node>
+    <node id="cfo_financial">
+      <data key="d0">CFO</data>
+      <data key="d1">5</data>
+      <data key="d2">6</data>
+      <data key="d3">5</data>
+      <data key="d4">6</data>
+      <data key="d5">11</data>
+      <data key="d6">2</data>
+      <data key="d7">0.2857142857142857</data>
+      <data key="d8">0.14285714285714285</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.09955185753423228</data>
+      <data key="d11">0.19910371506846453</data>
+      <data key="d12">0.32436869609663255</data>
+      <data key="d13">2</data>
+      <data key="d14">1.7575757575757576</data>
+    </node>
+    <node id="cto_developer">
+      <data key="d0">공동창업자 CTO</data>
+      <data key="d1">4</data>
+      <data key="d2">7</data>
+      <data key="d3">4</data>
+      <data key="d4">7</data>
+      <data key="d5">11</data>
+      <data key="d6">2</data>
+      <data key="d7">0.2857142857142857</data>
+      <data key="d8">0.14285714285714285</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.09955185753423226</data>
+      <data key="d11">0.19910371506846455</data>
+      <data key="d12">0.32436869609663255</data>
+      <data key="d13">2</data>
+      <data key="d14">1.7575757575757576</data>
+    </node>
+    <node id="ceo_yooim">
+      <data key="d0">창업자 CEO</data>
+      <data key="d1">4</data>
+      <data key="d2">3</data>
+      <data key="d3">8</data>
+      <data key="d4">3</data>
+      <data key="d5">11</data>
+      <data key="d6">2</data>
+      <data key="d7">0.2857142857142857</data>
+      <data key="d8">0.2857142857142857</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.18524667918784193</data>
+      <data key="d11">0.2312992114873871</data>
+      <data key="d12">0.08462105725825371</data>
+      <data key="d13">2</data>
+      <data key="d14">1.4545454545454546</data>
+    </node>
+    <node id="investor_partner">
+      <data key="d0">리드 투자사 파트너</data>
+      <data key="d1">6</data>
+      <data key="d2">6</data>
+      <data key="d3">2</data>
+      <data key="d4">6</data>
+      <data key="d5">8</data>
+      <data key="d6">2</data>
+      <data key="d7">0.2857142857142857</data>
+      <data key="d8">0.2857142857142857</data>
+      <data key="d9">0.0</data>
+      <data key="d10">0.18524667918784193</data>
+      <data key="d11">0.2312992114873871</data>
+      <data key="d12">0.08462105725825371</data>
+      <data key="d13">2</data>
+      <data key="d14">1.0</data>
+    </node>
+    <node id="whistleblower">
+      <data key="d0">Staff 엔지니어 내부고발자</data>
+      <data key="d1">0</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+      <data key="d4">0</data>
+      <data key="d5">0</data>
+      <data key="d6">0</data>
+      <data key="d7">0.0</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">-0.0</data>
+      <data key="d11">-0.0</data>
+      <data key="d12">0.027522935779816904</data>
+      <data key="d13">0</data>
+    </node>
+    <node id="tech_journalist">
+      <data key="d0">테크 전문 기자</data>
+      <data key="d1">1</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+      <data key="d4">0</data>
+      <data key="d5">0</data>
+      <data key="d6">0</data>
+      <data key="d7">0.0</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">-0.0</data>
+      <data key="d11">-0.0</data>
+      <data key="d12">0.027522935779816904</data>
+      <data key="d13">0</data>
+    </node>
+    <node id="customer_cto">
+      <data key="d0">핵심 고객사 CTO</data>
+      <data key="d1">0</data>
+      <data key="d2">0</data>
+      <data key="d3">0</data>
+      <data key="d4">0</data>
+      <data key="d5">0</data>
+      <data key="d6">0</data>
+      <data key="d7">0.0</data>
+      <data key="d8">0.0</data>
+      <data key="d9">0.0</data>
+      <data key="d10">-0.0</data>
+      <data key="d11">-0.0</data>
+      <data key="d12">0.027522935779816904</data>
+      <data key="d13">0</data>
+    </node>
+    <edge source="independent_director" target="cfo_financial">
+      <data key="d15">독립 사외이사</data>
+      <data key="d16">CFO</data>
+      <data key="d17">2</data>
+      <data key="d18">2</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">2</data>
+      <data key="d22">0</data>
+      <data key="d23">2</data>
+      <data key="d24">6</data>
+      <data key="d25">7</data>
+      <data key="d26">2</data>
+      <data key="d27">internal_risk_assessment</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="independent_director" target="cto_developer">
+      <data key="d15">독립 사외이사</data>
+      <data key="d16">공동창업자 CTO</data>
+      <data key="d17">2</data>
+      <data key="d18">2</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">2</data>
+      <data key="d22">0</data>
+      <data key="d23">2</data>
+      <data key="d24">6</data>
+      <data key="d25">7</data>
+      <data key="d26">2</data>
+      <data key="d27">internal_risk_assessment</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="independent_director" target="investor_partner">
+      <data key="d15">독립 사외이사</data>
+      <data key="d16">리드 투자사 파트너</data>
+      <data key="d17">2</data>
+      <data key="d18">2</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">2</data>
+      <data key="d22">0</data>
+      <data key="d23">2</data>
+      <data key="d24">1</data>
+      <data key="d25">3</data>
+      <data key="d26">2</data>
+      <data key="d27">board_confrontation</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="independent_director" target="ceo_yooim">
+      <data key="d15">독립 사외이사</data>
+      <data key="d16">창업자 CEO</data>
+      <data key="d17">2</data>
+      <data key="d18">2</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">2</data>
+      <data key="d22">0</data>
+      <data key="d23">2</data>
+      <data key="d24">1</data>
+      <data key="d25">3</data>
+      <data key="d26">2</data>
+      <data key="d27">board_confrontation</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="cfo_financial" target="cto_developer">
+      <data key="d15">CFO</data>
+      <data key="d16">공동창업자 CTO</data>
+      <data key="d17">5</data>
+      <data key="d18">5</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">5</data>
+      <data key="d22">0</data>
+      <data key="d23">5</data>
+      <data key="d24">2</data>
+      <data key="d25">7</data>
+      <data key="d26">5</data>
+      <data key="d27">internal_risk_assessment</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="cto_developer" target="cfo_financial">
+      <data key="d15">공동창업자 CTO</data>
+      <data key="d16">CFO</data>
+      <data key="d17">4</data>
+      <data key="d18">4</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">4</data>
+      <data key="d22">0</data>
+      <data key="d23">4</data>
+      <data key="d24">2</data>
+      <data key="d25">7</data>
+      <data key="d26">4</data>
+      <data key="d27">internal_risk_assessment</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="ceo_yooim" target="independent_director">
+      <data key="d15">창업자 CEO</data>
+      <data key="d16">독립 사외이사</data>
+      <data key="d17">4</data>
+      <data key="d18">4</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">4</data>
+      <data key="d22">0</data>
+      <data key="d23">4</data>
+      <data key="d24">1</data>
+      <data key="d25">7</data>
+      <data key="d26">4</data>
+      <data key="d27">board_confrontation</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="ceo_yooim" target="investor_partner">
+      <data key="d15">창업자 CEO</data>
+      <data key="d16">리드 투자사 파트너</data>
+      <data key="d17">4</data>
+      <data key="d18">4</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">4</data>
+      <data key="d22">0</data>
+      <data key="d23">4</data>
+      <data key="d24">1</data>
+      <data key="d25">7</data>
+      <data key="d26">4</data>
+      <data key="d27">board_confrontation</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="investor_partner" target="independent_director">
+      <data key="d15">리드 투자사 파트너</data>
+      <data key="d16">독립 사외이사</data>
+      <data key="d17">1</data>
+      <data key="d18">1</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">1</data>
+      <data key="d22">0</data>
+      <data key="d23">1</data>
+      <data key="d24">1</data>
+      <data key="d25">1</data>
+      <data key="d26">1</data>
+      <data key="d27">board_confrontation</data>
+      <data key="d28">1</data>
+    </edge>
+    <edge source="investor_partner" target="ceo_yooim">
+      <data key="d15">리드 투자사 파트너</data>
+      <data key="d16">창업자 CEO</data>
+      <data key="d17">1</data>
+      <data key="d18">1</data>
+      <data key="d19">0</data>
+      <data key="d20">0</data>
+      <data key="d21">1</data>
+      <data key="d22">0</data>
+      <data key="d23">1</data>
+      <data key="d24">1</data>
+      <data key="d25">1</data>
+      <data key="d26">1</data>
+      <data key="d27">board_confrontation</data>
+      <data key="d28">1</data>
+    </edge>
+  </graph>
+</graphml>

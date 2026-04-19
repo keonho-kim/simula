@@ -1,0 +1,15 @@
+출발 행위자 ID,출발 행위자 이름,대상 행위자 ID,대상 행위자 이름,실제 대상 액션 수,의도 전용 연결 수,공개 연결 수,그룹 연결 수,비공개 연결 수,스레드 연결 수,첫 라운드,마지막 라운드,누적 연결 횟수,엣지 라벨 요약,엣지 라벨 변형 수
+lead_investor,리드 투자사 파트너,founder_ceo,창업자 CEO,14,0,0,8,6,14,1,16,14,exert_pressure,2
+founder_ceo,창업자 CEO,lead_investor,리드 투자사 파트너,11,0,0,0,11,11,1,17,11,negotiate_deal,1
+cfo,CFO,lead_investor,리드 투자사 파트너,10,0,0,0,10,10,4,17,10,negotiate_deal,1
+lead_investor,리드 투자사 파트너,cfo,CFO,9,0,0,8,1,9,7,17,9,exert_pressure,2
+founder_ceo,창업자 CEO,tech_journalist,테크 전문 기자,6,0,0,0,6,6,2,7,6,negotiate_deal,1
+cofounder_cto,공동창업자 CTO,independent_director,독립 사외이사,4,0,0,0,4,4,11,17,4,verify_fact,1
+whistleblower_engineer,내부고발자 엔지니어,tech_journalist,테크 전문 기자,4,0,0,0,4,4,1,7,4,verify_fact,1
+tech_journalist,테크 전문 기자,whistleblower_engineer,내부고발자 엔지니어,4,0,0,0,4,4,1,8,4,verify_fact,1
+tech_journalist,테크 전문 기자,founder_ceo,창업자 CEO,4,0,0,0,4,4,3,7,4,exert_pressure,2
+independent_director,독립 사외이사,cofounder_cto,공동창업자 CTO,3,0,0,0,3,3,12,16,3,verify_fact,1
+customer_cto,핵심 고객사 CTO,founder_ceo,창업자 CEO,3,0,0,0,3,3,3,10,3,exert_pressure,1
+cofounder_cto,공동창업자 CTO,founder_ceo,창업자 CEO,2,0,0,0,2,2,2,9,2,verify_fact,1
+cofounder_cto,공동창업자 CTO,whistleblower_engineer,내부고발자 엔지니어,1,0,0,0,1,1,6,6,1,verify_fact,1
+independent_director,독립 사외이사,founder_ceo,창업자 CEO,1,0,0,0,1,1,10,10,1,verify_fact,1

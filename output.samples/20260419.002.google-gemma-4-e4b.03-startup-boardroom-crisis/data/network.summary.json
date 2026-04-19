@@ -1,0 +1,183 @@
+{
+  "summary": {
+    "node_count": 8,
+    "edge_count": 10,
+    "activity_count": 29,
+    "total_actor_count": 8,
+    "participating_actor_count": 6,
+    "participating_actor_ratio": 0.75,
+    "isolated_actor_count": 2,
+    "isolated_actor_ratio": 0.25,
+    "max_edge_weight": 4,
+    "density": 0.17857142857142858,
+    "weak_component_count": 4,
+    "strong_component_count": 5,
+    "largest_weak_component_size": 4,
+    "largest_weak_component_ratio": 0.5,
+    "largest_strong_component_size": 3,
+    "largest_strong_component_ratio": 0.375,
+    "reciprocity": 0.8,
+    "average_clustering": 0.2604166666666667,
+    "transitivity": 0.75,
+    "max_core_number": 2,
+    "community_count": 2,
+    "skipped_metrics": {},
+    "empty_reason": null,
+    "input_warnings": []
+  },
+  "benchmark_metrics": {
+    "participation_entropy": 0.9132819183158508,
+    "action_type_diversity": 0.5329681138290061,
+    "density": 0.17857142857142858,
+    "average_path_depth": 1.0909090909090908,
+    "network_diameter": 2,
+    "centralization": 0.47619047619047616,
+    "community_count": 2,
+    "modularity": 0.18549346016646856,
+    "mean_edge_growth_rate": 1.4285714285714286,
+    "mean_active_actor_growth_rate": 0.8571428571428571,
+    "top20_interaction_share": 0.5862068965517241
+  },
+  "leaderboards": {
+    "authorities": [
+      {
+        "cast_id": "founder-ceo",
+        "display_name": "창업자 CEO",
+        "score": 0.3903882032022076
+      },
+      {
+        "cast_id": "cfo",
+        "display_name": "CFO",
+        "score": 0.3903882032022075
+      },
+      {
+        "cast_id": "lead-investor-partner",
+        "display_name": "리드 투자사 파트너",
+        "score": 0.21922359359558488
+      },
+      {
+        "cast_id": "cofounder-cto",
+        "display_name": "공동창업자 CTO",
+        "score": 8.243743344582344e-18
+      },
+      {
+        "cast_id": "whistleblower-engineer",
+        "display_name": "내부고발자",
+        "score": -0.0
+      }
+    ],
+    "brokers": [
+      {
+        "cast_id": "cfo",
+        "display_name": "CFO",
+        "score": 0.011904761904761904
+      },
+      {
+        "cast_id": "founder-ceo",
+        "display_name": "창업자 CEO",
+        "score": 0.011904761904761904
+      },
+      {
+        "cast_id": "cofounder-cto",
+        "display_name": "공동창업자 CTO",
+        "score": 0.0
+      },
+      {
+        "cast_id": "whistleblower-engineer",
+        "display_name": "내부고발자",
+        "score": 0.0
+      },
+      {
+        "cast_id": "independent-director",
+        "display_name": "독립 사외이사",
+        "score": 0.0
+      }
+    ],
+    "hubs": [
+      {
+        "cast_id": "whistleblower-engineer",
+        "display_name": "내부고발자",
+        "score": 0.28077640640441515
+      },
+      {
+        "cast_id": "lead-investor-partner",
+        "display_name": "리드 투자사 파트너",
+        "score": 0.28077640640441515
+      },
+      {
+        "cast_id": "cfo",
+        "display_name": "CFO",
+        "score": 0.21922359359558485
+      },
+      {
+        "cast_id": "founder-ceo",
+        "display_name": "창업자 CEO",
+        "score": 0.21922359359558485
+      },
+      {
+        "cast_id": "client-cto",
+        "display_name": "핵심 고객사 CTO",
+        "score": 2.9645473564850995e-18
+      }
+    ],
+    "influence": [
+      {
+        "cast_id": "cfo",
+        "display_name": "CFO",
+        "score": 0.20607109910177984
+      },
+      {
+        "cast_id": "founder-ceo",
+        "display_name": "창업자 CEO",
+        "score": 0.20607109910177984
+      },
+      {
+        "cast_id": "lead-investor-partner",
+        "display_name": "리드 투자사 파트너",
+        "score": 0.19896891248216603
+      },
+      {
+        "cast_id": "cofounder-cto",
+        "display_name": "공동창업자 CTO",
+        "score": 0.1587301586693894
+      },
+      {
+        "cast_id": "client-cto",
+        "display_name": "핵심 고객사 CTO",
+        "score": 0.1587301586693894
+      }
+    ]
+  },
+  "communities": [
+    {
+      "community_index": 1,
+      "actor_count": 4,
+      "internal_weight": 26.0,
+      "member_cast_ids": [
+        "cfo",
+        "whistleblower-engineer",
+        "lead-investor-partner",
+        "founder-ceo"
+      ],
+      "member_display_names": [
+        "CFO",
+        "내부고발자",
+        "리드 투자사 파트너",
+        "창업자 CEO"
+      ]
+    },
+    {
+      "community_index": 2,
+      "actor_count": 2,
+      "internal_weight": 3.0,
+      "member_cast_ids": [
+        "cofounder-cto",
+        "client-cto"
+      ],
+      "member_display_names": [
+        "공동창업자 CTO",
+        "핵심 고객사 CTO"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+출발 행위자 ID,출발 행위자 이름,대상 행위자 ID,대상 행위자 이름,실제 대상 액션 수,의도 전용 연결 수,공개 연결 수,그룹 연결 수,비공개 연결 수,스레드 연결 수,첫 라운드,마지막 라운드,누적 연결 횟수,엣지 라벨 요약,엣지 라벨 변형 수
+cfo,CFO,lead-investor-partner,리드 투자사 파트너,4,0,0,0,4,4,5,8,4,negotiate_funding_terms,1
+cfo,CFO,founder-ceo,창업자 CEO,4,0,0,0,4,4,5,8,4,negotiate_funding_terms,1
+lead-investor-partner,리드 투자사 파트너,cfo,CFO,4,0,0,0,4,4,5,8,4,negotiate_funding_terms,1
+lead-investor-partner,리드 투자사 파트너,founder-ceo,창업자 CEO,4,0,0,0,4,4,5,8,4,negotiate_funding_terms,1
+founder-ceo,창업자 CEO,cfo,CFO,4,0,0,0,4,4,3,7,4,negotiate_funding_terms,1
+founder-ceo,창업자 CEO,lead-investor-partner,리드 투자사 파트너,4,0,0,0,4,4,3,7,4,negotiate_funding_terms,1
+cofounder-cto,공동창업자 CTO,client-cto,핵심 고객사 CTO,2,0,0,0,2,2,2,4,2,address_key_customer,1
+whistleblower-engineer,내부고발자,cfo,CFO,1,0,0,1,0,1,7,7,1,investigate_security_breach,1
+whistleblower-engineer,내부고발자,founder-ceo,창업자 CEO,1,0,0,1,0,1,7,7,1,investigate_security_breach,1
+client-cto,핵심 고객사 CTO,cofounder-cto,공동창업자 CTO,1,0,0,0,1,1,4,4,1,address_key_customer,1

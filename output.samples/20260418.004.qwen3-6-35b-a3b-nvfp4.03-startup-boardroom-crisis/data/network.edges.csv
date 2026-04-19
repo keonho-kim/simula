@@ -1,0 +1,7 @@
+출발 행위자 ID,출발 행위자 이름,대상 행위자 ID,대상 행위자 이름,실제 대상 액션 수,의도 전용 연결 수,공개 연결 수,그룹 연결 수,비공개 연결 수,스레드 연결 수,첫 라운드,마지막 라운드,누적 연결 횟수,엣지 라벨 요약,엣지 라벨 변형 수
+founder_ceo,창업자 CEO,lead_investor_partner,리드 투자사 파트너,5,0,0,1,4,5,1,5,5,bridge_fund_negotiation,2
+cofounder_cto,공동창업자 CTO,independent_director,독립 사외이사,3,0,0,3,0,3,2,5,3,internal_whistleblower_verification,1
+lead_investor_partner,리드 투자사 파트너,founder_ceo,창업자 CEO,3,0,0,1,2,3,3,5,3,bridge_fund_negotiation,2
+cofounder_cto,공동창업자 CTO,cfo,CFO,1,0,0,1,0,1,5,5,1,internal_whistleblower_verification,1
+lead_investor_partner,리드 투자사 파트너,independent_director,독립 사외이사,1,0,0,1,0,1,5,5,1,emergency_board_vote,1
+founder_ceo,창업자 CEO,independent_director,독립 사외이사,1,0,0,1,0,1,5,5,1,emergency_board_vote,1
