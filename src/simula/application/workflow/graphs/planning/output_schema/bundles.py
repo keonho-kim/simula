@@ -94,8 +94,8 @@ def build_plan_cast_chunk_prompt_bundle(
     *,
     example_mode: ExampleMode = "minimal",
 ) -> dict[str, str]:
-    return build_object_prompt_bundle(
-        example=_PLAN_CAST_CHUNK_EXAMPLE,
+    return build_simple_array_prompt_bundle(
+        example_item=_PLAN_CAST_CHUNK_ITEM_EXAMPLE,
         example_mode=example_mode,
     )
 
@@ -179,16 +179,12 @@ _EXECUTION_PLAN_FRAME_EXAMPLE: dict[str, Any] = {
     "major_events": [_MAJOR_EVENT_PLAN_ITEM_EXAMPLE],
 }
 
-_PLAN_CAST_CHUNK_EXAMPLE: dict[str, Any] = {
-    "items": [
-        {
-            "cast_id": "<stable snake_case or kebab-case cast identifier>",
-            "display_name": "<1 short participant name or role label grounded in the scenario>",
-            "role_hint": "<1 short Korean role hint>",
-            "group_name": "<1 short team, camp, faction, or participant group name>",
-            "core_tension": "<1 Korean sentence describing this actor's core tension>",
-        }
-    ]
+_PLAN_CAST_CHUNK_ITEM_EXAMPLE: dict[str, Any] = {
+    "cast_id": "<stable snake_case or kebab-case cast identifier>",
+    "display_name": "<1 short participant name or role label grounded in the scenario>",
+    "role_hint": "<1 short Korean role hint>",
+    "group_name": "<1 short team, camp, faction, or participant group name>",
+    "core_tension": "<1 Korean sentence describing this actor's core tension>",
 }
 
 

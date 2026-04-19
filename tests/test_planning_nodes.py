@@ -21,9 +21,12 @@ from simula.application.workflow.graphs.planning.nodes.planner import (
     prepare_plan_cast_chunks,
     validate_execution_plan_frame_semantics,
 )
+from simula.application.workflow.graphs.planning.nodes.planner_validation import (
+    validate_plan_cast_chunk_semantics,
+)
 from simula.domain.contracts import (
     ActionCatalog,
-    CastRoster,
+    CastRosterItem,
     CastRosterOutlineItem,
     CoordinationFrame,
     ExecutionPlanFrameBundle,
@@ -313,32 +316,32 @@ def test_prepare_plan_cast_chunks_groups_outline_by_fixed_size() -> None:
 
 def test_build_plan_cast_chunk_returns_assigned_cast_only() -> None:
     class FakeLLM:
-        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+        async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
             del prompt
             assert role == "planner"
-            assert schema is CastRoster
+            assert annotation == list[CastRosterItem]
+            assert kwargs["failure_policy"] == "fixer"
             semantic_validator = kwargs["semantic_validator"]
             repair_context = kwargs["repair_context"]
-            parsed = CastRoster(
-                items=[
-                    {
-                        "cast_id": "cast-alpha",
-                        "display_name": "알파",
-                        "role_hint": "선도자",
-                        "group_name": "A",
-                        "core_tension": "먼저 움직인다.",
-                    },
-                    {
-                        "cast_id": "cast-beta",
-                        "display_name": "베타",
-                        "role_hint": "조정자",
-                        "group_name": "B",
-                        "core_tension": "즉시 결정이 부담스럽다.",
-                    },
-                ]
-            )
+            parsed = [
+                CastRosterItem(
+                    cast_id="cast-alpha",
+                    display_name="알파",
+                    role_hint="선도자",
+                    group_name="A",
+                    core_tension="먼저 움직인다.",
+                ),
+                CastRosterItem(
+                    cast_id="cast-beta",
+                    display_name="베타",
+                    role_hint="조정자",
+                    group_name="B",
+                    core_tension="즉시 결정이 부담스럽다.",
+                ),
+            ]
             assert semantic_validator(parsed) == []
             assert repair_context["exact_chunk_size"] == 2
+            assert "Return one JSON array only." in repair_context["repair_guidance"]
             meta = _FakeMeta()
             meta.parse_failure_count = 1
             return parsed, meta
@@ -385,6 +388,28 @@ def test_build_plan_cast_chunk_returns_assigned_cast_only() -> None:
     assert result["generated_plan_cast_results"][0]["chunk_index"] == 1
     assert result["generated_plan_cast_results"][0]["cast_items"][0]["slot_index"] == 1
     assert result["generated_plan_cast_results"][0]["parse_failure_count"] == 1
+
+
+def test_validate_plan_cast_chunk_semantics_rejects_unassigned_cast_ids() -> None:
+    assigned_outline = [
+        CastRosterOutlineItem(slot_index=1, cast_id="cast-alpha", display_name="알파"),
+    ]
+
+    issues = validate_plan_cast_chunk_semantics(
+        cast_roster=[
+            CastRosterItem(
+                cast_id="cast-beta",
+                display_name="베타",
+                role_hint="조정자",
+                group_name="B",
+                core_tension="즉시 결정이 부담스럽다.",
+            )
+        ],
+        assigned_outline=assigned_outline,
+    )
+
+    assert "cast chunk에 배정되지 않은 cast_id가 포함되어 있습니다: cast-beta" in issues
+    assert "cast chunk에 누락된 cast_id가 있습니다: cast-alpha" in issues
 
 
 def test_assemble_execution_plan_merges_chunk_results_in_slot_order() -> None:

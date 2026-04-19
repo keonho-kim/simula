@@ -7,7 +7,7 @@ from typing import cast
 
 from simula.domain.contracts import (
     ActionCatalog,
-    CastRoster,
+    CastRosterItem,
     CastRosterOutlineItem,
     ExecutionPlanFrameBundle,
     MajorEventPlanItem,
@@ -210,12 +210,12 @@ def validate_action_catalog_semantics(
 
 def validate_plan_cast_chunk_semantics(
     *,
-    cast_roster: CastRoster,
+    cast_roster: list[CastRosterItem],
     assigned_outline: list[CastRosterOutlineItem],
 ) -> list[str]:
     issues: list[str] = []
     expected_by_id = {item.cast_id: item.display_name for item in assigned_outline}
-    actual_items = list(cast_roster.items)
+    actual_items = list(cast_roster)
     if len(actual_items) != len(assigned_outline):
         issues.append(
             f"cast chunk는 정확히 {len(assigned_outline)}명이어야 합니다. 현재 {len(actual_items)}명입니다."
@@ -255,6 +255,7 @@ def build_plan_cast_chunk_repair_context(
         },
         "exact_chunk_size": len(assigned_outline),
         "repair_guidance": [
+            "Return one JSON array only.",
             "Return only the assigned cast ids for this chunk.",
             "Reuse each assigned display_name exactly as provided.",
             f"Return exactly {len(assigned_outline)} cast items.",

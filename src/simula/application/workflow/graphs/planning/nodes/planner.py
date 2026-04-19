@@ -71,7 +71,7 @@ from simula.application.workflow.graphs.simulation.states.state import (
 from simula.shared.io.streaming import record_simulation_log_event
 from simula.domain.contracts import (
     ActionCatalog,
-    CastRoster,
+    CastRosterItem,
     CastRosterOutlineItem,
     CoordinationFrame,
     ExecutionPlanFrameBundle,
@@ -426,10 +426,11 @@ async def build_plan_cast_chunk(
         ),
         **build_plan_cast_chunk_prompt_bundle(),
     )
-    cast_chunk, meta = await runtime.context.llms.ainvoke_object_with_meta(
+    cast_chunk, meta = await runtime.context.llms.ainvoke_simple_with_meta(
         "planner",
         prompt,
-        CastRoster,
+        list[CastRosterItem],
+        failure_policy="fixer",
         log_context=build_llm_log_context(
             scope="plan-cast-chunk",
             phase="planning",
@@ -437,7 +438,8 @@ async def build_plan_cast_chunk(
             task_label="등장 인물 chunk 정리",
             artifact_key="generated_plan_cast_results",
             artifact_label="generated_plan_cast_results",
-            schema=CastRoster,
+            contract_kind="simple",
+            output_type_name="list[CastRosterItem]",
             chunk_index=chunk_spec["chunk_index"],
         ),
         semantic_validator=lambda parsed: validate_plan_cast_chunk_semantics(
@@ -457,7 +459,7 @@ async def build_plan_cast_chunk(
                 **item.model_dump(mode="json"),
                 "slot_index": slot_map[item.cast_id],
             }
-            for item in cast_chunk.items
+            for item in cast_chunk
         ],
         "parse_failure_count": meta.parse_failure_count,
     }

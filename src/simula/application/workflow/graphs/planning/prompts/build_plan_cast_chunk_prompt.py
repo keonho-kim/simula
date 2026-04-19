@@ -19,8 +19,8 @@ Expand the assigned cast outline items into complete cast roster items for this 
 - `group_name` must be concise and scenario-grounded.
 - `role_hint` and `core_tension` must be concrete, not analytical labels.
 - Every field is required.
-- Return only the JSON object that matches the required output schema.
-- Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
+- Return only the JSON array that matches the required output schema.
+- Do not return any prose, labels, headings, markdown, or commentary outside the JSON array.
 - Do not add extra keys that are not in the output schema.
 - Do not omit any required keys from the output schema.
 - If a field is an array, return a JSON array even when it has only one item.
