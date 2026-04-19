@@ -1,6 +1,5 @@
-<p align="center">
-  <h1>Simula</h1>
-</p>
+<h1 align="center">Simula</h1>
+
 
 <p align="center">
   <img alt="Python 3.13" src="https://img.shields.io/badge/python-3.13-blue">
