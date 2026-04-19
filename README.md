@@ -1,15 +1,19 @@
-# simula
+<p align="center">
+  <h1>Simula</h1>
+</p>
+
+<p align="center">
+  <img alt="Python 3.13" src="https://img.shields.io/badge/python-3.13-blue">
+  <img alt="Package manager uv" src="https://img.shields.io/badge/package_manager-uv-4B8BBE">
+  <img alt="Runtime LangGraph" src="https://img.shields.io/badge/runtime-LangGraph-1f6feb">
+  <img alt="Architecture staged" src="https://img.shields.io/badge/architecture-staged-0f766e">
+</p>
 
 `simula` is a scenario-to-report simulation engine built on LangGraph. It takes one scenario
 file, runs a staged multi-agent simulation, and writes one inspectable run directory with the
 final Markdown report, `simulation.log.jsonl`, and derived analysis artifacts.
 
 [Documentation](./docs/README.md) · [Workflow Docs](./docs/workflows/README.md) · [Sample Scenarios](./senario.samples/README.md)
-
-![Python 3.13](https://img.shields.io/badge/python-3.13-blue)
-![Package manager uv](https://img.shields.io/badge/package_manager-uv-4B8BBE)
-![Runtime LangGraph](https://img.shields.io/badge/runtime-LangGraph-1f6feb)
-![Architecture staged](https://img.shields.io/badge/architecture-staged-0f766e)
 
 ## What It Does
 
