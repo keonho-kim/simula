@@ -43,7 +43,9 @@ def _build_cli_overrides(args: argparse.Namespace) -> dict[str, str]:
         cli_overrides["SIM_MAX_ROUNDS"] = str(max_rounds)
 
     log_level = getattr(args, "log_level", None)
-    if log_level is not None:
+    if bool(getattr(args, "debug", False)):
+        cli_overrides["SIM_LOG_LEVEL"] = "DEBUG"
+    elif log_level is not None:
         cli_overrides["SIM_LOG_LEVEL"] = str(log_level)
 
     return cli_overrides

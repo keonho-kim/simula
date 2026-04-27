@@ -174,8 +174,8 @@ def test_executor_returns_successful_run_result(
                 self._run_id = run_id
                 self.statuses: list[tuple[str, str, str | None]] = []
 
-            def next_run_id(self, *, actor_model_id: str, scenario_file_stem: str) -> str:
-                assert actor_model_id == "gpt-test"
+            def next_run_id(self, *, run_model_id: str, scenario_file_stem: str) -> str:
+                assert run_model_id == "gpt-test"
                 assert scenario_file_stem == "scenario-01"
                 return self._run_id
 
@@ -245,6 +245,181 @@ def test_executor_returns_successful_run_result(
         ]
 
 
+def test_executor_subscribes_to_graph_debug_stream_when_debug_enabled(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    captured: dict[str, object] = {}
+    run_id = "20260413.debug"
+
+    class FakeLLMService:
+        def __init__(self) -> None:
+            self.logger = logging.getLogger("simula.test.llm")
+
+        def configure_run_logging(self, *, run_id, stream_event_sink):  # noqa: ANN001
+            del run_id, stream_event_sink
+
+    class FakeApp:
+        async def astream(self, state, **kwargs):  # noqa: ANN001
+            captured["stream_mode"] = kwargs.get("stream_mode")
+            captured["subgraphs"] = kwargs.get("subgraphs")
+            yield ("values", _success_values_payload(state["run_id"]))
+
+    class FakeStore:
+        def next_run_id(self, *, run_model_id: str, scenario_file_stem: str) -> str:
+            assert run_model_id == "gpt-test"
+            assert scenario_file_stem == "scenario-01"
+            return run_id
+
+        def save_run_started(self, **kwargs):  # noqa: ANN003
+            return None
+
+        def mark_run_status(self, run_id, status, error_text=None):  # noqa: ANN001
+            del run_id, status, error_text
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        executor_module,
+        "create_app_store",
+        lambda *args, **kwargs: FakeStore(),
+    )
+    monkeypatch.setattr(
+        executor_module,
+        "build_model_router",
+        lambda settings, usage_tracker: FakeLLMService(),  # noqa: ARG005
+    )
+    monkeypatch.setattr(executor_module, "SIMULATION_WORKFLOW", FakeApp())
+
+    class _NoCheckpointer:
+        async def __aenter__(self):
+            return None
+
+        async def __aexit__(self, exc_type, exc, tb):  # noqa: ANN001
+            return None
+
+    monkeypatch.setattr(
+        executor_module,
+        "create_async_checkpointer_context",
+        lambda settings: _NoCheckpointer(),
+    )
+    monkeypatch.setattr(
+        executor_module,
+        "write_run_outputs",
+        lambda **kwargs: None,
+    )
+
+    run_logger = logging.getLogger(f"simula.workflow.run.{run_id}")
+    previous_level = run_logger.level
+    run_logger.setLevel(logging.DEBUG)
+    settings = _settings(output_dir=tmp_path / "output-debug")
+    executor = executor_module.SimulationExecutor(
+        settings,
+        scenario_controls={"num_cast": 2, "allow_additional_cast": True},
+        scenario_file_path="/tmp/Scenario 01.md",
+        scenario_file_stem="scenario-01",
+    )
+    try:
+        result = asyncio.run(executor.run_async("scenario"))
+    finally:
+        run_logger.setLevel(previous_level)
+        executor.close()
+
+    assert result.success is True
+    assert captured["stream_mode"] == ["custom", "values", "debug"]
+    assert captured["subgraphs"] is True
+
+
+def test_consume_stream_chunk_logs_graph_debug_events(caplog) -> None:
+    logger = logging.getLogger("simula.test.executor_debug")
+
+    with caplog.at_level(logging.DEBUG, logger=logger.name):
+        result = executor_module._consume_stream_chunk(
+            chunk=(
+                ("planning:abc",),
+                "debug",
+                {
+                    "step": 1,
+                    "type": "task",
+                    "payload": {
+                        "name": "build_planning_analysis",
+                        "input": {"raw": "hidden"},
+                    },
+                },
+            ),
+            final_state=None,
+            appender=None,
+            logger=logger,
+        )
+        executor_module._consume_stream_chunk(
+            chunk=(
+                ("runtime:def",),
+                "debug",
+                {
+                    "step": 3,
+                    "type": "task_result",
+                    "payload": {
+                        "name": "apply_scene_delta",
+                        "error": "boom",
+                        "result": {"raw": "hidden"},
+                    },
+                },
+            ),
+            final_state=None,
+            appender=None,
+            logger=logger,
+        )
+
+    assert result is None
+    assert any(
+        record.message
+        == "GRAPH NODE 시작 | graph=planning | node=build_planning_analysis | step=1"
+        for record in caplog.records
+    )
+    assert any(
+        record.message
+        == "GRAPH NODE 완료 | graph=runtime | node=apply_scene_delta | step=3 | status=error"
+        for record in caplog.records
+    )
+    assert "hidden" not in caplog.text
+
+
+def test_consume_stream_chunk_handles_subgraph_values_and_custom_events() -> None:
+    class FakeAppender:
+        def __init__(self) -> None:
+            self.entries: list[dict[str, object]] = []
+
+        def append(self, entry: dict[str, object]) -> None:
+            self.entries.append(entry)
+
+    appender = FakeAppender()
+    logger = logging.getLogger("simula.test.executor_debug")
+    final_state = executor_module._consume_stream_chunk(
+        chunk=(("finalization:abc",), "values", {"run_id": "run-1"}),
+        final_state=None,
+        appender=appender,  # type: ignore[arg-type]
+        logger=logger,
+    )
+    result = executor_module._consume_stream_chunk(
+        chunk=(
+            ("planning:abc",),
+            "custom",
+            {
+                "stream": "simulation_log",
+                "entry": {"event": "plan_finalized"},
+            },
+        ),
+        final_state=final_state,
+        appender=appender,  # type: ignore[arg-type]
+        logger=logger,
+    )
+
+    assert final_state == {"run_id": "run-1"}
+    assert result == {"run_id": "run-1"}
+    assert appender.entries == [{"event": "plan_finalized"}]
+
+
 def test_executor_logs_original_failure_traceback(
     monkeypatch,
     caplog,
@@ -272,8 +447,8 @@ def test_executor_logs_original_failure_traceback(
             self._run_id = "20260413.3"
             self.statuses: list[tuple[str, str, str | None]] = []
 
-        def next_run_id(self, *, actor_model_id: str, scenario_file_stem: str) -> str:
-            assert actor_model_id == "gpt-test"
+        def next_run_id(self, *, run_model_id: str, scenario_file_stem: str) -> str:
+            assert run_model_id == "gpt-test"
             assert scenario_file_stem == "scenario-01"
             return self._run_id
 

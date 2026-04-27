@@ -85,3 +85,21 @@ def test_console_formatter_marks_actor_card_as_cast() -> None:
 
     assert "[CAST]" in rendered
     assert "의도: 경영권 방어" in rendered
+
+
+def test_console_formatter_marks_graph_node_progress() -> None:
+    formatter = SimulaConsoleFormatter(use_color=False)
+    record = logging.LogRecord(
+        name="simula.workflow.run.test",
+        level=logging.DEBUG,
+        pathname=__file__,
+        lineno=1,
+        msg="GRAPH NODE 시작 | graph=planning | node=build_planning_analysis | step=1",
+        args=(),
+        exc_info=None,
+    )
+
+    rendered = formatter.format(record)
+
+    assert "[GRAPH]" in rendered
+    assert "node=build_planning_analysis" in rendered

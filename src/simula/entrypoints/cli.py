@@ -48,6 +48,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--DEBUG",
+        dest="debug",
+        action="store_true",
+        help="--log-level DEBUG와 동일하게 상세 console 로그를 켠다.",
+    )
+
+    parser.add_argument(
         "--trials",
         type=int,
         default=1,

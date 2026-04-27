@@ -81,14 +81,13 @@ Parallel behavior by area:
 | Area | Default run | `--parallel` run |
 | --- | --- | --- |
 | trials | sequential | sequential |
-| planning cast chunks | serial queue | concurrent chunk generation |
-| generation actor slots | serial queue | concurrent slot generation |
-| runtime actor proposals | serial queue | concurrent proposal generation |
-| coordinator round planning and resolution | serial staged calls | serial staged calls |
-| finalization report sections | serial section writers | concurrent section writing |
+| planning | serial bundle calls | independent bundle calls and cast chunks may run concurrently |
+| generation actor chunks | serial chunk queue | concurrent chunk generation |
+| runtime scene ticks | one `SceneDelta` call per tick | one `SceneDelta` call per tick |
+| finalization | one `FinalReportDraft` call | one `FinalReportDraft` call |
 
-The `--parallel` flag does not make every LLM call concurrent. Coordinator stages such as round
-directive building, round resolution, and continuation checks remain sequential inside each run.
+The `--parallel` flag does not make every LLM call concurrent. It only allows independent planning
+bundles and large generation chunks to run concurrently.
 
 For Korean plot labels on Ubuntu, install the recommended system packages first:
 
@@ -127,7 +126,7 @@ Use the two directories differently:
 `run_id` now follows:
 
 ```text
-YYYYMMDD.001.<actor-model-id>.<scenario-file-stem>
+YYYYMMDD.001.<run-model-id>.<scenario-file-stem>
 ```
 
 The responsibilities are split deliberately:

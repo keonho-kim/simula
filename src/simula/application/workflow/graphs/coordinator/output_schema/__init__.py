@@ -1,1 +1,0 @@
-"""Coordinator output schema helpers."""

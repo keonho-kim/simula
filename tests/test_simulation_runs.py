@@ -15,8 +15,6 @@ from __future__ import annotations
 
 import textwrap
 from pathlib import Path
-from typing import Any
-
 import simula.application.commands.simulation_runs as simulation_runs
 from simula.application.services.executor import SimulationExecutionResult
 from simula.application.services.scenario_inputs import ScenarioInput
@@ -173,9 +171,6 @@ def _write_env_file(path: Path) -> None:
             provider = "openai"
             model = "gpt-5.4-mini"
 
-            [llm.actor]
-            provider = "openai-compatible"
-            model = "qwen3:8b"
 
             [llm.observer]
             provider = "openai"

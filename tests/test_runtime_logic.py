@@ -11,7 +11,6 @@
 - simula.domain.activity.feeds
 - simula.domain.activity.actions
 - simula.domain.reporting.reports
-- simula.domain.runtime.actions
 """
 
 from __future__ import annotations
@@ -31,7 +30,6 @@ from simula.domain.reporting.reports import (
     latest_world_state_summary,
 )
 from simula.domain.event_memory import hard_stop_round
-from simula.domain.runtime.actions import apply_actor_proposals
 from simula.domain.runtime.policy import derive_rng_seed
 
 
@@ -133,77 +131,6 @@ def test_list_unseen_activities_does_not_consume_feed() -> None:
 
     assert [item["activity_id"] for item in unseen] == [activity["activity_id"]]
     assert updated["a"]["unseen_activity_ids"] == [activity["activity_id"]]
-
-
-def test_apply_actor_proposals_consumes_unseen_once_and_routes_activity() -> None:
-    actors = [
-        {"cast_id": "a", "display_name": "A"},
-        {"cast_id": "b", "display_name": "B"},
-    ]
-    feeds = initialize_activity_feeds(actors)
-    inbound_activity = create_canonical_action(
-        run_id="run-1",
-        round_index=1,
-        source_cast_id="b",
-        visibility="private",
-        target_cast_ids=["a"],
-        action_type="speech",
-        goal="a의 답을 바로 듣는다.",
-        summary="질문 action",
-        detail="답변이 바로 필요하다.",
-        utterance="답변이 필요합니다.",
-        visibility_scope=["a", "b"],
-    ).model_dump(mode="json")
-    routed_feeds = route_activity(feeds, inbound_activity)
-
-    routed = apply_actor_proposals(
-        run_id="run-1",
-        round_index=2,
-        actors=actors,
-        activity_feeds=routed_feeds,
-        activities=[inbound_activity],
-        action_catalog={
-            "actions": [
-                {
-                    "action_type": "speech",
-                    "label": "직접 발화",
-                    "description": "직접 말로 의도를 전달한다.",
-                    "supported_visibility": ["public", "private", "group"],
-                    "requires_target": True,
-                }
-            ]
-        },
-        pending_actor_proposals=[
-            {
-                "cast_id": "a",
-                "unread_activity_ids": [inbound_activity["activity_id"]],
-                "proposal": {
-                    "action_type": "speech",
-                    "goal": "b에게 답을 돌려준다.",
-                    "summary": "A가 응답 action을 한다.",
-                    "detail": "질문에 바로 반응해 답을 준다.",
-                    "utterance": "확인했습니다.",
-                    "visibility": "private",
-                    "target_cast_ids": ["b"],
-                },
-                "forced_idle": False,
-                "parse_failure_count": 0,
-                "latency_seconds": 0.01,
-            }
-        ],
-        max_targets_per_activity=2,
-    )
-
-    assert routed["activity_feeds"]["a"]["unseen_activity_ids"] == []
-    assert (
-        inbound_activity["activity_id"]
-        in routed["activity_feeds"]["a"]["seen_activity_ids"]
-    )
-    assert len(routed["latest_round_activities"]) == 1
-    assert routed["activity_feeds"]["b"]["unseen_activity_ids"] == [
-        routed["latest_round_activities"][0]["activity_id"]
-    ]
-    assert routed["activities"][0]["activity_id"] == inbound_activity["activity_id"]
 
 
 def test_hard_stop_round_applies_default_grace_buffer() -> None:

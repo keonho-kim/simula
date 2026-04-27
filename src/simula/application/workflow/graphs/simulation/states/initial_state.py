@@ -10,14 +10,8 @@ from simula.application.workflow.graphs.simulation.states.state import (
     SimulationInputState,
     SimulationWorkflowState,
 )
-from simula.application.workflow.graphs.generation.states.state import (
-    empty_cast_slot_spec,
-)
 from simula.application.workflow.graphs.planning.states.state import (
     empty_plan_cast_chunk_spec,
-)
-from simula.application.workflow.graphs.runtime.states.state import (
-    empty_actor_proposal_task,
 )
 from simula.domain.runtime.policy import derive_rng_seed
 from simula.domain.scenario.controls import ScenarioControls
@@ -67,8 +61,13 @@ def expand_input_state_to_workflow_state(
             "parallel_graph_calls": bool(input_state.get("parallel_graph_calls", False)),
             "planning_analysis": {},
             "cast_roster_outline": [],
+            "situation": {},
+            "action_catalog": {},
+            "coordination_frame": {},
+            "major_events": [],
             "execution_plan_frame": {},
             "plan": {},
+            "simulation_plan": {},
             "actors": [],
             "activity_feeds": {},
             "activities": [],
@@ -76,8 +75,6 @@ def expand_input_state_to_workflow_state(
             "observer_reports": [],
             "focus_candidates": [],
             "round_focus_history": [],
-            "selected_cast_ids": [],
-            "deferred_cast_ids": [],
             "latest_background_updates": [],
             "background_updates": [],
             "event_memory": {
@@ -89,6 +86,8 @@ def expand_input_state_to_workflow_state(
                 "endgame_gate_open": False,
             },
             "event_memory_history": [],
+            "actor_agent_states": [],
+            "agent_memory_history": [],
             "actor_intent_states": [],
             "intent_history": [],
             "round_focus_plan": {},
@@ -105,12 +104,9 @@ def expand_input_state_to_workflow_state(
             "pending_plan_cast_chunks": [],
             "plan_cast_chunk": empty_plan_cast_chunk_spec(),
             "generated_plan_cast_results": [],
-            "pending_cast_slots": [],
-            "cast_slot": empty_cast_slot_spec(),
             "generated_actor_results": [],
-            "actor_proposal_task": empty_actor_proposal_task(),
-            "pending_actor_cast_ids": [],
-            "pending_actor_proposals": [],
+            "pending_actor_roster_chunks": [],
+            "actor_roster_chunk": {"chunk_index": 0, "cast_items": []},
             "parse_failures": 0,
             "forced_idles": 0,
             "stagnation_rounds": 0,
@@ -123,6 +119,15 @@ def expand_input_state_to_workflow_state(
             "stop_requested": False,
             "stop_reason": "",
             "world_state_summary": "",
+            "current_scene_event": {},
+            "current_scene_actors": [],
+            "scene_tick_history": [],
+            "scene_candidates": [],
+            "current_scene_compact_input": {},
+            "current_scene_delta": {},
+            "current_scene_llm_meta": {},
+            "current_scene_event_id": "",
+            "scene_llm_call_count": 0,
             "final_report": {},
             "llm_usage_summary": {},
             "simulation_log_jsonl": "",

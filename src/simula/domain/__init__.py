@@ -18,9 +18,6 @@ from simula.domain.reporting import (
     render_llm_usage_lines,
 )
 from simula.domain.runtime import (
-    ActorProposalPayload,
-    apply_actor_proposals,
-    build_focus_candidates,
     build_initial_intent_snapshots,
     derive_rng_seed,
     next_stagnation_steps,
@@ -35,12 +32,9 @@ from simula.domain.scenario import (
 )
 
 __all__ = [
-    "ActorProposalPayload",
     "ScenarioControls",
     "TimeUnit",
-    "apply_actor_proposals",
     "build_final_report",
-    "build_focus_candidates",
     "build_initial_intent_snapshots",
     "build_llm_call_event",
     "build_plan_finalized_event",

@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import re
+import json
 from types import UnionType
 from typing import Any, Union, get_args, get_origin
 
@@ -69,7 +70,9 @@ def parse_simple_output(text: str, annotation: Any) -> Any:
 
     try:
         payload = extract_json_like_text(text)
-        return TypeAdapter(annotation).validate_json(payload)
+        loaded = json.loads(payload)
+        normalized = _normalize_value_for_annotation(loaded, annotation)
+        return TypeAdapter(annotation).validate_python(normalized)
     except (ValidationError, ValueError, TypeError) as exc:
         raise OutputParserException(f"simple output 파싱 실패: {exc}") from exc
 

@@ -9,7 +9,10 @@ from typing import cast
 from langgraph.runtime import Runtime
 
 from simula.application.workflow.context import WorkflowRuntimeContext
-from simula.application.workflow.graphs.finalization.nodes.build_report_projection import (
+from simula.application.workflow.graphs.finalization.utils.report_artifacts import (
+    timeline_anchor,
+)
+from simula.application.workflow.graphs.finalization.utils.report_projection import (
     build_report_projection,
 )
 from simula.application.workflow.graphs.simulation.states.state import (
@@ -27,8 +30,12 @@ def build_report_artifacts(
     """Build the final report artifacts in one code-only node."""
 
     llm_usage_summary = runtime.context.llm_usage_tracker.snapshot()
+    report_timeline_anchor = timeline_anchor(state)
     final_report = build_final_report(
-        cast(dict[str, object], state),
+        {
+            **cast(dict[str, object], state),
+            "report_timeline_anchor_json": report_timeline_anchor,
+        },
         llm_usage_summary=llm_usage_summary,
     )
     projection_update = build_report_projection(
@@ -37,6 +44,7 @@ def build_report_artifacts(
             {
                 **cast(dict[str, object], state),
                 "final_report": final_report,
+                "report_timeline_anchor_json": report_timeline_anchor,
             },
         )
     )
@@ -50,6 +58,7 @@ def build_report_artifacts(
     )
     return {
         "final_report": final_report,
+        "report_timeline_anchor_json": report_timeline_anchor,
         "report_projection_json": str(projection_update["report_projection_json"]),
         "llm_usage_summary": llm_usage_summary,
     }

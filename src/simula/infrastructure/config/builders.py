@@ -35,6 +35,13 @@ from simula.infrastructure.config.scalar_parsers import env_optional_int
 def build_settings_from_values(values: dict[str, str]) -> AppSettings:
     """원시 문자열 값을 최종 `AppSettings`로 조립한다."""
 
+    legacy_actor_keys = sorted(key for key in values if key.startswith("SIM_ACTOR_"))
+    if legacy_actor_keys:
+        raise ValueError(
+            "legacy actor LLM 설정은 더 이상 지원하지 않습니다: "
+            + ", ".join(legacy_actor_keys)
+        )
+
     if not _has_role_specific_values(values, "FIXER"):
         raise ValueError("llm.fixer 설정이 필요합니다.")
 
@@ -58,21 +65,15 @@ def build_settings_from_values(values: dict[str, str]) -> AppSettings:
         log_level=env_str(values, "SIM_LOG_LEVEL", "INFO").upper(),
         runtime=RuntimeConfig(
             max_rounds=env_int(values, "SIM_MAX_ROUNDS", 20),
-            max_actor_calls_per_step=env_int(
-                values,
-                "SIM_MAX_ACTOR_CALLS_PER_STEP",
-                6,
-            ),
-            max_focus_slices_per_step=env_int(
-                values,
-                "SIM_MAX_FOCUS_SLICES_PER_STEP",
-                3,
-            ),
             max_recipients_per_message=env_int(
                 values,
                 "SIM_MAX_RECIPIENTS_PER_MESSAGE",
                 2,
             ),
+            max_scene_actors=env_int(values, "SIM_MAX_SCENE_ACTORS", 3),
+            max_scene_candidates=env_int(values, "SIM_MAX_SCENE_CANDIDATES", 6),
+            max_scene_beats=env_int(values, "SIM_MAX_SCENE_BEATS", 3),
+            actor_roster_chunk_size=env_int(values, "SIM_ROSTER_CHUNK_SIZE", 6),
             enable_checkpointing=env_bool(
                 values,
                 "SIM_ENABLE_CHECKPOINTING",
@@ -125,12 +126,6 @@ def build_settings_from_values(values: dict[str, str]) -> AppSettings:
                 default_model="gpt-4.1-mini",
             ),
             coordinator=coordinator_model,
-            actor=build_model_config(
-                values,
-                role="ACTOR",
-                default_provider="openai-compatible",
-                default_model="qwen3:8b",
-            ),
             observer=build_model_config(
                 values,
                 role="OBSERVER",

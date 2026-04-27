@@ -108,11 +108,11 @@ def test_fixer_report_attributes_roles_and_retries() -> None:
     assert report.overall.fixer_call_count == 3
     assert report.overall.session_count == 2
     assert report.overall.retry_count == 1
-    assert report.by_role["actor"].fixer_call_count == 2
-    assert report.by_role["actor"].session_count == 1
-    assert report.by_role["actor"].retry_count == 1
+    assert report.by_role["coordinator"].fixer_call_count == 2
+    assert report.by_role["coordinator"].session_count == 1
+    assert report.by_role["coordinator"].retry_count == 1
     assert report.by_role["observer"].fixer_call_count == 1
-    assert report.sessions[0].schema_name == "ActorActionProposal"
+    assert report.sessions[0].schema_name == "SceneDelta"
     assert report.sessions[0].attempt_count == 2
 
 
@@ -148,11 +148,11 @@ def test_load_run_analysis_exposes_task_and_artifact_metadata() -> None:
     assert planner_call.schema_name == "PlanningAnalysis"
     assert planner_call.provider_structured_mode == "prompt_parse"
     assert planner_call.prompt_variant == "primary"
-    assert fixer_call.task_identifier == "fixer.json_repair.actor.actor_action_proposal"
-    assert fixer_call.target_role == "actor"
-    assert fixer_call.target_task_key == "actor_action_proposal"
-    assert fixer_call.target_artifact_key == "pending_actor_proposals"
-    assert fixer_call.fixer_schema_name == "ActorActionProposal"
+    assert fixer_call.task_identifier == "fixer.json_repair.coordinator.scene_delta"
+    assert fixer_call.target_role == "coordinator"
+    assert fixer_call.target_task_key == "scene_delta"
+    assert fixer_call.target_artifact_key == "scene_delta"
+    assert fixer_call.fixer_schema_name == "SceneDelta"
 
 
 def test_load_run_analysis_parses_planned_actions_and_round_cap() -> None:

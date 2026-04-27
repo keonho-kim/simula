@@ -10,7 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from simula.entrypoints.cli import build_parser
-from simula.entrypoints.bootstrap import run_from_cli
+from simula.entrypoints.bootstrap import _build_cli_overrides, run_from_cli
 
 
 def test_cli_parses_defaults() -> None:
@@ -22,6 +22,7 @@ def test_cli_parses_defaults() -> None:
     assert args.env is None
     assert args.max_rounds is None
     assert args.log_level is None
+    assert args.debug is False
     assert args.trials == 1
     assert args.parallel is False
 
@@ -76,6 +77,51 @@ def test_cli_parses_log_level_override() -> None:
     assert args.log_level == "DEBUG"
 
 
+def test_cli_parses_debug() -> None:
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "--scenario-file",
+            "./scenario.md",
+            "--DEBUG",
+        ]
+    )
+
+    assert args.debug is True
+
+
+def test_cli_rejects_runtime_mode() -> None:
+    parser = build_parser()
+
+    try:
+        parser.parse_args(
+            [
+                "--scenario-file",
+                "./scenario.md",
+                "--runtime-mode",
+                "local-quality",
+            ]
+        )
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("--runtime-mode must not be accepted")
+
+
+def test_cli_overrides_debug() -> None:
+    overrides = _build_cli_overrides(
+        Namespace(
+            max_rounds=5,
+            log_level="INFO",
+            debug=True,
+        )
+    )
+
+    assert overrides["SIM_MAX_ROUNDS"] == "5"
+    assert overrides["SIM_LOG_LEVEL"] == "DEBUG"
+
+
 def test_run_from_cli_renders_round_feed(monkeypatch, capsys, tmp_path: Path) -> None:
     monkeypatch.setenv("NO_COLOR", "1")
     root_logger = logging.getLogger()
@@ -98,15 +144,15 @@ def test_run_from_cli_renders_round_feed(monkeypatch, capsys, tmp_path: Path) ->
     def fake_execute_single_run(**kwargs):  # noqa: ANN003
         del kwargs
         logger = logging.getLogger("simula.workflow.run.demo")
-        logger.info("ROUND 1 시작\n후보 actor: 4명 / 전체 8명")
+        logger.info("SCENE 1 시작 | event=evt-1 | actors=ceo,cfo,investor | candidates=3")
         logger.info(
-            "ROUND 1 지시 확정\n초점: 긴급 이사회와 경영권 대립\n참여: ceo-founder, investor-partner, outside-director\n행동 제안 대기: 4명 | background 4명"
+            "SCENE 1 요청\n이벤트: Emergency Board Session\n배우: CEO, CFO, Lead Investor\n후보:\n- C1 | CEO | speech -> CFO, Lead Investor\n입력: actors=3 actions=5 recent_effects=0 event_symbol=E1"
         )
         logger.info(
-            "창업자 CEO | investor_negotiation | 비공개 | 대상 investor-partner\n의도: 경영권을 지키며 협상 주도권을 확보한다.\n연관: investor-partner\n행동: 리드 투자사와 비공개 협상을 시도한다.\n세부: 브리지 투자 조건과 경영권 방어선을 함께 제시한다.\n발언: 우리는 지분만이 아니라 방향성도 지켜야 합니다.\n소요: 12.34s | round 1"
+            "SCENE 1 결과\nbeats:\n- B1/C1 | CEO -> CFO, Lead Investor | speech\n  의도: 경영권을 지키며 협상 주도권을 확보한다.\n  행동: CEO가 투자 조건과 생존 전략을 제시한다.\n  발화: 우리는 지분만이 아니라 방향성도 지켜야 합니다.\n  반응: 투자자는 조건을 더 압박한다.\n  효과: 이사회 긴장이 상승했다.\n사건 변화: 1건\n시간: +15분"
         )
         logger.info(
-            "ROUND 1 해소\n채택: 4명 | 사건 2건 | 시간 +1일 | stop continue\n사건: 긴급 이사회 개최\n압력: 내부 구조조정 요구"
+            "SCENE 1 적용 | beats=1 | actors=ceo,cfo,investor | events=1 | time +15분 | stop continue"
         )
         return SimpleNamespace(
             run_id="run-1",
@@ -139,6 +185,7 @@ def test_run_from_cli_renders_round_feed(monkeypatch, capsys, tmp_path: Path) ->
                 env=None,
                 max_rounds=None,
                 log_level=None,
+                debug=False,
                 trials=1,
                 parallel=False,
             )
@@ -157,11 +204,11 @@ def test_run_from_cli_renders_round_feed(monkeypatch, capsys, tmp_path: Path) ->
 
     assert exit_code == 0
     assert "[RUN] 시뮬레이션 시작 | trials=1 | graph_parallel=False" in captured.err
-    assert "[ROUND] ROUND 1 시작" in captured.err
-    assert "초점: 긴급 이사회와 경영권 대립" in captured.err
-    assert "행동 제안 대기: 4명 | background 4명" in captured.err
-    assert "[CAST] 창업자 CEO | investor_negotiation | 비공개 | 대상 investor-partner" in captured.err
+    assert "[SCENE] SCENE 1 시작" in captured.err
+    assert "이벤트: Emergency Board Session" in captured.err
+    assert "C1 | CEO | speech -> CFO, Lead Investor" in captured.err
+    assert "B1/C1 | CEO -> CFO, Lead Investor | speech" in captured.err
     assert "의도: 경영권을 지키며 협상 주도권을 확보한다." in captured.err
-    assert "발언: 우리는 지분만이 아니라 방향성도 지켜야 합니다." in captured.err
-    assert "[ROUND] ROUND 1 해소" in captured.err
+    assert "발화: 우리는 지분만이 아니라 방향성도 지켜야 합니다." in captured.err
+    assert "[SCENE] SCENE 1 적용" in captured.err
     assert f"{tmp_path / 'run-1' / 'report.final.md'}" in captured.out

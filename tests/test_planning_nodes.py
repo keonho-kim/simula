@@ -11,17 +11,44 @@ from types import SimpleNamespace
 import pytest
 from langgraph.types import Overwrite
 
-from simula.application.workflow.graphs.planning.nodes.planner import (
+from simula.application.workflow.graphs.planning.nodes.assemble_execution_plan import (
     assemble_execution_plan,
+)
+from simula.application.workflow.graphs.planning.nodes.assemble_execution_plan_frame import (
+    assemble_execution_plan_frame,
+)
+from simula.application.workflow.graphs.planning.nodes.build_action_catalog import (
+    build_action_catalog,
+)
+from simula.application.workflow.graphs.planning.nodes.build_cast_roster_outline import (
     build_cast_roster_outline,
-    build_execution_plan_frame,
+)
+from simula.application.workflow.graphs.planning.nodes.build_coordination_frame import (
+    build_coordination_frame,
+)
+from simula.application.workflow.graphs.planning.nodes.build_major_events import (
+    build_major_events,
+)
+from simula.application.workflow.graphs.planning.nodes.build_plan_cast_chunk import (
     build_plan_cast_chunk,
+)
+from simula.application.workflow.graphs.planning.nodes.build_planning_analysis import (
     build_planning_analysis,
+)
+from simula.application.workflow.graphs.planning.nodes.build_situation import (
+    build_situation,
+)
+from simula.application.workflow.graphs.planning.nodes.finalize_plan import (
     finalize_plan,
+)
+from simula.application.workflow.graphs.planning.nodes.prepare_plan_cast_chunks import (
     prepare_plan_cast_chunks,
+)
+from simula.application.workflow.graphs.planning.utils.validation import (
     validate_execution_plan_frame_semantics,
 )
-from simula.application.workflow.graphs.planning.nodes.planner_validation import (
+from simula.application.workflow.graphs.planning.utils.validation import (
+    validate_major_event_plan_batch_semantics,
     validate_plan_cast_chunk_semantics,
 )
 from simula.domain.contracts import (
@@ -57,6 +84,72 @@ def _build_runtime(llms: object) -> SimpleNamespace:
             store=store,
         )
     )
+
+
+def _planning_state() -> dict[str, object]:
+    return {
+        "scenario": "등장인물 1명이 있는 테스트 시나리오",
+        "scenario_controls": {"num_cast": 1, "allow_additional_cast": False},
+        "max_rounds": 6,
+        "planned_max_rounds": 6,
+        "planning_latency_seconds": 0.0,
+        "planning_analysis": {
+            "brief_summary": "요약",
+            "premise": "전제",
+            "time_scope": {"start": "초기", "end": "종결"},
+            "key_pressures": ["압박"],
+            "progression_plan": {
+                "max_rounds": 6,
+                "allowed_elapsed_units": ["hour"],
+                "default_elapsed_unit": "hour",
+                "reason": "짧은 조율이 중심이다.",
+            },
+        },
+        "cast_roster_outline": [
+            {
+                "slot_index": 1,
+                "cast_id": "cast-alpha",
+                "display_name": "알파",
+            }
+        ],
+    }
+
+
+def _planning_frame_state() -> dict[str, object]:
+    state = _planning_state()
+    state.update(
+        {
+            "situation": {
+                "simulation_objective": "위기 추적",
+                "world_summary": "요약",
+                "initial_tensions": ["긴장"],
+                "channel_guidance": {
+                    "public": "공개",
+                    "private": "비공개",
+                    "group": "그룹",
+                },
+                "current_constraints": ["제약"],
+            },
+            "action_catalog": {
+                "actions": [
+                    {
+                        "action_type": "speech",
+                        "label": "발화",
+                        "description": "말한다.",
+                        "supported_visibility": ["public", "private", "group"],
+                        "requires_target": False,
+                    }
+                ]
+            },
+            "coordination_frame": {
+                "focus_policy": "직접 압박을 본다.",
+                "background_policy": "배경은 요약한다.",
+                "max_focus_actors": 3,
+            },
+            "major_events": [],
+        }
+    )
+    return state
 
 
 def test_build_planning_analysis_returns_required_bundle() -> None:
@@ -141,93 +234,122 @@ def test_build_cast_roster_outline_returns_required_outline() -> None:
     assert result["cast_roster_outline"][0]["cast_id"] == "cast-alpha"
 
 
-def test_build_execution_plan_frame_returns_required_frame() -> None:
+def test_build_situation_returns_required_bundle() -> None:
+    class FakeLLM:
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del prompt, kwargs
+            assert role == "planner"
+            assert schema is SituationBundle
+            return (
+                SituationBundle(
+                    simulation_objective="위기 추적",
+                    world_summary="요약",
+                    initial_tensions=["긴장"],
+                    channel_guidance={
+                        "public": "공개",
+                        "private": "비공개",
+                        "group": "그룹",
+                    },
+                    current_constraints=["제약"],
+                ),
+                _FakeMeta(),
+            )
+
+    state = _planning_state()
+
+    result = asyncio.run(build_situation(state, _build_runtime(FakeLLM())))
+
+    assert result["situation"]["simulation_objective"] == "위기 추적"
+
+
+def test_build_action_catalog_returns_required_bundle() -> None:
     class FakeLLM:
         async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
             del prompt
             assert role == "planner"
-            if schema is SituationBundle:
-                return (
-                    SituationBundle(
-                        simulation_objective="위기 추적",
-                        world_summary="요약",
-                        initial_tensions=["긴장"],
-                        channel_guidance={
-                            "public": "공개",
-                            "private": "비공개",
-                            "group": "그룹",
-                        },
-                        current_constraints=["제약"],
-                    ),
-                    _FakeMeta(),
-                )
-            if schema is ActionCatalog:
-                semantic_validator = kwargs["semantic_validator"]
-                repair_context = kwargs["repair_context"]
-                parsed = ActionCatalog(
-                    actions=[
-                        {
-                            "action_type": "speech",
-                            "label": "발화",
-                            "description": "말한다.",
-                            "supported_visibility": ["public", "private", "group"],
-                            "requires_target": False,
-                        }
-                    ]
-                )
-                assert semantic_validator(parsed) == []
-                assert repair_context["max_actions"] == 5
-                return parsed, _FakeMeta()
-            if schema is CoordinationFrame:
-                return (
-                    CoordinationFrame(
-                        focus_policy="직접 압박을 본다.",
-                        background_policy="배경은 요약한다.",
-                        max_focus_actors=3,
-                    ),
-                    _FakeMeta(),
-                )
-            raise AssertionError(f"unexpected schema: {schema}")
+            assert schema is ActionCatalog
+            assert kwargs["failure_policy"] == "fixer"
+            semantic_validator = kwargs["semantic_validator"]
+            repair_context = kwargs["repair_context"]
+            parsed = ActionCatalog(
+                actions=[
+                    {
+                        "action_type": "speech",
+                        "label": "발화",
+                        "description": "말한다.",
+                        "supported_visibility": ["public", "private", "group"],
+                        "requires_target": False,
+                    }
+                ]
+            )
+            assert semantic_validator(parsed) == []
+            assert repair_context["max_actions"] == 5
+            return parsed, _FakeMeta()
 
+    result = asyncio.run(build_action_catalog(_planning_state(), _build_runtime(FakeLLM())))
+
+    assert result["action_catalog"]["actions"][0]["requires_target"] is False
+
+
+def test_build_coordination_frame_uses_fixed_inputs() -> None:
+    class FakeLLM:
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            del kwargs
+            assert role == "planner"
+            assert schema is CoordinationFrame
+            assert '"action_type":"speech"' in prompt
+            return (
+                CoordinationFrame(
+                    focus_policy="직접 압박을 본다.",
+                    background_policy="배경은 요약한다.",
+                    max_focus_actors=3,
+                ),
+                _FakeMeta(),
+            )
+
+    result = asyncio.run(
+        build_coordination_frame(_planning_frame_state(), _build_runtime(FakeLLM()))
+    )
+
+    assert result["coordination_frame"]["max_focus_actors"] == 3
+
+
+def test_major_events_uses_valid_action_types_in_prompt_and_repair_context() -> None:
+    class FakeLLM:
         async def ainvoke_simple_with_meta(self, role, prompt, annotation, **kwargs):  # noqa: ANN001
-            del prompt
             assert role == "planner"
             assert annotation == list[MajorEventPlanItem]
             assert kwargs["failure_policy"] == "fixer"
             assert kwargs["repair_context"]["planned_max_rounds"] == 6
+            assert kwargs["repair_context"]["valid_action_types"] == ["speech"]
+            assert "Valid action types:" in prompt
+            assert '"speech"' in prompt
             semantic_validator = kwargs["semantic_validator"]
-            parsed: list[MajorEventPlanItem] = []
+            parsed = [
+                MajorEventPlanItem(
+                    event_id="evt-1",
+                    title="결정",
+                    summary="결정을 확인한다.",
+                    participant_cast_ids=["cast-alpha"],
+                    earliest_round=1,
+                    latest_round=2,
+                    completion_action_types=["speech"],
+                    completion_signals=["결정"],
+                    must_resolve=True,
+                )
+            ]
             assert semantic_validator(parsed) == []
             return parsed, _FakeMeta()
 
-    state = {
-        "scenario": "등장인물 1명이 있는 테스트 시나리오",
-        "scenario_controls": {"num_cast": 1, "allow_additional_cast": False},
-        "max_rounds": 6,
-        "planned_max_rounds": 6,
-        "planning_latency_seconds": 0.0,
-        "planning_analysis": {
-            "brief_summary": "요약",
-            "premise": "전제",
-            "time_scope": {"start": "초기", "end": "종결"},
-            "key_pressures": ["압박"],
-            "progression_plan": {
-                "max_rounds": 6,
-                "allowed_elapsed_units": ["hour"],
-                "default_elapsed_unit": "hour",
-                "reason": "짧은 조율이 중심이다.",
-            },
-        },
-        "cast_roster_outline": [
-            {
-                "slot_index": 1,
-                "cast_id": "cast-alpha",
-                "display_name": "알파",
-            }
-        ],
-    }
+    result = asyncio.run(
+        build_major_events(_planning_frame_state(), _build_runtime(FakeLLM()))
+    )
 
-    result = asyncio.run(build_execution_plan_frame(state, _build_runtime(FakeLLM())))
+    assert result["major_events"][0]["completion_action_types"] == ["speech"]
+
+
+def test_assemble_execution_plan_frame_returns_required_frame() -> None:
+    result = assemble_execution_plan_frame(_planning_frame_state(), _build_runtime(object()))
 
     assert result["execution_plan_frame"]["action_catalog"]["actions"][0]["requires_target"] is False
 
@@ -293,6 +415,48 @@ def test_validate_execution_plan_frame_semantics_accepts_compact_action_catalog(
     )
 
     assert catalog.actions[0].action_type == "board_vote"
+
+
+def test_validate_major_events_rejects_action_types_outside_catalog() -> None:
+    issues = validate_major_event_plan_batch_semantics(
+        major_event_batch=[
+            MajorEventPlanItem(
+                event_id="evt-1",
+                title="공식 발표",
+                summary="공식 발표가 필요하다.",
+                participant_cast_ids=["cast-alpha"],
+                earliest_round=1,
+                latest_round=2,
+                completion_action_types=["public_statement"],
+                completion_signals=["발표 완료"],
+                must_resolve=True,
+            )
+        ],
+        cast_roster_outline=[
+            CastRosterOutlineItem(
+                slot_index=1,
+                cast_id="cast-alpha",
+                display_name="알파",
+            )
+        ],
+        action_catalog=ActionCatalog.model_validate(
+            {
+                "actions": [
+                    {
+                        "action_type": "speech",
+                        "label": "발화",
+                        "description": "말한다.",
+                        "supported_visibility": ["public", "private", "group"],
+                        "requires_target": False,
+                    }
+                ]
+            }
+        ),
+        planned_max_rounds=6,
+    )
+
+    assert "public_statement" in issues[0]
+    assert "Allowed action_type values: speech" in issues[0]
 
 
 def test_prepare_plan_cast_chunks_groups_outline_by_fixed_size() -> None:

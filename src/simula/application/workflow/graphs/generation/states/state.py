@@ -7,14 +7,11 @@ from __future__ import annotations
 from typing import Any, TypedDict
 
 
-class CastSlotSpec(TypedDict):
-    """One actor-generation slot."""
+class ActorRosterChunkSpec(TypedDict):
+    """One bundled actor-generation chunk."""
 
-    slot_index: int
-    cast_item: dict[str, Any]
-    cast_id: str
-    display_name: str
-    group_name: str
+    chunk_index: int
+    cast_items: list[dict[str, Any]]
 
 
 class GeneratedActorResult(TypedDict):
@@ -26,15 +23,3 @@ class GeneratedActorResult(TypedDict):
     actor: dict[str, Any]
     latency_seconds: float
     parse_failure_count: int
-
-
-def empty_cast_slot_spec() -> CastSlotSpec:
-    """Return a shape-valid empty generation slot sentinel."""
-
-    return {
-        "slot_index": 0,
-        "cast_item": {},
-        "cast_id": "",
-        "display_name": "",
-        "group_name": "",
-    }

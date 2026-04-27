@@ -23,12 +23,10 @@ _TARGET_SCHEMA_PATTERN = re.compile(
 
 _SCHEMA_ROLE_MAP = {
     "PlanningAnalysis": "planner",
-    "ExecutionPlanBundle": "planner",
-    "GeneratedActorCardDraft": "generator",
-    "RoundDirective": "coordinator",
-    "RoundResolution": "coordinator",
-    "ActorActionProposal": "actor",
+    "ActorRosterBundle": "generator",
+    "SceneDelta": "coordinator",
     "TimelineAnchorDecision": "observer",
+    "FinalReportDraft": "observer",
 }
 
 

@@ -21,13 +21,14 @@ from simula.infrastructure.llm.runtime.structured_retry import (
     RetryClassification,
     build_attempt_log_context,
     build_attempt_record,
-    build_transport_prompt,
     classify_structured_error,
+    coerce_missing_field_paths,
     log_retry_classification,
     log_retry_exhausted,
     log_retry_start,
     log_retry_success,
     merge_attempt_metrics,
+    transport_prompt_text,
 )
 
 ParsedT = TypeVar("ParsedT")
@@ -195,13 +196,13 @@ async def run_contract_loop(
                 [] if attempt_index == 1 else previous_error.missing_field_paths
             ),
         )
-        candidate_prompt = build_transport_prompt(
+        candidate_prompt = transport_prompt_text(
             prompt=prompt,
             format_instructions=format_instructions,
             prompt_variant=prompt_variant,
             retry_reason=str(final_retry_context.get("retry_reason", "")),
-            missing_field_paths=list(
-                final_retry_context.get("missing_field_paths", [])
+            missing_field_paths=coerce_missing_field_paths(
+                final_retry_context.get("missing_field_paths")
             ),
         )
         if attempt_index > 1:

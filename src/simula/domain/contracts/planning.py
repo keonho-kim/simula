@@ -208,21 +208,3 @@ class ExecutionPlanFrameBundle(BaseModel):
             raise ValueError("major_events must contain at most 6 items.")
         return self
 
-
-class ExecutionPlanBundle(BaseModel):
-    """Single execution-plan bundle."""
-
-    situation: SituationBundle
-    action_catalog: ActionCatalog
-    coordination_frame: CoordinationFrame
-    cast_roster: CastRoster
-    major_events: list[MajorEventPlanItem]
-
-    @model_validator(mode="after")
-    def validate_execution_plan_bundle(self) -> "ExecutionPlanBundle":
-        event_ids = [item.event_id for item in self.major_events]
-        if len(event_ids) != len(set(event_ids)):
-            raise ValueError("major_events must use unique event_id values.")
-        if len(self.major_events) > 6:
-            raise ValueError("major_events must contain at most 6 items.")
-        return self

@@ -45,7 +45,7 @@ def test_write_run_outputs_writes_expected_artifacts(tmp_path, monkeypatch) -> N
         run_id=run_id,
         scenario_file_path="/tmp/Demo 01.md",
         scenario_file_stem="demo-01",
-        actor_model_id="qwen3-8b",
+        run_model_id="qwen3-8b",
         started_at=datetime(2026, 4, 18, 10, 0, 0),
         ended_at=datetime(2026, 4, 18, 10, 5, 0),
         wall_clock_seconds=300.0,
@@ -72,7 +72,7 @@ def test_write_run_outputs_writes_expected_artifacts(tmp_path, monkeypatch) -> N
     assert manifest["status"] == "completed"
     assert manifest["scenario_file"] == "/tmp/Demo 01.md"
     assert manifest["scenario_file_stem"] == "demo-01"
-    assert manifest["actor_model_id"] == "qwen3-8b"
+    assert manifest["run_model_id"] == "qwen3-8b"
     assert manifest["analysis"]["llm_call_count"] == 5
     assert "summary.overview.md" in manifest["artifact_paths"]
     assert "data/network.summary.json" in manifest["artifact_paths"]
@@ -121,7 +121,7 @@ def test_write_run_outputs_writes_failure_manifest(tmp_path) -> None:
         run_id=run_id,
         scenario_file_path="/tmp/Demo 01.md",
         scenario_file_stem="demo-01",
-        actor_model_id="qwen3-8b",
+        run_model_id="qwen3-8b",
         started_at=datetime(2026, 4, 18, 10, 0, 0),
         ended_at=datetime(2026, 4, 18, 10, 1, 0),
         wall_clock_seconds=60.0,

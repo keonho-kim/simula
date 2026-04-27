@@ -7,11 +7,10 @@ workflow, and configuration decides which provider and model back that role.
 
 | Role | Responsibility |
 | --- | --- |
-| `planner` | scenario analysis and plan creation |
-| `generator` | actor card generation |
-| `coordinator` | round planning, continuation checks, and round resolution |
-| `actor` | one actor action proposal |
-| `observer` | timeline anchoring and final report sections |
+| `planner` | split planning bundle generation |
+| `generator` | bundled actor-card generation |
+| `coordinator` | scene tick delta selection |
+| `observer` | one-shot final report draft |
 | `fixer` | JSON repair for malformed structured responses |
 
 ## Provider Support
@@ -30,11 +29,10 @@ Provider and model settings are described in [`configuration.md`](./configuratio
 
 Model calls use compact, stage-specific inputs.
 
-- Planning receives the scenario text plus planning context.
-- Generation receives one planned cast item plus the context needed to turn it into an actor card.
-- Runtime coordinator calls receive round state, event state, and recent summaries.
-- Runtime actor calls receive one actor card plus the current round context.
-- Finalization receives the completed run state and report inputs.
+- Planning uses several small structured calls for analysis, cast outline, situation, action catalog, coordination frame, major events, and cast chunks.
+- Generation receives compact plan context plus one cast chunk and returns an `ActorRosterBundle`.
+- Runtime coordinator calls receive one selected event, scene actors, candidates, and recent effects.
+- Finalization receives the completed run projection once and returns a `FinalReportDraft`.
 
 The goal is simple: each stage gets the information it needs without carrying the entire workflow
 state into every call.
@@ -59,8 +57,8 @@ an explicit default value when that stage defines one.
 Different stages use different policies, but the rules are consistent:
 
 - planning and generation fail when their required structured outputs cannot be recovered
-- selected runtime stages can use explicit defaults
-- final report sections use text validators and a bounded retry
+- runtime scene ticks can use explicit defaults
+- final report drafting is one structured call validated in code
 - repair stays visible through logs and analysis artifacts
 
 The system prefers explicit failure or explicit defaults over silent degradation.

@@ -156,9 +156,11 @@ class RuntimeConfig(BaseModel):
     """핵심 루프 실행 한계를 정의한다."""
 
     max_rounds: int = Field(default=20, ge=1)
-    max_actor_calls_per_step: int = Field(default=6, ge=1)
-    max_focus_slices_per_step: int = Field(default=3, ge=1)
     max_recipients_per_message: int = 2
+    max_scene_actors: int = Field(default=3, ge=1)
+    max_scene_candidates: int = Field(default=6, ge=1)
+    max_scene_beats: int = Field(default=3, ge=1)
+    actor_roster_chunk_size: int = Field(default=6, ge=1)
     enable_checkpointing: bool = False
     rng_seed: int | None = None
 
@@ -201,7 +203,6 @@ class ModelRouterConfig(BaseModel):
     planner: ModelConfig
     generator: ModelConfig
     coordinator: ModelConfig
-    actor: ModelConfig
     observer: ModelConfig
     fixer: ModelConfig
 
@@ -222,7 +223,6 @@ class AppSettings(BaseModel):
             "planner",
             "generator",
             "coordinator",
-            "actor",
             "observer",
             "fixer",
         ):

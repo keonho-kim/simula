@@ -1,7 +1,6 @@
 # Planning Workflow
 
-Planning turns raw scenario text plus scenario controls into one compact execution plan that later
-stages can reuse without reopening the full scenario every time.
+Planning turns raw scenario text plus scenario controls into one compact execution plan.
 
 ## Active Path
 
@@ -9,90 +8,50 @@ stages can reuse without reopening the full scenario every time.
 flowchart LR
     Start([START]) --> Analysis["build_planning_analysis"]
     Analysis --> Outline["build_cast_roster_outline"]
-    Outline --> Frame["build_execution_plan_frame"]
-    Frame --> Chunks["plan cast chunk expansion"]
-    Chunks --> Assemble["assemble_execution_plan"]
+    Outline --> Situation["build_situation"]
+    Situation --> Catalog["build_action_catalog"]
+    Catalog --> Coordination["build_coordination_frame"]
+    Coordination --> Events["build_major_events"]
+    Events --> Frame["assemble_execution_plan_frame"]
+    Frame --> Chunks["prepare_plan_cast_chunks"]
+    Chunks --> Cast["build_plan_cast_chunk"]
+    Cast --> Assemble["assemble_execution_plan"]
     Assemble --> Finalize["finalize_plan"]
     Finalize --> End([END])
 ```
 
 ## Stage Responsibilities
 
-### `build_planning_analysis`
+### Field bundle nodes
 
-Builds the planning summary:
+Planning is split into small structured calls:
 
-- `brief_summary`
-- `premise`
-- `time_scope`
-- `key_pressures`
-- `progression_plan`
+- `build_planning_analysis` sets the premise, timing policy, and `planned_max_rounds`.
+- `build_cast_roster_outline` fixes stable cast ids and display names.
+- `build_situation` and `build_action_catalog` create independent plan inputs.
+- `build_coordination_frame` uses the fixed situation, cast outline, and action catalog.
+- `build_major_events` uses only action types from the fixed action catalog.
+- `build_plan_cast_chunk` expands cast outline chunks into full cast roster entries.
 
-It also sets `planned_max_rounds` from `planning_analysis.progression_plan.max_rounds`.
-
-### `build_cast_roster_outline`
-
-Builds the minimal cast outline used by the rest of planning.
-
-### `build_execution_plan_frame`
-
-Builds the shared planning frame from:
-
-- raw scenario text
-- the planning analysis JSON
-- the configured round cap
-- `scenario_controls.num_cast`
-- `scenario_controls.allow_additional_cast`
-
-The frame contributes:
-
-- `situation`
-- `action_catalog`
-- `coordination_frame`
-- `major_events`
-
-These bundles stay deliberately compact:
-
-- `action_catalog` stores only broad action options with `action_type`, `label`,
-  `description`, `supported_visibility`, and `requires_target`
-- `coordination_frame` stores only `focus_policy`, `background_policy`, and
-  `max_focus_actors`
-- `major_events` stores compact checkpoints with `must_resolve` instead of older
-  scenario-specific completion flags
-
-`major_events` may be empty when the scenario does not imply a shared event track worth carrying
-through runtime.
-
-### `plan cast chunk expansion`
-
-Expands the cast outline into full cast-roster items, one chunk at a time in serial mode or
-concurrently when `--parallel` is enabled.
-
-### `assemble_execution_plan`
-
-Merges the execution-plan frame and generated cast chunks into the final plan payload.
+The parallel graph may run independent bundle nodes concurrently after their inputs are fixed.
 
 ### `finalize_plan`
 
-Validates the final plan and saves it before runtime starts.
+Validates and saves the plan before generation starts.
 
 Current validation includes:
 
 - unique `cast_id`
 - unique `display_name`
 - cast roster count matches `scenario_controls`
-- each major event has a non-empty unique `event_id`
-- each major event round window stays within `planned_max_rounds`
-- each major event participant id exists in the cast roster
-
-After validation, the node:
-
-- saves the plan through the store
-- writes a `plan_finalized` runtime log event
+- major-event ids are unique and non-empty
+- major-event round windows stay within `planned_max_rounds`
+- major-event participant ids exist in the cast roster
+- major-event completion action types exist in the action catalog
 
 ## Stage Output
 
-The final `plan` stored in workflow state contains:
+The final `plan` contains:
 
 - `interpretation`
 - `situation`
@@ -102,18 +61,6 @@ The final `plan` stored in workflow state contains:
 - `cast_roster`
 - `major_events`
 
-Inside `interpretation`, the planning summary remains compact:
-
-- `brief_summary`
-- `premise`
-- `time_scope`
-- `key_pressures`
-
-Important distinctions:
-
-- `planned_max_rounds` is the planner-recommended target
-- `max_rounds` is the configured hard ceiling from runtime settings
-
 ## Failure Behavior
 
-Planning fails if the required plan structure cannot be produced or validated.
+Planning fails if any required bundle cannot be parsed, repaired, or validated.

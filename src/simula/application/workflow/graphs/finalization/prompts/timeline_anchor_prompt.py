@@ -10,60 +10,58 @@
 
 from __future__ import annotations
 
-import textwrap
+from textwrap import dedent
 
 from langchain_core.prompts import PromptTemplate
 from simula.shared.prompts.user_facing_language import build_user_facing_style_block
 
 _USER_FACING_STYLE = build_user_facing_style_block()
 
-_PROMPT = (
-    textwrap.dedent(
-        """
-    # Role
-    You are the final observer for this simulation.
-    Your task is to determine one absolute starting timestamp for the final report timeline.
+TIMELINE_ANCHOR_DECISION_EXAMPLE: dict[str, object] = {
+    "anchor_iso": "<one absolute timestamp in YYYY-MM-DDTHH:MM:SS format>",
+    "reason": "<1 short Korean sentence explaining which clues were used>",
+}
 
-    # Input
-    - scenario text:
-    {scenario_text}
-    - extracted date hint:
-    {date_hint}
-    - extracted time hint:
-    {time_hint}
-    - extracted context hint:
-    {context_hint}
-    - total simulated elapsed label:
-    {elapsed_simulation_label}
-    - max rounds:
-    {max_rounds}
+_PROMPT = dedent("""# Role
+You are the final observer for this simulation.
+Your task is to determine one absolute starting timestamp for the final report timeline.
 
-    # Output Format
-    - Return format: {output_format_name}
-    {format_rules}
+# Input
+- scenario text:
+{scenario_text}
+- extracted date hint:
+{date_hint}
+- extracted time hint:
+{time_hint}
+- extracted context hint:
+{context_hint}
+- total simulated elapsed label:
+{elapsed_simulation_label}
+- max rounds:
+{max_rounds}
 
-    # Shape Guide
-    {output_example}
+# Output Format
+- Return format: {output_format_name}
+{format_rules}
 
-    # Instructions
-    - Write all natural-language values in Korean.
-    - Keep identifiers, field names, and enum values in the required schema format.
-    - Return only the JSON object that matches the required output schema.
-    - Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
-    - Do not add extra keys that are not in the output schema.
-    - Do not omit any required keys from the output schema.
-    - If a field is a string, return a JSON string and never wrap it in an array.
-    - If a field is an array, return a JSON array even when it has only one item.
-    - Do not exceed the per-field sentence or item limits shown in the shape guide.
-    - `anchor_iso` must be one absolute timestamp in `YYYY-MM-DDTHH:MM:SS` format.
-    - Preserve any explicit date or time information found in the scenario whenever possible.
-    - If the scenario gives only partial time information, fill the missing parts with the most plausible value from the scenario context.
-    - If the scenario gives no absolute date or time, choose one internally consistent anchor that makes the report timeline readable.
-    - `reason` should briefly explain which clues you used.
-    """
-    ).strip()
-    + "\n"
-    + _USER_FACING_STYLE
-)
+# Shape Guide
+{output_example}
+
+# Instructions
+- Write all natural-language values in Korean.
+- Keep identifiers, field names, and enum values in the required schema format.
+- Return only the JSON object that matches the required output schema.
+- Do not return any prose, labels, headings, markdown, or commentary outside the JSON object.
+- Do not add extra keys that are not in the output schema.
+- Do not omit any required keys from the output schema.
+- If a field is a string, return a JSON string and never wrap it in an array.
+- If a field is an array, return a JSON array even when it has only one item.
+- Do not exceed the per-field sentence or item limits shown in the shape guide.
+- `anchor_iso` must be one absolute timestamp in `YYYY-MM-DDTHH:MM:SS` format.
+- Preserve any explicit date or time information found in the scenario whenever possible.
+- If the scenario gives only partial time information, fill the missing parts with the most plausible value from the scenario context.
+- If the scenario gives no absolute date or time, choose one internally consistent anchor that makes the report timeline readable.
+- `reason` should briefly explain which clues you used.
+""".strip()) + "\n" + _USER_FACING_STYLE
 
 PROMPT = PromptTemplate.from_template(_PROMPT)

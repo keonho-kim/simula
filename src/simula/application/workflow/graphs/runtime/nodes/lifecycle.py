@@ -10,10 +10,15 @@
 
 from __future__ import annotations
 
-from langgraph.types import Overwrite
+from langgraph.runtime import Runtime
 
-from simula.application.workflow.graphs.runtime.states.state import (
-    empty_actor_proposal_task,
+from simula.application.workflow.context import WorkflowRuntimeContext
+from simula.application.workflow.graphs.runtime.utils.agent_state import (
+    build_initial_actor_agent_states,
+)
+from simula.application.workflow.graphs.runtime.utils.planning import (
+    build_runtime_major_events,
+    build_simulation_plan,
 )
 from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
@@ -26,36 +31,76 @@ from simula.domain.runtime.policy import (
 )
 
 
-def initialize_runtime_state(state: SimulationWorkflowState) -> dict[str, object]:
+def initialize_runtime_state(
+    state: SimulationWorkflowState,
+    runtime: Runtime[WorkflowRuntimeContext] | None = None,
+) -> dict[str, object]:
     """planner/generation 이후 시간 단계 실행 상태를 초기화한다."""
 
+    plan = dict(state.get("plan", {}))
+    actors = list(state["actors"])
+    max_recipients = (
+        runtime.context.settings.runtime.max_recipients_per_message
+        if runtime is not None
+        else 2
+    )
+    max_scene_actors = (
+        runtime.context.settings.runtime.max_scene_actors
+        if runtime is not None
+        else 3
+    )
+    max_scene_candidates = (
+        runtime.context.settings.runtime.max_scene_candidates
+        if runtime is not None
+        else 6
+    )
+    max_scene_beats = (
+        runtime.context.settings.runtime.max_scene_beats
+        if runtime is not None
+        else 3
+    )
+    simulation_plan = build_simulation_plan(
+        plan=plan,
+        actors=actors,
+        max_rounds=int(state.get("max_rounds", 20)),
+        max_recipients_per_message=max_recipients,
+        max_scene_actors=max_scene_actors,
+        max_scene_candidates=max_scene_candidates,
+        max_scene_beats=max_scene_beats,
+    )
+    major_events = build_runtime_major_events(
+        plan=plan,
+        actors=actors,
+        max_rounds=int(state.get("max_rounds", 20)),
+    )
     initial_digest = build_initial_actor_facing_scenario_digest(
-        dict(state.get("plan", {}))
+        plan
     )
     initial_event_memory = build_event_memory(
-        list(dict(state.get("plan", {})).get("major_events", []))
+        major_events
     )
     return {
         "activity_feeds": initialize_activity_feeds(state["actors"]),
         "activities": [],
         "latest_round_activities": [],
+        "simulation_plan": simulation_plan.model_dump(mode="json"),
         "observer_reports": [],
         "focus_candidates": [],
         "round_focus_plan": {},
         "round_focus_history": [],
-        "selected_cast_ids": [],
-        "deferred_cast_ids": [],
         "latest_background_updates": [],
         "background_updates": [],
         "event_memory": initial_event_memory,
         "event_memory_history": [],
+        "actor_agent_states": build_initial_actor_agent_states(
+            actors=actors,
+            simulation_plan=simulation_plan,
+        ),
+        "agent_memory_history": [],
         "actor_intent_states": build_initial_intent_snapshots(list(state["actors"])),
         "intent_history": [],
         "time_advance": {},
         "actor_facing_scenario_digest": initial_digest,
-        "pending_actor_cast_ids": [],
-        "pending_actor_proposals": Overwrite(value=[]),
-        "actor_proposal_task": empty_actor_proposal_task(),
         "round_index": 0,
         "stop_requested": False,
         "stop_reason": "",
@@ -67,20 +112,13 @@ def initialize_runtime_state(state: SimulationWorkflowState) -> dict[str, object
         "world_state_summary": str(
             initial_digest.get("world_state_summary", "")
         ),
+        "current_scene_event": {},
+        "current_scene_actors": [],
+        "scene_tick_history": [],
+        "scene_candidates": [],
+        "current_scene_compact_input": {},
+        "current_scene_delta": {},
+        "current_scene_llm_meta": {},
+        "current_scene_event_id": "",
+        "scene_llm_call_count": 0,
     }
-
-
-def route_after_continuation_check(state: SimulationWorkflowState) -> str:
-    """앞단 continuation 판단 이후 다음 단계를 선택한다."""
-
-    return "complete" if state.get("stop_requested") else "prepare_round"
-
-
-def route_after_resolution(state: SimulationWorkflowState) -> str:
-    """round 해소 이후 runtime 종료 또는 continuation check로 분기한다."""
-
-    return (
-        "complete"
-        if state.get("stop_reason") == "simulation_done"
-        else "continuation_check"
-    )

@@ -15,18 +15,12 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 
 import pytest
 
 from simula.shared.logging.llm import build_llm_log_context
-from simula.application.workflow.graphs.runtime.proposal_contract import (
-    build_actor_proposal_repair_context,
-    validate_actor_action_proposal_semantics,
-)
 from simula.domain.contracts import (
-    ActorActionProposal,
     MajorEventPlanItem,
     ScenarioTimeScope,
 )
@@ -148,13 +142,11 @@ def _build_router(
         planner_config=planner_config or _config(),
         generator_config=_config(),
         coordinator_config=_config(),
-        actor_config=_config(),
         observer_config=_config(),
         fixer_config=_config(provider="openai"),
         planner=model,  # type: ignore[arg-type]
         generator=model,  # type: ignore[arg-type]
         coordinator=model,  # type: ignore[arg-type]
-        actor=model,  # type: ignore[arg-type]
         observer=model,  # type: ignore[arg-type]
         fixer=fixer_model or model,  # type: ignore[arg-type]
         usage_tracker=LLMUsageTracker(),
@@ -403,97 +395,6 @@ async def test_default_failure_policy_skips_fixer() -> None:
     assert meta.forced_default is True
     assert meta.fixer_used is False
     assert fixer_model.astream_called is False
-
-
-@pytest.mark.anyio
-async def test_service_passes_actor_target_guidance_to_fixer_prompt() -> None:
-    raw_actor_response = json.dumps(
-        {
-            "action_type": "initial_reaction",
-            "goal": "제품의 마케팅 문구보다 성분표 수치를 먼저 확인한다.",
-            "summary": "성분표를 살피며 혼잣말한다.",
-            "detail": "당류와 대체 감미료 정보를 확인한다.",
-            "utterance": "수치부터 확인해봐야겠어.",
-            "visibility": "private",
-            "target_cast_ids": ["seo_yeon"],
-        },
-        ensure_ascii=False,
-        separators=(",", ":"),
-    )
-    fixed_actor_response = json.dumps(
-        {
-            "action_type": "initial_reaction",
-            "goal": "제품의 마케팅 문구보다 성분표 수치를 먼저 확인한다.",
-            "summary": "성분표를 살피며 혼잣말한다.",
-            "detail": "당류와 대체 감미료 정보를 확인한다.",
-            "utterance": "",
-            "visibility": "private",
-            "target_cast_ids": [],
-        },
-        ensure_ascii=False,
-        separators=(",", ":"),
-    )
-    model = FakeModel(raw_actor_response)
-    fixer_model = FakeModel(fixed_actor_response)
-    service = _build_service(model, fixer_model=fixer_model)
-
-    result, meta = await service.ainvoke_object_with_meta(
-        "actor",
-        "prompt",
-        ActorActionProposal,
-        log_context=build_llm_log_context(
-            scope="actor-turn",
-            phase="runtime",
-            task_key="actor_action_proposal",
-            task_label="행동 제안",
-            artifact_key="pending_actor_proposals",
-            artifact_label="pending_actor_proposals",
-            schema=ActorActionProposal,
-            cast_id="seo_yeon",
-            actor_display_name="서연",
-        ),
-        semantic_validator=lambda parsed: validate_actor_action_proposal_semantics(
-            proposal=parsed,
-            cast_id="seo_yeon",
-            available_actions=[
-                {
-                    "action_type": "initial_reaction",
-                    "supported_visibility": ["public", "private"],
-                    "requires_target": False,
-                }
-            ],
-            valid_target_cast_ids=[],
-            visible_actors=[],
-            goal_snapshot={},
-            max_target_count=1,
-        ),
-        repair_context=build_actor_proposal_repair_context(
-            cast_id="seo_yeon",
-            actor_display_name="서연",
-            available_actions=[
-                {
-                    "action_type": "initial_reaction",
-                    "supported_visibility": ["public", "private"],
-                    "requires_target": False,
-                }
-            ],
-            valid_target_cast_ids=[],
-            visible_actors=[],
-            goal_target_cast_ids=[],
-            recent_visible_actions=[],
-            max_target_count=1,
-        ),
-    )
-
-    assert result.visibility == "private"
-    assert result.target_cast_ids == []
-    assert meta.forced_default is False
-    assert meta.parse_failure_count == 1
-    assert fixer_model.astream_called is True
-    assert service.router.usage_tracker.snapshot()["calls_by_task"] == {
-        "actor.actor_action_proposal": 1,
-        "fixer.json_repair.actor.actor_action_proposal": 1,
-    }
 
 
 @pytest.mark.anyio

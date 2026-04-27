@@ -7,16 +7,12 @@ from __future__ import annotations
 from typing import Annotated, Any, TypedDict
 
 from simula.application.workflow.graphs.generation.states.state import (
-    CastSlotSpec,
+    ActorRosterChunkSpec,
     GeneratedActorResult,
 )
 from simula.application.workflow.graphs.planning.states.state import (
     GeneratedPlanCastResult,
     PlanCastChunkSpec,
-)
-from simula.application.workflow.graphs.runtime.states.state import (
-    ActorProposalResult,
-    ActorProposalTask,
 )
 from simula.application.workflow.reducer.collections import extend_list, extend_str_list
 from simula.domain.contracts import StopReason
@@ -59,8 +55,13 @@ class SimulationWorkflowState(TypedDict):
     parallel_graph_calls: bool
     planning_analysis: dict[str, Any]
     cast_roster_outline: list[dict[str, Any]]
+    situation: dict[str, Any]
+    action_catalog: dict[str, Any]
+    coordination_frame: dict[str, Any]
+    major_events: list[dict[str, Any]]
     execution_plan_frame: dict[str, Any]
     plan: dict[str, Any]
+    simulation_plan: dict[str, Any]
     actors: list[dict[str, Any]]
     activity_feeds: dict[str, dict[str, Any]]
     activities: list[dict[str, Any]]
@@ -68,12 +69,12 @@ class SimulationWorkflowState(TypedDict):
     observer_reports: list[dict[str, Any]]
     focus_candidates: list[dict[str, Any]]
     round_focus_history: list[dict[str, Any]]
-    selected_cast_ids: list[str]
-    deferred_cast_ids: list[str]
     latest_background_updates: list[dict[str, Any]]
     background_updates: list[dict[str, Any]]
     event_memory: dict[str, Any]
     event_memory_history: list[dict[str, Any]]
+    actor_agent_states: list[dict[str, Any]]
+    agent_memory_history: list[dict[str, Any]]
     actor_intent_states: list[dict[str, Any]]
     intent_history: list[dict[str, Any]]
     round_focus_plan: dict[str, Any]
@@ -84,12 +85,9 @@ class SimulationWorkflowState(TypedDict):
     pending_plan_cast_chunks: list[PlanCastChunkSpec]
     plan_cast_chunk: PlanCastChunkSpec
     generated_plan_cast_results: Annotated[list[GeneratedPlanCastResult], extend_list]
-    pending_cast_slots: list[CastSlotSpec]
-    cast_slot: CastSlotSpec
     generated_actor_results: Annotated[list[GeneratedActorResult], extend_list]
-    actor_proposal_task: ActorProposalTask
-    pending_actor_cast_ids: list[str]
-    pending_actor_proposals: Annotated[list[ActorProposalResult], extend_list]
+    pending_actor_roster_chunks: list[ActorRosterChunkSpec]
+    actor_roster_chunk: ActorRosterChunkSpec
     parse_failures: int
     forced_idles: int
     stagnation_rounds: int
@@ -102,6 +100,15 @@ class SimulationWorkflowState(TypedDict):
     stop_requested: bool
     stop_reason: StopReason
     world_state_summary: str
+    current_scene_event: dict[str, Any]
+    current_scene_actors: list[dict[str, Any]]
+    scene_tick_history: list[dict[str, Any]]
+    scene_candidates: list[dict[str, Any]]
+    current_scene_compact_input: dict[str, Any]
+    current_scene_delta: dict[str, Any]
+    current_scene_llm_meta: dict[str, Any]
+    current_scene_event_id: str
+    scene_llm_call_count: int
     final_report: dict[str, Any]
     llm_usage_summary: dict[str, Any]
     simulation_log_jsonl: str

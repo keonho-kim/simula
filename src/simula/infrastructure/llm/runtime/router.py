@@ -76,13 +76,11 @@ class StructuredLLMRouter:
     planner_config: ModelConfig
     generator_config: ModelConfig
     coordinator_config: ModelConfig
-    actor_config: ModelConfig
     observer_config: ModelConfig
     fixer_config: ModelConfig
     planner: BaseChatModel
     generator: BaseChatModel
     coordinator: BaseChatModel
-    actor: BaseChatModel
     observer: BaseChatModel
     fixer: BaseChatModel
     usage_tracker: LLMUsageTracker
@@ -726,7 +724,7 @@ class StructuredLLMRouter:
     ) -> None:
         """Keep successful LLM calls out of INFO unless they are slow enough to surface."""
 
-        if role != "actor" and duration_seconds >= _SLOW_CALL_INFO_THRESHOLD_SECONDS:
+        if duration_seconds >= _SLOW_CALL_INFO_THRESHOLD_SECONDS:
             self.logger.info("%s | %s", title, summary)
             return
         self.logger.debug("%s | %s", title, summary)
@@ -744,13 +742,11 @@ def build_raw_model_router(
         planner_config=settings.models.planner,
         generator_config=settings.models.generator,
         coordinator_config=settings.models.coordinator,
-        actor_config=settings.models.actor,
         observer_config=settings.models.observer,
         fixer_config=settings.models.fixer,
         planner=build_provider_chat_model(settings.models.planner),
         generator=build_provider_chat_model(settings.models.generator),
         coordinator=build_provider_chat_model(settings.models.coordinator),
-        actor=build_provider_chat_model(settings.models.actor),
         observer=build_provider_chat_model(settings.models.observer),
         fixer=build_provider_chat_model(settings.models.fixer),
         usage_tracker=usage_tracker,

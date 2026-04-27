@@ -23,18 +23,17 @@ from pydantic import BaseModel
 from simula.domain.contracts import (
     ActionCatalog,
     ActorFacingScenarioDigest,
-    ActorActionProposal,
     ActorCard,
+    ActorRosterBundle,
     CastRoster,
     CoordinationFrame,
+    FinalReportDraft,
     ObserverReport,
-    ExecutionPlanBundle,
     PlanningAnalysis,
     RuntimeProgressionPlan,
     ScenarioTimeScope,
+    SceneDelta,
     SimulationClockSnapshot,
-    RoundDirective,
-    RoundResolution,
     RoundTimeAdvanceProposal,
     SituationBundle,
 )
@@ -102,12 +101,6 @@ def render_object_response(
             model=parsed,
         )
 
-    if isinstance(parsed, ExecutionPlanBundle):
-        return _render_model_block(
-            subject="planner | 실행 계획",
-            model=parsed,
-        )
-
     if isinstance(parsed, CoordinationFrame):
         return _render_model_block(
             subject="planner | 상황 조율 기준",
@@ -132,16 +125,9 @@ def render_object_response(
             model=parsed,
         )
 
-    if isinstance(parsed, RoundDirective):
+    if isinstance(parsed, ActorRosterBundle):
         return _render_model_block(
-            subject="coordinator | ROUND 가이드 ",
-            model=parsed,
-        )
-
-    if isinstance(parsed, ActorActionProposal):
-        actor_name = _actor_name(log_context)
-        return _render_model_block(
-            subject=f"{actor_name} | 행동 제안",
+            subject="generator | ACTOR ROSTER BUNDLE DEBUG",
             model=parsed,
         )
 
@@ -160,9 +146,15 @@ def render_object_response(
             body=_render_mapping(payload),
         )
 
-    if isinstance(parsed, RoundResolution):
+    if isinstance(parsed, SceneDelta):
         return _render_model_block(
-            subject="coordinator | ROUND 결과",
+            subject="coordinator | SCENE DELTA DEBUG",
+            model=parsed,
+        )
+
+    if isinstance(parsed, FinalReportDraft):
+        return _render_model_block(
+            subject="observer | FINAL REPORT DRAFT DEBUG",
             model=parsed,
         )
 

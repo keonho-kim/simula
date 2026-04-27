@@ -71,7 +71,7 @@ def initial_retry_context(
     )
 
 
-def build_transport_prompt(
+def transport_prompt_text(
     *,
     prompt: str,
     format_instructions: str,
@@ -94,6 +94,14 @@ def build_transport_prompt(
             "Missing required fields: " + ", ".join(missing_field_paths) + "."
         )
     return "\n".join(lines)
+
+
+def coerce_missing_field_paths(value: object) -> list[str]:
+    """Return retry missing-field paths from a loosely typed log context value."""
+
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item).strip()]
 
 
 def build_attempt_log_context(

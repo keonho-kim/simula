@@ -15,6 +15,8 @@ _BOLD = "\033[1m"
 _STAGE_COLORS = {
     "RUN": "\033[38;5;81m",
     "SIM": "\033[38;5;117m",
+    "GRAPH": "\033[38;5;153m",
+    "SCENE": "\033[38;5;111m",
     "ROUND": "\033[38;5;45m",
     "CAST": "\033[38;5;151m",
     "LLM": "\033[38;5;214m",
@@ -89,6 +91,10 @@ def _stage_label(logger_name: str, message: str) -> str:
     stripped = message.lstrip()
     if logger_name.startswith("simula.llm"):
         return "LLM"
+    if stripped.startswith("GRAPH NODE "):
+        return "GRAPH"
+    if stripped.startswith("SCENE "):
+        return "SCENE"
     if stripped.startswith("ROUND "):
         return "ROUND"
     if (

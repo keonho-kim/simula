@@ -46,13 +46,14 @@ from simula.application.workflow.graphs.simulation.states.state import (
     SimulationWorkflowState,
 )
 
+
 def _build_simulation_workflow_graph(
     *,
     planning_subgraph: Any,
     generation_subgraph: Any,
     runtime_subgraph: Any,
     finalization_subgraph: Any,
-) -> StateGraph:
+) -> StateGraph[Any, WorkflowRuntimeContext, Any, Any]:
     graph = StateGraph(
         state_schema=cast(Any, SimulationWorkflowState),
         context_schema=WorkflowRuntimeContext,

@@ -15,9 +15,7 @@ import json
 from datetime import datetime
 from types import SimpleNamespace
 
-from langchain_core.prompts import PromptTemplate
-
-from simula.application.workflow.graphs.finalization.nodes.build_report_projection import (
+from simula.application.workflow.graphs.finalization.utils.report_projection import (
     build_report_projection,
     cluster_round_activities,
     format_report_time_label,
@@ -25,22 +23,25 @@ from simula.application.workflow.graphs.finalization.nodes.build_report_projecti
 from simula.application.workflow.graphs.finalization.nodes.render_and_persist_final_report import (
     render_and_persist_final_report,
 )
-from simula.application.workflow.graphs.finalization.sections import (
-    build_report_prompt_inputs,
+from simula.application.workflow.graphs.finalization.nodes.write_final_report_draft import (
+    write_final_report_draft,
+)
+from simula.application.workflow.graphs.finalization.utils.final_report_draft import (
+    render_timeline_section,
+    validate_final_report_draft,
+)
+from simula.application.workflow.graphs.finalization.utils.sections import (
     normalize_conclusion_section,
-    normalize_final_report_sections,
-    render_markdown_table,
-    write_report_section,
     validate_actor_dynamics_section,
     validate_bullet_section,
     validate_conclusion_section,
-    validate_markdown_table_rows,
     validate_timeline_section,
 )
-from simula.application.workflow.graphs.finalization.nodes.resolve_timeline_anchor import (
+from simula.application.workflow.graphs.finalization.utils.timeline_anchor import (
     extract_explicit_anchor,
     extract_partial_anchor_hint,
 )
+from simula.domain.contracts import FinalReportDraft
 from simula.shared.prompts.user_facing_language import build_user_facing_style_block
 
 
@@ -124,24 +125,6 @@ def test_validate_bullet_section_rejects_plain_paragraph() -> None:
     assert error is not None
 
 
-def test_validate_markdown_table_rows_accepts_body_rows_only() -> None:
-    error = validate_markdown_table_rows(
-        "| A | 결과 | B | 우세 | 근거 |\n| B | 관망 | A | 열세 | 근거 |",
-    )
-
-    assert error is None
-
-
-def test_validate_markdown_table_rows_allows_empty_body() -> None:
-    assert validate_markdown_table_rows("") is None
-
-
-def test_validate_markdown_table_rows_allows_more_than_fourteen_rows() -> None:
-    rows = "\n".join(f"| A{i} | 결과{i} | B{i} | 우세 | 근거{i} |" for i in range(15))
-
-    assert validate_markdown_table_rows(rows) is None
-
-
 def test_validate_timeline_section_requires_fixed_timestamp_pattern() -> None:
     error = validate_timeline_section(
         "- 2027-06-18 03:20 | 시작 단계 | 사건 발생 | 판세 변화\n"
@@ -189,25 +172,6 @@ def test_normalize_conclusion_section_promotes_plain_lines_to_bullets() -> None:
     assert validate_conclusion_section(normalized) is None
 
 
-def test_normalize_final_report_sections_drops_table_header_rows() -> None:
-    normalized = normalize_final_report_sections(
-        {
-            "conclusion_section": "### 최종 상태\n유지\n### 핵심 판단 근거\n유지",
-            "actor_results_rows": "| 행위자 | 결과 | 상대 | 우세 | 근거 |\n| --- | --- | --- | --- | --- |\n| A | 결과 | B | 우세 | 근거 |",
-            "timeline_section": "2027-06-18 03:20 | 시작 단계 | 사건 | 결과",
-            "actor_dynamics_section": "### 현재 구도\nA\n### 관계 변화\nB",
-            "major_events_section": "사건",
-        }
-    )
-
-    assert normalized["actor_results_rows"] == "| A | 결과 | B | 우세 | 근거 |"
-    assert normalized["timeline_section"].startswith("- ")
-    assert (
-        normalized["actor_dynamics_section"] == "### 현재 구도\n- A\n### 관계 변화\n- B"
-    )
-    assert normalized["major_events_section"].startswith("- ")
-
-
 def test_validate_actor_dynamics_section_requires_fixed_subheadings() -> None:
     error = validate_actor_dynamics_section(
         "### 현재 구도\n"
@@ -251,48 +215,140 @@ def test_validate_actor_dynamics_section_allows_terms_previously_blocked_as_jarg
     assert error is None
 
 
-def test_write_report_section_accepts_valid_timeline_with_previously_forbidden_term() -> (
+def test_final_report_draft_semantic_validation_rejects_array_without_headings() -> (
+    None
+):
+    draft = FinalReportDraft(
+        conclusion_section=["- 결론만 있다."],
+        actor_dynamics_section="### 현재 구도\n- A\n### 관계 변화\n- B",
+        major_events_section="- 사건",
+    )
+
+    issues = validate_final_report_draft(draft)
+
+    assert any("소제목 없이 시작할 수 없습니다" in issue for issue in issues)
+
+
+def test_render_timeline_section_uses_projection_highlights() -> None:
+    timeline = render_timeline_section(
+        report_projection={
+            "summary_context": {
+                "timeline_anchor": {"anchor_iso": "2027-06-18T03:20:00"}
+            },
+            "timeline_highlights": [
+                {
+                    "time_label": "2027-06-18 03:50",
+                    "phase_hint": "도입",
+                    "notable_events": ["내부고발 접수"],
+                    "action_highlights": ["CTO가 내부 조사를 시작했다."],
+                    "observer_summary": "책임 소재가 좁혀졌다.",
+                }
+            ],
+        },
+        final_report={"world_state_summary": "상태가 바뀌었다."},
+    )
+
+    assert (
+        timeline
+        == "- 2027-06-18 03:50 | 도입 | 내부고발 접수 | 책임 소재가 좁혀졌다."
+    )
+    assert validate_timeline_section(timeline) is None
+
+
+def test_render_timeline_section_falls_back_to_anchor_summary() -> None:
+    timeline = render_timeline_section(
+        report_projection={
+            "summary_context": {
+                "timeline_anchor": {"anchor_iso": "2027-06-18T03:20:00"}
+            },
+            "timeline_highlights": [],
+        },
+        final_report={
+            "last_observer_summary": "최종 국면이 정리됐다.",
+            "world_state_summary": "위기 대응 상태가 확정됐다.",
+        },
+    )
+
+    assert (
+        timeline
+        == "- 2027-06-18 03:20 | 정리 | 최종 국면이 정리됐다. | 위기 대응 상태가 확정됐다."
+    )
+    assert validate_timeline_section(timeline) is None
+
+
+def test_write_final_report_draft_accepts_section_array_and_code_renders_timeline() -> (
     None
 ):
     class FakeLLM:
-        async def ainvoke_text_with_meta(self, role, prompt, **kwargs):  # noqa: ANN001
-            del role, prompt, kwargs
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def ainvoke_object_with_meta(self, role, prompt, schema, **kwargs):  # noqa: ANN001
+            assert role == "observer"
+            assert schema is FinalReportDraft
+            assert "timeline_section" not in prompt
+            self.calls += 1
+            parsed = FinalReportDraft(
+                conclusion_section="### 최종 상태\n- 유지\n### 핵심 판단 근거\n- 근거",
+                actor_dynamics_section="### 현재 구도\n- A\n### 관계 변화\n- B",
+                major_events_section=["- 사건 A", "- 사건 B"],
+            )
+            assert kwargs["semantic_validator"](parsed) == []
             return (
-                "- 2026-04-14 09:00 | 마무리 단계 | CFO가 표결 안건을 숫자 기준으로 정렬함 | 결론 직전 준비가 끝났다.",
-                SimpleNamespace(),
+                parsed,
+                SimpleNamespace(
+                    duration_seconds=1.0,
+                    input_tokens=10,
+                    output_tokens=20,
+                    total_tokens=30,
+                    fixer_used=False,
+                ),
             )
 
+    fake_llm = FakeLLM()
     runtime = SimpleNamespace(
         context=SimpleNamespace(
-            llms=FakeLLM(),
+            llms=fake_llm,
+            logger=SimpleNamespace(
+                info=lambda *args, **kwargs: None,
+                debug=lambda *args, **kwargs: None,
+            ),
         )
     )
 
     result = asyncio.run(
-        write_report_section(
-            runtime=runtime,  # type: ignore[arg-type]
-            prompt=PromptTemplate.from_template("{scenario_text}"),
-            prompt_inputs={"scenario_text": "테스트 시나리오"},
-            section_title="timeline",
-            task_key="final_report_section.timeline",
-            task_label="타임라인 섹션 작성",
-            artifact_key="report_timeline_section",
-            validator=validate_timeline_section,
+        write_final_report_draft(
+            {
+                "scenario": "테스트 시나리오",
+                "final_report": {"world_state_summary": "상태가 바뀌었다."},
+                "report_projection_json": json.dumps(
+                    {
+                        "summary_context": {
+                            "timeline_anchor": {
+                                "anchor_iso": "2027-06-18T03:20:00"
+                            }
+                        },
+                        "timeline_highlights": [
+                            {
+                                "time_label": "2027-06-18 03:50",
+                                "phase_hint": "도입",
+                                "action_highlights": ["CEO가 대응 성명을 냈다."],
+                                "observer_summary": "언론 압박이 커졌다.",
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+            },  # type: ignore[arg-type]
+            runtime,  # type: ignore[arg-type]
         )
     )
 
-    assert "정렬함" in result
-
-
-def test_render_markdown_table_keeps_header_when_body_is_empty() -> None:
-    rendered = render_markdown_table(
-        headers=["인물", "최종 결론", "상대/대상", "유불리/상태", "근거 요약"],
-        section_body="",
-    )
-
-    assert rendered == (
-        "| 인물 | 최종 결론 | 상대/대상 | 유불리/상태 | 근거 요약 |\n"
-        "| --- | --- | --- | --- | --- |"
+    assert fake_llm.calls == 1
+    assert result["report_major_events_section"] == "- 사건 A\n- 사건 B"
+    assert (
+        result["report_timeline_section"]
+        == "- 2027-06-18 03:50 | 도입 | CEO가 대응 성명을 냈다. | 언론 압박이 커졌다."
     )
 
 
@@ -364,31 +420,6 @@ def test_build_report_projection_returns_compact_context() -> None:
         '"timeline_anchor":{"anchor_iso":"2027-06-18T03:20:00"}'
         in projection["report_projection_json"]
     )
-
-
-def test_build_report_prompt_inputs_compacts_long_scenario_and_summary() -> None:
-    prompt_inputs = build_report_prompt_inputs(
-        {
-            "scenario": "A" * 2_000,
-            "final_report": {
-                "objective": "긴장 추적",
-                "world_summary": "B" * 400,
-                "world_state_summary": "C" * 400,
-                "elapsed_simulation_label": "1시간",
-                "rounds_completed": 4,
-                "total_activities": 12,
-                "last_observer_summary": "D" * 400,
-                "notable_events": ["사건 1", "사건 2"],
-                "errors": ["오류 없음"],
-            },
-            "report_projection_json": '{"summary_context":{}}',
-        }
-    )
-    final_report_payload = json.loads(prompt_inputs["final_report_json"])
-
-    assert len(prompt_inputs["scenario_text"]) < 2_000
-    assert final_report_payload["objective"] == "긴장 추적"
-    assert final_report_payload["rounds_completed"] == 4
 
 
 def test_render_and_persist_final_report_omits_actor_results_section() -> None:

@@ -20,7 +20,10 @@ from typing import Any, Callable, Literal, Union, get_args, get_origin
 from pydantic import BaseModel
 
 from simula.shared.logging.llm import build_fixer_log_context
-from simula.application.ports.llm import ObjectSemanticValidator, SimpleSemanticValidator
+from simula.application.ports.llm import (
+    ObjectSemanticValidator,
+    SimpleSemanticValidator,
+)
 from simula.infrastructure.llm.output_parsers import parse_simple_output
 from simula.infrastructure.llm.runtime import StructuredLLMRouter
 from simula.infrastructure.llm.runtime.metrics import merge_token_count, merge_ttft
@@ -92,23 +95,6 @@ _KNOWN_VALIDATION_RULES: dict[str, tuple[str, ...]] = {
         "major_events must use unique event_id values.",
         "major_events must contain at most 6 items.",
     ),
-    "ExecutionPlanBundle": (
-        "major_events must use unique event_id values.",
-        "major_events must contain at most 6 items.",
-    ),
-    "ActorActionShell": (
-        "action_type must not be empty.",
-        "group proposals require target_cast_ids.",
-    ),
-    "ActorActionNarrative": (
-        "goal must not be empty.",
-        "summary must not be empty.",
-        "detail must not be empty.",
-    ),
-    "RoundDirectiveFocusCore": (
-        "focus_summary must not be empty.",
-        "reason must not be empty.",
-    ),
     "MajorEventPlanItem": (
         "participant_cast_ids must not be empty.",
         "completion_action_types must not be empty.",
@@ -116,18 +102,6 @@ _KNOWN_VALIDATION_RULES: dict[str, tuple[str, ...]] = {
         "participant_cast_ids must be unique.",
         "completion_action_types must be unique.",
         "earliest_round must be less than or equal to latest_round.",
-    ),
-    "ObserverReportBody": (
-        "summary must not be empty.",
-        "atmosphere must not be empty.",
-    ),
-    "ActorFacingScenarioDigestBody": (
-        "current_pressures must not be empty.",
-        "next_step_notes must not be empty.",
-    ),
-    "RoundResolutionCore": (
-        "adopted_cast_ids must be unique.",
-        "world_state_summary must not be empty.",
     ),
 }
 
@@ -197,7 +171,7 @@ async def repair_structured_json(
 
     fixed_content, meta = await router.ainvoke_text_with_meta(
         "fixer",
-        _build_fix_json_prompt(
+        _fix_json_prompt_text(
             parser=parser,
             annotation=annotation,
             output_type_name=output_type_name,
@@ -253,7 +227,7 @@ async def repair_structured_json(
     )
 
 
-def _build_fix_json_prompt(
+def _fix_json_prompt_text(
     *,
     parser: Any | None,
     annotation: Any | None,
@@ -342,7 +316,9 @@ def _collect_annotation_lines(
         lines.extend(_collect_field_lines(nested_model, prefix=prefix))
         return lines
     if origin is list and args:
-        lines = [f"- {prefix}: array[{_describe_annotation(_unwrap_optional_annotation(args[0]))}]"]
+        lines = [
+            f"- {prefix}: array[{_describe_annotation(_unwrap_optional_annotation(args[0]))}]"
+        ]
         item_model = _extract_base_model_from_annotation(args[0])
         if item_model is not None:
             lines.extend(_collect_field_lines(item_model, prefix=f"{prefix}[]"))
@@ -399,12 +375,6 @@ def _render_repair_context(repair_context: dict[str, object] | None) -> str:
 
 
 def _known_validation_rules_for_model(model: type[BaseModel]) -> tuple[str, ...]:
-    if model.__name__ == "ActorActionProposal":
-        from simula.application.workflow.graphs.runtime.proposal_contract import (
-            actor_proposal_target_rule_lines,
-        )
-
-        return actor_proposal_target_rule_lines()
     return _KNOWN_VALIDATION_RULES.get(model.__name__, ())
 
 
@@ -476,6 +446,7 @@ def _build_parse_and_validate(
     ),
 ) -> Callable[[str], object]:
     if parser is not None:
+
         def parse_and_validate(text: str) -> object:
             parsed = parser.parse(text)
             semantic_issues = _run_semantic_validator(

@@ -110,13 +110,13 @@ class SqlAlchemyAppStore(AppStore):
                 session.rollback()
                 raise RunIdConflictError(run_id) from exc
 
-    def next_run_id(self, *, actor_model_id: str, scenario_file_stem: str) -> str:
+    def next_run_id(self, *, run_model_id: str, scenario_file_stem: str) -> str:
         date_prefix = datetime.now().astimezone().strftime("%Y%m%d")
         prefix_pattern = f"{date_prefix}.%"
-        normalized_model_id = slugify_path_token(actor_model_id)
+        normalized_model_id = slugify_path_token(run_model_id)
         normalized_scenario_stem = slugify_path_token(scenario_file_stem)
         if not normalized_model_id:
-            raise ValueError("actor_model_id를 slug로 정규화할 수 없습니다.")
+            raise ValueError("run_model_id를 slug로 정규화할 수 없습니다.")
         if not normalized_scenario_stem:
             raise ValueError("scenario_file_stem을 slug로 정규화할 수 없습니다.")
 

@@ -10,11 +10,9 @@ from simula.domain.scenario.time import TimeUnit
 
 VisibilityType = Literal["public", "private", "group"]
 SimulationMomentum = Literal["high", "medium", "low"]
-AttentionTier = Literal["lead", "driver", "support", "background"]
 PressureLevel = Literal["low", "medium", "high"]
 MajorEventStatusType = Literal["pending", "in_progress", "completed", "missed"]
 StopReason = Literal["", "no_progress", "simulation_done"]
-ContinuationStopReason = Literal["", "no_progress"]
 ResolutionStopReason = Literal["", "simulation_done"]
 
 
@@ -48,7 +46,9 @@ class RuntimeProgressionPlan(BaseModel):
         if len(self.allowed_elapsed_units) != len(set(self.allowed_elapsed_units)):
             raise ValueError("allowed_elapsed_units must be unique.")
         if self.default_elapsed_unit not in self.allowed_elapsed_units:
-            raise ValueError("default_elapsed_unit must be included in allowed_elapsed_units.")
+            raise ValueError(
+                "default_elapsed_unit must be included in allowed_elapsed_units."
+            )
         if not self.reason.strip():
             raise ValueError("reason must not be empty.")
         return self

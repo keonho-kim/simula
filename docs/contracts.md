@@ -74,9 +74,9 @@ finalization.
 
 - `planning_analysis`
 - `plan`
-- `pending_cast_slots`
-- `cast_slot`
 - `generated_actor_results`
+- `pending_actor_roster_chunks`
+- `actor_roster_chunk`
 - `actors`
 - `generation_started_at`
 - `generation_latency_seconds`
@@ -89,8 +89,6 @@ finalization.
 - `observer_reports`
 - `focus_candidates`
 - `round_focus_history`
-- `selected_cast_ids`
-- `deferred_cast_ids`
 - `latest_background_updates`
 - `background_updates`
 - `round_focus_plan`
@@ -108,8 +106,6 @@ finalization.
 - `actor_intent_states`
 - `intent_history`
 - `actor_facing_scenario_digest`
-- `actor_proposal_task`
-- `pending_actor_proposals`
 
 ### Lifecycle and counters
 
@@ -142,15 +138,12 @@ Most model-backed stages use structured outputs validated in code.
 
 | Stage | Contract |
 | --- | --- |
-| planning | `PlanningAnalysis`, `ExecutionPlanBundle` |
-| generation | `GeneratedActorCardDraft` |
-| runtime continuation | `RoundContinuationDecision` |
-| runtime directive | `RoundDirective` |
-| runtime actor turn | `ActorActionProposal` |
-| runtime resolution | `RoundResolution` |
-| finalization anchor | `TimelineAnchorDecision` |
+| planning | `PlanningAnalysis`, `CastRosterOutlineItem[]`, `SituationBundle`, `ActionCatalog`, `CoordinationFrame`, `MajorEventPlanItem[]`, `CastRosterItem[]` |
+| generation | `ActorRosterBundle` |
+| runtime scene tick | `SceneDelta` |
+| finalization | `FinalReportDraft` |
 
-Finalization section writers return text and are validated separately.
+Finalization is one structured draft call followed by code-side markdown rendering.
 
 ## Durable Artifacts
 
@@ -204,8 +197,8 @@ round count, activity totals, notable events, explicit errors, and LLM usage sum
 
 ### `report_projection_json`
 
-Persistent finalization projection used by report-section writers. It combines final state with
-the history needed to explain how the run reached that outcome.
+Persistent finalization projection used by the single final report draft call. It combines final
+state with the history needed to explain how the run reached that outcome.
 
 ### `final_report_sections`
 
@@ -252,13 +245,11 @@ Notes:
 ## Failure and Default Policy
 
 - planning and generation fail when the required contract cannot be satisfied
-- runtime continuation, directive, actor proposal, and resolution nodes may use explicit default
-  payloads when parsing or validation fails
+- runtime scene ticks may use explicit default payloads when parsing or validation fails
 - defaulted runtime behavior remains observable through `errors`
-- invalid adopted proposals are dropped explicitly and recorded in `errors`
 - required unresolved major events can keep the runtime alive past the planner target until the
   hard ceiling is reached
-- final report section writing retries once with validation feedback
+- final report drafting fails explicitly when the one structured draft cannot be recovered
 
 ## Related Docs
 

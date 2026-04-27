@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class LLMUsageSummary(BaseModel):
@@ -52,4 +52,35 @@ class TimelineAnchorDecision(BaseModel):
             raise ValueError("anchor_iso must not be empty.")
         if not self.reason.strip():
             raise ValueError("reason must not be empty.")
+        return self
+
+
+class FinalReportDraft(BaseModel):
+    """Single-call final report prose."""
+
+    conclusion_section: str
+    actor_dynamics_section: str
+    major_events_section: str
+
+    @field_validator(
+        "conclusion_section",
+        "actor_dynamics_section",
+        "major_events_section",
+        mode="before",
+    )
+    @classmethod
+    def normalize_markdown_string(cls, value: object) -> object:
+        if isinstance(value, list):
+            return "\n".join(str(item) for item in value)
+        return value
+
+    @model_validator(mode="after")
+    def validate_final_report_draft(self) -> "FinalReportDraft":
+        for field_name in (
+            "conclusion_section",
+            "actor_dynamics_section",
+            "major_events_section",
+        ):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
         return self

@@ -28,7 +28,7 @@ SUPPORTED_PREFIXES = (
     "BEDROCK_",
 )
 
-ROLE_NAMES = ("planner", "generator", "coordinator", "actor", "observer", "fixer")
+ROLE_NAMES = ("planner", "generator", "coordinator", "observer", "fixer")
 PROVIDER_NAMES = (
     "openai",
     "openai-compatible",
@@ -124,8 +124,10 @@ def _flatten_env_table(table: Any) -> dict[str, str]:
     key_map = {
         "log_level": "SIM_LOG_LEVEL",
         "max_recipients_per_message": "SIM_MAX_RECIPIENTS_PER_MESSAGE",
-        "max_actor_calls_per_step": "SIM_MAX_ACTOR_CALLS_PER_STEP",
-        "max_focus_slices_per_step": "SIM_MAX_FOCUS_SLICES_PER_STEP",
+        "max_scene_actors": "SIM_MAX_SCENE_ACTORS",
+        "max_scene_candidates": "SIM_MAX_SCENE_CANDIDATES",
+        "max_scene_beats": "SIM_MAX_SCENE_BEATS",
+        "actor_roster_chunk_size": "SIM_ROSTER_CHUNK_SIZE",
         "enable_checkpointing": "SIM_ENABLE_CHECKPOINTING",
         "rng_seed": "SIM_RNG_SEED",
     }
@@ -231,6 +233,16 @@ def _flatten_llm_table(table: Any) -> dict[str, str]:
         if isinstance(value, dict):
             continue
         raise ValueError("[llm] 에는 provider 또는 role 하위 테이블만 둘 수 있습니다.")
+
+    known_tables = set(PROVIDER_NAMES) | set(ROLE_NAMES)
+    unknown_tables = sorted(
+        key for key, value in table.items() if isinstance(value, dict) and key not in known_tables
+    )
+    if unknown_tables:
+        raise ValueError(
+            "알 수 없는 LLM role/provider 테이블입니다: "
+            + ", ".join(f"[llm.{key}]" for key in unknown_tables)
+        )
 
     values = _flatten_llm_shared_table(table)
     for role in ROLE_NAMES:

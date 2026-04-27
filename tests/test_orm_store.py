@@ -132,7 +132,7 @@ def test_orm_store_next_run_id_is_sequential(tmp_path) -> None:
 
     try:
         first = store.next_run_id(
-            actor_model_id="qwen3:8b",
+            run_model_id="qwen3:8b",
             scenario_file_stem="scenario-01",
         )
         store.save_run_started(
@@ -141,7 +141,7 @@ def test_orm_store_next_run_id_is_sequential(tmp_path) -> None:
             settings_json={"log_level": "INFO"},
         )
         second = store.next_run_id(
-            actor_model_id="qwen3:8b",
+            run_model_id="qwen3:8b",
             scenario_file_stem="scenario-01",
         )
     finally:

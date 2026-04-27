@@ -59,9 +59,6 @@ def test_load_settings_reads_openai_defaults_and_role_override(
         provider = "openai"
         model = "gpt-5.4-mini"
 
-        [llm.actor]
-        provider = "openai"
-        model = "gpt-5.4-mini"
 
         [llm.observer]
         provider = "openai"
@@ -108,9 +105,6 @@ def test_load_settings_reads_openai_compatible_extra_body_and_role_override(
         provider = "openai"
         model = "gpt-5.4-mini"
 
-        [llm.actor]
-        provider = "openai-compatible"
-        model = "qwen3-32b"
 
         [llm.observer]
         provider = "openai"
@@ -136,11 +130,6 @@ def test_load_settings_reads_openai_compatible_extra_body_and_role_override(
         "reasoning": {"effort": "low"},
         "top_k": 40,
         "top_p": 0.7,
-    }
-    assert settings.models.actor.openai_compatible.stream_usage is True
-    assert settings.models.actor.extra_body == {
-        "reasoning": {"effort": "medium"},
-        "top_k": 40,
     }
 
 
@@ -168,8 +157,6 @@ def test_load_settings_reads_openai_compatible_env_override(
         provider = "openai"
         model = "gpt-5.4-mini"
 
-        [llm.actor]
-        model = "qwen3-32b"
 
         [llm.observer]
         provider = "openai"
@@ -184,13 +171,13 @@ def test_load_settings_reads_openai_compatible_env_override(
         """,
     )
     monkeypatch.setenv("OPENAI_COMPATIBLE_BASE_URL", "http://127.0.0.1:1234/v1")
-    monkeypatch.setenv("SIM_ACTOR_EXTRA_BODY", '{"top_p": 0.8}')
+    monkeypatch.setenv("SIM_PLANNER_EXTRA_BODY", '{"top_p": 0.8}')
 
     settings = load_settings(env_file)
 
-    assert settings.models.actor.provider == "openai-compatible"
-    assert settings.models.actor.base_url == "http://127.0.0.1:1234/v1"
-    assert settings.models.actor.extra_body == {"top_p": 0.8}
+    assert settings.models.planner.provider == "openai-compatible"
+    assert settings.models.planner.base_url == "http://127.0.0.1:1234/v1"
+    assert settings.models.planner.extra_body == {"top_p": 0.8}
 
 
 def test_load_settings_reads_stream_usage_with_role_override(
@@ -219,9 +206,6 @@ def test_load_settings_reads_stream_usage_with_role_override(
         provider = "openai"
         model = "gpt-5.4-mini"
 
-        [llm.actor]
-        provider = "openai-compatible"
-        model = "qwen3-32b"
 
         [llm.observer]
         provider = "openai"
@@ -239,7 +223,6 @@ def test_load_settings_reads_stream_usage_with_role_override(
     settings = load_settings(env_file)
 
     assert settings.models.planner.openai_compatible.stream_usage is False
-    assert settings.models.actor.openai_compatible.stream_usage is True
 
 
 def test_load_settings_reads_google_vertex_role_config(
@@ -268,11 +251,6 @@ def test_load_settings_reads_google_vertex_role_config(
         project_id = "generator-project"
         location = "us-east1"
 
-        [llm.actor]
-        provider = "google"
-        model = "gemini-2.5-flash"
-        project_id = "actor-project"
-        location = "asia-northeast3"
 
         [llm.observer]
         provider = "google"
@@ -320,9 +298,6 @@ def test_load_settings_rejects_partial_google_vertex_config(
         provider = "openai"
         model = "gpt-5.4-mini"
 
-        [llm.actor]
-        provider = "openai"
-        model = "gpt-5.4-mini"
 
         [llm.observer]
         provider = "openai"
@@ -365,9 +340,6 @@ def test_load_settings_reads_bedrock_defaults(
         provider = "bedrock"
         model = "anthropic.claude-3-5-sonnet-20240620-v1:0"
 
-        [llm.actor]
-        provider = "bedrock"
-        model = "anthropic.claude-3-5-sonnet-20240620-v1:0"
 
         [llm.observer]
         provider = "bedrock"
@@ -391,6 +363,12 @@ def test_load_settings_environment_overrides_file_values(
     env_file = _write_env_file(
         tmp_path,
         """
+        [env]
+        max_scene_actors = 2
+        max_scene_candidates = 4
+        max_scene_beats = 2
+        actor_roster_chunk_size = 5
+
         [time]
         max_rounds = 4
 
@@ -411,9 +389,6 @@ def test_load_settings_environment_overrides_file_values(
         provider = "openai"
         model = "gpt-5.4-mini"
 
-        [llm.actor]
-        provider = "openai"
-        model = "gpt-5.4-mini"
 
         [llm.observer]
         provider = "openai"
@@ -426,11 +401,17 @@ def test_load_settings_environment_overrides_file_values(
     )
     monkeypatch.setenv("OPENAI_API_KEY", "env-key")
     monkeypatch.setenv("SIM_MAX_ROUNDS", "9")
+    monkeypatch.setenv("SIM_MAX_SCENE_CANDIDATES", "3")
+    monkeypatch.setenv("SIM_MAX_SCENE_BEATS", "4")
 
     settings = load_settings(env_file)
 
     assert settings.models.planner.openai.api_key == "env-key"
     assert settings.runtime.max_rounds == 9
+    assert settings.runtime.max_scene_actors == 2
+    assert settings.runtime.max_scene_candidates == 3
+    assert settings.runtime.max_scene_beats == 4
+    assert settings.runtime.actor_roster_chunk_size == 5
 
 
 def test_load_settings_reads_runtime_max_rounds_from_time_table(
@@ -460,9 +441,6 @@ def test_load_settings_reads_runtime_max_rounds_from_time_table(
         provider = "openai"
         model = "gpt-5.4-mini"
 
-        [llm.actor]
-        provider = "openai"
-        model = "gpt-5.4-mini"
 
         [llm.observer]
         provider = "openai"
@@ -501,9 +479,6 @@ def test_load_settings_rejects_openai_compatible_without_base_url(
         provider = "openai"
         model = "gpt-5.4-mini"
 
-        [llm.actor]
-        provider = "openai-compatible"
-        model = "qwen3-32b"
 
         [llm.observer]
         provider = "openai"
@@ -547,9 +522,6 @@ def test_load_settings_rejects_openai_compatible_reasoning_effort(
         provider = "openai"
         model = "gpt-5.4-mini"
 
-        [llm.actor]
-        provider = "openai-compatible"
-        model = "qwen3-32b"
 
         [llm.observer]
         provider = "openai"
@@ -595,9 +567,6 @@ def test_load_settings_rejects_nested_role_provider_table(
         provider = "openai"
         model = "gpt-5.4-mini"
 
-        [llm.actor]
-        provider = "openai"
-        model = "gpt-5.4-mini"
 
         [llm.observer]
         provider = "openai"
@@ -640,9 +609,6 @@ def test_load_settings_rejects_unexpected_time_keys(
         provider = "openai"
         model = "gpt-5.4-mini"
 
-        [llm.actor]
-        provider = "openai"
-        model = "gpt-5.4-mini"
 
         [llm.observer]
         provider = "openai"
@@ -658,6 +624,87 @@ def test_load_settings_rejects_unexpected_time_keys(
         load_settings(env_file)
 
 
+def test_load_settings_rejects_legacy_actor_llm_role(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_known_env(monkeypatch)
+    env_file = _write_env_file(
+        tmp_path,
+        """
+        [db]
+        provider = "sqlite"
+
+        [db.sqlite]
+        path = "./runtime.sqlite"
+
+        [llm.openai]
+        API_KEY = "openai-key"
+
+        [llm.planner]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.generator]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.actor]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.observer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.fixer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+        """,
+    )
+
+    with pytest.raises(ValueError, match=r"알 수 없는 LLM role"):
+        load_settings(env_file)
+
+
+def test_load_settings_rejects_legacy_actor_environment_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_known_env(monkeypatch)
+    env_file = _write_env_file(
+        tmp_path,
+        """
+        [db]
+        provider = "sqlite"
+
+        [db.sqlite]
+        path = "./runtime.sqlite"
+
+        [llm.openai]
+        API_KEY = "openai-key"
+
+        [llm.planner]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.generator]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.observer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+
+        [llm.fixer]
+        provider = "openai"
+        model = "gpt-5.4-mini"
+        """,
+    )
+    monkeypatch.setenv("SIM_ACTOR_MODEL", "qwen3:8b")
+
+    with pytest.raises(ValueError, match="legacy actor LLM"):
+        load_settings(env_file)
+
+
 def test_env_sample_can_be_loaded_after_placeholder_replacement(tmp_path: Path) -> None:
     example_path = Path("env.sample.toml")
     content = example_path.read_text(encoding="utf-8").replace(
@@ -670,5 +717,4 @@ def test_env_sample_can_be_loaded_after_placeholder_replacement(tmp_path: Path) 
     settings = load_settings(env_file)
 
     assert settings.models.planner.provider == "openai"
-    assert settings.models.actor.provider == "openai-compatible"
     assert settings.models.fixer.provider == "openai"

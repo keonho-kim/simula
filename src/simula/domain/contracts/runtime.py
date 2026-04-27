@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field, model_validator
 
 from simula.domain.contracts.shared import (
     MajorEventStatusType,
-    PressureLevel,
     ResolutionStopReason,
     RoundTimeAdvanceProposal,
     SimulationMomentum,
@@ -56,7 +55,9 @@ class MajorEventState(BaseModel):
             if not getattr(self, field_name).strip():
                 raise ValueError(f"{field_name} must not be empty.")
         if self.earliest_round > self.latest_round:
-            raise ValueError("earliest_round must be less than or equal to latest_round.")
+            raise ValueError(
+                "earliest_round must be less than or equal to latest_round."
+            )
         if not self.participant_cast_ids:
             raise ValueError("participant_cast_ids must not be empty.")
         if not self.completion_action_types:
@@ -97,56 +98,263 @@ class EventMemory(BaseModel):
         return self
 
 
-class ActorActionProposal(BaseModel):
-    """One actor proposal for one step."""
+class SymbolTable(BaseModel):
+    """Compact runtime symbols for prompt input."""
 
-    action_type: str
-    goal: str
-    summary: str
-    detail: str
-    utterance: str
-    visibility: VisibilityType
-    target_cast_ids: list[str]
+    actors: dict[str, str]
+    events: dict[str, str]
+    actions: dict[str, str]
 
     @model_validator(mode="after")
-    def validate_actor_action_proposal(self) -> "ActorActionProposal":
-        for field_name in ("action_type", "goal", "summary", "detail"):
-            if not getattr(self, field_name).strip():
-                raise ValueError(f"{field_name} must not be empty.")
-        if self.visibility == "group" and not self.target_cast_ids:
-            raise ValueError("group proposals require target_cast_ids.")
+    def validate_symbol_table(self) -> "SymbolTable":
+        for field_name in ("actors", "events", "actions"):
+            values = list(getattr(self, field_name).values())
+            if len(values) != len(set(values)):
+                raise ValueError(f"{field_name} symbols must be unique.")
         return self
 
 
-class ActorActionShell(BaseModel):
-    """Action shell chosen before narrative details are filled."""
+class ActorPolicy(BaseModel):
+    """Runtime-facing actor policy."""
 
-    action_type: str
-    visibility: VisibilityType
-    target_cast_ids: list[str]
+    cast_id: str
+    symbol: str
+    priorities: list[str]
+    preferred_target_cast_ids: list[str]
+    allowed_action_types: list[str]
+    trigger_rules: list[str]
+    current_intent: str
+    relationship_notes: dict[str, str]
+    recent_memory: list[str]
+    pressure_level: int = Field(ge=0, le=5)
+    hidden_information: list[str]
+    speech_cooldown: int = Field(ge=0)
+    action_cooldown: int = Field(ge=0)
 
     @model_validator(mode="after")
-    def validate_actor_action_shell(self) -> "ActorActionShell":
-        if not self.action_type.strip():
-            raise ValueError("action_type must not be empty.")
-        if self.visibility == "group" and not self.target_cast_ids:
-            raise ValueError("group proposals require target_cast_ids.")
+    def validate_actor_policy(self) -> "ActorPolicy":
+        for field_name in ("cast_id", "symbol", "current_intent"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        if not self.priorities:
+            raise ValueError("priorities must not be empty.")
+        if not self.allowed_action_types:
+            raise ValueError("allowed_action_types must not be empty.")
+        if not self.trigger_rules:
+            raise ValueError("trigger_rules must not be empty.")
         return self
 
 
-class ActorActionNarrative(BaseModel):
-    """Narrative fields filled after the action shell is fixed."""
+class ActorAgentState(BaseModel):
+    """Mutable runtime state for one simulated actor."""
 
+    cast_id: str
+    current_intent: str
+    relationship_notes: dict[str, str]
+    recent_memory: list[str]
+    pressure_level: int = Field(ge=0, le=5)
+    hidden_information: list[str]
+    speech_cooldown: int = Field(ge=0)
+    action_cooldown: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_actor_agent_state(self) -> "ActorAgentState":
+        for field_name in ("cast_id", "current_intent"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        return self
+
+
+class EventQueueItem(BaseModel):
+    """One deterministic runtime event-queue entry."""
+
+    event_id: str
+    symbol: str
+    title: str
+    status: MajorEventStatusType
+    participant_cast_ids: list[str]
+    must_resolve: bool
+    earliest_round: int = Field(ge=1)
+    latest_round: int = Field(ge=1)
+
+    @model_validator(mode="after")
+    def validate_event_queue_item(self) -> "EventQueueItem":
+        for field_name in ("event_id", "symbol", "title"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        if not self.participant_cast_ids:
+            raise ValueError("participant_cast_ids must not be empty.")
+        if self.earliest_round > self.latest_round:
+            raise ValueError(
+                "earliest_round must be less than or equal to latest_round."
+            )
+        return self
+
+
+class ActionTemplate(BaseModel):
+    """One compact action template for candidate generation."""
+
+    action_type: str
+    symbol: str
+    label: str
+    description: str
+    supported_visibility: list[VisibilityType]
+    requires_target: bool
+
+    @model_validator(mode="after")
+    def validate_action_template(self) -> "ActionTemplate":
+        for field_name in ("action_type", "symbol", "label", "description"):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        if not self.supported_visibility:
+            raise ValueError("supported_visibility must not be empty.")
+        return self
+
+
+class RuntimeBudget(BaseModel):
+    """Runtime-mode limits used by the scene kernel."""
+
+    max_scene_actors: int = Field(ge=1)
+    max_candidates: int = Field(ge=1)
+    max_scene_beats: int = Field(ge=1)
+    runtime_narrative: bool
+
+
+class SimulationPlan(BaseModel):
+    """Runtime-ready plan consumed by the current runtime graph."""
+
+    symbol_table: SymbolTable
+    actor_policies: list[ActorPolicy]
+    event_queue: list[EventQueueItem]
+    action_templates: list[ActionTemplate]
+    runtime_budget: RuntimeBudget
+
+    @model_validator(mode="after")
+    def validate_simulation_plan(self) -> "SimulationPlan":
+        cast_ids = [item.cast_id for item in self.actor_policies]
+        if len(cast_ids) != len(set(cast_ids)):
+            raise ValueError("actor_policies must use unique cast_id values.")
+        event_ids = [item.event_id for item in self.event_queue]
+        if len(event_ids) != len(set(event_ids)):
+            raise ValueError("event_queue must use unique event_id values.")
+        action_types = [item.action_type for item in self.action_templates]
+        if len(action_types) != len(set(action_types)):
+            raise ValueError("action_templates must use unique action_type values.")
+        return self
+
+
+class ActionCandidate(BaseModel):
+    """Code-generated scene action candidate."""
+
+    candidate_id: str
+    event_id: str
+    source_cast_id: str
+    target_cast_ids: list[str]
+    action_type: str
+    visibility: VisibilityType
     goal: str
     summary: str
     detail: str
-    utterance: str
+    utterance: str = ""
+    intent: str
+    stakes: str
+    expected_effect: str
+    risk: str
+    target_reason: str
+    initiative_score: int
 
     @model_validator(mode="after")
-    def validate_actor_action_narrative(self) -> "ActorActionNarrative":
-        for field_name in ("goal", "summary", "detail"):
+    def validate_action_candidate(self) -> "ActionCandidate":
+        for field_name in (
+            "candidate_id",
+            "event_id",
+            "source_cast_id",
+            "action_type",
+            "goal",
+            "summary",
+            "detail",
+            "intent",
+            "stakes",
+            "expected_effect",
+            "risk",
+            "target_reason",
+        ):
             if not getattr(self, field_name).strip():
                 raise ValueError(f"{field_name} must not be empty.")
+        return self
+
+
+class SceneBeat(BaseModel):
+    """One dramatized beat inside a scene tick."""
+
+    beat_id: str
+    candidate_id: str
+    source_cast_id: str
+    target_cast_ids: list[str]
+    intent: str
+    action_type: str
+    summary: str
+    detail: str
+    utterance: str
+    reaction: str
+    emotional_tone: str
+    event_effect: str
+
+    @model_validator(mode="after")
+    def validate_scene_beat(self) -> "SceneBeat":
+        for field_name in (
+            "beat_id",
+            "candidate_id",
+            "source_cast_id",
+            "intent",
+            "action_type",
+            "summary",
+            "detail",
+            "reaction",
+            "emotional_tone",
+            "event_effect",
+        ):
+            if not getattr(self, field_name).strip():
+                raise ValueError(f"{field_name} must not be empty.")
+        if len(self.target_cast_ids) != len(set(self.target_cast_ids)):
+            raise ValueError("target_cast_ids must be unique.")
+        return self
+
+
+class SceneDelta(BaseModel):
+    """Single LLM output for one current-runtime scene tick."""
+
+    selected_event_id: str
+    scene_beats: list[SceneBeat]
+    intent_updates: list[ActorIntentSnapshot]
+    event_updates: list[MajorEventUpdate]
+    world_state_summary: str
+    time_advance: RoundTimeAdvanceProposal
+    stop_reason: ResolutionStopReason
+    debug_rationale: str
+
+    @model_validator(mode="after")
+    def validate_scene_delta(self) -> "SceneDelta":
+        if not self.selected_event_id.strip():
+            raise ValueError("selected_event_id must not be empty.")
+        if not self.scene_beats:
+            raise ValueError("scene_beats must not be empty.")
+        beat_ids = [item.beat_id for item in self.scene_beats]
+        if len(beat_ids) != len(set(beat_ids)):
+            raise ValueError("scene_beats must use unique beat_id values.")
+        candidate_ids = [item.candidate_id for item in self.scene_beats]
+        if len(candidate_ids) != len(set(candidate_ids)):
+            raise ValueError("scene_beats must use unique candidate_id values.")
+        intent_cast_ids = [item.cast_id for item in self.intent_updates]
+        if len(intent_cast_ids) != len(set(intent_cast_ids)):
+            raise ValueError("intent_updates must use unique cast_id values.")
+        event_ids = [item.event_id for item in self.event_updates]
+        if len(event_ids) != len(set(event_ids)):
+            raise ValueError("event_updates must use unique event_id values.")
+        if not self.world_state_summary.strip():
+            raise ValueError("world_state_summary must not be empty.")
+        if not self.debug_rationale.strip():
+            raise ValueError("debug_rationale must not be empty.")
         return self
 
 
@@ -154,6 +362,7 @@ class CanonicalAction(BaseModel):
     """Persisted canonical action."""
 
     activity_id: str
+    beat_id: str = ""
     run_id: str
     round_index: int
     source_cast_id: str
@@ -165,6 +374,9 @@ class CanonicalAction(BaseModel):
     summary: str
     detail: str
     utterance: str
+    reaction: str = ""
+    emotional_tone: str = ""
+    event_effect: str = ""
     thread_id: str
     created_at: str
 
@@ -183,63 +395,6 @@ class ActorIntentSnapshot(BaseModel):
         for field_name in ("cast_id", "goal"):
             if not getattr(self, field_name).strip():
                 raise ValueError(f"{field_name} must not be empty.")
-        return self
-
-
-class FocusSlice(BaseModel):
-    """Selected focus slice."""
-
-    slice_id: str
-    title: str
-    focus_cast_ids: list[str]
-    visibility: VisibilityType
-    stakes: str
-    reason: str
-
-    @model_validator(mode="after")
-    def validate_focus_slice(self) -> "FocusSlice":
-        if not self.slice_id.strip():
-            raise ValueError("slice_id must not be empty.")
-        if not self.title.strip():
-            raise ValueError("title must not be empty.")
-        if not self.focus_cast_ids:
-            raise ValueError("focus_cast_ids must not be empty.")
-        if not self.stakes.strip():
-            raise ValueError("stakes must not be empty.")
-        if not self.reason.strip():
-            raise ValueError("reason must not be empty.")
-        return self
-
-
-class BackgroundUpdate(BaseModel):
-    """Compressed off-screen update."""
-
-    round_index: int = Field(ge=1)
-    cast_id: str
-    summary: str
-    pressure_level: PressureLevel
-
-    @model_validator(mode="after")
-    def validate_background_update(self) -> "BackgroundUpdate":
-        for field_name in ("cast_id", "summary"):
-            if not getattr(self, field_name).strip():
-                raise ValueError(f"{field_name} must not be empty.")
-        return self
-
-
-class RoundDirectiveFocusCore(BaseModel):
-    """Focus-only portion of a round directive."""
-
-    focus_summary: str
-    reason: str
-    focus_slices: list[FocusSlice]
-
-    @model_validator(mode="after")
-    def validate_round_directive_focus_core(self) -> "RoundDirectiveFocusCore":
-        if not self.focus_summary.strip():
-            raise ValueError("focus_summary must not be empty.")
-        if not self.reason.strip():
-            raise ValueError("reason must not be empty.")
         return self
 
 
@@ -264,90 +419,6 @@ class ActorFacingScenarioDigest(BaseModel):
         return self
 
 
-class ActorFacingScenarioDigestBody(BaseModel):
-    """Round-digest body before round/world injection."""
-
-    current_pressures: list[str]
-    next_step_notes: list[str]
-
-    @model_validator(mode="after")
-    def validate_actor_facing_scenario_digest_body(
-        self,
-    ) -> "ActorFacingScenarioDigestBody":
-        for field_name in ("current_pressures", "next_step_notes"):
-            if not getattr(self, field_name):
-                raise ValueError(f"{field_name} must not be empty.")
-        return self
-
-
-class RoundDirective(BaseModel):
-    """Single runtime directive for a round."""
-
-    round_index: int = Field(ge=1)
-    focus_summary: str
-    reason: str
-    selected_cast_ids: list[str]
-    deferred_cast_ids: list[str]
-    focus_slices: list[FocusSlice]
-    background_updates: list[BackgroundUpdate]
-
-    @model_validator(mode="after")
-    def validate_round_directive(self) -> "RoundDirective":
-        if not self.focus_summary.strip():
-            raise ValueError("focus_summary must not be empty.")
-        if not self.reason.strip():
-            raise ValueError("reason must not be empty.")
-        if len(self.selected_cast_ids) != len(set(self.selected_cast_ids)):
-            raise ValueError("selected_cast_ids must be unique.")
-        if len(self.deferred_cast_ids) != len(set(self.deferred_cast_ids)):
-            raise ValueError("deferred_cast_ids must be unique.")
-        selected_set = set(self.selected_cast_ids)
-        for focus_slice in self.focus_slices:
-            if not set(focus_slice.focus_cast_ids).issubset(selected_set):
-                raise ValueError("focus_cast_ids must be contained in selected_cast_ids.")
-        return self
-
-
-class ObserverReportBody(BaseModel):
-    """Observer-report body before round/world injection."""
-
-    summary: str
-    notable_events: list[str]
-    atmosphere: str
-    momentum: SimulationMomentum
-
-    @model_validator(mode="after")
-    def validate_observer_report_body(self) -> "ObserverReportBody":
-        for field_name in ("summary", "atmosphere"):
-            if not getattr(self, field_name).strip():
-                raise ValueError(f"{field_name} must not be empty.")
-        return self
-
-
-class RoundResolutionNarrativeBodies(BaseModel):
-    """Narrative-only portion of round resolution."""
-
-    observer_report: ObserverReportBody
-    actor_facing_scenario_digest: ActorFacingScenarioDigestBody
-
-
-class RoundResolutionCore(BaseModel):
-    """Core non-narrative portion of round resolution."""
-
-    adopted_cast_ids: list[str]
-    time_advance: RoundTimeAdvanceProposal
-    world_state_summary: str
-    stop_reason: ResolutionStopReason
-
-    @model_validator(mode="after")
-    def validate_round_resolution_core(self) -> "RoundResolutionCore":
-        if len(self.adopted_cast_ids) != len(set(self.adopted_cast_ids)):
-            raise ValueError("adopted_cast_ids must be unique.")
-        if not self.world_state_summary.strip():
-            raise ValueError("world_state_summary must not be empty.")
-        return self
-
-
 class ObserverReport(BaseModel):
     """Observer round summary."""
 
@@ -363,38 +434,4 @@ class ObserverReport(BaseModel):
         for field_name in ("summary", "atmosphere", "world_state_summary"):
             if not getattr(self, field_name).strip():
                 raise ValueError(f"{field_name} must not be empty.")
-        return self
-
-
-class RoundResolution(BaseModel):
-    """Single required runtime resolution bundle."""
-
-    adopted_cast_ids: list[str]
-    intent_states: list[ActorIntentSnapshot]
-    event_updates: list[MajorEventUpdate]
-    time_advance: RoundTimeAdvanceProposal
-    observer_report: ObserverReport
-    actor_facing_scenario_digest: ActorFacingScenarioDigest
-    world_state_summary: str
-    stop_reason: ResolutionStopReason
-
-    @model_validator(mode="after")
-    def validate_round_resolution(self) -> "RoundResolution":
-        if len(self.adopted_cast_ids) != len(set(self.adopted_cast_ids)):
-            raise ValueError("adopted_cast_ids must be unique.")
-        intent_state_cast_ids = [item.cast_id for item in self.intent_states]
-        if len(intent_state_cast_ids) != len(set(intent_state_cast_ids)):
-            raise ValueError("intent_states must use unique cast_id values.")
-        event_ids = [item.event_id for item in self.event_updates]
-        if len(event_ids) != len(set(event_ids)):
-            raise ValueError("event_updates must use unique event_id values.")
-        if not self.world_state_summary.strip():
-            raise ValueError("world_state_summary must not be empty.")
-        if (
-            self.actor_facing_scenario_digest.world_state_summary
-            != self.world_state_summary
-        ):
-            raise ValueError(
-                "actor_facing_scenario_digest.world_state_summary must match world_state_summary."
-            )
         return self

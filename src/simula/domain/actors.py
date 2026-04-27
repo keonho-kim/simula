@@ -8,7 +8,7 @@
 - 순수 검증 함수 패턴
 
 연관된 다른 모듈/구조:
-- simula.application.workflow.graphs.generation.nodes.finalize
+- simula.application.workflow.graphs.generation.nodes.finalize_actor_roster
 """
 
 from __future__ import annotations

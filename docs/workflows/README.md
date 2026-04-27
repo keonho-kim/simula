@@ -32,14 +32,14 @@ flowchart LR
 | planning | scenario text and scenario controls | compact execution plan plus planned round target |
 | generation | plan cast roster | finalized actor cards |
 | runtime | plan, actors, and accumulated trace | completed runtime trace plus event history |
-| finalization | completed runtime trace | final report, report projection, markdown sections |
+| finalization | completed runtime trace | final report, report projection, markdown report |
 
 ## Notes
 
 - the runtime stage is the only looping stage
-- the default workflow uses serial stage variants
-- `--parallel` switches the run onto the parallel stage variants
-- generation, runtime, and finalization keep explicit parallel variants, but they are opt-in
+- the default workflow uses one planning call, bundled actor generation, scene ticks, and one report call
+- `--parallel` only parallelizes large independent chunks such as actor roster chunks
+- runtime and finalization do not add LLM fan-out under `--parallel`
 
 Related docs:
 

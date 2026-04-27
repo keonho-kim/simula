@@ -1,1 +1,0 @@
-"""Generation output schema helpers."""

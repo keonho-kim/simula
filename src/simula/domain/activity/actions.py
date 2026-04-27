@@ -45,12 +45,17 @@ def create_canonical_action(
     summary: str,
     detail: str,
     utterance: str = "",
+    beat_id: str = "",
+    reaction: str = "",
+    emotional_tone: str = "",
+    event_effect: str = "",
     thread_id: str = "",
 ) -> CanonicalAction:
     """canonical action을 생성한다."""
 
     return CanonicalAction(
         activity_id=new_action_id(),
+        beat_id=beat_id,
         run_id=run_id,
         round_index=round_index,
         source_cast_id=source_cast_id,
@@ -62,6 +67,9 @@ def create_canonical_action(
         summary=summary,
         detail=detail,
         utterance=utterance,
+        reaction=reaction,
+        emotional_tone=emotional_tone,
+        event_effect=event_effect,
         thread_id=thread_id,
         created_at=iso_timestamp(),
     )

@@ -37,7 +37,6 @@ def validate_settings(settings: AppSettings) -> None:
         ("planner", settings.models.planner),
         ("generator", settings.models.generator),
         ("coordinator", settings.models.coordinator),
-        ("actor", settings.models.actor),
         ("observer", settings.models.observer),
         ("fixer", settings.models.fixer),
     )

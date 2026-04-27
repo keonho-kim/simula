@@ -37,6 +37,7 @@ The only current CLI overrides are:
 
 - `--max-rounds` -> `SIM_MAX_ROUNDS`
 - `--log-level` -> `SIM_LOG_LEVEL`
+- `--DEBUG` -> `SIM_LOG_LEVEL=DEBUG`
 
 ## `env.toml` Shape
 
@@ -45,14 +46,14 @@ TOML file are rejected.
 
 | Table | Purpose | Notes |
 | --- | --- | --- |
-| `[env]` | general runtime controls | log level, actor-call caps, recipient cap, checkpointing, RNG seed |
+| `[env]` | general runtime controls | log level, runtime budgets, recipient cap, checkpointing, RNG seed |
 | `[time]` | runtime round cap | only `max_rounds` is allowed |
 | `[db]` | storage provider selection | choose `sqlite` or `postgresql` |
 | `[db.sqlite]` | SQLite path settings | required when `db.provider = "sqlite"` |
 | `[db.postgresql]` | PostgreSQL connection and table names | required when `db.provider = "postgresql"` |
 | `[fs]` | file output directory | controls the live simulation run directory root, typically `output/` |
 | `[llm.<provider>]` | provider-wide defaults | shared credentials and provider-specific defaults |
-| `[llm.<role>]` | role routing and per-role overrides | one of `planner`, `generator`, `coordinator`, `actor`, `observer`, `fixer` |
+| `[llm.<role>]` | role routing and per-role overrides | one of `planner`, `generator`, `coordinator`, `observer`, `fixer` |
 
 ### Runtime keys
 
@@ -60,8 +61,10 @@ TOML file are rejected.
 
 - `log_level`
 - `max_recipients_per_message`
-- `max_actor_calls_per_step`
-- `max_focus_slices_per_step`
+- `max_scene_actors`
+- `max_scene_candidates`
+- `max_scene_beats`
+- `actor_roster_chunk_size`
 - `enable_checkpointing`
 - `rng_seed`
 
@@ -103,12 +106,11 @@ They are checked-in snapshots, not live runtime outputs.
 
 ## LLM Routing Model
 
-The settings model always resolves six logical roles:
+The settings model always resolves five logical roles:
 
 - `planner`
 - `generator`
 - `coordinator`
-- `actor`
 - `observer`
 - `fixer`
 
@@ -167,14 +169,13 @@ Examples:
 LM Studio supports this on OpenAI-compatible endpoints. Servers that do not support streaming
 usage may still leave token counts empty while TTFT and duration continue to be recorded.
 
-Nested role provider tables such as `[llm.actor.openai]` are no longer supported. Put
-provider-specific keys directly inside `[llm.actor]`.
+Nested role provider tables such as `[llm.planner.openai]` are no longer supported. Put
+provider-specific keys directly inside the role table.
 
 ### Important defaults and special cases
 
 - `planner`, `generator`, and `observer` default to OpenAI-style routing when no role config is
   present.
-- `actor` defaults to OpenAI-compatible routing when no role config is present.
 - `coordinator` inherits the planner config when no coordinator-specific role config is present.
 - `fixer` has OpenAI-style built-in defaults at the model-builder layer, but the loader still
   requires explicit fixer role configuration to exist. It rejects a config that does not define

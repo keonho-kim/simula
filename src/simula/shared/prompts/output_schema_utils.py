@@ -16,6 +16,7 @@ _OBJECT_FORMAT_RULES = textwrap.dedent(
     - Match the required object shape exactly.
     - Do not add prose, markdown, code fences, or extra keys.
     - Do not omit required keys.
+    - Every key shown in the shape guide is required; include the key even when the value is [] or "".
     - Keep string fields as strings and array fields as arrays.
     - Replace the shape guide placeholders with schema-valid values.
     - Do not exceed the per-field sentence or item limits described inside the shape guide placeholders.
@@ -45,7 +46,7 @@ _SIMPLE_SCALAR_FORMAT_RULES = textwrap.dedent(
 ).strip()
 
 
-def build_object_prompt_bundle(
+def object_prompt_bundle(
     *,
     example: dict[str, Any],
     example_mode: ExampleMode = "minimal",
@@ -59,12 +60,12 @@ def build_object_prompt_bundle(
         "output_example": json.dumps(
             rendered,
             ensure_ascii=False,
-            separators=(",", ":"),
+            indent=2,
         ),
     }
 
 
-def build_simple_array_prompt_bundle(
+def simple_array_prompt_bundle(
     *,
     example_item: dict[str, Any] | Any,
     example_mode: ExampleMode = "minimal",
@@ -78,12 +79,12 @@ def build_simple_array_prompt_bundle(
         "output_example": json.dumps(
             rendered,
             ensure_ascii=False,
-            separators=(",", ":"),
+            indent=2,
         ),
     }
 
 
-def build_simple_scalar_prompt_bundle(
+def simple_scalar_prompt_bundle(
     *,
     example_value: Any,
 ) -> dict[str, str]:

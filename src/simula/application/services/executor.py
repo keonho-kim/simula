@@ -105,12 +105,12 @@ class SimulationExecutor:
 
         run_id = ""
         settings_snapshot = self.settings.redacted_dump()
-        actor_model_id = slugify_path_token(self.settings.models.actor.model)
-        if not actor_model_id:
-            raise ValueError("actor model id를 slug로 정규화할 수 없습니다.")
+        run_model_id = slugify_path_token(self.settings.models.planner.model)
+        if not run_model_id:
+            raise ValueError("run model id를 slug로 정규화할 수 없습니다.")
         for _ in range(10):
             candidate_run_id = self.store.next_run_id(
-                actor_model_id=actor_model_id,
+                run_model_id=run_model_id,
                 scenario_file_stem=self.scenario_file_stem,
             )
             try:
@@ -209,17 +209,27 @@ class SimulationExecutor:
                     )
                 )
                 final_state: dict[str, Any] | None = None
-                async for chunk in app.astream(
-                    input_state,
-                    config={"configurable": {"thread_id": run_id}},
-                    context=context,
-                    stream_mode=["custom", "values"],
-                    version="v2",
-                ):
+                debug_graph_nodes = run_logger.isEnabledFor(logging.DEBUG)
+                stream_modes = (
+                    ["custom", "values", "debug"]
+                    if debug_graph_nodes
+                    else ["custom", "values"]
+                )
+                stream_kwargs: dict[str, object] = {
+                    "config": {"configurable": {"thread_id": run_id}},
+                    "context": context,
+                    "stream_mode": stream_modes,
+                    "version": "v2",
+                }
+                if debug_graph_nodes:
+                    stream_kwargs["subgraphs"] = True
+
+                async for chunk in app.astream(input_state, **stream_kwargs):
                     final_state = _consume_stream_chunk(
                         chunk=chunk,
                         final_state=final_state,
                         appender=context.run_jsonl_appender,
+                        logger=run_logger,
                     )
             if final_state is None:
                 raise RuntimeError("workflow did not produce a final state.")
@@ -242,7 +252,7 @@ class SimulationExecutor:
                 run_id=run_id,
                 scenario_file_path=self.scenario_file_path,
                 scenario_file_stem=self.scenario_file_stem,
-                actor_model_id=actor_model_id,
+                run_model_id=run_model_id,
                 started_at=started_at_utc,
                 ended_at=ended_at,
                 wall_clock_seconds=wall_clock,
@@ -279,7 +289,7 @@ class SimulationExecutor:
                         run_id=run_id,
                         scenario_file_path=self.scenario_file_path,
                         scenario_file_stem=self.scenario_file_stem,
-                        actor_model_id=actor_model_id,
+                        run_model_id=run_model_id,
                         started_at=started_at_utc,
                         ended_at=ended_at,
                         wall_clock_seconds=wall_clock,
@@ -307,6 +317,7 @@ def _consume_stream_chunk(
     chunk: object,
     final_state: dict[str, Any] | None,
     appender: RunJsonlAppender | None,
+    logger: logging.Logger,
 ) -> dict[str, Any] | None:
     if isinstance(chunk, dict):
         chunk_dict = cast(dict[str, object], chunk)
@@ -319,17 +330,37 @@ def _consume_stream_chunk(
         if chunk_type == "custom":
             _append_stream_entry(chunk_dict.get("data"), appender)
             return final_state
+        if chunk_type == "debug":
+            _log_graph_debug_event(
+                logger=logger,
+                graph_path=chunk_dict.get("ns", ()),
+                payload=chunk_dict.get("data"),
+            )
+            return final_state
         return cast(dict[str, Any], chunk_dict)
 
-    if not isinstance(chunk, tuple) or len(chunk) != 2:
+    if not isinstance(chunk, tuple) or len(chunk) not in (2, 3):
         return final_state
 
-    mode, payload = chunk
+    if len(chunk) == 3:
+        graph_path, mode, payload = chunk
+    else:
+        graph_path = ()
+        mode, payload = chunk
+
     if mode == "values" and isinstance(payload, dict):
         return cast(dict[str, Any], payload)
 
     if mode == "custom":
         _append_stream_entry(payload, appender)
+        return final_state
+
+    if mode == "debug":
+        _log_graph_debug_event(
+            logger=logger,
+            graph_path=graph_path,
+            payload=payload,
+        )
         return final_state
 
     return final_state
@@ -346,3 +377,58 @@ def _append_stream_entry(
     entry = payload_dict.get("entry")
     if isinstance(entry, dict):
         appender.append(cast(dict[str, object], entry))
+
+
+def _log_graph_debug_event(
+    *,
+    logger: logging.Logger,
+    graph_path: object,
+    payload: object,
+) -> None:
+    if not logger.isEnabledFor(logging.DEBUG) or not isinstance(payload, dict):
+        return
+
+    payload_dict = cast(dict[str, object], payload)
+    event_type = str(payload_dict.get("type", "")).strip()
+    if event_type not in {"task", "task_result"}:
+        return
+
+    task_payload = payload_dict.get("payload")
+    if not isinstance(task_payload, dict):
+        return
+
+    task_dict = cast(dict[str, object], task_payload)
+    node_name = str(task_dict.get("name", "")).strip()
+    if not node_name:
+        return
+
+    step = payload_dict.get("step")
+    graph_name = _graph_name_from_path(graph_path)
+    if event_type == "task":
+        logger.debug(
+            "GRAPH NODE 시작 | graph=%s | node=%s | step=%s",
+            graph_name,
+            node_name,
+            step,
+        )
+        return
+
+    status = "error" if task_dict.get("error") else "ok"
+    logger.debug(
+        "GRAPH NODE 완료 | graph=%s | node=%s | step=%s | status=%s",
+        graph_name,
+        node_name,
+        step,
+        status,
+    )
+
+
+def _graph_name_from_path(graph_path: object) -> str:
+    if not isinstance(graph_path, (tuple, list)) or not graph_path:
+        return "simulation"
+
+    last_segment = str(graph_path[-1]).strip()
+    if not last_segment:
+        return "simulation"
+
+    return last_segment.split(":", maxsplit=1)[0] or "simulation"

@@ -6,67 +6,58 @@ Generation turns the planning cast roster into concrete actor cards.
 
 ```mermaid
 flowchart LR
-    Start([START]) --> Prepare["prepare_actor_slots"]
-    Prepare --> Route{"route_actor_slot_queue"}
-    Route -->|slots remain| Worker["generate_actor_slot_serial"]
-    Route -->|no slots| Finalize["finalize_generated_actors"]
+    Start([START]) --> Prepare["prepare_actor_roster_chunks"]
+    Prepare --> Route{"route_actor_roster_chunk_queue"}
+    Route -->|chunks remain| Worker["generate_actor_roster_chunk_serial"]
+    Route -->|no chunks| Finalize["finalize_actor_roster"]
     Worker --> Route
     Finalize --> End([END])
 ```
 
-This document describes the default serial generation graph. When `--parallel` is enabled,
-generation may process multiple cast slots at the same time.
+The default serial graph processes actor chunks one at a time. The chunk size comes from
+`runtime.actor_roster_chunk_size`, which defaults to 6, so scenarios with 6 or fewer actors use one
+generation LLM call by default.
 
 ## Node Responsibilities
 
-### `prepare_actor_slots`
+### `prepare_actor_roster_chunks`
 
-Builds one `CastSlotSpec` per planned cast item and resets generation-local buffers. It also
-records `generation_started_at` for latency tracking.
+Builds deterministic roster chunks from `plan.cast_roster`, resets generation-local buffers, and
+records `generation_started_at`.
 
-### `generate_actor_slot_serial`
+### `generate_actor_roster_chunk_serial`
 
-Generates one actor card from:
+Calls the `generator` role once for the next chunk and expects an `ActorRosterBundle`.
+Each actor card keeps only runtime-useful fields: identity, role, narrative profile, private goal,
+voice, and preferred action types.
 
-- compact interpretation view
-- compact situation view
-- compact action catalog view
-- compact coordination frame view
-- one cast item
-- the requested cast-count controls
+The model receives:
 
-The node then wraps the generated draft into a full `ActorCard` using the cast identity from the
-planned slot and advances the pending slot queue by one.
+- compact plan context
+- action catalog
+- coordination frame
+- assigned cast items
+- scenario cast-count controls
 
-### `finalize_generated_actors`
+### `finalize_actor_roster`
 
-Collects accumulated slot results and finalizes the actor list.
+Collects chunk results and finalizes the actor list.
 
 Checks and side effects:
 
-- restore slot order by `slot_index`
-- validate that generated `cast_id` order still matches the plan
+- restore cast order by `slot_index`
+- validate generated cast ids still match the plan
 - require at least 2 actors
 - save actors through the store
 - write an `actors_finalized` runtime log event
 - aggregate generation parse-failure counts
-- record `generation_latency_seconds`
-
-## Stage Output
-
-After generation, workflow state has:
-
-- `actors`
-- `generation_latency_seconds`
-- updated `parse_failures`
-
-Generation does not build activity feeds. Runtime initialization owns that step.
 
 ## Parallel Variant
 
-When a run is started with CLI `--parallel`, generation switches to the parallel path:
+When `--parallel` is enabled, generation fans out only by actor roster chunk:
 
-- `prepare_actor_slots -> dispatch_actor_slots -> generate_actor_slot -> finalize_generated_actors`
+```text
+prepare_actor_roster_chunks -> dispatch_actor_roster_chunks -> generate_actor_roster_chunk -> finalize_actor_roster
+```
 
-That variant preserves the same output and validation behavior while allowing concurrent slot-level
-LLM calls.
+This preserves the same output while avoiding actor-per-call fan-out.

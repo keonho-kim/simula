@@ -16,7 +16,6 @@ from simula.application.ports.llm import (
 from simula.application.workflow.fixer import repair_structured_json
 from simula.infrastructure.llm.output_parsers import parse_simple_output
 from simula.infrastructure.llm.runtime.contract_runner import (
-    ContractLoopFailure,
     ContractLoopSuccess,
     ParseResult,
     run_contract_loop,
@@ -24,6 +23,7 @@ from simula.infrastructure.llm.runtime.contract_runner import (
 from simula.infrastructure.llm.runtime.logging import log_primary_parse_failure
 from simula.infrastructure.llm.runtime.router import StructuredLLMRouter
 from simula.infrastructure.llm.runtime.structured_retry import (
+    coerce_missing_field_paths,
     emit_contract_attempt_events,
     final_prompt_variant,
 )
@@ -147,8 +147,8 @@ async def run_simple_contract(
             retry_attempt=int(str(loop_result.final_retry_context.get("retry_attempt", 0) or 0)),
             retry_budget=retry_budget,
             retry_reason=str(loop_result.final_retry_context.get("retry_reason", "")),
-            missing_field_paths=list(
-                loop_result.final_retry_context.get("missing_field_paths", [])
+            missing_field_paths=coerce_missing_field_paths(
+                loop_result.final_retry_context.get("missing_field_paths")
             ),
             transport_retry_attempt=int(
                 str(loop_result.final_retry_context.get("transport_retry_attempt", 1) or 1)
@@ -161,7 +161,7 @@ async def run_simple_contract(
             ),
         )
 
-    failure = cast(ContractLoopFailure, loop_result)
+    failure = loop_result
     log_primary_parse_failure(
         logger=logger,
         role=role,
@@ -220,8 +220,8 @@ async def run_simple_contract(
             retry_attempt=int(str(failure.final_retry_context.get("retry_attempt", 0) or 0)),
             retry_budget=retry_budget,
             retry_reason=str(failure.final_retry_context.get("retry_reason", "")),
-            missing_field_paths=list(
-                failure.final_retry_context.get("missing_field_paths", [])
+            missing_field_paths=coerce_missing_field_paths(
+                failure.final_retry_context.get("missing_field_paths")
             ),
             transport_retry_attempt=int(
                 str(failure.final_retry_context.get("transport_retry_attempt", 1) or 1)
