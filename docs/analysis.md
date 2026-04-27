@@ -1,79 +1,101 @@
 # Analysis
 
-Derived analysis is no longer a separate CLI or a separate `analysis/<run_id>/` workspace.
-Instead, every successful simulation run writes analysis artifacts into the same run directory
-that already contains `simulation.log.jsonl`.
+`simula` writes analysis artifacts beside the run that produced them. Analysis is derived from the
+same durable trace used for inspection and reporting.
 
-For repository examples, committed run directories live under `output.samples/<run_id>/`.
+## Source Of Truth
 
-## Source of Truth
+`simulation.log.jsonl` is the source artifact for analysis.
 
-The analysis pipeline still uses `simulation.log.jsonl` as its only durable input.
+It contains the ordered runtime event stream, including model calls, planning results, actor
+registry, round activity, event-memory updates, observer reports, and final report metadata.
 
-- `simulation.log.jsonl` is written incrementally during execution.
-- after the workflow completes, the integrated output writer reloads that JSONL file
-- the derived metrics, tables, plots, and summary markdown are written beside it
+Because analysis is derived from this event stream, saved runs can be inspected and compared after
+the simulation has completed.
 
 ## Output Layout
 
-Each run directory now follows this shape:
+Each completed run may contain:
 
 ```text
-<storage.output_dir>/<run_id>/
-  simulation.log.jsonl
-  manifest.json
-  report.final.md
-  summary.overview.md
-  data/
-    llm_calls.csv
-    performance.summary.csv
-    fixer.summary.csv
-    token_usage.summary.csv
-    actions.summary.csv
-    network.nodes.csv
-    network.edges.csv
-    network.growth.csv
-    network.summary.json
-  summaries/
-    token_usage.summary.md
-    network.summary.md
-  assets/
-    performance.summary.png
-    network.graph.png
-    network.graph.graphml
-    network.growth_metrics.png
-    network.concentration.png
-    network.growth.mp4
+output/
+  <run_id>/
+    simulation.log.jsonl
+    manifest.json
+    report.final.md
+    summary.overview.md
+    data/
+      llm_calls.csv
+      performance.summary.csv
+      token_usage.summary.csv
+      actions.summary.csv
+      network.nodes.csv
+      network.edges.csv
+      network.growth.csv
+      network.summary.json
+    summaries/
+      token_usage.summary.md
+      network.summary.md
+    assets/
+      performance.summary.png
+      network.graph.png
+      network.graph.graphml
+      network.growth_metrics.png
+      network.concentration.png
+      network.growth.mp4
 ```
 
-That same shape is what the repository sample runs preserve under `output.samples/`.
+Committed example runs use the same shape under `output.samples/`.
 
-## Run Metadata
+## Metrics
 
-`manifest.json` is the only manifest file.
+The analysis layer focuses on run comparability.
 
-It includes:
+It can summarize:
+
+- model-call timing and usage
+- actor participation
+- action type diversity
+- interaction volume
+- source and target concentration
+- relationship graph structure
+- path depth and reachability
+- community structure
+- cumulative network growth
+
+These metrics make it easier to compare scenarios, model configurations, and repeated trials.
+
+## Manifest
+
+`manifest.json` is the run-level index.
+
+It records:
 
 - run identity and status
 - start and end timestamps
-- wall-clock runtime
-- scenario file metadata
-- actor model id
-- redacted settings snapshot
+- scenario metadata
+- redacted configuration summary
 - produced artifact paths
-- analysis summary metadata such as event count, llm call count, and roles
+- event count
+- model-call count
+- roles observed in the run
 - error text for failed runs
 
-Failed runs still keep `simulation.log.jsonl` and `manifest.json`, but they do not write derived
-analysis artifacts unless those artifacts were actually completed.
+Failed runs may still keep `simulation.log.jsonl` and `manifest.json` even when derived analysis
+artifacts are incomplete.
 
-## Implementation Notes
+## Reading A Run
 
-The analysis computation still lives under `src/simula/application/analysis/`.
+For human inspection, start with:
 
-- `loader.py` validates and loads JSONL rows
-- `metrics/*` computes reports
-- `plotting/*` renders visual artifacts
-- `runner/bundle.py` assembles the computed report bundle
-- `runner/writing.py` writes the integrated analysis files into the run directory
-- committed examples in `output.samples/` are snapshots of that same output layout
+1. `summary.overview.md`
+2. `report.final.md`
+3. `summaries/network.summary.md`
+4. `simulation.log.jsonl`
+
+For comparison across runs, start with the tables in `data/` and the visuals in `assets/`.
+
+## Related Docs
+
+- runtime log contract: [`contracts.md`](./contracts.md)
+- operational artifact notes: [`operations.md`](./operations.md)

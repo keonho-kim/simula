@@ -1,34 +1,11 @@
 # Operations
 
-## Local Run
+This document describes language-neutral operating expectations for `simula`: scenario controls,
+trial behavior, output layout, and maintenance rules.
 
-Typical local setup:
+## Scenario Input
 
-```bash
-uv sync
-cp env.sample.toml env.toml
-uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md
-```
-
-To increase console logging without changing persisted artifacts:
-
-```bash
-uv run simula \
-  --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
-  --log-level DEBUG
-```
-
-You can also pass the scenario inline:
-
-The parser requires:
-
-- a frontmatter block at the top of the document
-- flat `key: value` lines only
-- `num_cast`
-- optional `allow_additional_cast`
-- no unsupported keys
-
-Example:
+A scenario is a document with a frontmatter control block followed by the scenario body.
 
 ```text
 ---
@@ -38,171 +15,84 @@ allow_additional_cast: true
 Scenario body starts here.
 ```
 
+The control block accepts:
+
+- `num_cast`: required positive integer
+- `allow_additional_cast`: optional boolean
+
+Unsupported controls should fail explicitly. The scenario body should describe the situation,
+actors or actor types, stakes, constraints, and pressure that should drive the simulation.
+
 ## Repeated Trials
 
-The simulator can run the same scenario multiple times. Trials are always executed sequentially.
+The same scenario may be run more than once to compare behavior across trials.
 
-Repeated trials:
+Operational expectations:
 
-```bash
-uv run simula \
-  --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
-  --trials 3
-```
+- each trial gets its own run id
+- each trial writes its own run directory
+- trials should not overwrite each other's structured records
+- shared sample runs under `output.samples/` should not be treated as live output
 
-Intra-run graph parallelism:
-
-```bash
-uv run simula \
-  --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
-  --parallel
-```
-
-You can combine both:
-
-```bash
-uv run simula \
-  --scenario-file ./senario.samples/03_startup_boardroom_crisis.md \
-  --trials 3 \
-  --parallel
-```
-
-Operational notes:
-
-- `--trials` must be `>= 1`
-- `--parallel` enables concurrent work inside one run
-- without `--parallel`, the default workflow uses the serial variants
-- for SQLite storage, repeated trials rewrite the SQLite database path to sibling files under a
-  `trial-runs/` directory so repeated trials do not share one runtime database
-- the file output root still comes from `storage.output_dir`
-
-Parallel behavior by area:
-
-| Area | Default run | `--parallel` run |
-| --- | --- | --- |
-| trials | sequential | sequential |
-| planning | serial bundle calls | independent bundle calls and cast chunks may run concurrently |
-| generation actor chunks | serial chunk queue | concurrent chunk generation |
-| runtime scene ticks | one `SceneDelta` call per tick | one `SceneDelta` call per tick |
-| finalization | one `FinalReportDraft` call | one `FinalReportDraft` call |
-
-The `--parallel` flag does not make every LLM call concurrent. It only allows independent planning
-bundles and large generation chunks to run concurrently.
-
-For Korean plot labels on Ubuntu, install the recommended system packages first:
-
-```bash
-./scripts/install_deps_ubuntu.sh
-```
+Trial execution order is an implementation detail. Artifact isolation is the product requirement.
 
 ## Output Layout
 
-Each completed simulation run writes:
+Each completed simulation run writes one run directory:
 
 ```text
-<storage.output_dir>/<run_id>/
-  manifest.json
-  report.final.md
-  summary.overview.md
-  simulation.log.jsonl
-  data/
-  summaries/
-  assets/
+output/
+  <run_id>/
+    manifest.json
+    report.final.md
+    summary.overview.md
+    simulation.log.jsonl
+    data/
+    summaries/
+    assets/
 ```
 
-The repository also keeps committed sample runs under:
-
-```text
-output.samples/<run_id>/
-```
-
-Use the two directories differently:
+Use the paths as follows:
 
 | Path | Meaning |
 | --- | --- |
-| `<storage.output_dir>/` | live runtime output written by the simulator |
-| `output.samples/` | committed reference runs checked into the repository |
+| `output/` | live run output written by local execution |
+| `output.samples/` | committed reference runs kept for inspection |
+| `simulation.log.jsonl` | source event stream for inspection and analysis |
+| `report.final.md` | final human-readable report |
+| `summary.overview.md` | compact analysis entrypoint |
+| `data/` | tabular and structured analysis exports |
+| `summaries/` | human-readable analysis summaries |
+| `assets/` | rendered analysis visuals |
 
-`run_id` now follows:
+## Run Manifest
 
-```text
-YYYYMMDD.001.<run-model-id>.<scenario-file-stem>
-```
+`manifest.json` should make a saved run self-describing.
 
-The responsibilities are split deliberately:
+It should include:
 
-- `simula.shared.io.RunJsonlAppender` writes `simulation.log.jsonl` incrementally during execution
-- the workflow builds structured report payloads and markdown text in memory
-- the executor reuses the completed JSONL file as the source-of-truth for derived analysis
-- the integrated output writer writes `report.final.md`, `summary.overview.md`, `data/*`,
-  `summaries/*`, `assets/*`, and one unified `manifest.json`
-
-The integrated analysis artifacts include:
-
-```text
-<storage.output_dir>/<run_id>/
-  data/llm_calls.csv
-  data/performance.summary.csv
-  data/fixer.summary.csv
-  data/token_usage.summary.csv
-  data/actions.summary.csv
-  data/network.nodes.csv
-  data/network.edges.csv
-  data/network.growth.csv
-  data/network.summary.json
-  summaries/token_usage.summary.md
-  summaries/network.summary.md
-  assets/performance.summary.png
-  assets/network.graph.png
-  assets/network.graph.graphml
-  assets/network.growth_metrics.png
-  assets/network.concentration.png
-  assets/network.growth.mp4
-```
-
-Some analyzer artifacts are conditional:
-
-- `actions/summary.csv` is written only when there are action rows to report
-- `network/growth.csv` is written only when growth rows exist
-- `network/growth.mp4` is recorded only when video rendering produces a file
-
-When you need an example output tree for inspection, prefer `output.samples/` over `output/`
-because `output/` is intentionally treated as a local runtime workspace.
-
-## Storage Bootstrap
-
-For PostgreSQL-backed runs, initialize storage explicitly when the schema or checkpoint tables do
-not already exist:
-
-```bash
-uv run python -m simula.infrastructure.storage.schema_bootstrap --env ./env.toml
-```
-
-## Validation Commands
-
-Run the full local validation set after behavior changes:
-
-```bash
-uv run pytest -q
-uv run ty check src
-uv run ruff check src tests
-uv run ruff clean
-```
-
-Use formatting only when you actually need a formatting rewrite:
-
-```bash
-uv run ruff format src tests
-uv run ruff clean
-```
+- run id
+- status
+- timestamps
+- scenario metadata
+- effective configuration summary with secrets redacted
+- artifact paths
+- event count
+- model-call count
+- observed roles
+- failure text when a run fails
 
 ## Maintenance Notes
 
-- Keep docs aligned with the current graph and code paths.
-- Treat `simulation.log.jsonl` as the source artifact for analysis, not as a derived export.
-- Treat `<run_dir>/summary.overview.md` as the default human-readable entrypoint for derived analysis.
-- Update the workflow docs when active node names, branch points, or stage outputs change.
-- Keep shared logging and runtime-output helpers under `simula.shared.*` rather than scattering
-  them across application and workflow packages.
-- Prefer domain subpackages such as `simula.domain.activity`, `simula.domain.runtime`, and
-  `simula.domain.reporting` over adding more flat modules directly under `simula.domain`.
+- Keep documentation aligned with product behavior and artifact contracts.
+- Keep `simulation.log.jsonl` as the source artifact for analysis.
+- Keep final reports tied to completed runtime traces.
+- Update workflow docs when stage responsibilities or handoffs change.
+- Do not document language-specific setup here until the runtime transition has a stable target
+  surface.
+
+## Related Docs
+
+- configuration concepts: [`configuration.md`](./configuration.md)
+- analysis artifacts: [`analysis.md`](./analysis.md)
+- workflow stages: [`workflows/README.md`](./workflows/README.md)

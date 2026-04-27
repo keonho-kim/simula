@@ -1,63 +1,50 @@
-# Generation Workflow
+# Actor Generation Workflow
 
-Generation turns the planning cast roster into concrete actor cards.
+Actor generation turns planned cast slots into concrete actor cards.
 
-## Active Path
+## Flow
 
 ```mermaid
 flowchart LR
-    Start([START]) --> Prepare["prepare_actor_roster_chunks"]
-    Prepare --> Route{"route_actor_roster_chunk_queue"}
-    Route -->|chunks remain| Worker["generate_actor_roster_chunk_serial"]
-    Route -->|no chunks| Finalize["finalize_actor_roster"]
-    Worker --> Route
-    Finalize --> End([END])
+    Plan["Execution Plan"] --> Slots["Cast Slots"]
+    Slots --> Cards["Actor Cards"]
+    Cards --> Registry["Actor Registry"]
 ```
 
-The default serial graph processes actor chunks one at a time. The chunk size comes from
-`runtime.actor_roster_chunk_size`, which defaults to 6, so scenarios with 6 or fewer actors use one
-generation LLM call by default.
+## Responsibilities
 
-## Node Responsibilities
+Actor generation creates runtime-useful actor data:
 
-### `prepare_actor_roster_chunks`
+- stable id
+- display name
+- role
+- narrative profile
+- private goal
+- voice
+- preferred action types
 
-Builds deterministic roster chunks from `plan.cast_roster`, resets generation-local buffers, and
-records `generation_started_at`.
+The generated actor should match the planned cast slot. This keeps planning, runtime, and reports
+using the same actor identity.
 
-### `generate_actor_roster_chunk_serial`
+## Validation
 
-Calls the `generator` role once for the next chunk and expects an `ActorRosterBundle`.
-Each actor card keeps only runtime-useful fields: identity, role, narrative profile, private goal,
-voice, and preferred action types.
+The actor registry should be validated before runtime begins.
 
-The model receives:
+- every planned required actor has one generated actor card
+- generated ids match planned cast ids
+- actor order remains stable for reports and deterministic selection
+- every actor has a display name and role
+- the run has enough actors for interactions to be meaningful
 
-- compact plan context
-- action catalog
-- coordination frame
-- assigned cast items
-- scenario cast-count controls
+If actor generation cannot produce a valid registry, the run should fail before runtime.
 
-### `finalize_actor_roster`
+## Stage Output
 
-Collects chunk results and finalizes the actor list.
+Actor generation produces the finalized actor registry used by runtime and finalization.
 
-Checks and side effects:
+Runtime consumes actors as stateful participants, not as isolated text snippets.
 
-- restore cast order by `slot_index`
-- validate generated cast ids still match the plan
-- require at least 2 actors
-- save actors through the store
-- write an `actors_finalized` runtime log event
-- aggregate generation parse-failure counts
+## Related Docs
 
-## Parallel Variant
-
-When `--parallel` is enabled, generation fans out only by actor roster chunk:
-
-```text
-prepare_actor_roster_chunks -> dispatch_actor_roster_chunks -> generate_actor_roster_chunk -> finalize_actor_roster
-```
-
-This preserves the same output while avoiding actor-per-call fan-out.
+- actor contract: [`../contracts.md`](../contracts.md)
+- runtime workflow: [`runtime.md`](./runtime.md)

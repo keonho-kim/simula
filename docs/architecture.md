@@ -1,147 +1,82 @@
 # Architecture
 
-`simula` is a layered application centered on one LangGraph workflow. The workflow owns simulation
-state transitions. The surrounding application is responsible for:
+`simula` is organized around one staged simulation pipeline. The pipeline turns a scenario into a
+world model, expands that world into actors and events, advances the world through rounds, and
+projects the completed trace into reports and analysis artifacts.
 
-- turning CLI input into a compact graph input
-- supplying services through runtime context
-- persisting SQL-backed artifacts
-- streaming JSONL runtime events
-- writing human-facing output artifacts after the graph completes
+## System Boundaries
 
-## Layers
+| Boundary | Responsibility |
+| --- | --- |
+| Input boundary | Accept scenario text, scenario controls, run identity, and runtime limits. |
+| Domain boundary | Define actors, plans, events, activities, memory, reporting data, and validation rules. |
+| Workflow boundary | Coordinate stage order and pass explicit state from one stage to the next. |
+| Model boundary | Request structured planning, actor, runtime, and report data from configured model roles. |
+| Persistence boundary | Store durable run records, event streams, reports, and analysis-ready artifacts. |
+| Presentation boundary | Render final human-readable reports and summaries from structured data. |
 
-| Layer | Responsibility | Representative modules |
-| --- | --- | --- |
-| Entry | CLI parsing and process bootstrap | `simula.entrypoints.*` |
-| Common | cross-layer logging and runtime-output helpers | `simula.shared.*` |
-| Application | commands, workflow execution, presentation, output writing, analysis orchestration | `simula.application.*` |
-| Domain | typed contracts, event memory, activity/runtime/reporting/scenario rules | `simula.domain.*` |
-| Infrastructure | config loading, provider adapters, storage engines, checkpointers | `simula.infrastructure.*` |
+These boundaries keep simulation concepts separate from transport, storage, and rendering details.
 
-## Execution Path
+## Stage Architecture
 
 ```mermaid
 flowchart LR
-    CLI["entrypoints.cli"] --> Bootstrap["entrypoints.bootstrap"]
-    Bootstrap --> Command["application.commands.simulation_runs"]
-    Command --> Executor["application.services.executor"]
-    Executor --> Input["SimulationInputState"]
-    Executor --> Context["WorkflowRuntimeContext"]
-    Input --> Hydrate["hydrate_initial_state"]
-    Hydrate --> Workflow["SIMULATION_WORKFLOW or SIMULATION_WORKFLOW_PARALLEL"]
-    Context --> Workflow
-    Workflow --> Output["SimulationOutputState"]
-    Output --> Writer["application.services.output_writer"]
-    Writer --> Files["report.final.md + manifest.json + analysis artifacts"]
-    Executor --> Jsonl["simulation.log.jsonl"]
-    Executor --> Store["SQL store"]
+    Input["Scenario Input"] --> Plan["Planning"]
+    Plan --> Cast["Actor Generation"]
+    Cast --> Rounds["Runtime Rounds"]
+    Rounds --> Report["Finalization"]
+    Report --> Output["Run Artifacts"]
 ```
 
-The executor is the boundary that combines graph execution, output streaming, storage, and
-integrated output writing.
+Each stage owns one product-level concern:
 
-## LangGraph Boundary
+- Planning defines what the run is about, who participates, which events matter, and how progress
+  should be recognized.
+- Actor generation turns planned cast entries into stateful actor cards.
+- Runtime advances the world through selected events, actor actions, intent updates, memory updates,
+  and stop decisions.
+- Finalization converts the completed trace into a structured report, rendered markdown, and
+  analysis inputs.
 
-The root graph has distinct public input, internal state, and public output schemas:
+## State Flow
 
-- `input_schema=SimulationInputState`
-- `state_schema=SimulationWorkflowState`
-- `output_schema=SimulationOutputState`
-- `context_schema=WorkflowRuntimeContext`
+The pipeline separates public input, internal workflow state, and public output.
 
-This keeps the public API narrow while allowing the workflow to carry stage-specific state.
+- Public input stays compact: scenario text, scenario controls, run id, round ceiling, and seed.
+- Internal state carries stage-specific data such as plan, actors, event memory, round history,
+  intent history, world summary, and report buffers.
+- Public output stays compact: run id, final report, rendered report, event log reference, usage
+  summary, stop reason, and explicit errors.
 
-The shipped default is the serial root workflow. When CLI `--parallel` is enabled, the executor
-switches to the parallel root workflow variant instead of changing trial execution.
+Service dependencies such as storage, model clients, logging, and output writing stay outside the
+simulation state. That keeps the world model serializable and easier to inspect.
 
-## Internal State
+## Persistence Model
 
-The graph accepts a compact input and expands it once in `hydrate_initial_state`.
+`simula` keeps two durable paths:
 
-This keeps CLI input small while giving later stages a consistent state shape.
+- Structured storage records the run, finalized plan, actor registry, adopted activities, observer
+  reports, and final report payload.
+- File artifacts record the event stream, rendered report, manifest, summaries, tables, and visual
+  analysis outputs.
 
-## Runtime Context
+`simulation.log.jsonl` is the append-only event stream. It is the source artifact for derived
+analysis, while `report.final.md` is the primary human-readable run result.
 
-Service dependencies stay out of the graph state and are carried through `WorkflowRuntimeContext`.
+## Design Direction
 
-The current context includes:
+The architecture favors explicit state over hidden context.
 
-- `settings`
-- `store`
-- `llms`
-- `logger`
-- `llm_usage_tracker`
-- `run_jsonl_appender`
-- `parallel_graph_calls`
-
-This keeps simulation data separate from database handles, provider clients, and loggers.
-
-## Stream Surface
-
-The executor runs the graph with:
-
-- `app.astream(...)`
-- `stream_mode=["custom", "values"]`
-- `version="v2"`
-
-The stream responsibilities are separated:
-
-- `custom` parts carry stable domain events that are appended to `simulation.log.jsonl`
-- `values` parts carry state snapshots, with the last snapshot treated as the final graph output
-
-This keeps the stream surface small and predictable.
-
-## Persistence Split
-
-There are two persistence paths.
-
-### SQL-backed runtime store
-
-The application store persists:
-
-- run records
-- the finalized plan
-- finalized actors
-- per-round adopted activities and observer reports
-- the structured final report
-
-### File outputs
-
-File output is separate from the SQL store:
-
-- `simula.shared.io.RunJsonlAppender` writes `simulation.log.jsonl` incrementally during execution
-- the integrated output writer uses that JSONL file to build `report.final.md`, `manifest.json`,
-  and analysis artifacts inside the same run directory
-
-The runtime output root is still configured by `storage.output_dir`. Separately, the repository may
-keep committed example runs under `output.samples/` for inspection and documentation.
-
-This keeps append-heavy event logging separate from relational storage and keeps markdown rendering
-out of the nodes that manage simulation state.
-
-## Prompt and Report Boundaries
-
-The workflow uses different data shapes for different stages.
-
-- internal workflow state is used for node-to-node coordination
-- model calls use compact stage-specific inputs
-- `report_projection_json` is a finalization artifact used for report writing
-
-## Domain Package Shape
-
-The domain layer is organized by responsibility:
-
-- `simula.domain.contracts` contains typed contracts
-- `simula.domain.event_memory` contains event-memory lifecycle, matching, and update rules
-- `simula.domain.activity` contains canonical action and feed rules
-- `simula.domain.runtime` contains runtime action, runtime policy, and coordinator policy
-- `simula.domain.reporting` contains durable event builders and final-report helpers
-- `simula.domain.scenario` contains scenario controls and shared time utilities
+- Actor state, intent, and memory are first-class data.
+- Event progress is tracked through event memory rather than inferred only from prose.
+- Runtime decisions are written into durable logs.
+- Final reports are projections of the completed trace.
+- Implementation details are allowed to change while the product concepts and artifact contracts
+  remain understandable.
 
 ## Related Docs
 
-- state and artifact contracts: [`contracts.md`](./contracts.md)
-- settings and storage configuration: [`configuration.md`](./configuration.md)
-- role routing and parsing policy: [`llm.md`](./llm.md)
-- stage-level workflow details: [`workflows/README.md`](./workflows/README.md)
+- data and artifact contracts: [`contracts.md`](./contracts.md)
+- model-backed behavior: [`llm.md`](./llm.md)
+- stage-level workflows: [`workflows/README.md`](./workflows/README.md)
+- analysis artifacts: [`analysis.md`](./analysis.md)

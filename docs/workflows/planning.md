@@ -1,66 +1,60 @@
 # Planning Workflow
 
-Planning turns raw scenario text plus scenario controls into one compact execution plan.
+Planning turns scenario text and scenario controls into an execution plan that later stages can use
+without reinterpreting the original brief.
 
-## Active Path
+## Flow
 
 ```mermaid
 flowchart LR
-    Start([START]) --> Analysis["build_planning_analysis"]
-    Analysis --> Outline["build_cast_roster_outline"]
-    Outline --> Situation["build_situation"]
-    Situation --> Catalog["build_action_catalog"]
-    Catalog --> Coordination["build_coordination_frame"]
-    Coordination --> Events["build_major_events"]
-    Events --> Frame["assemble_execution_plan_frame"]
-    Frame --> Chunks["prepare_plan_cast_chunks"]
-    Chunks --> Cast["build_plan_cast_chunk"]
-    Cast --> Assemble["assemble_execution_plan"]
-    Assemble --> Finalize["finalize_plan"]
-    Finalize --> End([END])
+    Scenario["Scenario"] --> Interpretation["Interpretation"]
+    Interpretation --> Situation["Situation Model"]
+    Situation --> Actions["Action Catalog"]
+    Actions --> Cast["Cast Roster"]
+    Cast --> Events["Major Events"]
+    Events --> Plan["Execution Plan"]
 ```
 
-## Stage Responsibilities
+## Responsibilities
 
-### Field bundle nodes
+Planning defines:
 
-Planning is split into small structured calls:
+- what the scenario is about
+- what pressures and constraints matter
+- which action types are available
+- which actors should exist
+- which major events should drive the run
+- how many rounds the run should target before finalization
 
-- `build_planning_analysis` sets the premise, timing policy, and `planned_max_rounds`.
-- `build_cast_roster_outline` fixes stable cast ids and display names.
-- `build_situation` and `build_action_catalog` create independent plan inputs.
-- `build_coordination_frame` uses the fixed situation, cast outline, and action catalog.
-- `build_major_events` uses only action types from the fixed action catalog.
-- `build_plan_cast_chunk` expands cast outline chunks into full cast roster entries.
+The plan is the main contract between scenario interpretation and runtime behavior.
 
-The parallel graph may run independent bundle nodes concurrently after their inputs are fixed.
+## Validation
 
-### `finalize_plan`
+Planning output should be internally consistent.
 
-Validates and saves the plan before generation starts.
+- cast ids are stable and unique
+- display names are unique enough for reports
+- cast count follows scenario controls
+- major events have stable ids
+- major events reference known actors
+- event completion rules use known action types
+- planned round windows fit inside the configured run ceiling
 
-Current validation includes:
-
-- unique `cast_id`
-- unique `display_name`
-- cast roster count matches `scenario_controls`
-- major-event ids are unique and non-empty
-- major-event round windows stay within `planned_max_rounds`
-- major-event participant ids exist in the cast roster
-- major-event completion action types exist in the action catalog
+If the plan cannot be validated, the run should fail before actor generation.
 
 ## Stage Output
 
-The final `plan` contains:
+The execution plan contains:
 
-- `interpretation`
-- `situation`
-- `progression_plan`
-- `action_catalog`
-- `coordination_frame`
-- `cast_roster`
-- `major_events`
+- scenario interpretation
+- situation model
+- progression plan
+- action catalog
+- coordination frame
+- cast roster
+- major events
 
-## Failure Behavior
+## Related Docs
 
-Planning fails if any required bundle cannot be parsed, repaired, or validated.
+- plan contract: [`../contracts.md`](../contracts.md)
+- actor generation: [`generation.md`](./generation.md)

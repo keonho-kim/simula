@@ -1,80 +1,79 @@
 # Runtime Workflow
 
-Runtime is the only looping stage. It selects the next event, builds deterministic action
-candidates, asks for one `SceneDelta`, applies the delta, and decides whether another tick is
-needed.
+Runtime is the looping stage that advances the virtual world.
 
-## Active Path
+## Flow
 
 ```mermaid
 flowchart TD
-    Start([START]) --> Init["initialize_runtime_state"]
-    Init --> Tick["run_scene_tick"]
-    Tick --> Route{"route_after_scene_tick"}
-    Route -->|continue| Tick
-    Route -->|complete| End([END])
+    Start["Runtime State"] --> Select["Select Event Focus"]
+    Select --> Actors["Select Scene Actors"]
+    Actors --> Actions["Build Action Candidates"]
+    Actions --> Delta["Apply Scene Delta"]
+    Delta --> Memory["Update Memory And Intent"]
+    Memory --> Stop{"Stop?"}
+    Stop -->|No| Select
+    Stop -->|Yes| Done["Completed Trace"]
 ```
 
-`--parallel` does not add runtime LLM fan-out. Runtime keeps one coordinator call per scene tick.
+## Round Responsibilities
 
-## Stage Responsibilities
+Each round should:
 
-### `initialize_runtime_state`
+- select one event focus from event memory
+- select relevant actors
+- build plausible action candidates
+- adopt concrete interactions
+- update actor intent
+- update event progress
+- advance simulation time
+- write observer-facing summary data
+- decide whether the run should continue
 
-Builds the runtime-only starting point after planning and generation:
+This keeps runtime grounded in explicit state instead of free-running narrative generation.
 
-- initializes `activity_feeds`
-- compiles the runtime `SimulationPlan`
-- initializes `event_memory` from `plan.major_events`
-- initializes actor intent snapshots
-- builds the initial actor-facing scenario digest
-- resets runtime scratch fields
+## Actor State
 
-### `run_scene_tick`
+Runtime maintains actor-facing state across rounds.
 
-One tick performs:
+Actor state includes:
 
-- deterministic next-event selection
-- deterministic scene actor selection, capped by `runtime.max_scene_actors`
-- deterministic action candidate generation, capped by `runtime.max_scene_candidates`
-- scene beat writing, capped by `runtime.max_scene_beats`
-- one `SceneDelta` LLM call
-- canonical action creation for scene beats
-- event-memory update and transition recording
-- intent-state merge
-- simulation clock advancement
-- compact observer report creation
-- stop decision
+- current intent
+- recent memories
+- relevant event pressures
+- activity feed
+- relationship signals
+- recent actions and reactions
 
-The console DEBUG output summarizes the selected event, actors, candidates, scene beats, event
-updates, time advance, and LLM cost metadata. Raw prompts and responses remain in the JSONL LLM log.
+Later rounds use this state so actors can respond to what already happened.
 
 ## Stop Behavior
 
-The runtime loop ends when one of these happens:
+The runtime loop ends when one of these conditions is met:
 
 - the hard round ceiling is reached
-- `SceneDelta.stop_reason` requests completion and no required event remains unresolved
-- repeated no-action ticks produce `no_progress`
+- the simulation reaches a valid completion state
+- no meaningful progress can be made
 - no unresolved event can be selected
 
-`stop_reason` values remain:
-
-- `""`
-- `no_progress`
-- `simulation_done`
+The stop reason is recorded in final output and reports.
 
 ## Stage Output
 
-Runtime leaves behind the trace consumed by finalization:
+Runtime leaves the trace consumed by finalization:
 
-- `activities`
-- `observer_reports`
-- `round_time_history`
-- `event_memory`
-- `event_memory_history`
-- `actor_intent_states`
-- `intent_history`
-- `world_state_summary`
-- `scene_tick_history`
-- `stop_reason`
+- adopted interactions
+- observer reports
+- round time history
+- event memory
+- event-memory history
+- actor intent states
+- intent history
+- world-state summary
+- stop reason
+- explicit errors and defaults
+
+## Related Docs
+
+- event memory contract: [`../contracts.md`](../contracts.md)
+- finalization workflow: [`finalization.md`](./finalization.md)

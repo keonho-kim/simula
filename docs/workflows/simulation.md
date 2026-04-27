@@ -1,102 +1,76 @@
-# Simulation Root Graph
+# Simulation Workflow
 
-The root graph defines the public workflow boundary, state initialization step, and stage order.
+The root simulation workflow defines the public boundary and stage order for one run.
 
-## Active Path
+## Boundary
+
+The workflow accepts compact run input:
+
+- run id
+- scenario body
+- scenario controls
+- maximum round limit
+- deterministic seed when provided
+
+It returns compact run output:
+
+- run id
+- final report payload
+- rendered report
+- event log reference
+- usage summary
+- stop reason
+- explicit errors
+
+## Stage Order
 
 ```mermaid
 flowchart LR
-    Start([START]) --> Hydrate["hydrate_initial_state"]
-    Hydrate --> Planning["planning"]
-    Planning --> Generation["generation"]
-    Generation --> Runtime["runtime"]
-    Runtime --> Finalization["finalization"]
-    Finalization --> End([END])
+    Start["Run Input"] --> Plan["Planning"]
+    Plan --> Actors["Actor Generation"]
+    Actors --> Runtime["Runtime"]
+    Runtime --> Final["Finalization"]
+    Final --> Done["Run Output"]
 ```
 
-## Graph Shape
+## State Initialization
 
-The root builder is a `StateGraph` configured with:
+Before planning begins, the workflow expands compact input into initialized state.
 
-- `input_schema=SimulationInputState`
-- `state_schema=SimulationWorkflowState`
-- `output_schema=SimulationOutputState`
-- `context_schema=WorkflowRuntimeContext`
+The initialized state includes:
 
-That keeps the public boundary narrow while allowing downstream nodes to communicate through a
-single shared workflow state.
+- empty plan and actor buffers
+- empty runtime activity and observer history
+- initial event-memory fields
+- initial actor intent fields
+- initial simulation clock
+- empty report buffers
+- empty error list
 
-## Hydration
-
-`hydrate_initial_state` is the only root node that reads public input directly.
-
-It expands:
-
-- `run_id`
-- `scenario`
-- `scenario_controls`
-- `max_rounds`
-- `rng_seed`
-- `parallel_graph_calls`
-
-into an initialized workflow state, including:
-
-- empty planning and runtime scratch fields
-- initial simulation clock fields
-- initial report buffers
-- empty `errors`
-- internal-only `checkpoint_enabled`
-
-Downstream nodes read that initialized state rather than rebuilding these fields.
-
-## Runtime Context
-
-The graph also receives `WorkflowRuntimeContext`, which currently provides:
-
-- `settings`
-- `store`
-- `llms`
-- `logger`
-- `llm_usage_tracker`
-- `run_jsonl_appender`
-
-These dependencies stay outside the graph state.
-
-## Serial And Parallel Variants
-
-The shipped default root workflow uses the serial stage variants.
-
-- `SIMULATION_WORKFLOW` is the default serial root workflow
-- `SIMULATION_WORKFLOW_PARALLEL` is selected only when CLI `--parallel` is enabled
-
-The public input and output schemas stay the same across both variants. Only intra-run branch
-concurrency changes.
-
-## Execution Stream Surface
-
-The graph defines the workflow shape. The executor defines how it is consumed.
-
-During execution, the executor streams:
-
-- `custom` events for stable runtime log entries
-- `values` snapshots for state output
-
-Operationally this means:
-
-- custom events are appended to `simulation.log.jsonl`
-- the last `values` snapshot becomes the final graph output seen by the executor
+Later stages should read this initialized state instead of rebuilding shared defaults.
 
 ## Stage Ownership
 
-Each stage has one clear responsibility:
+| Stage | Owns |
+| --- | --- |
+| Planning | scenario interpretation, action catalog, cast roster, and major events |
+| Actor generation | concrete actor cards and actor registry validation |
+| Runtime | event selection, actor actions, intent updates, event-memory updates, and stop decisions |
+| Finalization | report projection, report drafting, markdown rendering, and final metadata |
 
-- `planning`: scenario interpretation and execution plan construction
-- `generation`: actor card generation
-- `runtime`: round loop, action adoption, and stop decisions
-- `finalization`: final report projection and markdown assembly
+## Durable Events
+
+During execution, stable events are appended to `simulation.log.jsonl`.
+
+The log is used for:
+
+- inspection
+- analysis
+- performance summaries
+- final artifact indexing
 
 ## Related Docs
 
-- stage hub: [`README.md`](./README.md)
-- state and runtime context contracts: [`../contracts.md`](../contracts.md)
-- architecture and stream boundary: [`../architecture.md`](../architecture.md)
+- workflow hub: [`README.md`](./README.md)
+- state and artifact contracts: [`../contracts.md`](../contracts.md)
+- architecture: [`../architecture.md`](../architecture.md)
