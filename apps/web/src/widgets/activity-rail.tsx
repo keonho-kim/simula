@@ -59,6 +59,7 @@ type TraceEntry = {
 }
 
 type RolePanelRole = Exclude<ModelRole, "storyBuilder" | "actor">
+type RoleStatus = "idle" | "active" | "running" | "done" | "failed"
 
 interface LogItem {
   id: string
@@ -72,7 +73,7 @@ interface RoleSummary {
   role: RolePanelRole
   label: string
   description: string
-  status: string
+  status: RoleStatus
   preview: string
   trace?: RoleTrace
   messages: Array<{ content: string; timestamp: string }>
@@ -166,13 +167,13 @@ function RoleSignalButton({ summary, t, onClick }: { summary: RoleSummary; t: Ui
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold">{summary.label}</span>
             <Badge variant={summary.status === "failed" ? "destructive" : "secondary"} className="h-4 rounded-sm px-1.5 text-[10px]">
-              {summary.status}
+              {formatRoleStatus(summary.status, t)}
             </Badge>
           </div>
           <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{summary.preview}</p>
           <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
-            <span>{summary.messages.length} {t.messages}</span>
-            <span>{summary.metrics.length} {t.metrics}</span>
+            <span>{formatCount(summary.messages.length, t.messageCountLabel, t)}</span>
+            <span>{formatCount(summary.metrics.length, t.metricCountLabel, t)}</span>
           </div>
         </div>
       </div>
@@ -245,7 +246,7 @@ function RoleDialog({ summary, t, onOpenChange }: {
             <section className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-xs font-semibold uppercase text-muted-foreground">{t.stateSignals}</h3>
-                <Badge variant="outline" className="rounded-sm bg-background">{summary.status}</Badge>
+                <Badge variant="outline" className="rounded-sm bg-background">{formatRoleStatus(summary.status, t)}</Badge>
               </div>
               {summary.sections.length ? (
                 <div className="divide-y divide-border/60 overflow-hidden rounded-md bg-muted/20">
@@ -342,6 +343,25 @@ function MetricChip({ label, value }: { label: string; value: string }) {
   )
 }
 
+function formatRoleStatus(status: RoleStatus, t: UiTexts): string {
+  if (status === "idle") return t.statusIdle
+  if (status === "active") return t.statusActive
+  if (status === "running") return t.statusRunning
+  if (status === "done") return t.statusDone
+  return t.statusFailed
+}
+
+function formatCount(count: number, label: string, t: UiTexts): string {
+  if (isKoreanText(t)) {
+    return `${label} ${count.toLocaleString()}개`
+  }
+  return `${count.toLocaleString()} ${label}`
+}
+
+function isKoreanText(t: UiTexts): boolean {
+  return t.languageKorean === "한국어"
+}
+
 function buildLogItems(events: RunEvent[], t: UiTexts): LogItem[] {
   return events.flatMap((event, index): LogItem[] => {
     const id = `${event.type}-${index}`
@@ -408,7 +428,7 @@ function roleStatus(
   trace: RoleTrace | undefined,
   messages: Array<{ content: string; timestamp: string }>,
   logs: LogItem[]
-): string {
+): RoleStatus {
   if (logs.some((log) => log.level === "error")) {
     return "failed"
   }
@@ -425,7 +445,7 @@ function roleStatus(
 }
 
 function rolePreview(
-  role: RolePanelRole,
+  _role: RolePanelRole,
   trace: RoleTrace | undefined,
   messages: Array<{ content: string; timestamp: string }>,
   logs: LogItem[],
@@ -440,11 +460,9 @@ function rolePreview(
   if (trace?.intent) return trace.intent
   if (trace?.action) return trace.action
   if (trace?.thought) return trace.thought
-  const latestMessage = messages.at(-1)?.content
-  if (latestMessage) return latestMessage
-  const latestLog = logs.at(-1)?.body
-  if (latestLog) return latestLog
-  return `${roleLabel(role)} ${t.roleNoSignal}`
+  if (messages.length) return t.roleModelSignalCaptured
+  if (logs.length) return t.roleLogSignalCaptured
+  return t.roleNoSignal
 }
 
 function buildRoleSections(
