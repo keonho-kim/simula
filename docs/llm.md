@@ -1,80 +1,78 @@
-# LLM Design
+# Model Design
 
-## Overview
+`simula` uses model calls as bounded contributors to a larger stateful simulation. Models create
+structured proposals, but the system validates and records those proposals before they become part
+of the run.
 
-`simula` routes model calls through a small set of named roles. Each role owns one part of the
-workflow, and configuration decides which provider and model back that role.
+## Model Roles
 
 | Role | Responsibility |
 | --- | --- |
-| `planner` | scenario analysis and plan creation |
-| `generator` | actor card generation |
-| `coordinator` | round planning, continuation checks, and round resolution |
-| `actor` | one actor action proposal |
-| `observer` | timeline anchoring and final report sections |
-| `fixer` | JSON repair for malformed structured responses |
+| Planner | Interpret the scenario and produce planning bundles. |
+| Generator | Turn planned cast slots into concrete actor cards. |
+| Coordinator | Advance one runtime focus through actor actions, event updates, and world-state changes. |
+| Observer | Draft the final report from the completed trace. |
+| Repair | Recover malformed structured responses when recovery is allowed. |
 
-## Provider Support
-
-The application supports:
-
-- OpenAI
-- OpenAI-compatible
-- Anthropic
-- Google
-- Bedrock
-
-Provider and model settings are described in [`configuration.md`](./configuration.md).
+Role separation keeps each model call small and purpose-specific.
 
 ## Model Inputs
 
-Model calls use compact, stage-specific inputs.
+Model calls receive compact stage-specific inputs.
 
-- Planning receives the scenario text plus planning context.
-- Generation receives one planned cast item plus the context needed to turn it into an actor card.
-- Runtime coordinator calls receive round state, event state, and recent summaries.
-- Runtime actor calls receive one actor card plus the current round context.
-- Finalization receives the completed run state and report inputs.
+- Planning receives scenario text, scenario controls, and partial planning context.
+- Actor generation receives the execution plan and assigned cast entries.
+- Runtime receives the selected event, selected actors, recent effects, current intent state, and
+  current world summary.
+- Finalization receives a report projection derived from the completed trace.
 
-The goal is simple: each stage gets the information it needs without carrying the entire workflow
-state into every call.
+The goal is to avoid passing the whole world into every call. Each stage gets only the context it
+needs to produce its contract.
 
 ## Structured Outputs
 
-Most model calls use local parsing and validation. Structured responses are checked in code before
-they are accepted into workflow state.
+Most model-backed stages expect structured responses.
 
-The common path is:
+The normal acceptance path is:
 
-1. call the configured model for a role
-2. parse the response locally
-3. validate the result against the expected schema or contract
-4. apply local normalization when the stage requires it
+1. request a response for one role
+2. parse the response
+3. validate it against the stage contract
+4. normalize accepted data where the stage requires canonical fields
+5. merge the result into workflow state
 
-When parsing fails, the runtime may retry, repair malformed JSON through the `fixer` role, or use
-an explicit default value when that stage defines one.
+Structured output is a product contract, not just a formatting preference. It allows later stages
+to reason over actors, events, actions, reports, and metrics.
 
-## Failure Handling
+## Validation And Recovery
 
-Different stages use different policies, but the rules are consistent:
+Validation is stage-specific.
 
-- planning and generation fail when their required structured outputs cannot be recovered
-- selected runtime stages can use explicit defaults
-- final report sections use text validators and a bounded retry
-- repair stays visible through logs and analysis artifacts
+- Planning checks that cast, actions, and events are internally consistent.
+- Actor generation checks that generated actors match planned cast slots.
+- Runtime checks that scene updates affect the selected event and selected actors.
+- Finalization checks that report sections can be rendered from the completed trace.
 
-The system prefers explicit failure or explicit defaults over silent degradation.
+When a response is malformed, the system may retry or use the repair role if that stage allows
+recovery. Runtime may use explicit default behavior for bounded scene advancement, but that default
+must remain visible through logs and errors.
 
-## Logging and Observability
+## Observability
 
-Every run records model-call activity in `simulation.log.jsonl`. The log includes role, timings,
-token counts when available, and per-call context for later analysis.
+Every run records model-call metadata in `simulation.log.jsonl`.
 
-This log is also the source for derived analysis artifacts such as token summaries, performance
-tables, and fixer usage reports.
+The log supports:
+
+- role-level timing inspection
+- token and usage summaries when available
+- recovery and default tracking
+- per-stage performance comparison
+- analysis of how model calls contributed to the final report
+
+The event log is also the source for derived analysis artifacts.
 
 ## Related Docs
 
-- configuration and provider rules: [`configuration.md`](./configuration.md)
-- state and artifact contracts: [`contracts.md`](./contracts.md)
-- stage-level workflow docs: [`workflows/README.md`](./workflows/README.md)
+- data contracts: [`contracts.md`](./contracts.md)
+- configuration concepts: [`configuration.md`](./configuration.md)
+- workflow stages: [`workflows/README.md`](./workflows/README.md)

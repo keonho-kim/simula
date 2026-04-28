@@ -1,241 +1,105 @@
 # Configuration
 
-`simula` loads a typed `AppSettings` object from four layers:
+This document describes configuration concepts without prescribing a language-specific setup path.
+Concrete command syntax belongs outside this documentation until the current runtime transition is
+settled.
+
+## Resolution Model
+
+Settings are expected to resolve from layered sources.
 
 1. built-in defaults
-2. `env.toml` or an explicit `--env` file
+2. local configuration file
 3. environment variables
-4. CLI overrides
+4. explicit run overrides
 
-The preferred operator path is still:
+Later layers override earlier layers. A run should record a redacted settings summary in
+`manifest.json` so saved artifacts remain inspectable.
 
-```bash
-cp env.sample.toml env.toml
+## Configuration Areas
+
+| Area | Purpose |
+| --- | --- |
+| Runtime controls | Round limits, recipient caps, scene size limits, deterministic seed, and optional checkpoint behavior. |
+| Scenario controls | Cast count and whether additional cast entries are allowed. |
+| Storage | Where structured run records and file artifacts are written. |
+| Model roles | Which model configuration backs planning, actor generation, runtime coordination, final reporting, and repair. |
+| Logging | Console verbosity and durable event-log behavior. |
+| Analysis | Which summaries, tables, and visual artifacts are emitted for completed runs. |
+
+## Runtime Controls
+
+Runtime controls shape how far a simulation can advance.
+
+- maximum rounds define the hard ceiling
+- scene actor limits bound how many actors can participate in one runtime focus
+- candidate limits bound how many possible actions are considered
+- scene beat limits bound how much activity one round can adopt
+- deterministic seeds support repeatable selection where the implementation allows it
+
+The exact defaults may change, but each completed run should make the effective controls visible
+through the manifest.
+
+## Scenario Controls
+
+Scenario controls are part of the scenario contract.
+
+```text
+---
+num_cast: 6
+allow_additional_cast: true
+---
+Scenario body starts here.
 ```
 
-The sample file is not the only supported path, but it is the clearest starting point for local
-setup.
+`num_cast` is required and must be a positive integer. `allow_additional_cast` is optional. When it
+is false, the run should use exactly the requested cast size. When it is true or omitted, the plan
+may include additional cast entries if the scenario requires them.
 
-## Resolution Rules
+## Model Role Configuration
 
-### File resolution
+`simula` uses role-level model configuration.
 
-- `--env /path/to/file.toml`: use that file and fail if it does not exist
-- no `--env`, local `env.toml` exists: use `./env.toml`
-- no `--env`, no local `env.toml`: continue with defaults plus environment variables
+The current roles are:
 
-### Precedence
+- planner
+- generator
+- coordinator
+- observer
+- repair
 
-Later layers override earlier ones:
+Each role should resolve to one concrete model configuration with its own temperature, token
+budget, timeout, and provider-specific credentials or endpoint settings when needed.
 
-1. built-in defaults from the config builders
-2. parsed TOML values
-3. real environment variables
-4. CLI overrides from `simula`
+Role separation allows different stages to use different model strengths while keeping product
+contracts stable.
 
-The only current CLI overrides are:
+## Storage And Artifacts
 
-- `--max-rounds` -> `SIM_MAX_ROUNDS`
-- `--log-level` -> `SIM_LOG_LEVEL`
+Configuration should identify:
 
-## `env.toml` Shape
+- where structured run records are stored
+- where file artifacts are written
+- whether checkpoint-like recovery data is enabled
+- how repeated trials isolate their outputs
 
-The loader accepts the current nested structure only. Legacy flat keys such as `SIM_*` inside the
-TOML file are rejected.
-
-| Table | Purpose | Notes |
-| --- | --- | --- |
-| `[env]` | general runtime controls | log level, actor-call caps, recipient cap, checkpointing, RNG seed |
-| `[time]` | runtime round cap | only `max_rounds` is allowed |
-| `[db]` | storage provider selection | choose `sqlite` or `postgresql` |
-| `[db.sqlite]` | SQLite path settings | required when `db.provider = "sqlite"` |
-| `[db.postgresql]` | PostgreSQL connection and table names | required when `db.provider = "postgresql"` |
-| `[fs]` | file output directory | controls the live simulation run directory root, typically `output/` |
-| `[llm.<provider>]` | provider-wide defaults | shared credentials and provider-specific defaults |
-| `[llm.<role>]` | role routing and per-role overrides | one of `planner`, `generator`, `coordinator`, `actor`, `observer`, `fixer` |
-
-### Runtime keys
-
-`[env]` accepts:
-
-- `log_level`
-- `max_recipients_per_message`
-- `max_actor_calls_per_step`
-- `max_focus_slices_per_step`
-- `enable_checkpointing`
-- `rng_seed`
-
-`[time]` accepts only:
-
-- `max_rounds`
-
-### Storage keys
-
-`[db]` accepts:
-
-- `provider`
-
-`[db.sqlite]` accepts:
-
-- `dir`
-- `path`
-
-`[db.postgresql]` accepts:
-
-- `host`
-- `port`
-- `user`
-- `password`
-- `database`
-- `schema`
-- `runs_table`
-- `actors_table`
-- `activities_table`
-- `observer_reports_table`
-- `final_reports_table`
-
-`[fs]` accepts:
-
-- `output_dir`
-
-The committed repository examples under `output.samples/` are not controlled by `output_dir`.
-They are checked-in snapshots, not live runtime outputs.
-
-## LLM Routing Model
-
-The settings model always resolves six logical roles:
-
-- `planner`
-- `generator`
-- `coordinator`
-- `actor`
-- `observer`
-- `fixer`
-
-Each role resolves to one `ModelConfig` containing:
-
-- `provider`
-- `model`
-- `temperature`
-- `max_tokens`
-- `timeout_seconds`
-- provider-specific options
-
-### Shared provider defaults
-
-The top-level provider tables supply shared defaults for matching roles:
-
-- `[llm.openai]`
-- `[llm.openai-compatible]`
-- `[llm.anthropic]`
-- `[llm.google]`
-- `[llm.bedrock]`
-
-For example, a role with `provider = "openai"` inherits shared `API_KEY`, `base_url`,
-`stream_usage`, `reasoning_effort`, and `verbosity` from `[llm.openai]` unless `[llm.<role>]` overrides them.
-`provider = "openai-compatible"` inherits shared `API_KEY`, `base_url`, and `stream_usage` from
-`[llm.openai-compatible]`, and any other keys from that table are forwarded through `extra_body`.
-Role-level shared fields such as `temperature`, `max_tokens`, and `timeout_seconds` still apply
-normally to OpenAI-compatible models.
-For example, `reasoning = { effort = "medium" }` inside `[llm.openai-compatible]` or `[llm.<role>]`
-is forwarded to the server as part of `extra_body`, but whether that field is honored depends on
-the specific OpenAI-compatible server.
-
-### Role tables
-
-Each `[llm.<role>]` table sets routing and optional provider-specific overrides directly:
-
-- `provider`
-- `model`
-- `temperature`
-- `max_tokens`
-- `timeout_seconds`
-- provider-specific fields such as `API_KEY`, `base_url`, `stream_usage`, `thinking_budget`, or `region_name`
-
-For `provider = "openai-compatible"`, only `API_KEY`, `base_url`, and `stream_usage` are reserved provider keys.
-Any additional keys in `[llm.openai-compatible]` or `[llm.<role>]` are forwarded through
-`extra_body`. You can also use `extra_body = { ... }` as an inline table.
-
-Examples:
-
-- LM Studio-style:
-  `reasoning = { effort = "medium" }`
-- vLLM-style:
-  `extra_body = { chat_template_kwargs = { enable_thinking = false } }`
-
-`stream_usage = true` requests token usage in streaming responses when the provider supports it.
-LM Studio supports this on OpenAI-compatible endpoints. Servers that do not support streaming
-usage may still leave token counts empty while TTFT and duration continue to be recorded.
-
-Nested role provider tables such as `[llm.actor.openai]` are no longer supported. Put
-provider-specific keys directly inside `[llm.actor]`.
-
-### Important defaults and special cases
-
-- `planner`, `generator`, and `observer` default to OpenAI-style routing when no role config is
-  present.
-- `actor` defaults to OpenAI-compatible routing when no role config is present.
-- `coordinator` inherits the planner config when no coordinator-specific role config is present.
-- `fixer` has OpenAI-style built-in defaults at the model-builder layer, but the loader still
-  requires explicit fixer role configuration to exist. It rejects a config that does not define
-  `[llm.fixer]` or equivalent `SIM_FIXER_*` environment variables.
+The file output root is conceptually separate from committed sample runs. `output/` is the live
+workspace for generated artifacts. `output.samples/` contains reference runs checked into the
+repository.
 
 ## Validation Rules
 
-The config validator is intentionally strict.
+Configuration validation should fail explicitly when required values are missing or incompatible.
 
-- OpenAI and Anthropic roles require an API key.
-- OpenAI-compatible roles require `base_url`.
-- Google requires either a Gemini API key or a complete Vertex path
-  (`project_id` plus `location`).
-- Bedrock requires `region_name`.
-- OpenAI `reasoning_effort` and `verbosity` are only valid for GPT-5 model names.
-- Provider-specific fields are rejected when they are attached to the wrong provider.
+Examples:
 
-The loader reads environment variables with these prefixes:
-
-- `SIM_`
-- `OPENAI_`
-- `OPENAI_COMPATIBLE_`
-- `ANTHROPIC_`
-- `GOOGLE_`
-- `BEDROCK_`
-
-## Storage and Checkpoints
-
-### SQLite
-
-When `db.provider = "sqlite"`:
-
-- the application store uses the configured SQLite database
-- schema creation happens automatically on startup
-- if checkpointing is enabled, LangGraph stores checkpoints in a sibling SQLite file named
-  `<sqlite_stem>.checkpoints<suffix>`
-
-Example:
-
-- runtime database: `./data/db/runtime.sqlite`
-- checkpoint database: `./data/db/runtime.checkpoints.sqlite`
-
-### PostgreSQL
-
-When `db.provider = "postgresql"`:
-
-- the application store validates the configured schema and table layout on startup
-- checkpointing uses LangGraph's PostgreSQL saver
-- schema creation is not implicit unless you run the bootstrap command
-
-Initialize PostgreSQL storage explicitly before the first run when needed:
-
-```bash
-uv run python -m simula.infrastructure.storage.schema_bootstrap --env ./env.toml
-```
-
-If checkpointing is enabled for PostgreSQL, that bootstrap command also creates the checkpoint
-tables.
+- unknown setting names should be rejected
+- model roles should resolve before a run starts
+- storage settings should be validated before the run writes artifacts
+- invalid scenario controls should stop the run before planning
 
 ## Related Docs
 
-- local execution and commands: [`operations.md`](./operations.md)
-- system boundaries: [`architecture.md`](./architecture.md)
-- role routing and retries: [`llm.md`](./llm.md)
+- scenario and artifact operations: [`operations.md`](./operations.md)
+- model roles: [`llm.md`](./llm.md)
+- artifact contracts: [`contracts.md`](./contracts.md)

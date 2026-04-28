@@ -1,39 +1,23 @@
 .DS_Store
 
-# Python bytecode and caches
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environments
-.venv/
-venv/
 .env/
-
-# Tool caches
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-.pyre/
-.hypothesis/
-.tox/
-.nox/
-.coverage
-.coverage.*
-htmlcov/
-.ty/
+node_modules/
+bun.lockb
 
 # Build artifacts
 build/
 dist/
-site/
-*.egg-info/
-.eggs/
-pip-wheel-metadata/
+apps/*/dist/
 
 # Local runtime and environment files
 .codex
 env.toml
+settings.json
+.e2e-settings.json
+.e2e-runs/
+test-results/
+playwright-report/
+runs/
 runtime.sqlite
 runtime.db
 data/db/*.sqlite

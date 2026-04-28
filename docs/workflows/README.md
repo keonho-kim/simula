@@ -1,48 +1,47 @@
 # Workflow Docs
 
-This section documents the workflow stages used by the application.
+`simula` runs a scenario through four product stages: planning, actor generation, runtime, and
+finalization.
 
 ## Stage Order
 
 ```mermaid
 flowchart LR
-    Input["SimulationInputState"] --> Hydrate["hydrate_initial_state"]
-    Hydrate --> Planning["planning"]
-    Planning --> Generation["generation"]
-    Generation --> Runtime["runtime"]
-    Runtime --> Finalization["finalization"]
-    Finalization --> Output["SimulationOutputState"]
+    Input["Scenario Input"] --> Planning["Planning"]
+    Planning --> Generation["Actor Generation"]
+    Generation --> Runtime["Runtime Rounds"]
+    Runtime --> Finalization["Finalization"]
+    Finalization --> Output["Run Artifacts"]
 ```
 
 ## Reading Order
 
 | If you need to understand... | Read |
 | --- | --- |
-| the root graph boundary | [`simulation.md`](./simulation.md) |
-| how scenario text becomes a plan | [`planning.md`](./planning.md) |
-| how cast slots become actors | [`generation.md`](./generation.md) |
-| how rounds loop and stop | [`runtime.md`](./runtime.md) |
-| how the report is assembled | [`finalization.md`](./finalization.md) |
+| the root workflow boundary | [`simulation.md`](./simulation.md) |
+| how scenario text becomes an execution plan | [`planning.md`](./planning.md) |
+| how cast slots become stateful actors | [`generation.md`](./generation.md) |
+| how rounds advance the world | [`runtime.md`](./runtime.md) |
+| how the final report is assembled | [`finalization.md`](./finalization.md) |
 
 ## Cross-Stage Handoffs
 
 | Stage | Consumes | Produces |
 | --- | --- | --- |
-| simulation root | public input plus runtime context | initialized workflow state |
-| planning | scenario text and scenario controls | compact execution plan plus planned round target |
-| generation | plan cast roster | finalized actor cards |
-| runtime | plan, actors, and accumulated trace | completed runtime trace plus event history |
-| finalization | completed runtime trace | final report, report projection, markdown sections |
+| Planning | scenario text and scenario controls | execution plan, cast roster, major events |
+| Actor generation | planned cast roster and plan context | finalized actor cards |
+| Runtime | plan, actors, event memory, and round limits | completed trace, activities, intent history, stop reason |
+| Finalization | completed runtime trace | final report, rendered report, manifest-ready metadata |
 
 ## Notes
 
-- the runtime stage is the only looping stage
-- the default workflow uses serial stage variants
-- `--parallel` switches the run onto the parallel stage variants
-- generation, runtime, and finalization keep explicit parallel variants, but they are opt-in
+- Runtime is the only looping stage.
+- Each stage consumes explicit data from previous stages.
+- Model-backed stages return structured data that is validated before it affects later stages.
+- Durable artifacts are written so a run can be inspected after completion.
 
-Related docs:
+## Related Docs
 
-- root graph boundary: [`simulation.md`](./simulation.md)
-- system architecture: [`../architecture.md`](../architecture.md)
-- artifact contracts: [`../contracts.md`](../contracts.md)
+- architecture: [`../architecture.md`](../architecture.md)
+- contracts: [`../contracts.md`](../contracts.md)
+- analysis: [`../analysis.md`](../analysis.md)

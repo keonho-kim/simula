@@ -21,6 +21,7 @@ Sample scenario seeds for local runs.
 
 - Each sample must start with YAML frontmatter.
 - `num_cast` is required and sets the requested cast count for the scenario.
+- `max_round` is required and sets the default maximum actor activity rounds.
 - `allow_additional_cast` is optional and defaults to `true`.
 - When `allow_additional_cast: false`, the planner must return exactly `num_cast` cast entries.
 - When `allow_additional_cast: true`, the planner must return at least `num_cast` cast entries.

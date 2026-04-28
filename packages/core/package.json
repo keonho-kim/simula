@@ -1,0 +1,14 @@
+{
+  "name": "@simula/core",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@simula/shared": "workspace:*"
+  }
+}

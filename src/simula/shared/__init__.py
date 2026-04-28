@@ -1,1 +1,0 @@
-"""Shared cross-layer components."""

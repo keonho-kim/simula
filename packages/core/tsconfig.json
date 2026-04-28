@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist",
+    "verbatimModuleSyntax": true,
+    "types": ["bun"]
+  },
+  "references": [{ "path": "../shared" }],
+  "include": ["src", "tests"]
+}

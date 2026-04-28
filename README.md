@@ -1,259 +1,136 @@
 <h1 align="center">Simula</h1>
 
-
 <p align="center">
-  <img alt="Python 3.13" src="https://img.shields.io/badge/python-3.13-blue">
-  <img alt="Package manager uv" src="https://img.shields.io/badge/package_manager-uv-4B8BBE">
-  <img alt="Runtime LangGraph" src="https://img.shields.io/badge/runtime-LangGraph-1f6feb">
   <img alt="Architecture staged" src="https://img.shields.io/badge/architecture-staged-0f766e">
+  <img alt="Model actor-based" src="https://img.shields.io/badge/model-actor_based-1f6feb">
+  <img alt="Artifacts inspectable" src="https://img.shields.io/badge/artifacts-inspectable-7c3aed">
 </p>
 
-`simula` is a scenario-to-report simulation engine built on LangGraph. It takes one scenario
-file, runs a staged multi-agent simulation, and writes one inspectable run directory with the
-final Markdown report, `simulation.log.jsonl`, and derived analysis artifacts.
+`simula` is an agent-based virtual simulation system. It turns a scenario into a structured
+virtual world, runs that world through staged actor interactions, and produces inspectable reports,
+event logs, and analysis artifacts.
 
 [Documentation](./docs/README.md) · [Workflow Docs](./docs/workflows/README.md) · [Sample Scenarios](./senario.samples/README.md)
 
-## What It Does
+## What Simula Is
 
-`simula` keeps planning, actor generation, runtime rounds, and report writing as separate stages.
+`simula` models a scenario as a temporary world populated by actors. Each actor has explicit
+identity, state, intent, memory, relationships, and available actions. The system advances the
+world through focused simulation rounds instead of producing one opaque narrative in a single pass.
 
-- Planning turns raw scenario text into one compact analysis bundle and one execution-plan bundle.
-- Generation turns the cast roster into actor cards through explicit slot-by-slot generation.
-- Runtime loops through directed rounds instead of free-running until token exhaustion.
-- Finalization turns the finished state into a report bundle and a JSONL log.
+The output is not just a final story. A run leaves a durable trace that shows what was planned,
+which actors existed, what happened round by round, how events changed, and how the final report was
+derived.
 
-The result is easier to inspect, test, and extend than a single opaque generation loop.
+## Core Concepts
 
-The integrated analysis pipeline also exposes benchmark-friendly network metrics so saved runs can be compared on
-participation spread, action diversity, path depth, concentration, community structure, and
-cumulative growth.
+| Concept | Meaning |
+| --- | --- |
+| Scenario | The source brief that defines the situation, constraints, cast size, and initial pressure. |
+| Actor | A stateful participant with a role, private goal, voice, intent, memory, and relationships. |
+| World state | The current shared situation, including recent actions, unresolved tensions, and event progress. |
+| Event memory | The planned and emergent event track used to decide what must still happen before the run can end. |
+| Interaction | A directed action, reaction, message, decision, or pressure between actors or against the world. |
+| Round | One focused advancement of the world, usually centered on a selected event and a relevant actor subset. |
+| Report | The final explanation of the run outcome, actor dynamics, timeline, and major events. |
+| Analysis | Derived metrics and visuals for comparing participation, action diversity, relationship structure, and growth. |
 
-Shared logging and runtime-output helpers live under `simula.shared.*`.
-
-## Why This Design
-
-- Small public API: the root graph accepts a compact input and returns a compact output.
-- Staged execution: planning, generation, runtime, and finalization are independent steps.
-- Durable artifacts: each successful run leaves a report, a JSONL log, and analysis files.
-- Inspectable runs: saved outputs can be compared across models and repeated trials.
-
-## Quick Start
-
-```bash
-uv sync
-cp env.sample.toml env.toml
-# UPDATE YOUR ENV.TOML
-uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md
-```
-
-For detailed local workflow logs:
-
-```bash
-uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md --log-level DEBUG
-```
-
-Repeat the same scenario three times:
-
-```bash
-uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md --trials 3
-```
-
-Allow intra-run graph parallelism for one run:
-
-```bash
-uv run simula --scenario-file ./senario.samples/03_startup_boardroom_crisis.md --parallel
-```
-
-Outputs land in:
-
-```text
-output/
-  <run_id>/
-    manifest.json
-    report.final.md
-    summary.overview.md
-    simulation.log.jsonl
-    data/
-    summaries/
-    assets/
-```
-
-Committed sample outputs live in:
-
-```text
-output.samples/
-  <run_id>/
-    manifest.json
-    report.final.md
-    summary.overview.md
-    simulation.log.jsonl
-    data/
-    summaries/
-    assets/
-```
-
-Run ids follow:
-
-```text
-YYYYMMDD.001.<actor-model-id>.<scenario-file-stem>
-```
-
-For example:
-
-```text
-20260418.001.qwen3-8b.03-startup-boardroom-crisis
-```
-
-The integrated analysis artifacts land in the same run directory:
-
-```text
-output/
-  <run_id>/
-    data/llm_calls.csv
-    data/performance.summary.csv
-    summaries/token_usage.summary.md
-    summaries/network.summary.md
-    assets/network.graph.png
-    assets/network.growth.mp4
-```
-
-The repository keeps example saved runs under [`output.samples/`](./output.samples/).
-Treat `output/` as the live runtime output root and `output.samples/` as committed reference data.
-
-## One End-to-End Flow
+## How A Simulation Works
 
 ```mermaid
 flowchart LR
-    Scenario["Scenario file"] --> CLI["CLI / bootstrap"]
-    CLI --> Executor["SimulationExecutor"]
-    Executor --> Input["SimulationInputState"]
-    Input --> Hydrate["hydrate_initial_state"]
-    Hydrate --> Planning["planning"]
-    Planning --> Generation["generation"]
-    Generation --> Runtime["runtime"]
-    Runtime --> Finalization["finalization"]
-    Finalization --> Output["SimulationOutputState"]
-    Output --> Report["report.final.md"]
-    Output --> Log["simulation.log.jsonl"]
+    Scenario["Scenario"] --> Planning["Planning"]
+    Planning --> Actors["Actor Generation"]
+    Actors --> Runtime["Runtime Rounds"]
+    Runtime --> Finalization["Finalization"]
+    Finalization --> Artifacts["Reports, Logs, Analysis"]
 ```
 
-This is the only flow described by the current documentation set.
+The workflow is intentionally staged.
 
-## Workflow Stages
+- Planning interprets the scenario, identifies the cast outline, defines major events, and builds an execution plan.
+- Actor generation turns planned cast slots into concrete actor cards with runtime-useful traits.
+- Runtime advances the world through selected events, actor actions, intent updates, and event-memory changes.
+- Finalization turns the completed trace into a report and analysis-ready artifacts.
 
-| Stage | Active path | Output |
-| --- | --- | --- |
-| `planning` | `build_planning_analysis -> build_execution_plan -> finalize_plan` | compact execution plan |
-| `generation` | `prepare_actor_slots -> generate_actor_slot -> finalize_generated_actors` | actor cards |
-| `runtime` | `initialize_runtime_state -> prepare_round -> plan_round -> actor proposal stage -> resolve_round` | adopted activities, observer reports, stop state |
-| `finalization` | `resolve_timeline_anchor -> build_report_artifacts -> section writers -> render_and_persist_final_report` | final report payloads and markdown |
+This structure keeps the simulation inspectable. Each stage has one responsibility, and later
+stages consume explicit outputs from earlier stages.
 
-By default the shipped workflow runs serial variants for planning, generation, runtime, and
-finalization. `--parallel` enables concurrent work inside a single run where the workflow supports it.
+## Outputs And Inspectability
 
-## Outputs
+Each run is expected to produce one run directory with durable artifacts:
 
-`report.final.md` contains:
+```text
+output/
+  <run_id>/
+    manifest.json
+    report.final.md
+    summary.overview.md
+    simulation.log.jsonl
+    data/
+    summaries/
+    assets/
+```
 
-- simulation conclusion
-- actor results table
-- timeline
-- actor dynamics
-- major events
+`simulation.log.jsonl` is the main event stream. It records model calls, finalized plans,
+finalized actors, round selections, adopted actions, observer summaries, event-memory updates, and
+final report metadata.
 
-`simulation.log.jsonl` records:
+`report.final.md` is the main human-readable report. It explains the simulation conclusion, actor
+outcomes, timeline, actor dynamics, and major events.
 
-- simulation start
-- raw LLM call logs
-- finalized plan
-- finalized actors
-- round focus selection
-- round time advancement
-- background updates
-- adopted actions
-- observer reports
-- final report
-- LLM usage summary
+The integrated analysis artifacts expose run-level metrics such as participation spread, action
+diversity, path depth, concentration, community structure, and cumulative growth. Committed sample
+runs live under [`output.samples/`](./output.samples/) for inspection.
 
-## Configuration
+## Project Direction
 
-Settings resolve in this order:
+`simula` is being shaped around a small set of stable product ideas:
 
-1. built-in defaults
-2. `env.toml`
-3. environment variables
-4. CLI overrides
+- virtual worlds are driven by stateful actors, not one-pass text generation
+- actor identity, intent, memory, and relationships should be explicit state
+- simulation behavior should be inspectable through durable logs and structured artifacts
+- reports should be projections of the completed trace, not unrelated summaries
+- implementation details should stay behind stable concepts and data contracts
 
-Common runtime controls:
+The current documentation therefore focuses on concepts, workflow behavior, and artifacts instead
+of language-specific setup or framework mechanics.
 
-- `runtime.max_rounds`
-- `runtime.max_actor_calls_per_step`
-- `runtime.max_focus_slices_per_step`
-- `runtime.max_recipients_per_message`
-- `runtime.enable_checkpointing`
-- `runtime.rng_seed`
-- `--max-rounds` for CLI round-cap override
-- `--trials` for sequential repeated runs
-- `--parallel` for intra-run graph parallelism
-- `--log-level` for CLI-visible logging verbosity
+## Current Implementation
 
-`--parallel` changes only work inside a single run. Trials stay sequential even when the flag is
-enabled.
+The current rebuild is a TypeScript web app:
 
-| Area | Default run | `--parallel` run |
-| --- | --- | --- |
-| trials | sequential | sequential |
-| planning cast chunks | serial queue | concurrent chunk generation |
-| generation actor slots | serial queue | concurrent slot generation |
-| runtime actor proposals | serial queue | concurrent proposal generation |
-| coordinator nodes | serial staged calls | serial staged calls |
-| finalization sections | serial section writers | concurrent section writing |
+- `apps/web`: Vite React SPA with Tailwind CSS v4, shadcn/ui, TanStack Query, Zustand, and React Flow.
+- `apps/server`: Bun API server with file-backed runs and SSE event streaming.
+- `packages/core`: scenario parsing, settings validation, LangGraph workflow, reporting, and file storage.
+- `packages/shared`: shared API and simulation types.
 
-Coordinator logic remains sequential. The current parallel switch only affects parts of the run
-that can be processed concurrently.
+Development commands:
 
-Scenario files use YAML frontmatter with the following controls:
+```bash
+bun install
+bun run dev:server
+bun run dev:web
+```
 
-- `num_cast`
-  - required positive integer
-  - sets the requested cast count for planning and generation
-- `allow_additional_cast`
-  - optional boolean
-  - defaults to `true`
-  - `false`: require exactly `num_cast` cast entries
-  - `true`: require at least `num_cast` cast entries
+Validation commands:
 
-## Sample Scenarios
-
-The repository includes scenario seeds in [`senario.samples/`](./senario.samples/README.md):
-
-- `01_consumer_marketing_launch.md`
-- `02_wargame_iran_us.md`
-- `03_startup_boardroom_crisis.md`
-- `04_city_hall_disaster_response.md`
-- `05_korean_enterprise_promo_approval_conflict.md`
-- `06_new_technology_internal_conflict.md`
+```bash
+bun test
+bun run typecheck
+bun run lint
+bun run build
+```
 
 ## Documentation Map
 
 | Document | Focus |
 | --- | --- |
-| [`docs/README.md`](./docs/README.md) | documentation map and reading order |
-| [`docs/architecture.md`](./docs/architecture.md) | layers, execution path, and runtime boundaries |
-| [`docs/contracts.md`](./docs/contracts.md) | public state surfaces, internal state groups, and artifacts |
-| [`docs/llm.md`](./docs/llm.md) | role routing, prompt projections, and structured-output policy |
-| [`docs/analysis.md`](./docs/analysis.md) | integrated analysis pipeline and output artifact layout |
+| [`docs/README.md`](./docs/README.md) | documentation map and reading paths |
+| [`docs/architecture.md`](./docs/architecture.md) | system boundaries and staged architecture |
+| [`docs/contracts.md`](./docs/contracts.md) | scenario, actor, event, report, and artifact contracts |
+| [`docs/llm.md`](./docs/llm.md) | model roles, structured responses, validation, and observability |
+| [`docs/analysis.md`](./docs/analysis.md) | analysis source data, metrics, and artifact layout |
+| [`docs/configuration.md`](./docs/configuration.md) | language-neutral configuration concepts |
+| [`docs/operations.md`](./docs/operations.md) | scenario controls, run artifacts, and maintenance expectations |
 | [`docs/workflows/README.md`](./docs/workflows/README.md) | workflow hub and stage handoffs |
-| [`docs/operations.md`](./docs/operations.md) | local execution, validation, and maintenance |
-
-## Development
-
-Validate changes with:
-
-```bash
-uv run pytest -q
-uv run ty check src
-uv run ruff check src tests
-uv run ruff clean
-```

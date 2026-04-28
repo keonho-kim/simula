@@ -1,0 +1,14 @@
+{
+  "name": "@simula/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@simula/core": "workspace:*",
+    "@simula/shared": "workspace:*"
+  }
+}

@@ -1,72 +1,50 @@
-# Generation Workflow
+# Actor Generation Workflow
 
-Generation turns the planning cast roster into concrete actor cards.
+Actor generation turns planned cast slots into concrete actor cards.
 
-## Active Path
+## Flow
 
 ```mermaid
 flowchart LR
-    Start([START]) --> Prepare["prepare_actor_slots"]
-    Prepare --> Route{"route_actor_slot_queue"}
-    Route -->|slots remain| Worker["generate_actor_slot_serial"]
-    Route -->|no slots| Finalize["finalize_generated_actors"]
-    Worker --> Route
-    Finalize --> End([END])
+    Plan["Execution Plan"] --> Slots["Cast Slots"]
+    Slots --> Cards["Actor Cards"]
+    Cards --> Registry["Actor Registry"]
 ```
 
-This document describes the default serial generation graph. When `--parallel` is enabled,
-generation may process multiple cast slots at the same time.
+## Responsibilities
 
-## Node Responsibilities
+Actor generation creates runtime-useful actor data:
 
-### `prepare_actor_slots`
+- stable id
+- display name
+- role
+- narrative profile
+- private goal
+- voice
+- preferred action types
 
-Builds one `CastSlotSpec` per planned cast item and resets generation-local buffers. It also
-records `generation_started_at` for latency tracking.
+The generated actor should match the planned cast slot. This keeps planning, runtime, and reports
+using the same actor identity.
 
-### `generate_actor_slot_serial`
+## Validation
 
-Generates one actor card from:
+The actor registry should be validated before runtime begins.
 
-- compact interpretation view
-- compact situation view
-- compact action catalog view
-- compact coordination frame view
-- one cast item
-- the requested cast-count controls
+- every planned required actor has one generated actor card
+- generated ids match planned cast ids
+- actor order remains stable for reports and deterministic selection
+- every actor has a display name and role
+- the run has enough actors for interactions to be meaningful
 
-The node then wraps the generated draft into a full `ActorCard` using the cast identity from the
-planned slot and advances the pending slot queue by one.
-
-### `finalize_generated_actors`
-
-Collects accumulated slot results and finalizes the actor list.
-
-Checks and side effects:
-
-- restore slot order by `slot_index`
-- validate that generated `cast_id` order still matches the plan
-- require at least 2 actors
-- save actors through the store
-- write an `actors_finalized` runtime log event
-- aggregate generation parse-failure counts
-- record `generation_latency_seconds`
+If actor generation cannot produce a valid registry, the run should fail before runtime.
 
 ## Stage Output
 
-After generation, workflow state has:
+Actor generation produces the finalized actor registry used by runtime and finalization.
 
-- `actors`
-- `generation_latency_seconds`
-- updated `parse_failures`
+Runtime consumes actors as stateful participants, not as isolated text snippets.
 
-Generation does not build activity feeds. Runtime initialization owns that step.
+## Related Docs
 
-## Parallel Variant
-
-When a run is started with CLI `--parallel`, generation switches to the parallel path:
-
-- `prepare_actor_slots -> dispatch_actor_slots -> generate_actor_slot -> finalize_generated_actors`
-
-That variant preserves the same output and validation behavior while allowing concurrent slot-level
-LLM calls.
+- actor contract: [`../contracts.md`](../contracts.md)
+- runtime workflow: [`runtime.md`](./runtime.md)

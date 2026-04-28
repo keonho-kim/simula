@@ -1,6 +1,7 @@
 ---
 num_cast: 8
 allow_additional_cast: true
+max_round: 8
 ---
 
 # 시나리오 03

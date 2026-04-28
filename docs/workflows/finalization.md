@@ -1,105 +1,55 @@
 # Finalization Workflow
 
-Finalization turns the completed runtime trace into stable report artifacts and rendered markdown.
+Finalization turns the completed runtime trace into stable report artifacts.
 
-## Active Path
+## Flow
 
 ```mermaid
 flowchart LR
-    Start([START]) --> Anchor["resolve_timeline_anchor"]
-    Anchor --> Artifacts["build_report_artifacts"]
-    Artifacts --> Conclusion["write_conclusion_section"]
-    Conclusion --> Timeline["write_timeline_section"]
-    Timeline --> Dynamics["write_actor_dynamics_section"]
-    Dynamics --> Events["write_major_events_section"]
-    Events --> Render["render_and_persist_final_report"]
-    Render --> End([END])
+    Trace["Completed Trace"] --> Projection["Report Projection"]
+    Projection --> Draft["Report Draft"]
+    Draft --> Render["Rendered Report"]
+    Render --> Artifacts["Saved Artifacts"]
 ```
 
-This document describes the default serial finalization graph. When `--parallel` is enabled,
-the four report sections may be written concurrently.
+## Responsibilities
 
-## Stage Responsibilities
+Finalization should:
 
-### `resolve_timeline_anchor`
+- build a structured final report from runtime state
+- summarize model usage when available
+- project timeline and actor dynamics from the completed trace
+- draft report prose from the projection
+- render the final markdown report
+- expose errors and stop reason in the final output
 
-Uses a parser-first strategy:
+The final report should explain the run that actually happened. It should not invent major
+outcomes outside the completed trace.
 
-1. parse explicit date or time cues from the scenario when possible
-2. extract partial hints from incomplete scenario wording
-3. call the `observer` role only when inference is still needed
+## Report Sections
 
-The output is always one `TimelineAnchorDecision`.
+The rendered report contains:
 
-### `build_report_artifacts`
+- simulation conclusion
+- actor results table
+- timeline
+- actor dynamics
+- major events
+- explicit errors or defaults when present
 
-Pure code-side node. It does not call a model.
+## Stage Output
 
-It builds:
+Finalization produces:
 
-- `final_report`
-- `llm_usage_summary`
-- `report_projection_json`
+- final report payload
+- usage summary
+- report projection
+- rendered markdown report
+- manifest-ready metadata
+- stop reason
+- explicit errors
 
-It also writes a `final_report` runtime log event before markdown rendering begins.
+## Related Docs
 
-### `write_conclusion_section`
-
-Writes the conclusion section.
-
-### `write_timeline_section`
-
-Writes the timeline section.
-
-### `write_actor_dynamics_section`
-
-Writes the actor-dynamics section.
-
-### `write_major_events_section`
-
-Writes the major-events section.
-
-### Validation behavior for all section writers
-
-Each section writer:
-
-- uses text generation rather than a structured schema
-- validates the returned text locally
-- retries once with validation feedback when the first answer violates the section rules
-
-### `render_and_persist_final_report`
-
-Builds the final markdown document from validated section strings and saves the structured
-`final_report` through the store.
-
-## Final Outputs
-
-By the end of finalization, workflow state contains:
-
-- `final_report`
-- `llm_usage_summary`
-- `report_projection_json`
-- `report_conclusion_section`
-- `report_timeline_section`
-- `report_actor_dynamics_section`
-- `report_major_events_section`
-- `final_report_sections`
-- `final_report_markdown`
-- `stop_reason`
-- `errors`
-
-`simulation_log_jsonl` becomes part of the public output after the executor reads the completed
-JSONL file back from disk.
-
-## Parallel Variant
-
-When a run is started with CLI `--parallel`, finalization switches to the parallel branch:
-
-- `build_report_artifacts`
-- `write_conclusion_section`
-- `write_timeline_section`
-- `write_actor_dynamics_section`
-- `write_major_events_section`
-- `render_and_persist_final_report`
-
-The rendered outputs stay the same; only the section-writing concurrency changes.
+- final report contract: [`../contracts.md`](../contracts.md)
+- analysis artifacts: [`../analysis.md`](../analysis.md)
