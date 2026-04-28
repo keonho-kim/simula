@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import type { RunEvent, ScenarioInput } from "@simula/shared"
+import type { ScenarioInput } from "@simula/shared"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -13,7 +13,6 @@ import {
 } from "@/components/ui/dialog"
 import {
   createRun,
-  fetchExport,
   fetchRun,
   fetchRuns,
   startRun,
@@ -35,24 +34,8 @@ import {
 import { StoryBuilderDialog } from "@/features/scenario/story-builder-dialog"
 import { SettingsDialog } from "@/features/settings/settings-dialog"
 import { useLocaleText } from "@/lib/i18n"
-
-const eventTypes: RunEvent["type"][] = [
-  "run.started",
-  "node.started",
-  "node.completed",
-  "node.failed",
-  "model.message",
-  "model.metrics",
-  "actors.ready",
-  "interaction.recorded",
-  "actor.message",
-  "round.completed",
-  "graph.delta",
-  "log",
-  "report.delta",
-  "run.completed",
-  "run.failed",
-]
+import { downloadExport } from "./download-export"
+import { useRunEventStream } from "./use-run-event-stream"
 
 type ViewMode = "home" | "simulation" | "report"
 
@@ -136,54 +119,15 @@ function App() {
     )
   }, [selectedRunQuery.data, syncRunDetail])
 
-  useEffect(() => {
-    if (!selectedRunId) {
-      return
-    }
-    resetLiveState()
-    const source = new EventSource(`/api/runs/${selectedRunId}/events`)
-    const queuedEvents: RunEvent[] = []
-    let scheduledFrame: number | undefined
-    const flushEvents = () => {
-      scheduledFrame = undefined
-      const events = queuedEvents.splice(0)
-      if (events.length) {
-        pushEvents(events)
-      }
-    }
-    const listeners = eventTypes.map((type) => {
-      const listener = (message: MessageEvent<string>) => {
-        const event = JSON.parse(message.data) as RunEvent
-        queuedEvents.push(event)
-        scheduledFrame ??= window.requestAnimationFrame(flushEvents)
-        if (
-          event.type === "run.completed" &&
-          event.runId === selectedRunIdRef.current &&
-          viewModeRef.current === "simulation"
-        ) {
-          setReportConfirmRunId(event.runId)
-        }
-        if (event.type === "run.completed" || event.type === "run.failed") {
-          void queryClient.invalidateQueries({ queryKey: ["runs"] })
-          void queryClient.invalidateQueries({ queryKey: ["runs", selectedRunId] })
-        }
-      }
-      source.addEventListener(type, listener)
-      return { type, listener }
-    })
-    source.onerror = () => {
-      source.close()
-    }
-    return () => {
-      for (const item of listeners) {
-        source.removeEventListener(item.type, item.listener)
-      }
-      if (scheduledFrame !== undefined) {
-        window.cancelAnimationFrame(scheduledFrame)
-      }
-      source.close()
-    }
-  }, [pushEvents, queryClient, resetLiveState, selectedRunId])
+  useRunEventStream({
+    selectedRunId,
+    selectedRunIdRef,
+    viewModeRef,
+    queryClient,
+    resetLiveState,
+    pushEvents,
+    setReportConfirmRunId,
+  })
 
   const selectedRun = runsQuery.data?.find((run) => run.id === selectedRunId)
   const selectedRunStatus = selectedRunQuery.data?.run.status ?? selectedRun?.status
@@ -385,17 +329,6 @@ function App() {
       </div>
     </main>
   )
-}
-
-async function downloadExport(runId: string, kind: "json" | "jsonl" | "md") {
-  const body = await fetchExport(runId, kind)
-  const blob = new Blob([body], { type: "text/plain" })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement("a")
-  anchor.href = url
-  anchor.download = `${runId}.${kind}`
-  anchor.click()
-  URL.revokeObjectURL(url)
 }
 
 export default App

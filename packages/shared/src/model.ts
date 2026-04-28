@@ -1,0 +1,30 @@
+export type ModelProvider = "openai" | "anthropic" | "gemini" | "ollama" | "lmstudio" | "vllm" | "litellm"
+export type ModelRole =
+  | "storyBuilder"
+  | "planner"
+  | "generator"
+  | "coordinator"
+  | "actor"
+  | "observer"
+  | "repair"
+
+export type SimulationRole = "planner" | "generator" | "coordinator" | "observer"
+export type RoleTraceStep = "thought" | "target" | "action" | "intent"
+export type ActorTraceStep = RoleTraceStep | "message" | "context"
+export type PlannerTraceStep =
+  | "coreSituation"
+  | "actorPressures"
+  | "conflictDynamics"
+  | "simulationDirection"
+  | "majorEvents"
+export type CoordinatorTraceStep =
+  | "runtimeFrame"
+  | "actorRouting"
+  | "interactionPolicy"
+  | "outcomeDirection"
+  | "eventInjection"
+  | "progressDecision"
+  | "extensionDecision"
+export type GeneratorRosterStep = "roster"
+export type ActorCardStep = "role" | "backgroundHistory" | "personality" | "preference"
+
