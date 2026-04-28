@@ -1,12 +1,50 @@
-import type { RoleGraphOptions } from "../shared"
+import type { PlannerTraceStep } from "@simula/shared"
+import type { WorkflowState } from "../../state"
 
-export const plannerPrompts: RoleGraphOptions["prompts"] = {
-  thought: (current) =>
-    `Planner thought. In one short paragraph, interpret the initial scenario input and its hidden pressure.\n\nScenario: ${current.scenario.text}`,
-  target: (_current, partial) =>
-    `Planner target. In one sentence, name the main background force, place, or conflict the story should center on.\n\nThought: ${partial.thought}`,
-  action: (_current, partial) =>
-    `Planner action. In one compact paragraph, write the background story that sets up the simulation world.\n\nTarget: ${partial.target}`,
-  intent: (_current, partial) =>
-    `Planner intent. In one sentence, explain why this background story creates useful actor pressure.\n\nBackground story: ${partial.action}`,
+export type PlannerPromptBuilder = (
+  state: WorkflowState,
+  partial: Partial<Record<PlannerTraceStep, string>>
+) => string
+
+export const plannerPrompts: Record<PlannerTraceStep, PlannerPromptBuilder> = {
+  coreSituation: (current) =>
+    `Planner coreSituation.
+Summarize the scenario's factual situation, setting, triggering pressure, and end condition in one compact paragraph.
+Do not introduce actors that are not implied by the scenario.
+Return only the digest body. Do not include labels, headings, markdown, bullets, or prefixes.
+
+Scenario: ${current.scenario.text}`,
+  actorPressures: (_current, partial) =>
+    `Planner actorPressures.
+Summarize the main pressures, incentives, constraints, and asymmetries that different actors will feel.
+Write one compact paragraph that downstream actor generation can reuse.
+Return only the digest body. Do not include labels, headings, markdown, bullets, or prefixes.
+
+Core situation digest: ${partial.coreSituation}`,
+  conflictDynamics: (_current, partial) =>
+    `Planner conflictDynamics.
+Summarize how actor pressures are likely to collide through public, semi-public, private, and solitary actions.
+Write one compact paragraph focused on interaction dynamics, not prose backstory.
+Return only the digest body. Do not include labels, headings, markdown, bullets, or prefixes.
+
+Actor pressure digest: ${partial.actorPressures}`,
+  simulationDirection: (_current, partial) =>
+    `Planner simulationDirection.
+Summarize what the simulation should explore across rounds and what kind of resolution would count as meaningful.
+Write one compact paragraph that Coordinator and Actor roles can use as shared direction.
+Return only the digest body. Do not include labels, headings, markdown, bullets, or prefixes.
+
+Conflict dynamics digest: ${partial.conflictDynamics}`,
+  majorEvents: (current, partial) =>
+    `Planner majorEvents.
+List concrete major events that could occur during this scenario and create new pressure for actors.
+Return one event per line in exactly this format: Title - Summary
+Do not include headings, markdown tables, code fences, or commentary.
+Create at least 3 events and enough events to support the requested max rounds.
+
+Max rounds: ${current.scenario.controls.maxRound ?? 8}
+Core situation: ${partial.coreSituation}
+Actor pressures: ${partial.actorPressures}
+Conflict dynamics: ${partial.conflictDynamics}
+Simulation direction: ${partial.simulationDirection}`,
 }

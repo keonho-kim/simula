@@ -3,21 +3,29 @@ import { emptyActorContext } from "../../context"
 
 const VISIBILITIES: ActionVisibility[] = ["public", "semi-public", "private", "solitary"]
 
-export function buildActor(
-  index: number,
-  backgroundStory: string,
-  trace: { target: string; action: string; intent: string },
-  actionsPerType: number
-): ActorState {
-  const sentence = backgroundStory.split(/[.!?]/).find((item) => item.trim())?.trim() ?? "the background story"
+export interface ActorCard {
+  role: string
+  name: string
+  backgroundHistory: string
+  personality: string
+  preference: string
+}
+
+export function buildActor(index: number, card: ActorCard, plannerDigest: string, actionsPerType: number): ActorState {
+  const preference = card.preference || `Shape the outcome of ${firstSentence(plannerDigest).toLowerCase()}.`
+  const personality = card.personality || "Pragmatic under pressure."
   return {
     id: `actor-${index}`,
-    name: `Actor ${index}`,
-    role: index === 1 ? "Primary decision maker" : `Stakeholder ${index}`,
-    privateGoal: `Shape the outcome of ${sentence.toLowerCase()}.`,
-    intent: index === 1 ? trace.intent : `Respond to ${trace.target.toLowerCase()}.`,
-    actions: buildActorActions(index, trace, actionsPerType),
+    name: card.name || `Actor ${index}`,
+    role: card.role || (index === 1 ? "Primary decision maker" : `Stakeholder ${index}`),
+    backgroundHistory: card.backgroundHistory || firstSentence(plannerDigest),
+    personality,
+    preference,
+    privateGoal: preference,
+    intent: `${personality} Preference: ${preference}`,
+    actions: buildActorActions(index, card, actionsPerType),
     context: emptyActorContext(),
+    contextSummary: "",
     memory: [],
     relationships: {},
   }
@@ -32,11 +40,11 @@ export function buildActionCatalog(actors: ActorState | ActorState[]): string[] 
 
 function buildActorActions(
   actorIndex: number,
-  trace: { target: string; action: string; intent: string },
+  card: ActorCard,
   actionsPerType: number
 ): ActorAction[] {
   return VISIBILITIES.flatMap((visibility) =>
-    Array.from({ length: actionsPerType }, (_, index) => buildAction(actorIndex, visibility, index + 1, trace))
+    Array.from({ length: actionsPerType }, (_, index) => buildAction(actorIndex, visibility, index + 1, card))
   )
 }
 
@@ -44,14 +52,14 @@ function buildAction(
   actorIndex: number,
   visibility: ActionVisibility,
   actionIndex: number,
-  trace: { target: string; action: string; intent: string }
+  card: ActorCard
 ): ActorAction {
   return {
     id: `actor-${actorIndex}-${visibility}-${actionIndex}`,
     visibility,
-    label: `${visibilityLabel(visibility)} ${actionIndex} about ${trace.target}`,
-    intentHint: trace.intent,
-    expectedOutcome: `${trace.action} creates a ${visibility} consequence.`,
+    label: `${visibilityLabel(visibility)} ${actionIndex} about ${card.preference}`,
+    intentHint: card.preference,
+    expectedOutcome: `${card.name} creates a ${visibility} consequence shaped by ${card.personality}.`,
   }
 }
 
@@ -66,4 +74,8 @@ function visibilityLabel(visibility: ActionVisibility): string {
     return "Private encounter"
   }
   return "Solitary reflection"
+}
+
+function firstSentence(value: string): string {
+  return value.split(/[.!?]/).find((item) => item.trim())?.trim() ?? "the scenario pressure"
 }

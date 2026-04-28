@@ -10,6 +10,7 @@ import type {
 } from "@simula/shared"
 import { normalizeScenarioControls } from "../scenario"
 import { buildTimelineFrame } from "../simulation/timeline"
+import { normalizePromptLanguage } from "../language"
 
 export interface RunStoreOptions {
   rootDir: string
@@ -17,6 +18,7 @@ export interface RunStoreOptions {
 
 export class RunStore {
   readonly rootDir: string
+  private readonly timelineCache = new Map<string, GraphTimelineFrame[]>()
 
   constructor(options: RunStoreOptions) {
     this.rootDir = options.rootDir
@@ -41,6 +43,7 @@ export class RunStore {
     await this.writeManifest(manifest)
     await this.writeJson(id, "scenario.json", normalizedScenario)
     await this.writeJson(id, "graph.timeline.json", [])
+    this.timelineCache.set(id, [])
     await writeFile(this.path(id, "events.jsonl"), "", "utf8")
     return manifest
   }
@@ -85,6 +88,7 @@ export class RunStore {
   }
 
   async writeState(state: SimulationState): Promise<void> {
+    await this.flushTimeline(state.runId)
     await this.writeJson(state.runId, "state.json", state)
     await writeFile(this.path(state.runId, "report.md"), state.reportMarkdown, "utf8")
   }
@@ -94,13 +98,23 @@ export class RunStore {
       encoding: "utf8",
       flag: "a",
     })
+    if (event.type === "run.completed" || event.type === "run.failed") {
+      await this.flushTimeline(event.runId)
+    }
     if (event.type === "graph.delta") {
       return event.frame
     }
+    if (!createsTimelineFrame(event)) {
+      return undefined
+    }
 
-    const previousTimeline = await this.readTimeline(event.runId)
+    const previousTimeline = await this.loadTimeline(event.runId)
     const frame = buildTimelineFrame(previousTimeline.length, event, previousTimeline.at(-1))
-    await this.writeJson(event.runId, "graph.timeline.json", [...previousTimeline, frame])
+    const nextTimeline = [...previousTimeline, frame]
+    this.timelineCache.set(event.runId, nextTimeline)
+    if (event.type === "actors.ready" || event.type === "round.completed") {
+      await this.flushTimeline(event.runId)
+    }
     return frame
   }
 
@@ -114,10 +128,31 @@ export class RunStore {
   }
 
   async readTimeline(runId: string): Promise<GraphTimelineFrame[]> {
+    const cached = this.timelineCache.get(runId)
+    if (cached) {
+      return cloneTimeline(cached)
+    }
     try {
       return JSON.parse(await readFile(this.path(runId, "graph.timeline.json"), "utf8")) as GraphTimelineFrame[]
     } catch {
       return []
+    }
+  }
+
+  private async loadTimeline(runId: string): Promise<GraphTimelineFrame[]> {
+    const cached = this.timelineCache.get(runId)
+    if (cached) {
+      return cached
+    }
+    const timeline = await this.readTimeline(runId)
+    this.timelineCache.set(runId, timeline)
+    return timeline
+  }
+
+  private async flushTimeline(runId: string): Promise<void> {
+    const timeline = this.timelineCache.get(runId)
+    if (timeline) {
+      await this.writeJson(runId, "graph.timeline.json", timeline)
     }
   }
 
@@ -171,9 +206,29 @@ export class RunStore {
   }
 }
 
+function cloneTimeline(timeline: GraphTimelineFrame[]): GraphTimelineFrame[] {
+  return timeline.map((frame) => ({
+    ...frame,
+    nodes: frame.nodes.map((node) => ({ ...node })),
+    edges: frame.edges.map((edge) => ({ ...edge })),
+    activeNodeIds: [...frame.activeNodeIds],
+    messages: [...frame.messages],
+    logRefs: [...frame.logRefs],
+  }))
+}
+
+function createsTimelineFrame(event: RunEvent): boolean {
+  return (
+    event.type === "actors.ready" ||
+    event.type === "interaction.recorded" ||
+    event.type === "round.completed"
+  )
+}
+
 function normalizeScenario(scenario: ScenarioInput): ScenarioInput {
   return {
     ...scenario,
+    language: normalizePromptLanguage(scenario.language),
     controls: normalizeScenarioControls(scenario.controls),
   }
 }

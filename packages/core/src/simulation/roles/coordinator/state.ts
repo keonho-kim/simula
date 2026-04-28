@@ -1,75 +1,60 @@
 import type {
-  ActionVisibility,
   ActorDecision,
   ActorState,
+  CoordinatorTrace,
+  CoordinatorTraceStep,
   Interaction,
   PlannedEvent,
   RoundDigest,
+  SimulationState,
 } from "@simula/shared"
-import { applyInteractionContext, applyPreRoundDigestContext, contextUsedByActor } from "../../context"
 
-const ROUND_VISIBILITY: ActionVisibility[] = ["public", "semi-public", "private", "solitary"]
+export const COORDINATOR_STEPS: CoordinatorTraceStep[] = [
+  "runtimeFrame",
+  "actorRouting",
+  "interactionPolicy",
+  "outcomeDirection",
+  "eventInjection",
+  "progressDecision",
+  "extensionDecision",
+]
 
-export function buildCoordinatorInteractions(
-  events: PlannedEvent[],
-  actors: ActorState[],
-  trace: { action: string; intent: string }
-): { actors: ActorState[]; interactions: Interaction[]; roundDigests: RoundDigest[] } {
-  let nextActors = actors
-  const interactions: Interaction[] = []
-  const roundDigests: RoundDigest[] = []
-  const rounds = Math.min(3, Math.max(1, events.length))
-
-  for (let roundIndex = 1; roundIndex <= rounds; roundIndex += 1) {
-    const preRoundDigest = buildPreRoundDigest(roundIndex, events[roundIndex - 2])
-    roundDigests.push(preRoundDigest)
-    nextActors = applyPreRoundDigestContext(nextActors, preRoundDigest)
-
-    const event = events[roundIndex - 1]
-    const actor = nextActors[(roundIndex - 1) % nextActors.length]
-    const target = nextActors[roundIndex % nextActors.length]
-    if (!event || !actor || !target) {
-      continue
-    }
-
-    const decision = selectActorDecision(actor, target, roundIndex, trace)
-    event.status = "completed"
-    const updatedActor = {
-      ...actor,
-      intent: decision.intent,
-      relationships: {
-        ...actor.relationships,
-        [target.name]: `engaged through a ${decision.visibility} interaction`,
-      },
-    }
-
-    nextActors = nextActors.map((item) => (item.id === actor.id ? updatedActor : item))
-    const interaction = {
-      id: `round-${roundIndex}-${actor.id}`,
-      roundIndex,
-      sourceActorId: actor.id,
-      targetActorIds: decision.targetActorIds,
-      actionType: decision.actionId ?? decision.decisionType,
-      content: interactionContent(updatedActor, target, event, decision),
-      eventId: event.id,
-      visibility: decision.visibility,
-      decisionType: decision.decisionType,
-      intent: decision.intent,
-      expectation: decision.expectation,
-    } satisfies Interaction
-    interactions.push(interaction)
-    nextActors = applyInteractionContext(nextActors, interaction)
-  }
-
-  return { actors: nextActors, interactions, roundDigests }
+export function getCoordinatorTrace(state: SimulationState): CoordinatorTrace {
+  const trace = state.roleTraces.find((trace) => trace.role === "coordinator")
+  return trace?.role === "coordinator" ? trace : emptyCoordinatorTrace()
 }
 
-function buildPreRoundDigest(roundIndex: number, previousEvent?: PlannedEvent): RoundDigest {
-  const elapsedTime = roundIndex === 1 ? "Opening moment" : `After ${previousEvent?.title ?? "the previous event"}`
-  const content =
-    roundIndex === 1
-      ? "The situation is now visible to every actor."
-      : `${previousEvent?.summary ?? "The previous event changed the shared situation."}`
+export function coordinatorTracePartial(trace: CoordinatorTrace): Partial<Record<CoordinatorTraceStep, string>> {
+  return Object.fromEntries(COORDINATOR_STEPS.map((step) => [step, trace[step]]))
+}
+
+export function emptyCoordinatorTrace(): CoordinatorTrace {
+  return {
+    role: "coordinator",
+    runtimeFrame: "",
+    actorRouting: "",
+    interactionPolicy: "",
+    outcomeDirection: "",
+    eventInjection: "",
+    progressDecision: "",
+    extensionDecision: "",
+    retryCounts: {
+      runtimeFrame: 0,
+      actorRouting: 0,
+      interactionPolicy: 0,
+      outcomeDirection: 0,
+      eventInjection: 0,
+      progressDecision: 0,
+      extensionDecision: 0,
+    },
+  }
+}
+
+export function buildPreRoundDigest(roundIndex: number, injectedEvent?: PlannedEvent): RoundDigest {
+  const elapsedTime = roundIndex === 1 ? "Opening moment" : `Round ${roundIndex}`
+  const content = injectedEvent
+    ? `Injected event: ${injectedEvent.title}. ${injectedEvent.summary}`
+    : "No new major event was injected; actors respond to accumulated context and unresolved pressure."
   return {
     roundIndex,
     preRound: {
@@ -79,50 +64,71 @@ function buildPreRoundDigest(roundIndex: number, previousEvent?: PlannedEvent): 
     afterRound: {
       content: "",
     },
+    injectedEventId: injectedEvent?.id,
   }
 }
 
-function selectActorDecision(
-  actor: ActorState,
-  target: ActorState,
-  roundIndex: number,
-  trace: { action: string; intent: string }
-): ActorDecision {
-  const visibility = ROUND_VISIBILITY[(roundIndex - 1) % ROUND_VISIBILITY.length] ?? "public"
-  const action = actor.actions.find((item) => item.visibility === visibility)
-  if (!action) {
-    return {
-      actorId: actor.id,
-      decisionType: "no_action",
-      visibility: "solitary",
-      targetActorIds: [],
-      intent: `Hold position while considering ${trace.intent.toLowerCase()}.`,
-      expectation: "Waiting preserves optionality for a later turn.",
-      contextUsed: contextUsedByActor(actor),
+export function applyActorDecision(actors: ActorState[], decision: ActorDecision): ActorState[] {
+  return actors.map((actor) => {
+    if (actor.id !== decision.actorId) {
+      return actor
     }
-  }
 
+    const relationships = Object.fromEntries(
+      decision.targetActorIds
+        .map((targetId) => actors.find((candidate) => candidate.id === targetId))
+        .filter((target): target is ActorState => Boolean(target))
+        .map((target) => [target.name, `engaged through a ${decision.visibility} interaction`])
+    )
+
+    return {
+      ...actor,
+      intent: decision.intent,
+      relationships: {
+        ...actor.relationships,
+        ...relationships,
+      },
+    }
+  })
+}
+
+export function buildInteraction(
+  roundIndex: number,
+  event: PlannedEvent,
+  actor: ActorState,
+  actors: ActorState[],
+  decision: ActorDecision
+): Interaction {
   return {
-    actorId: actor.id,
-    actionId: action.id,
-    decisionType: "action",
-    visibility,
-    targetActorIds: visibility === "solitary" ? [] : [target.id],
-    intent: action.intentHint,
-    expectation: action.expectedOutcome,
-    contextUsed: contextUsedByActor(actor),
+    id: `round-${roundIndex}-${actor.id}`,
+    roundIndex,
+    sourceActorId: actor.id,
+    targetActorIds: decision.targetActorIds,
+    actionType: decision.actionId ?? decision.decisionType,
+    content: interactionContent(actor, actors, event, decision),
+    eventId: event.id,
+    visibility: decision.visibility,
+    decisionType: decision.decisionType,
+    intent: decision.intent,
+    expectation: decision.expectation,
   }
 }
 
 function interactionContent(
   actor: ActorState,
-  target: ActorState,
+  actors: ActorState[],
   event: PlannedEvent,
   decision: ActorDecision
 ): string {
+  if (decision.message) {
+    return `${actor.name}: ${decision.message}`
+  }
   if (decision.decisionType === "no_action") {
     return `${actor.name} held back during "${event.title}".`
   }
-  const targetText = decision.targetActorIds.length > 0 ? ` with ${target.name}` : ""
+  const targetNames = decision.targetActorIds
+    .map((targetId) => actors.find((candidate) => candidate.id === targetId)?.name)
+    .filter(Boolean)
+  const targetText = targetNames.length > 0 ? ` with ${targetNames.join(", ")}` : ""
   return `${actor.name} advanced "${event.title}"${targetText} through a ${decision.visibility} action.`
 }

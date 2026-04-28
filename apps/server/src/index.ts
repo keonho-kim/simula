@@ -2,7 +2,6 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import {
   RunStore,
-  defaultSettings,
   draftScenario,
   listScenarioSamples,
   normalizeSettings,
@@ -23,6 +22,7 @@ import type {
 const PORT = Number(process.env.PORT ?? 3001)
 const DATA_ROOT = process.env.SIMULA_DATA_DIR ?? join(process.cwd(), "runs")
 const SETTINGS_PATH = process.env.SIMULA_SETTINGS_PATH ?? join(process.cwd(), "settings.json")
+const ENV_TOML_PATH = process.env.SIMULA_ENV_TOML_PATH ?? join(process.cwd(), "env.toml")
 const SAMPLE_ROOT = process.env.SIMULA_SAMPLE_DIR ?? join(import.meta.dirname, "../../..", "senario.samples")
 
 const store = new RunStore({ rootDir: DATA_ROOT })
@@ -33,6 +33,7 @@ await store.ensureRoot()
 
 const server = Bun.serve({
   port: PORT,
+  idleTimeout: 0,
   async fetch(request) {
     try {
       if (request.method === "OPTIONS") {
@@ -68,7 +69,7 @@ async function route(request: Request, url: URL): Promise<Response> {
     if (request.method === "PUT") {
       const payload = (await request.json()) as { settings: LLMSettings }
       await writeSettings(payload.settings)
-      return json({ settings: sanitizeSettings(payload.settings) })
+      return json({ settings: sanitizeSettings(await readSettings()) })
     }
   }
 
@@ -114,6 +115,7 @@ async function route(request: Request, url: URL): Promise<Response> {
         run: await store.readManifest(runId),
         state: await store.readState(runId),
         timeline: await store.readTimeline(runId),
+        events: await store.readEvents(runId),
       })
     }
     if (parts[3] === "start" && request.method === "POST") {
@@ -162,6 +164,7 @@ async function executeRun(
       runId: manifest.id,
       scenario,
       settings,
+      roundDelayMs: 5000,
       emit: (event) => appendAndPublish(event),
     })
     await store.writeState(finalState)
@@ -254,17 +257,75 @@ function publish(runId: string, event: RunEvent): void {
 }
 
 async function readSettings(): Promise<LLMSettings> {
-  try {
-    return normalizeSettings(JSON.parse(await readFile(SETTINGS_PATH, "utf8")) as Partial<LLMSettings>)
-  } catch {
-    return defaultSettings()
-  }
+  return normalizeSettings({
+    ...await readEnvTomlSettings(),
+    ...await readSavedSettings(),
+  })
 }
 
 async function writeSettings(settings: LLMSettings): Promise<void> {
-  const normalized = normalizeSettings(settings)
+  const normalized = normalizeSettings(mergeRetainedSecrets(settings, await readSettings()))
   await mkdir(dirname(SETTINGS_PATH), { recursive: true }).catch(() => undefined)
   await writeFile(SETTINGS_PATH, `${JSON.stringify(normalized, null, 2)}\n`, "utf8")
+}
+
+async function readEnvTomlSettings(): Promise<Partial<LLMSettings>> {
+  try {
+    const parsed = Bun.TOML.parse(await readFile(ENV_TOML_PATH, "utf8")) as {
+      settings?: Partial<LLMSettings>
+    }
+    return parsed.settings ?? {}
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return {}
+    }
+    throw new Error(`Failed to read env.toml: ${error instanceof Error ? error.message : String(error)}`, {
+      cause: error,
+    })
+  }
+}
+
+async function readSavedSettings(): Promise<Partial<LLMSettings>> {
+  try {
+    return JSON.parse(await readFile(SETTINGS_PATH, "utf8")) as Partial<LLMSettings>
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return {}
+    }
+    throw new Error(`Failed to read settings.json: ${error instanceof Error ? error.message : String(error)}`, {
+      cause: error,
+    })
+  }
+}
+
+function mergeRetainedSecrets(next: LLMSettings, previous: LLMSettings): LLMSettings {
+  const merged = normalizeSettings(next)
+  for (const role of Object.keys(merged) as Array<keyof LLMSettings>) {
+    if (merged[role].apiKey === "********") {
+      merged[role].apiKey = previous[role].apiKey
+    }
+    merged[role].extraHeaders = mergeRetainedHeaders(merged[role].extraHeaders, previous[role].extraHeaders)
+  }
+  return merged
+}
+
+function mergeRetainedHeaders(
+  next: Record<string, string> | undefined,
+  previous: Record<string, string> | undefined
+): Record<string, string> | undefined {
+  if (!next) {
+    return undefined
+  }
+  return Object.fromEntries(
+    Object.entries(next).map(([key, value]) => [
+      key,
+      value === "********" ? previous?.[key] ?? "" : value,
+    ])
+  )
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT"
 }
 
 function formatSse(event: RunEvent): string {

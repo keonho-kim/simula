@@ -1,28 +1,26 @@
 import { END, START, StateGraph } from "@langchain/langgraph"
 import type { RunEvent } from "@simula/shared"
 import { WorkflowAnnotation } from "../../state"
-import { createRoleStepNode, type RoleGraphOptions } from "../shared"
-import { plannerNode } from "./nodes"
+import { createPlannerStepNode, plannerNode } from "./nodes"
 import { plannerPrompts } from "./prompts"
 
 export function createPlannerGraph(emit: (event: RunEvent) => Promise<void>) {
-  const options: RoleGraphOptions = {
-    role: "planner",
-    emit,
-    prompts: plannerPrompts,
-  }
-
   return new StateGraph(WorkflowAnnotation)
-    .addNode("planner.thought", createRoleStepNode(options, "thought"))
-    .addNode("planner.target", createRoleStepNode(options, "target"))
-    .addNode("planner.action", createRoleStepNode(options, "action"))
-    .addNode("planner.intent", createRoleStepNode(options, "intent"))
+    .addNode("planner.coreSituation", createPlannerStepNode("coreSituation", plannerPrompts.coreSituation, emit))
+    .addNode("planner.actorPressures", createPlannerStepNode("actorPressures", plannerPrompts.actorPressures, emit))
+    .addNode("planner.conflictDynamics", createPlannerStepNode("conflictDynamics", plannerPrompts.conflictDynamics, emit))
+    .addNode(
+      "planner.simulationDirection",
+      createPlannerStepNode("simulationDirection", plannerPrompts.simulationDirection, emit)
+    )
+    .addNode("planner.majorEvents", createPlannerStepNode("majorEvents", plannerPrompts.majorEvents, emit))
     .addNode("planner.apply", plannerNode)
-    .addEdge(START, "planner.thought")
-    .addEdge("planner.thought", "planner.target")
-    .addEdge("planner.target", "planner.action")
-    .addEdge("planner.action", "planner.intent")
-    .addEdge("planner.intent", "planner.apply")
+    .addEdge(START, "planner.coreSituation")
+    .addEdge("planner.coreSituation", "planner.actorPressures")
+    .addEdge("planner.actorPressures", "planner.conflictDynamics")
+    .addEdge("planner.conflictDynamics", "planner.simulationDirection")
+    .addEdge("planner.simulationDirection", "planner.majorEvents")
+    .addEdge("planner.majorEvents", "planner.apply")
     .addEdge("planner.apply", END)
     .compile()
 }

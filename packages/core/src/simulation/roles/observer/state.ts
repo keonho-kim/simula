@@ -3,7 +3,7 @@ import type { RoundReport, SimulationState } from "@simula/shared"
 export function applyObserverRound(state: SimulationState): SimulationState {
   const roundIndex = state.observerRoundIndex ?? state.roundDigests.length
   const trace = state.roleTraces.find((item) => item.role === "observer")
-  if (!trace) {
+  if (!trace || trace.role !== "observer") {
     return state
   }
 

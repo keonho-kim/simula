@@ -37,7 +37,7 @@ describe("server API", () => {
   test("creates, runs, streams, and reports a completed run", async () => {
     const settings = defaultSettings()
     for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].apiKey = "test-key"
+      settings[role].apiKey = "unit-test-api-key"
     }
     await fetch(`${baseUrl}/api/settings`, {
       method: "PUT",
@@ -52,7 +52,7 @@ describe("server API", () => {
         scenario: {
           sourceName: "api.md",
           text: "A product team debates a critical release.",
-          controls: { numCast: 3, allowAdditionalCast: true, actionsPerType: 3, fastMode: false },
+          controls: { numCast: 3, allowAdditionalCast: true, actionsPerType: 3, maxRound: 3, fastMode: false },
         },
       }),
     })
@@ -87,7 +87,7 @@ describe("server API", () => {
         scenario: {
           sourceName: "bad.md",
           text: "A run without keys should fail.",
-          controls: { numCast: 2, allowAdditionalCast: true, actionsPerType: 3, fastMode: false },
+          controls: { numCast: 2, allowAdditionalCast: true, actionsPerType: 3, maxRound: 3, fastMode: false },
         },
       }),
     })
@@ -100,7 +100,7 @@ describe("server API", () => {
   test("logs retry attempts when a role node returns empty text", async () => {
     const settings = defaultSettings()
     for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].apiKey = role === "planner" ? "empty-test-key" : "test-key"
+      settings[role].apiKey = role === "planner" ? "unit-test-empty-key" : "unit-test-api-key"
     }
     await fetch(`${baseUrl}/api/settings`, {
       method: "PUT",
@@ -114,14 +114,14 @@ describe("server API", () => {
         scenario: {
           sourceName: "retry.md",
           text: "A retry-sensitive run.",
-          controls: { numCast: 2, allowAdditionalCast: true, actionsPerType: 3, fastMode: false },
+          controls: { numCast: 2, allowAdditionalCast: true, actionsPerType: 3, maxRound: 3, fastMode: false },
         },
       }),
     })
     const { run } = (await createResponse.json()) as { run: { id: string } }
     await fetch(`${baseUrl}/api/runs/${run.id}/start`, { method: "POST" })
     const failed = await pollRun(run.id, "failed")
-    expect(failed.error).toContain("planner.thought failed after 5 empty responses")
+    expect(failed.error).toContain("planner.coreSituation failed after 5 empty responses")
     const exported = await fetch(`${baseUrl}/api/runs/${run.id}/export?kind=jsonl`).then((response) =>
       response.text()
     )
@@ -132,7 +132,7 @@ describe("server API", () => {
       .filter(
         (event) =>
           event.type === "log" &&
-          event.message?.includes("planner.thought returned empty text")
+          event.message?.includes("planner.coreSituation returned empty text")
       )
     expect(retryLogEvents).toHaveLength(5)
   })
@@ -155,7 +155,7 @@ describe("server API", () => {
 
   test("drafts a scenario with the StoryBuilder role", async () => {
     const settings = defaultSettings()
-    settings.storyBuilder.apiKey = "test-key"
+    settings.storyBuilder.apiKey = "unit-test-api-key"
     await fetch(`${baseUrl}/api/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -167,7 +167,7 @@ describe("server API", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: [{ role: "user", content: "A city council faces a controversial infrastructure vote." }],
-        controls: { numCast: 4, allowAdditionalCast: true, actionsPerType: 3, fastMode: false },
+        controls: { numCast: 4, allowAdditionalCast: true, actionsPerType: 3, maxRound: 8, fastMode: false },
       }),
     })
     const draft = (await response.json()) as { text: string }
@@ -186,7 +186,7 @@ describe("server API", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages: [{ role: "user", content: "Draft a scenario." }],
-        controls: { numCast: 3, allowAdditionalCast: true, actionsPerType: 3, fastMode: false },
+        controls: { numCast: 3, allowAdditionalCast: true, actionsPerType: 3, maxRound: 8, fastMode: false },
       }),
     })
     const body = (await response.json()) as { error: string }

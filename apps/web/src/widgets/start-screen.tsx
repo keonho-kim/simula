@@ -2,31 +2,81 @@ import {
   ArchiveIcon,
   FileUpIcon,
   Gamepad2Icon,
+  LanguagesIcon,
+  SettingsIcon,
   SparklesIcon,
 } from "lucide-react"
 import type React from "react"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
-import type { UiTexts } from "@/lib/i18n"
+import type { LanguagePreference, Locale, UiTexts } from "@/lib/i18n"
 
 interface StartScreenProps {
   t: UiTexts
+  languagePreference: LanguagePreference
+  promptLanguage: Locale
   onNewScenario: () => void
   onUploadScenario: () => void
   onExampleScenario: () => void
   onRunHistory: () => void
+  onOpenSettings: () => void
+  onLanguagePreferenceChange: (preference: LanguagePreference) => void
 }
 
 export function StartScreen({
   t,
+  languagePreference,
+  promptLanguage,
   onNewScenario,
   onUploadScenario,
   onExampleScenario,
   onRunHistory,
+  onOpenSettings,
+  onLanguagePreferenceChange,
 }: StartScreenProps) {
   return (
     <main className="min-h-svh bg-background text-foreground">
-      <div className="mx-auto flex min-h-svh w-full max-w-[980px] flex-col justify-center gap-8 px-5 py-10">
+      <div className="mx-auto flex min-h-svh w-full max-w-[980px] flex-col gap-8 px-5 py-5">
+        <div className="flex justify-end gap-1">
+          <Button aria-label={t.settings} variant="ghost" size="icon" className="rounded-md" onClick={onOpenSettings}>
+            <SettingsIcon />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button aria-label={t.language} variant="ghost" size="icon" className="rounded-md">
+                <LanguagesIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel>{t.promptLanguage}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuRadioGroup
+                value={languagePreference}
+                onValueChange={(value) => onLanguagePreferenceChange(value as LanguagePreference)}
+              >
+                <DropdownMenuGroup>
+                  <DropdownMenuRadioItem value="system">
+                    {t.languageSystem} · {languageLabel(promptLanguage, t)}
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="en">{t.languageEnglish}</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="ko">{t.languageKorean}</DropdownMenuRadioItem>
+                </DropdownMenuGroup>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="flex flex-1 flex-col justify-center gap-8 pb-10">
         <header className="text-center">
           <p className="text-sm font-medium text-muted-foreground">Simula</p>
           <h1 className="mt-2 font-heading text-4xl font-semibold tracking-normal sm:text-5xl">
@@ -56,7 +106,7 @@ export function StartScreen({
             title={t.exampleScenario}
             body={t.exampleScenarioBody}
             icon={<Gamepad2Icon />}
-            tone="sun"
+            tone="violet"
             onClick={onExampleScenario}
           />
           <StartTile
@@ -67,9 +117,14 @@ export function StartScreen({
             onClick={onRunHistory}
           />
         </section>
+        </div>
       </div>
     </main>
   )
+}
+
+function languageLabel(locale: Locale, t: UiTexts): string {
+  return locale === "ko" ? t.languageKorean : t.languageEnglish
 }
 
 function StartTile({
@@ -82,14 +137,14 @@ function StartTile({
   title: string
   body: string
   icon: React.ReactNode
-  tone: "sky" | "mint" | "sun" | "rose"
+  tone: "sky" | "mint" | "violet" | "rose"
   onClick: () => void
 }) {
   const toneClass = {
-    sky: "bg-[oklch(0.94_0.035_230)]",
-    mint: "bg-[oklch(0.94_0.04_155)]",
-    sun: "bg-[oklch(0.94_0.045_82)]",
-    rose: "bg-[oklch(0.94_0.035_25)]",
+    sky: "bg-[#eef6ff]",
+    mint: "bg-[#eefbf6]",
+    violet: "bg-[#f5f3ff]",
+    rose: "bg-[#fff1f4]",
   }[tone]
 
   return (

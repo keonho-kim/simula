@@ -1,39 +1,73 @@
 export type RunStatus = "created" | "running" | "completed" | "failed"
 export type StopReason = "" | "simulation_done" | "no_progress" | "failed"
-export type ModelProvider = "openai" | "anthropic"
+export type ModelProvider = "openai" | "anthropic" | "gemini" | "ollama" | "lmstudio" | "vllm" | "litellm"
 export type ModelRole =
   | "storyBuilder"
   | "planner"
   | "generator"
   | "coordinator"
+  | "actor"
   | "observer"
   | "repair"
 
 export type SimulationRole = "planner" | "generator" | "coordinator" | "observer"
 export type RoleTraceStep = "thought" | "target" | "action" | "intent"
+export type ActorTraceStep = RoleTraceStep | "message" | "context"
+export type PlannerTraceStep =
+  | "coreSituation"
+  | "actorPressures"
+  | "conflictDynamics"
+  | "simulationDirection"
+  | "majorEvents"
+export type CoordinatorTraceStep =
+  | "runtimeFrame"
+  | "actorRouting"
+  | "interactionPolicy"
+  | "outcomeDirection"
+  | "eventInjection"
+  | "progressDecision"
+  | "extensionDecision"
+export type GeneratorRosterStep = "roster"
+export type ActorCardStep = "role" | "backgroundHistory" | "personality" | "preference"
 export type ActionVisibility = "public" | "semi-public" | "private" | "solitary"
 export type ActorDecisionType = "action" | "no_action"
+export type PromptLanguage = "en" | "ko"
 
 export interface ScenarioControls {
   numCast: number
   allowAdditionalCast: boolean
   actionsPerType: number
+  maxRound: number
   fastMode: boolean
+  actorContextTokenBudget?: number
 }
 
 export interface ScenarioInput {
   sourceName?: string
   text: string
   controls: ScenarioControls
+  language?: PromptLanguage
 }
 
 export interface RoleSettings {
   provider: ModelProvider
   model: string
   apiKey?: string
+  baseUrl?: string
   temperature: number
   maxTokens: number
   timeoutSeconds: number
+  streamUsage?: boolean
+  topP?: number
+  topK?: number
+  frequencyPenalty?: number
+  presencePenalty?: number
+  seed?: number
+  reasoningEffort?: "low" | "medium" | "high"
+  contextTokenBudget?: number
+  extraBody?: Record<string, unknown>
+  extraHeaders?: Record<string, string>
+  safetySettings?: Array<Record<string, string>>
 }
 
 export type LLMSettings = Record<ModelRole, RoleSettings>
@@ -61,15 +95,19 @@ export interface RunManifest {
 export interface GraphNodeView {
   id: string
   label: string
-  kind: "stage" | "actor" | "event" | "artifact"
-  status: "pending" | "running" | "completed" | "failed"
+  role: string
+  intent: string
+  interactionCount: number
 }
 
 export interface GraphEdgeView {
   id: string
   source: string
   target: string
-  label?: string
+  visibility: ActionVisibility
+  weight: number
+  roundIndex: number
+  latestContent: string
 }
 
 export interface GraphTimelineFrame {
@@ -80,6 +118,19 @@ export interface GraphTimelineFrame {
   activeNodeIds: string[]
   messages: string[]
   logRefs: string[]
+  layoutRoundIndex?: number
+}
+
+export interface ModelMetrics {
+  role: ModelRole
+  step: ActorTraceStep | PlannerTraceStep | CoordinatorTraceStep | GeneratorRosterStep | ActorCardStep | "draft"
+  attempt: number
+  ttftMs: number
+  durationMs: number
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  tokenSource: "provider" | "unavailable"
 }
 
 export type RunEvent =
@@ -88,7 +139,11 @@ export type RunEvent =
   | { type: "node.completed"; runId: string; timestamp: string; nodeId: string; label: string }
   | { type: "node.failed"; runId: string; timestamp: string; nodeId: string; label: string; error: string }
   | { type: "model.message"; runId: string; timestamp: string; role: ModelRole; content: string }
+  | { type: "model.metrics"; runId: string; timestamp: string; metrics: ModelMetrics }
+  | { type: "actors.ready"; runId: string; timestamp: string; actors: GraphNodeView[] }
+  | { type: "interaction.recorded"; runId: string; timestamp: string; interaction: Interaction }
   | { type: "actor.message"; runId: string; timestamp: string; actorId: string; actorName: string; content: string }
+  | { type: "round.completed"; runId: string; timestamp: string; roundIndex: number }
   | { type: "graph.delta"; runId: string; timestamp: string; frame: GraphTimelineFrame }
   | { type: "log"; runId: string; timestamp: string; level: "info" | "warn" | "error"; message: string }
   | { type: "report.delta"; runId: string; timestamp: string; content: string }
@@ -99,12 +154,22 @@ export interface ActorState {
   id: string
   name: string
   role: string
+  backgroundHistory: string
+  personality: string
+  preference: string
   privateGoal: string
   intent: string
   actions: ActorAction[]
   context: ActorContextMemory
+  contextSummary: string
   memory: string[]
   relationships: Record<string, string>
+}
+
+export interface ActorRosterEntry {
+  index: number
+  name: string
+  roleSeed: string
 }
 
 export interface ActorAction {
@@ -129,6 +194,7 @@ export interface ActorDecision {
   visibility: ActionVisibility
   targetActorIds: string[]
   intent: string
+  message?: string
   expectation: string
   contextUsed: string[]
 }
@@ -139,6 +205,13 @@ export interface PlannedEvent {
   summary: string
   status: "pending" | "active" | "completed" | "missed"
   participantIds: string[]
+}
+
+export interface ScenarioDigest {
+  coreSituation: string
+  actorPressures: string
+  conflictDynamics: string
+  simulationDirection: string
 }
 
 export interface Interaction {
@@ -164,6 +237,7 @@ export interface RoundDigest {
   afterRound: {
     content: string
   }
+  injectedEventId?: string
 }
 
 export interface RoundReport {
@@ -175,8 +249,8 @@ export interface RoundReport {
   unresolvedQuestions: string[]
 }
 
-export interface RoleTrace {
-  role: SimulationRole
+export interface StandardRoleTrace {
+  role: Exclude<SimulationRole, "planner" | "coordinator">
   thought: string
   target: string
   action: string
@@ -184,16 +258,42 @@ export interface RoleTrace {
   retryCounts: Record<RoleTraceStep, number>
 }
 
+export interface PlannerTrace {
+  role: "planner"
+  coreSituation: string
+  actorPressures: string
+  conflictDynamics: string
+  simulationDirection: string
+  majorEvents: string
+  retryCounts: Record<PlannerTraceStep, number>
+}
+
+export interface CoordinatorTrace {
+  role: "coordinator"
+  runtimeFrame: string
+  actorRouting: string
+  interactionPolicy: string
+  outcomeDirection: string
+  eventInjection: string
+  progressDecision: string
+  extensionDecision: string
+  retryCounts: Record<CoordinatorTraceStep, number>
+}
+
+export type RoleTrace = PlannerTrace | CoordinatorTrace | StandardRoleTrace
+
 export interface SimulationState {
   runId: string
   scenario: ScenarioInput
   plan?: {
     interpretation: string
     backgroundStory: string
+    scenarioDigest?: ScenarioDigest
     actionCatalog: string[]
     majorEvents: PlannedEvent[]
   }
   actors: ActorState[]
+  actorRoster?: ActorRosterEntry[]
   interactions: Interaction[]
   roundDigests: RoundDigest[]
   roundReports: RoundReport[]
@@ -221,6 +321,7 @@ export interface StoryBuilderMessage {
 export interface StoryBuilderDraftRequest {
   messages: StoryBuilderMessage[]
   controls: ScenarioControls
+  language?: PromptLanguage
 }
 
 export interface StoryBuilderDraftResponse {

@@ -1,15 +1,67 @@
-import { useMemo } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import type { PromptLanguage } from "@simula/shared"
 
 export type Locale = "ko" | "en"
+export type LanguagePreference = "system" | PromptLanguage
 export type UiTexts = Record<keyof typeof dictionary.en, string>
+
+export const LANGUAGE_STORAGE_KEY = "simula.language"
 
 export function resolveLocale(language?: string): Locale {
   return (language ?? "").toLowerCase().startsWith("ko") ? "ko" : "en"
 }
 
+export function resolvePromptLanguage(
+  preference: LanguagePreference,
+  browserLanguage?: string
+): PromptLanguage {
+  return preference === "system" ? resolveLocale(browserLanguage) : preference
+}
+
 export function useLocaleText() {
-  const locale = resolveLocale(typeof navigator === "undefined" ? undefined : navigator.language)
-  return useMemo(() => ({ locale, t: dictionary[locale] as UiTexts }), [locale])
+  const [languagePreference, setLanguagePreferenceState] = useState<LanguagePreference>(() =>
+    readLanguagePreference()
+  )
+  const [browserLanguage, setBrowserLanguage] = useState(() =>
+    typeof navigator === "undefined" ? undefined : navigator.language
+  )
+
+  useEffect(() => {
+    setBrowserLanguage(typeof navigator === "undefined" ? undefined : navigator.language)
+  }, [])
+
+  const promptLanguage = resolvePromptLanguage(languagePreference, browserLanguage)
+  const locale = promptLanguage
+  const setLanguagePreference = useCallback((preference: LanguagePreference) => {
+    setLanguagePreferenceState(preference)
+    writeLanguagePreference(preference)
+  }, [])
+
+  return useMemo(
+    () => ({
+      locale,
+      promptLanguage,
+      languagePreference,
+      setLanguagePreference,
+      t: dictionary[locale] as UiTexts,
+    }),
+    [languagePreference, locale, promptLanguage, setLanguagePreference]
+  )
+}
+
+function readLanguagePreference(): LanguagePreference {
+  if (typeof localStorage === "undefined") {
+    return "system"
+  }
+  const value = localStorage.getItem(LANGUAGE_STORAGE_KEY)
+  return value === "en" || value === "ko" || value === "system" ? value : "system"
+}
+
+function writeLanguagePreference(preference: LanguagePreference): void {
+  if (typeof localStorage === "undefined") {
+    return
+  }
+  localStorage.setItem(LANGUAGE_STORAGE_KEY, preference)
 }
 
 export const dictionary = {
@@ -39,7 +91,11 @@ export const dictionary = {
     scenarioText: "시나리오 본문",
     scenarioPlaceholder: "시나리오 본문을 붙여넣거나 StoryBuilder로 생성하세요.",
     castSize: "등장 인원",
+    maxRound: "Max round",
+    maxRoundHelp: "Actor가 활동할 기본 최대 라운드 수입니다.",
     actionsPerType: "유형별 행동 수",
+    actorContextTokens: "Actor context tokens",
+    actorContextTokensHelp: "각 라운드에서 actor가 유지할 context 요약 토큰 예산입니다.",
     fastMode: "Fast Mode",
     fastModeHelp: "안정성이 유지되는 독립 작업을 병렬로 처리합니다.",
     allowExtraCast: "추가 등장 인물 허용",
@@ -61,7 +117,16 @@ export const dictionary = {
     historyPickerDescription: "이전 실행을 선택해 그래프와 리포트를 복기합니다.",
     openRun: "열기",
     settings: "Settings",
+    language: "언어",
+    languageSystem: "시스템",
+    languageEnglish: "English",
+    languageKorean: "한국어",
+    promptLanguage: "프롬프트 언어",
     report: "Report",
+    reportConfirmTitle: "Report 페이지로 이동하시겠습니까?",
+    reportConfirmDescription: "시뮬레이션이 완료되었습니다. 현재 그래프와 리플레이를 계속 보거나 최종 리포트로 이동할 수 있습니다.",
+    reportConfirmStay: "계속 보기",
+    reportConfirmOpen: "Report 보기",
     exportJson: "Export JSON",
     exportJsonl: "Export JSONL",
     exportMarkdown: "Export Markdown",
@@ -92,7 +157,11 @@ export const dictionary = {
     scenarioText: "Scenario text",
     scenarioPlaceholder: "Paste scenario body here or generate it with StoryBuilder.",
     castSize: "Cast size",
+    maxRound: "Max round",
+    maxRoundHelp: "Default maximum number of actor activity rounds.",
     actionsPerType: "Actions per type",
+    actorContextTokens: "Actor context tokens",
+    actorContextTokensHelp: "Token budget for each actor's compressed context per round.",
     fastMode: "Fast Mode",
     fastModeHelp: "Parallelize independent work when consistency remains safe.",
     allowExtraCast: "Allow extra cast",
@@ -114,7 +183,16 @@ export const dictionary = {
     historyPickerDescription: "Open a previous run to review graph and report artifacts.",
     openRun: "Open run",
     settings: "Settings",
+    language: "Language",
+    languageSystem: "System",
+    languageEnglish: "English",
+    languageKorean: "Korean",
+    promptLanguage: "Prompt language",
     report: "Report",
+    reportConfirmTitle: "Move to the Report page?",
+    reportConfirmDescription: "The simulation is complete. You can keep reviewing the current graph and replay, or open the final report.",
+    reportConfirmStay: "Keep watching",
+    reportConfirmOpen: "Open Report",
     exportJson: "Export JSON",
     exportJsonl: "Export JSONL",
     exportMarkdown: "Export Markdown",

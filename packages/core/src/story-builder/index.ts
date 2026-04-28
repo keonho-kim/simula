@@ -5,6 +5,7 @@ import type {
   StoryBuilderMessage,
 } from "@simula/shared"
 import { invokeRoleText } from "../llm"
+import { withPromptLanguageGuide } from "../language"
 import { validateRoleSettings } from "../settings"
 
 export async function draftScenario(
@@ -12,26 +13,25 @@ export async function draftScenario(
   settings: LLMSettings
 ): Promise<StoryBuilderDraftResponse> {
   validateRoleSettings(settings, "storyBuilder")
-  const prompt = renderStoryBuilderPrompt(request)
+  const prompt = withPromptLanguageGuide(renderStoryBuilderPrompt(request), request.language)
   const generated = await invokeRoleText(settings, "storyBuilder", prompt)
   return { text: generated || fallbackDraft(request.messages) }
 }
 
 function renderStoryBuilderPrompt(request: StoryBuilderDraftRequest): string {
-  return [
-    "You are StoryBuilder for Simula, an actor-based virtual simulation system.",
-    "Create a compact simulation-ready scenario draft as markdown/plain text.",
-    "The scenario must describe the purpose, end condition, core situation, actor pressure, and likely interaction dynamics.",
-    "Write concrete actor-driven material. Avoid generic creative-writing advice.",
-    `Requested cast size: ${request.controls.numCast}.`,
-    `Allow additional cast: ${request.controls.allowAdditionalCast ? "true" : "false"}.`,
-    `Actions per visibility type: ${request.controls.actionsPerType}.`,
-    "",
-    "Conversation:",
-    renderConversation(request.messages),
-    "",
-    "Return only the scenario draft. Do not wrap it in code fences.",
-  ].join("\n")
+  return `You are StoryBuilder for Simula, an actor-based virtual simulation system.
+Create a compact simulation-ready scenario draft as markdown/plain text.
+The scenario must describe the purpose, end condition, core situation, actor pressure, and likely interaction dynamics.
+Write concrete actor-driven material. Avoid generic creative-writing advice.
+Requested cast size: ${request.controls.numCast}.
+Requested max rounds: ${request.controls.maxRound ?? 8}.
+Allow additional cast: ${request.controls.allowAdditionalCast ? "true" : "false"}.
+Actions per visibility type: ${request.controls.actionsPerType}.
+
+Conversation:
+${renderConversation(request.messages)}
+
+Return only the scenario draft. Do not wrap it in code fences.`
 }
 
 function renderConversation(messages: StoryBuilderMessage[]): string {

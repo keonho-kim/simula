@@ -3,6 +3,7 @@ import type {
   ExportKindResponse,
   LLMSettings,
   RunManifest,
+  RunEvent,
   ScenarioSampleDetail,
   ScenarioSampleSummary,
   ScenarioInput,
@@ -17,6 +18,7 @@ export interface RunDetailResponse {
   run: RunManifest
   state?: SimulationState
   timeline: GraphTimelineFrame[]
+  events: RunEvent[]
 }
 
 export async function fetchRuns(): Promise<RunManifest[]> {

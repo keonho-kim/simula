@@ -1,45 +1,45 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "@xyflow/react/dist/style.css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "katex/dist/katex.min.css";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: oklch(0.982 0.007 95);
-  --foreground: oklch(0.21 0.018 255);
-  --card: oklch(0.998 0.003 95);
-  --card-foreground: oklch(0.21 0.018 255);
-  --popover: oklch(0.998 0.003 95);
-  --popover-foreground: oklch(0.21 0.018 255);
-  --primary: oklch(0.31 0.055 252);
-  --primary-foreground: oklch(0.99 0.004 95);
-  --secondary: oklch(0.945 0.012 96);
-  --secondary-foreground: oklch(0.24 0.02 255);
-  --muted: oklch(0.946 0.01 96);
-  --muted-foreground: oklch(0.48 0.018 255);
-  --accent: oklch(0.94 0.018 225);
-  --accent-foreground: oklch(0.24 0.035 252);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.99 0.004 95);
-  --border: oklch(0.878 0.012 96);
-  --input: oklch(0.89 0.012 96);
-  --ring: oklch(0.62 0.085 250);
+  --background: #ffffff;
+  --foreground: #172033;
+  --card: #ffffff;
+  --card-foreground: #172033;
+  --popover: #ffffff;
+  --popover-foreground: #172033;
+  --primary: #1f2a44;
+  --primary-foreground: #ffffff;
+  --secondary: #f4f7fb;
+  --secondary-foreground: #1f2a44;
+  --muted: #f3f6fa;
+  --muted-foreground: #667085;
+  --accent: #eef5ff;
+  --accent-foreground: #1f3a5f;
+  --destructive: #d92d20;
+  --destructive-foreground: #ffffff;
+  --border: #e5eaf0;
+  --input: #d7dee8;
+  --ring: #4c8df6;
   --radius: 0.5rem;
-  --chart-1: oklch(0.62 0.12 230);
-  --chart-2: oklch(0.58 0.1 150);
-  --chart-3: oklch(0.66 0.12 62);
-  --chart-4: oklch(0.55 0.09 300);
-  --chart-5: oklch(0.56 0.12 24);
-  --sidebar: oklch(0.968 0.008 96);
-  --sidebar-foreground: oklch(0.21 0.018 255);
-  --sidebar-primary: oklch(0.31 0.055 252);
-  --sidebar-primary-foreground: oklch(0.99 0.004 95);
-  --sidebar-accent: oklch(0.94 0.018 225);
-  --sidebar-accent-foreground: oklch(0.24 0.035 252);
-  --sidebar-border: oklch(0.878 0.012 96);
-  --sidebar-ring: oklch(0.62 0.085 250);
+  --chart-1: #3b82f6;
+  --chart-2: #10b981;
+  --chart-3: #8b5cf6;
+  --chart-4: #64748b;
+  --chart-5: #f43f5e;
+  --sidebar: #f8fafc;
+  --sidebar-foreground: #172033;
+  --sidebar-primary: #1f2a44;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eef5ff;
+  --sidebar-accent-foreground: #1f3a5f;
+  --sidebar-border: #e5eaf0;
+  --sidebar-ring: #4c8df6;
 }
 
 @theme inline {
@@ -104,24 +104,6 @@ body {
   color: var(--foreground);
 }
 
-.react-flow__controls {
-  overflow: hidden;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  box-shadow: 0 2px 8px oklch(0.2 0.02 250 / 0.08);
-}
-
-.react-flow__controls-button {
-  border-bottom: 1px solid var(--border);
-  background: var(--card);
-  color: var(--foreground);
-}
-
-.react-flow__node-default {
-  border: 0;
-  background: transparent;
-}
-
 button,
 input,
 textarea,
@@ -172,5 +154,148 @@ select {
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer components {
+  .simula-markdown {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-size: 0.875rem;
+    line-height: 1.625;
+    color: color-mix(in srgb, var(--foreground) 88%, transparent);
+  }
+
+  .simula-markdown > :first-child {
+    margin-top: 0;
+  }
+
+  .simula-markdown > :last-child {
+    margin-bottom: 0;
+  }
+
+  .simula-markdown p,
+  .simula-markdown ul,
+  .simula-markdown ol,
+  .simula-markdown blockquote,
+  .simula-markdown pre,
+  .simula-markdown table,
+  .simula-markdown .katex-display {
+    margin-block: 0.65rem;
+  }
+
+  .simula-markdown h1,
+  .simula-markdown h2,
+  .simula-markdown h3,
+  .simula-markdown h4 {
+    margin-block: 1rem 0.45rem;
+    color: var(--foreground);
+    font-weight: 650;
+    line-height: 1.25;
+  }
+
+  .simula-markdown h1 {
+    font-size: 1.25rem;
+  }
+
+  .simula-markdown h2 {
+    font-size: 1.05rem;
+  }
+
+  .simula-markdown h3,
+  .simula-markdown h4 {
+    font-size: 0.95rem;
+  }
+
+  .simula-markdown a {
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .simula-markdown ul,
+  .simula-markdown ol {
+    padding-left: 1.2rem;
+  }
+
+  .simula-markdown li + li {
+    margin-top: 0.2rem;
+  }
+
+  .simula-markdown blockquote {
+    border-left: 3px solid var(--border);
+    color: var(--muted-foreground);
+    padding-left: 0.85rem;
+  }
+
+  .simula-markdown :not(pre) > code {
+    border-radius: 0.25rem;
+    background: var(--muted);
+    color: var(--foreground);
+    font-size: 0.86em;
+    padding: 0.1rem 0.28rem;
+  }
+
+  .simula-markdown pre {
+    max-width: 100%;
+    overflow-x: auto;
+    border-radius: 0.45rem;
+    background: var(--muted);
+    padding: 0.85rem;
+  }
+
+  .simula-markdown pre code {
+    background: transparent;
+    padding: 0;
+    white-space: pre;
+  }
+
+  .simula-markdown table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+  }
+
+  .simula-markdown th,
+  .simula-markdown td {
+    border: 1px solid var(--border);
+    padding: 0.35rem 0.5rem;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .simula-markdown th {
+    background: var(--muted);
+    color: var(--foreground);
+    font-weight: 650;
+  }
+
+  .simula-markdown hr {
+    margin-block: 1rem;
+    border: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .simula-markdown .katex-display {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-block: 0.2rem;
+  }
+
+  .simula-markdown-compact {
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+
+  .simula-markdown-compact p,
+  .simula-markdown-compact ul,
+  .simula-markdown-compact ol,
+  .simula-markdown-compact blockquote,
+  .simula-markdown-compact pre,
+  .simula-markdown-compact table,
+  .simula-markdown-compact .katex-display {
+    margin-block: 0.35rem;
   }
 }

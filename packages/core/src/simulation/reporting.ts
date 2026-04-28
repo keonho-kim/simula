@@ -1,4 +1,5 @@
 import type { ActorState, Interaction, PlannedEvent, SimulationState } from "@simula/shared"
+import { plannerDigestSummary } from "./plan"
 
 export function renderReport(state: SimulationState): string {
   const plan = state.plan
@@ -6,7 +7,10 @@ export function renderReport(state: SimulationState): string {
     .map((event) => `| ${event.title} | ${event.status} | ${event.summary} |`)
     .join("\n")
   const actorRows = state.actors
-    .map((actor) => `| ${actor.name} | ${actor.role} | ${actor.intent} |`)
+    .map(
+      (actor) =>
+        `| ${actor.name} | ${actor.role} | ${actor.personality || "not recorded"} | ${actor.preference || "not recorded"} |`
+    )
     .join("\n")
   const interactionRows = state.interactions
     .map((item) => {
@@ -21,13 +25,16 @@ export function renderReport(state: SimulationState): string {
     `## Conclusion`,
     state.worldSummary,
     ``,
-    `## Background Story`,
-    state.plan?.backgroundStory ?? state.plan?.interpretation ?? "No background story was recorded.",
+    `## Scenario Digest`,
+    plannerDigestSummary(state.plan, "No scenario digest was recorded."),
     ``,
     `## Actor Results`,
-    `| Actor | Role | Final Intent |`,
-    `| --- | --- | --- |`,
-    actorRows || `| No actors | - | - |`,
+    `| Actor | Role | Personality | Preference |`,
+    `| --- | --- | --- | --- |`,
+    actorRows || `| No actors | - | - | - |`,
+    ``,
+    `## Actor Cards`,
+    renderActorCards(state.actors),
     ``,
     `## Timeline`,
     interactionRows || `No interactions were adopted.`,
@@ -60,6 +67,23 @@ export function renderReport(state: SimulationState): string {
     `- Interactions: ${state.interactions.length}`,
     state.errors.length ? `- Errors: ${state.errors.join("; ")}` : `- Errors: none`,
   ].join("\n")
+}
+
+function renderActorCards(actors: ActorState[]): string {
+  if (actors.length === 0) {
+    return "No actor cards were generated."
+  }
+  return actors
+    .map((actor) =>
+      [
+        `### ${actor.name}`,
+        `- Role: ${actor.role}`,
+        `- Background history: ${actor.backgroundHistory || "not recorded"}`,
+        `- Personality: ${actor.personality || "not recorded"}`,
+        `- Preference: ${actor.preference || "not recorded"}`,
+      ].join("\n")
+    )
+    .join("\n\n")
 }
 
 function renderRoundReports(state: SimulationState): string {
@@ -136,6 +160,26 @@ function renderRoleTraces(traces: SimulationState["roleTraces"]): string {
       const retries = Object.entries(trace.retryCounts)
         .map(([step, count]) => `${step}: ${count}`)
         .join(", ")
+      if (trace.role === "planner") {
+        return [
+          `### ${trace.role}`,
+          `- Core situation: ${trace.coreSituation}`,
+          `- Actor pressures: ${trace.actorPressures}`,
+          `- Conflict dynamics: ${trace.conflictDynamics}`,
+          `- Simulation direction: ${trace.simulationDirection}`,
+          `- Retries: ${retries}`,
+        ].join("\n")
+      }
+      if (trace.role === "coordinator") {
+        return [
+          `### ${trace.role}`,
+          `- Runtime frame: ${trace.runtimeFrame}`,
+          `- Actor routing: ${trace.actorRouting}`,
+          `- Interaction policy: ${trace.interactionPolicy}`,
+          `- Outcome direction: ${trace.outcomeDirection}`,
+          `- Retries: ${retries}`,
+        ].join("\n")
+      }
       return [
         `### ${trace.role}`,
         `- Thought: ${trace.thought}`,
