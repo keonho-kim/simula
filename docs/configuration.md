@@ -1,105 +1,96 @@
 # Configuration
 
-This document describes configuration concepts without prescribing a language-specific setup path.
-Concrete command syntax belongs outside this documentation until the current runtime transition is
-settled.
+`simula` uses role-based model settings for every model-backed stage.
 
 ## Resolution Model
 
-Settings are expected to resolve from layered sources.
+Settings resolve in this order:
 
-1. built-in defaults
-2. local configuration file
-3. environment variables
-4. explicit run overrides
+1. built-in defaults from `packages/core/src/settings`
+2. `env.toml`, or the file pointed to by `SIMULA_ENV_TOML_PATH`
+3. `settings.json`, or the file pointed to by `SIMULA_SETTINGS_PATH`
+4. values saved through `PUT /api/settings`
 
-Later layers override earlier layers. A run should record a redacted settings summary in
-`manifest.json` so saved artifacts remain inspectable.
+Saved settings are normalized before writing. When the client sends a masked API key value
+(`********`), the server keeps the previous secret.
 
-## Configuration Areas
+## Server Environment Variables
 
-| Area | Purpose |
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PORT` | `3001` | Bun API server port |
+| `SIMULA_DATA_DIR` | `runs` under the server working directory | live run artifact root |
+| `SIMULA_SETTINGS_PATH` | `settings.json` under the server working directory | saved settings file |
+| `SIMULA_ENV_TOML_PATH` | `env.toml` under the server working directory | local TOML settings file |
+| `SIMULA_SAMPLE_DIR` | repository `senario.samples` directory | scenario sample root |
+
+For web development, `SIMULA_API_ORIGIN` controls the Vite proxy target for `/api`.
+
+## Model Roles
+
+Every role resolves to one concrete `RoleSettings` object:
+
+- `storyBuilder`
+- `planner`
+- `generator`
+- `coordinator`
+- `actor`
+- `observer`
+- `repair`
+
+`actor` may inherit the coordinator settings when no actor-specific settings are provided.
+
+## Providers
+
+Supported providers:
+
+| Provider | Notes |
 | --- | --- |
-| Runtime controls | Round limits, recipient caps, scene size limits, deterministic seed, and optional checkpoint behavior. |
-| Scenario controls | Cast count and whether additional cast entries are allowed. |
-| Storage | Where structured run records and file artifacts are written. |
-| Model roles | Which model configuration backs planning, actor generation, runtime coordination, final reporting, and repair. |
-| Logging | Console verbosity and durable event-log behavior. |
-| Analysis | Which summaries, tables, and visual artifacts are emitted for completed runs. |
+| `openai` | requires API key |
+| `anthropic` | requires API key |
+| `gemini` | requires API key |
+| `ollama` | OpenAI-compatible local provider, default base URL `http://localhost:11434/v1` |
+| `lmstudio` | OpenAI-compatible local provider, default base URL `http://localhost:1234/v1` |
+| `vllm` | OpenAI-compatible local provider, default base URL `http://localhost:8000/v1` |
+| `litellm` | OpenAI-compatible gateway, default base URL `http://localhost:4000/v1` |
 
-## Runtime Controls
+OpenAI-compatible providers require a `baseUrl`. Non-local providers require an API key.
 
-Runtime controls shape how far a simulation can advance.
+## Role Settings
 
-- maximum rounds define the hard ceiling
-- scene actor limits bound how many actors can participate in one runtime focus
-- candidate limits bound how many possible actions are considered
-- scene beat limits bound how much activity one round can adopt
-- deterministic seeds support repeatable selection where the implementation allows it
+Each role setting contains:
 
-The exact defaults may change, but each completed run should make the effective controls visible
-through the manifest.
+- `provider`
+- `model`
+- `apiKey`
+- `baseUrl`
+- `temperature`
+- `maxTokens`
+- `timeoutSeconds`
+- optional sampling and provider fields such as `topP`, `topK`, penalties, seed, `reasoningEffort`,
+  `streamUsage`, `extraBody`, `extraHeaders`, and `safetySettings`
+
+The actor role also supports `contextTokenBudget`; its default is `2000`.
 
 ## Scenario Controls
 
-Scenario controls are part of the scenario contract.
+Scenario controls are read from flat frontmatter:
 
 ```text
 ---
 num_cast: 6
 allow_additional_cast: true
+actions_per_type: 3
+max_round: 8
+fast_mode: false
+actor_context_token_budget: 2000
 ---
-Scenario body starts here.
 ```
 
-`num_cast` is required and must be a positive integer. `allow_additional_cast` is optional. When it
-is false, the run should use exactly the requested cast size. When it is true or omitted, the plan
-may include additional cast entries if the scenario requires them.
-
-## Model Role Configuration
-
-`simula` uses role-level model configuration.
-
-The current roles are:
-
-- planner
-- generator
-- coordinator
-- observer
-- repair
-
-Each role should resolve to one concrete model configuration with its own temperature, token
-budget, timeout, and provider-specific credentials or endpoint settings when needed.
-
-Role separation allows different stages to use different model strengths while keeping product
-contracts stable.
-
-## Storage And Artifacts
-
-Configuration should identify:
-
-- where structured run records are stored
-- where file artifacts are written
-- whether checkpoint-like recovery data is enabled
-- how repeated trials isolate their outputs
-
-The file output root is conceptually separate from committed sample runs. `output/` is the live
-workspace for generated artifacts. `output.samples/` contains reference runs checked into the
-repository.
-
-## Validation Rules
-
-Configuration validation should fail explicitly when required values are missing or incompatible.
-
-Examples:
-
-- unknown setting names should be rejected
-- model roles should resolve before a run starts
-- storage settings should be validated before the run writes artifacts
-- invalid scenario controls should stop the run before planning
+`num_cast` is required. Unsupported keys fail explicitly.
 
 ## Related Docs
 
-- scenario and artifact operations: [`operations.md`](./operations.md)
-- model roles: [`llm.md`](./llm.md)
-- artifact contracts: [`contracts.md`](./contracts.md)
+- server and artifact operations: [`operations.md`](./operations.md)
+- model behavior: [`llm.md`](./llm.md)
+- scenario contract: [`contracts.md`](./contracts.md)

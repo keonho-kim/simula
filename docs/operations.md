@@ -1,98 +1,121 @@
 # Operations
 
-This document describes language-neutral operating expectations for `simula`: scenario controls,
-trial behavior, output layout, and maintenance rules.
+## Local Development
+
+Install dependencies:
+
+```bash
+bun install
+```
+
+Run the server and web app in separate terminals:
+
+```bash
+bun run dev:server
+bun run dev:web
+```
+
+Or run both:
+
+```bash
+bun run dev
+```
+
+The server defaults to `http://localhost:3001`. The web app proxies `/api` to that server.
 
 ## Scenario Input
 
-A scenario is a document with a frontmatter control block followed by the scenario body.
+A scenario file must start with frontmatter followed by a non-empty body.
 
 ```text
 ---
 num_cast: 6
 allow_additional_cast: true
+actions_per_type: 3
+max_round: 8
+fast_mode: false
+actor_context_token_budget: 2000
 ---
 Scenario body starts here.
 ```
 
-The control block accepts:
+`num_cast` is required. Other controls are optional and default in code. Unsupported controls fail
+explicitly.
 
-- `num_cast`: required positive integer
-- `allow_additional_cast`: optional boolean
+Sample scenarios live in [`../senario.samples/`](../senario.samples/README.md).
 
-Unsupported controls should fail explicitly. The scenario body should describe the situation,
-actors or actor types, stakes, constraints, and pressure that should drive the simulation.
+## Run Lifecycle
 
-## Repeated Trials
+The web app normally drives runs:
 
-The same scenario may be run more than once to compare behavior across trials.
+1. create or load a scenario
+2. review scenario controls
+3. save role settings
+4. create a run with `POST /api/runs`
+5. start it with `POST /api/runs/:id/start`
+6. stream updates from `GET /api/runs/:id/events`
+7. inspect or export the report after completion
 
-Operational expectations:
+The server prevents starting the same run twice in the same process. A second start request for an
+already running run returns `already_running`.
 
-- each trial gets its own run id
-- each trial writes its own run directory
-- trials should not overwrite each other's structured records
-- shared sample runs under `output.samples/` should not be treated as live output
+## Run Artifacts
 
-Trial execution order is an implementation detail. Artifact isolation is the product requirement.
-
-## Output Layout
-
-Each completed simulation run writes one run directory:
+Default live output:
 
 ```text
-output/
-  <run_id>/
-    manifest.json
-    report.final.md
-    summary.overview.md
-    simulation.log.jsonl
-    data/
-    summaries/
-    assets/
+runs/<run_id>/
+  manifest.json
+  scenario.json
+  events.jsonl
+  state.json
+  report.md
+  graph.timeline.json
 ```
 
-Use the paths as follows:
+Override the live root with `SIMULA_DATA_DIR`.
 
-| Path | Meaning |
+| File | Purpose |
 | --- | --- |
-| `output/` | live run output written by local execution |
-| `output.samples/` | committed reference runs kept for inspection |
-| `simulation.log.jsonl` | source event stream for inspection and analysis |
-| `report.final.md` | final human-readable report |
-| `summary.overview.md` | compact analysis entrypoint |
-| `data/` | tabular and structured analysis exports |
-| `summaries/` | human-readable analysis summaries |
-| `assets/` | rendered analysis visuals |
+| `manifest.json` | run id, status, timestamps, stop reason, error, and artifact paths |
+| `scenario.json` | normalized scenario used by the run |
+| `events.jsonl` | append-only runtime events |
+| `state.json` | completed structured simulation state |
+| `report.md` | final human-readable report |
+| `graph.timeline.json` | replay frames for graph and message inspection |
 
-## Run Manifest
+## Exports
 
-`manifest.json` should make a saved run self-describing.
+Use the export endpoint for completed runs:
 
-It should include:
+| Query | Output |
+| --- | --- |
+| `kind=json` | `state.json` |
+| `kind=jsonl` | `events.jsonl` |
+| `kind=md` | `report.md` |
 
-- run id
-- status
-- timestamps
-- scenario metadata
-- effective configuration summary with secrets redacted
-- artifact paths
-- event count
-- model-call count
-- observed roles
-- failure text when a run fails
+Unsupported kinds fail with `400`.
+
+## Validation Commands
+
+Run these from the repository root:
+
+```bash
+bun test
+bun run typecheck
+bun run lint
+bun run build
+```
+
+Browser smoke tests:
+
+```bash
+bun run test:e2e
+```
 
 ## Maintenance Notes
 
-- Keep documentation aligned with product behavior and artifact contracts.
-- Keep `simulation.log.jsonl` as the source artifact for analysis.
-- Keep final reports tied to completed runtime traces.
-- Update workflow docs when stage responsibilities or handoffs change.
-- Do not document language-specific setup here until the runtime transition has a stable target
-  surface.
-
-## Related Docs
-
-- configuration concepts: [`configuration.md`](./configuration.md)
-- analysis artifacts: [`analysis.md`](./analysis.md)
-- workflow stages: [`workflows/README.md`](./workflows/README.md)
+- Keep `runs/` ignored; it is local runtime state.
+- Keep `output.samples/` as committed reference data only.
+- Update workflow docs when stage order or run event behavior changes.
+- Update `packages/shared` types and this documentation together when public event or API shapes change.

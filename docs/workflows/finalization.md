@@ -1,55 +1,45 @@
 # Finalization Workflow
 
-Finalization turns the completed runtime trace into stable report artifacts.
-
-## Flow
-
-```mermaid
-flowchart LR
-    Trace["Completed Trace"] --> Projection["Report Projection"]
-    Projection --> Draft["Report Draft"]
-    Draft --> Render["Rendered Report"]
-    Render --> Artifacts["Saved Artifacts"]
-```
+Finalization turns completed simulation state into a Markdown report.
 
 ## Responsibilities
 
-Finalization should:
+Finalization:
 
-- build a structured final report from runtime state
-- summarize model usage when available
-- project timeline and actor dynamics from the completed trace
-- draft report prose from the projection
-- render the final markdown report
-- expose errors and stop reason in the final output
+- renders the current report projection
+- emits a final `report.delta`
+- completes the `finalization` node
+- returns `SimulationState` with `reportMarkdown`
 
-The final report should explain the run that actually happened. It should not invent major
-outcomes outside the completed trace.
+The server writes the completed state to `state.json` and the Markdown report to `report.md`.
 
-## Report Sections
+## Report Shape
 
-The rendered report contains:
+The rendered report currently includes sections such as:
 
-- simulation conclusion
-- actor results table
-- timeline
-- actor dynamics
-- major events
-- explicit errors or defaults when present
+- scenario digest
+- actor cards
+- round digests
+- round reports
+- role traces
 
-## Stage Output
+The report is a projection of completed workflow state. It should not introduce outcomes that were
+not represented in state.
 
-Finalization produces:
+## Artifacts
 
-- final report payload
-- usage summary
-- report projection
-- rendered markdown report
-- manifest-ready metadata
-- stop reason
-- explicit errors
+Finalization contributes to:
+
+```text
+runs/<run_id>/
+  state.json
+  report.md
+  events.jsonl
+```
+
+The server updates `manifest.json` after the workflow completes.
 
 ## Related Docs
 
-- final report contract: [`../contracts.md`](../contracts.md)
-- analysis artifacts: [`../analysis.md`](../analysis.md)
+- runtime: [`runtime.md`](./runtime.md)
+- contracts: [`../contracts.md`](../contracts.md)

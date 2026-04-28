@@ -1,76 +1,67 @@
-# Simulation Workflow
+# Simulation Root Workflow
 
-The root simulation workflow defines the public boundary and stage order for one run.
+The server starts a run by calling `runSimulation` from `packages/core`.
 
-## Boundary
+## Input
 
-The workflow accepts compact run input:
+`runSimulation` receives:
 
-- run id
-- scenario body
-- scenario controls
-- maximum round limit
-- deterministic seed when provided
+- `runId`
+- normalized `ScenarioInput`
+- normalized `LLMSettings`
+- async `emit` callback for `RunEvent`
+- optional `roundDelayMs`
 
-It returns compact run output:
+The server owns persistence and passes an emitter that appends each event to `events.jsonl`, builds
+timeline frames, and publishes SSE messages.
 
-- run id
-- final report payload
-- rendered report
-- event log reference
-- usage summary
-- stop reason
-- explicit errors
-
-## Stage Order
+## Root Stage Order
 
 ```mermaid
 flowchart LR
-    Start["Run Input"] --> Plan["Planning"]
-    Plan --> Actors["Actor Generation"]
-    Actors --> Runtime["Runtime"]
-    Runtime --> Final["Finalization"]
-    Final --> Done["Run Output"]
+    Start["run.started"] --> Planner["planner"]
+    Planner --> Generator["generator"]
+    Generator --> Coordinator["coordinator"]
+    Coordinator --> Observer["observer"]
+    Observer --> Finalization["finalization"]
+    Finalization --> Done["run.completed"]
 ```
 
-## State Initialization
+## State
 
-Before planning begins, the workflow expands compact input into initialized state.
+The workflow starts from `initialSimulationState(runId, scenario)` and returns the completed
+`SimulationState`.
 
-The initialized state includes:
+The final state is written to:
 
-- empty plan and actor buffers
-- empty runtime activity and observer history
-- initial event-memory fields
-- initial actor intent fields
-- initial simulation clock
-- empty report buffers
-- empty error list
+- `state.json`
+- `report.md`
 
-Later stages should read this initialized state instead of rebuilding shared defaults.
+The server writes terminal manifest fields after the workflow resolves or fails.
 
-## Stage Ownership
+## Events
 
-| Stage | Owns |
-| --- | --- |
-| Planning | scenario interpretation, action catalog, cast roster, and major events |
-| Actor generation | concrete actor cards and actor registry validation |
-| Runtime | event selection, actor actions, intent updates, event-memory updates, and stop decisions |
-| Finalization | report projection, report drafting, markdown rendering, and final metadata |
+The workflow emits:
 
-## Durable Events
+- run lifecycle events
+- node lifecycle events
+- model messages and metrics
+- actor readiness
+- interactions
+- actor messages
+- round completion
+- report deltas
+- logs
 
-During execution, stable events are appended to `simulation.log.jsonl`.
+The storage layer derives `graph.delta` events for actor readiness, interactions, and completed
+rounds.
 
-The log is used for:
+## Failure Behavior
 
-- inspection
-- analysis
-- performance summaries
-- final artifact indexing
+If a stage throws, the server emits `run.failed`, writes a failed manifest with the error message,
+and removes the run from the in-memory running set.
 
 ## Related Docs
 
 - workflow hub: [`README.md`](./README.md)
-- state and artifact contracts: [`../contracts.md`](../contracts.md)
-- architecture: [`../architecture.md`](../architecture.md)
+- contracts: [`../contracts.md`](../contracts.md)

@@ -1,101 +1,63 @@
-# Analysis
+# Analysis and Inspection
 
-`simula` writes analysis artifacts beside the run that produced them. Analysis is derived from the
-same durable trace used for inspection and reporting.
+The current TypeScript implementation writes live run artifacts under `runs/`. It does not write
+the older integrated analysis bundle for new runs.
 
-## Source Of Truth
+## Current Live Artifacts
 
-`simulation.log.jsonl` is the source artifact for analysis.
-
-It contains the ordered runtime event stream, including model calls, planning results, actor
-registry, round activity, event-memory updates, observer reports, and final report metadata.
-
-Because analysis is derived from this event stream, saved runs can be inspected and compared after
-the simulation has completed.
-
-## Output Layout
-
-Each completed run may contain:
+For each run, inspect:
 
 ```text
-output/
-  <run_id>/
-    simulation.log.jsonl
-    manifest.json
-    report.final.md
-    summary.overview.md
-    data/
-      llm_calls.csv
-      performance.summary.csv
-      token_usage.summary.csv
-      actions.summary.csv
-      network.nodes.csv
-      network.edges.csv
-      network.growth.csv
-      network.summary.json
-    summaries/
-      token_usage.summary.md
-      network.summary.md
-    assets/
-      performance.summary.png
-      network.graph.png
-      network.graph.graphml
-      network.growth_metrics.png
-      network.concentration.png
-      network.growth.mp4
+runs/<run_id>/
+  manifest.json
+  scenario.json
+  events.jsonl
+  state.json
+  report.md
+  graph.timeline.json
 ```
 
-Committed example runs use the same shape under `output.samples/`.
+Recommended reading order:
 
-## Metrics
+1. `manifest.json`
+2. `report.md`
+3. `graph.timeline.json`
+4. `events.jsonl`
+5. `state.json`
 
-The analysis layer focuses on run comparability.
+## Event Stream
 
-It can summarize:
+`events.jsonl` is the main source of truth for runtime inspection. It records lifecycle events,
+model messages, model metrics, actor readiness, accepted interactions, actor messages, graph
+deltas, report deltas, logs, and terminal run status.
 
-- model-call timing and usage
-- actor participation
-- action type diversity
-- interaction volume
-- source and target concentration
-- relationship graph structure
-- path depth and reachability
-- community structure
-- cumulative network growth
+Because the file is newline-delimited JSON, it can be streamed during a run and exported afterward
+through `GET /api/runs/:id/export?kind=jsonl`.
 
-These metrics make it easier to compare scenarios, model configurations, and repeated trials.
+## Graph Timeline
 
-## Manifest
+`graph.timeline.json` is the replay-oriented view derived from runtime events. The web app uses it
+to show actor nodes, interaction edges, active actors, and message history over time.
 
-`manifest.json` is the run-level index.
+## Structured State
 
-It records:
+`state.json` stores the completed simulation state and is exported through
+`GET /api/runs/:id/export?kind=json`.
 
-- run identity and status
-- start and end timestamps
-- scenario metadata
-- redacted configuration summary
-- produced artifact paths
-- event count
-- model-call count
-- roles observed in the run
-- error text for failed runs
+Use it when you need structured actor, interaction, round, report, or trace data rather than the
+human-readable report.
 
-Failed runs may still keep `simulation.log.jsonl` and `manifest.json` even when derived analysis
-artifacts are incomplete.
+## Reference Sample Outputs
 
-## Reading A Run
+`output.samples/` contains committed reference outputs from earlier sample runs. Those directories
+may include files such as `report.final.md`, `summary.overview.md`, `simulation.log.jsonl`, `data/`,
+`summaries/`, and `assets/`.
 
-For human inspection, start with:
-
-1. `summary.overview.md`
-2. `report.final.md`
-3. `summaries/network.summary.md`
-4. `simulation.log.jsonl`
-
-For comparison across runs, start with the tables in `data/` and the visuals in `assets/`.
+Those files are kept for inspection and comparison only. They are not the live output layout for
+new runs in the current server.
 
 ## Related Docs
 
-- runtime log contract: [`contracts.md`](./contracts.md)
-- operational artifact notes: [`operations.md`](./operations.md)
+- operations: [`operations.md`](./operations.md)
+- contracts: [`contracts.md`](./contracts.md)
+- architecture: [`architecture.md`](./architecture.md)

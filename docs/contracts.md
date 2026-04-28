@@ -1,166 +1,125 @@
 # Contracts
 
-This document describes the product-level data contracts used by `simula`. The contracts are
-language-neutral: they describe the shape and meaning of simulation data rather than a specific
-implementation.
+This document describes the current public data contracts used across server, web, core, and
+shared packages.
 
 ## Scenario Contract
 
-A scenario provides the starting pressure for a run.
+A scenario contains:
 
-It contains:
+| Field | Meaning |
+| --- | --- |
+| `sourceName` | optional source file or display name |
+| `text` | scenario body with frontmatter removed |
+| `controls` | parsed scenario controls |
+| `language` | optional prompt language, `en` or `ko` |
 
-- scenario body: the human-written situation to simulate
-- requested cast size: the intended number of actors
-- cast flexibility: whether additional actors may be introduced when the scenario requires them
-- optional time framing: dates, deadlines, or phase hints that influence the simulation clock
+Scenario controls:
 
-The scenario should define a concrete situation with enough conflict, uncertainty, or coordination
-pressure for actors to make meaningful moves.
+| Field | Meaning |
+| --- | --- |
+| `numCast` | required requested cast size |
+| `allowAdditionalCast` | whether planning may add more actors |
+| `actionsPerType` | generated action count for each visibility type |
+| `maxRound` | actor activity round count |
+| `fastMode` | enables dependency-safe parallel work inside a run |
+| `actorContextTokenBudget` | optional actor context compression budget |
 
-## Actor Contract
+## Settings Contract
 
-An actor is a stateful participant in the virtual world.
+`LLMSettings` is a record keyed by model role. Each role maps to `RoleSettings`.
 
-An actor contains:
+`GET /api/settings` always returns sanitized settings. Secrets are masked as `********`.
 
-- stable id
-- display name
-- role in the scenario
-- narrative profile
-- private goal
-- voice or behavioral style
-- preferred action types
-- current intent
-- memory of recent relevant events
-- relationship signals with other actors
+`PUT /api/settings` accepts the same shape. Masked secrets retain the previous saved value.
 
-Actors are not just names in a prompt. Their state is carried through the run so later rounds can
-react to earlier actions.
+## Run Contract
 
-## Plan Contract
+`RunManifest` contains:
 
-The execution plan is the bridge between scenario interpretation and runtime behavior.
+- `id`
+- `status`: `created`, `running`, `completed`, or `failed`
+- timestamps
+- optional scenario name
+- optional stop reason or error
+- artifact paths
 
-It contains:
+Artifact paths are written relative to the default root shape:
 
-- scenario interpretation
-- situation model
-- progression plan
-- action catalog
-- coordination frame
-- cast roster
-- major events
+```text
+runs/<run_id>/
+  manifest.json
+  events.jsonl
+  state.json
+  report.md
+  graph.timeline.json
+```
 
-The plan must be internally consistent. Cast ids should be stable, major events should reference
-known actors, and event completion rules should use known action types.
+`scenario.json` is also written in the run directory so a run can be restarted or inspected with
+the original normalized scenario.
 
-## World State Contract
+## Event Contract
 
-World state is the accumulated simulation state visible to runtime decisions.
+`RunEvent` is the append-only runtime event union written to `events.jsonl` and streamed over SSE.
 
-It includes:
+Current event families include:
 
-- current round index and simulation clock
-- current world summary
-- actor registry
-- latest and historical activities
-- actor-facing feeds
-- observer reports
-- actor intent states
-- intent history
-- event memory
-- event-memory history
-- explicit errors and defaults
+- run lifecycle: `run.started`, `run.completed`, `run.failed`
+- node lifecycle: `node.started`, `node.completed`, `node.failed`
+- model output and metrics: `model.message`, `model.metrics`
+- actor and interaction activity: `actors.ready`, `actor.message`, `interaction.recorded`
+- round and graph updates: `round.completed`, `graph.delta`
+- report and log updates: `report.delta`, `log`
 
-World state is intentionally separate from model clients, storage connections, and logging systems.
+Every event includes `runId` and `timestamp`.
 
-## Event Memory Contract
+## State Contract
 
-Event memory tracks the major event plan during runtime.
+`SimulationState` is the completed structured state written to `state.json`.
 
-It records:
+It includes the normalized scenario, plan, actor registry, interactions, round digests, round
+reports, traces, graph/report-ready values, stop reason, and rendered report Markdown.
 
-- event ids and current event status
-- earliest and latest useful rounds
-- required and optional events
-- next, overdue, completed, and missed event ids
-- progress summaries
-- whether unresolved required events keep the run open
+The web app treats `state.json` as the structured export for `kind=json`.
 
-Runtime uses event memory to select focus, update progress, and decide whether the simulation can
-end.
+## Timeline Contract
 
-## Interaction Contract
+`graph.timeline.json` stores an ordered array of `GraphTimelineFrame`.
 
-Interactions are durable activity records created during runtime.
+Frames contain:
 
-An interaction may represent:
+- graph nodes with actor label, role, intent, and interaction count
+- graph edges with visibility, source, target, weight, round index, and latest content
+- active node ids
+- messages
+- log references
 
-- a message
-- a decision
-- a negotiation move
-- a public action
-- a private action with visible consequences
-- a reaction to another actor
-- an event-level state change
+The server appends timeline frames after actor readiness, accepted interactions, and round
+completion events.
 
-Each accepted interaction should identify its source actor when applicable, target actors or world
-targets when applicable, action type, intent, visible detail, and effect on the selected event.
+## Export Contract
 
-## Runtime Log Contract
+`GET /api/runs/:id/export` accepts:
 
-`simulation.log.jsonl` is an ordered append-only event stream.
+| Kind | File | Content type |
+| --- | --- | --- |
+| `json` | `state.json` | `application/json` |
+| `jsonl` | `events.jsonl` | `application/x-ndjson` |
+| `md` | `report.md` | `text/markdown` |
 
-It records:
+Unsupported export kinds return an explicit `400`.
 
-- simulation start
-- model call metadata
-- finalized plan
-- finalized actors
-- selected runtime focus
-- time advancement
-- adopted interactions
-- observer reports
-- event-memory updates
-- final report metadata
-- usage summaries
+## Failure Policy
 
-Every row includes enough identity and event information to support replay, inspection, and
-analysis.
+The system prefers explicit failure over silent fallback:
 
-## Final Report Contract
-
-The final report explains the completed run.
-
-It includes:
-
-- scenario framing
-- simulation conclusion
-- actor outcomes
-- timeline
-- actor dynamics
-- major event progression
-- activity totals
-- stop reason
-- explicit errors or defaults
-- usage summary
-
-The report is a projection of the completed trace. It should not introduce unsupported outcomes
-that were not represented in runtime state.
-
-## Failure And Default Policy
-
-`simula` favors explicit failure or explicit defaults.
-
-- Planning and actor generation should fail when required structured data cannot be recovered.
-- Runtime may use explicit default behavior only when that behavior is recorded in errors and logs.
-- Final report generation should fail when the completed trace cannot be projected into the report
-  contract.
-- Silent degradation is not part of the contract.
+- unsupported scenario controls fail before run creation
+- invalid model settings fail when a run starts
+- missing provider credentials fail through validation
+- failed runs write `run.failed` and persist the manifest error
 
 ## Related Docs
 
 - architecture: [`architecture.md`](./architecture.md)
-- model roles and validation: [`llm.md`](./llm.md)
+- configuration: [`configuration.md`](./configuration.md)
 - workflow stages: [`workflows/README.md`](./workflows/README.md)

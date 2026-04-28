@@ -1,41 +1,39 @@
 # Documentation
 
-This directory documents the product model, workflow behavior, and durable artifacts of `simula`.
-It avoids language-specific setup and implementation framework details.
+This directory documents the current Bun/TypeScript implementation of `simula`: the local API
+server, React client, core simulation workflow, settings model, and run artifacts.
 
 ## Suggested Reading Paths
 
 | Goal | Start here | Then read |
 | --- | --- | --- |
-| Understand the product model | [`../README.md`](../README.md) | [`architecture.md`](./architecture.md) |
-| Understand actor and event concepts | [`contracts.md`](./contracts.md) | [`workflows/runtime.md`](./workflows/runtime.md) |
-| Understand the end-to-end flow | [`workflows/README.md`](./workflows/README.md) | the stage document you need |
-| Understand model-backed behavior | [`llm.md`](./llm.md) | [`contracts.md`](./contracts.md) |
-| Understand saved run artifacts | [`analysis.md`](./analysis.md) | [`operations.md`](./operations.md) |
-| Understand configuration concepts | [`configuration.md`](./configuration.md) | [`operations.md`](./operations.md) |
+| Run the system locally | [`../README.md`](../README.md) | [`operations.md`](./operations.md) |
+| Understand the code boundaries | [`architecture.md`](./architecture.md) | [`contracts.md`](./contracts.md) |
+| Configure model roles | [`configuration.md`](./configuration.md) | [`llm.md`](./llm.md) |
+| Understand one workflow stage | [`workflows/README.md`](./workflows/README.md) | the stage document you need |
+| Inspect saved runs | [`operations.md`](./operations.md) | [`analysis.md`](./analysis.md) |
 
 ## Document Map
 
 | Document | Owns |
 | --- | --- |
-| [`../README.md`](../README.md) | project framing, core concepts, and high-level flow |
-| [`architecture.md`](./architecture.md) | system boundaries, stage responsibilities, and artifact flow |
-| [`contracts.md`](./contracts.md) | scenario, actor, state, event, report, and log contracts |
-| [`llm.md`](./llm.md) | model roles, structured output expectations, validation, and logs |
-| [`analysis.md`](./analysis.md) | analysis source data, metrics, summaries, and visual artifacts |
-| [`configuration.md`](./configuration.md) | settings concepts and precedence without runtime-specific commands |
-| [`operations.md`](./operations.md) | scenario controls, output layout, repeated trials, and maintenance notes |
+| [`../README.md`](../README.md) | project framing, quick start, API, and validation commands |
+| [`architecture.md`](./architecture.md) | package boundaries, server/client split, persistence, and streaming |
+| [`contracts.md`](./contracts.md) | scenario, settings, run, event, state, timeline, and export contracts |
+| [`configuration.md`](./configuration.md) | settings resolution, provider defaults, and environment variables |
+| [`llm.md`](./llm.md) | model roles, provider support, metrics, retry, and repair behavior |
+| [`analysis.md`](./analysis.md) | current inspection artifacts and reference sample-output notes |
+| [`operations.md`](./operations.md) | local execution, scenario controls, run artifacts, and maintenance |
 | [`workflows/README.md`](./workflows/README.md) | workflow overview and cross-stage handoffs |
-| [`workflows/planning.md`](./workflows/planning.md) | scenario interpretation and execution-plan construction |
-| [`workflows/generation.md`](./workflows/generation.md) | actor-card generation from planned cast slots |
-| [`workflows/runtime.md`](./workflows/runtime.md) | simulation rounds, event selection, actor actions, and stop behavior |
-| [`workflows/finalization.md`](./workflows/finalization.md) | final report projection and markdown assembly |
-| [`workflows/simulation.md`](./workflows/simulation.md) | root workflow boundary and stage ownership |
+| [`workflows/planning.md`](./workflows/planning.md) | scenario interpretation and plan construction |
+| [`workflows/generation.md`](./workflows/generation.md) | roster and actor-card generation |
+| [`workflows/runtime.md`](./workflows/runtime.md) | round execution, events, graph timeline, and stop behavior |
+| [`workflows/finalization.md`](./workflows/finalization.md) | report rendering and completed state persistence |
+| [`workflows/simulation.md`](./workflows/simulation.md) | root simulation graph and server execution boundary |
 
 ## Conventions
 
-- These docs describe current product behavior, not historical implementation details.
-- Concepts and artifact names are stable unless a product contract changes.
-- Workflow docs describe behavior at the stage level rather than internal function names.
-- `output/` means the live run output root. `output.samples/` means committed reference runs kept
-  in the repository for inspection.
+- `runs/` is the default live run artifact root.
+- `output.samples/` contains committed reference outputs and is not the live output path.
+- Documentation names public routes, files, and types only when that precision prevents ambiguity.
+- Workflow docs describe product-stage responsibilities rather than every internal helper.

@@ -1,73 +1,86 @@
-# React + TypeScript + Vite
+# Simula Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+`apps/web` is the Vite React client for `simula`. It provides the local command surface for:
 
-Currently, two official plugins are available:
+- editing or loading scenarios
+- drafting scenarios with Story Builder
+- configuring role-based model settings
+- starting simulation runs
+- viewing live actor activity and graph replay
+- reading and exporting completed reports
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Development
 
-## React Compiler
+Run the API server and web app from the repository root:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+bun run dev:server
+bun run dev:web
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Or run both with:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+bun run dev
+```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+The Vite dev server proxies `/api` to `http://localhost:3001` by default. Override the server origin
+with:
+
+```bash
+SIMULA_API_ORIGIN=http://127.0.0.1:3001 bun --filter @simula/web dev
+```
+
+## App Structure
+
+The web app follows the repository's Feature-Sliced Design convention:
+
+| Path | Purpose |
+| --- | --- |
+| `src/app` | application composition and top-level workflow state |
+| `src/widgets` | large simulation surfaces such as activity, actors, graph, replay, and command bar |
+| `src/features` | scenario, settings, and report workflows |
+| `src/entities` | run-specific domain UI |
+| `src/shared` | shared UI utilities |
+| `src/store` | cross-cutting Zustand state |
+| `src/lib` | API and i18n helpers |
+
+The UI uses React, Tailwind CSS v4, shadcn/ui components, TanStack Query, Zustand, lucide icons,
+graphology, and Sigma.
+
+## API Assumptions
+
+The client expects the server routes documented in the root README:
+
+- `/api/settings`
+- `/api/story-builder/draft`
+- `/api/scenarios/samples`
+- `/api/runs`
+- `/api/runs/:id/events`
+- `/api/runs/:id/report`
+- `/api/runs/:id/export`
+
+Run events are streamed through Server-Sent Events. The client subscribes to the known `RunEvent`
+types and batches live state updates with `requestAnimationFrame`.
+
+## Localization
+
+The client supports English and Korean UI text. The selected prompt language is also passed into
+scenario creation and Story Builder requests so model-facing natural language follows the chosen
+locale while machine-readable tokens remain unchanged.
+
+## Validation
+
+From the repository root:
+
+```bash
+bun --filter @simula/web typecheck
+bun --filter @simula/web lint
+bun --filter @simula/web build
+```
+
+End-to-end smoke tests are configured at the repository root:
+
+```bash
+bun run test:e2e
 ```

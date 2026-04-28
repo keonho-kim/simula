@@ -1,50 +1,42 @@
 # Actor Generation Workflow
 
-Actor generation turns planned cast slots into concrete actor cards.
-
-## Flow
-
-```mermaid
-flowchart LR
-    Plan["Execution Plan"] --> Slots["Cast Slots"]
-    Slots --> Cards["Actor Cards"]
-    Cards --> Registry["Actor Registry"]
-```
+Actor generation turns planned roster entries into stateful actor cards.
 
 ## Responsibilities
 
-Actor generation creates runtime-useful actor data:
+Generation creates:
 
-- stable id
+- stable actor id
 - display name
 - role
-- narrative profile
+- background history
+- personality
+- preference
 - private goal
-- voice
-- preferred action types
+- current intent
+- action catalog
+- initial context and relationships
 
-The generated actor should match the planned cast slot. This keeps planning, runtime, and reports
-using the same actor identity.
+Each actor receives actions across the supported visibility types:
 
-## Validation
+- `public`
+- `semi-public`
+- `private`
+- `solitary`
 
-The actor registry should be validated before runtime begins.
-
-- every planned required actor has one generated actor card
-- generated ids match planned cast ids
-- actor order remains stable for reports and deterministic selection
-- every actor has a display name and role
-- the run has enough actors for interactions to be meaningful
-
-If actor generation cannot produce a valid registry, the run should fail before runtime.
+The number of actions per visibility type comes from `actionsPerType`.
 
 ## Stage Output
 
-Actor generation produces the finalized actor registry used by runtime and finalization.
+After generation, runtime receives the finalized actor registry. The server also emits
+`actors.ready` so the web app can render graph nodes before interactions begin.
 
-Runtime consumes actors as stateful participants, not as isolated text snippets.
+## Failure Behavior
+
+Generation fails if required actor card data cannot be produced or if the registry does not match
+the planned roster contract.
 
 ## Related Docs
 
-- actor contract: [`../contracts.md`](../contracts.md)
-- runtime workflow: [`runtime.md`](./runtime.md)
+- planning: [`planning.md`](./planning.md)
+- runtime: [`runtime.md`](./runtime.md)

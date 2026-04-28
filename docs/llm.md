@@ -1,78 +1,75 @@
 # Model Design
 
-`simula` uses model calls as bounded contributors to a larger stateful simulation. Models create
-structured proposals, but the system validates and records those proposals before they become part
-of the run.
+`simula` routes model calls through named roles. Each role has its own provider, model, sampling,
+timeout, and token settings.
 
-## Model Roles
+## Roles
 
 | Role | Responsibility |
 | --- | --- |
-| Planner | Interpret the scenario and produce planning bundles. |
-| Generator | Turn planned cast slots into concrete actor cards. |
-| Coordinator | Advance one runtime focus through actor actions, event updates, and world-state changes. |
-| Observer | Draft the final report from the completed trace. |
-| Repair | Recover malformed structured responses when recovery is allowed. |
+| `storyBuilder` | draft a scenario from user messages before a run is created |
+| `planner` | interpret the scenario and build scenario digest, event plan, and runtime direction |
+| `generator` | build roster entries and actor cards |
+| `coordinator` | coordinate runtime rounds and event progress |
+| `actor` | produce actor choices, messages, and context updates |
+| `observer` | summarize rounds and contribute report-ready observations |
+| `repair` | recover malformed structured responses when a stage allows repair |
 
-Role separation keeps each model call small and purpose-specific.
+Role separation keeps prompts small and makes per-stage provider choices explicit.
 
-## Model Inputs
+## Providers
 
-Model calls receive compact stage-specific inputs.
+Supported providers are:
 
-- Planning receives scenario text, scenario controls, and partial planning context.
-- Actor generation receives the execution plan and assigned cast entries.
-- Runtime receives the selected event, selected actors, recent effects, current intent state, and
-  current world summary.
-- Finalization receives a report projection derived from the completed trace.
+- `openai`
+- `anthropic`
+- `gemini`
+- `ollama`
+- `lmstudio`
+- `vllm`
+- `litellm`
 
-The goal is to avoid passing the whole world into every call. Each stage gets only the context it
-needs to produce its contract.
+`ollama`, `lmstudio`, `vllm`, and `litellm` are OpenAI-compatible providers and require a base URL.
+Other providers require an API key.
 
-## Structured Outputs
+## Inputs and Outputs
 
-Most model-backed stages expect structured responses.
+Model calls receive compact stage-specific inputs:
 
-The normal acceptance path is:
+- planning receives the scenario text and scenario controls
+- generator calls receive the plan and one roster or actor-card task
+- coordinator calls receive current world state, event pressure, and round context
+- actor calls receive one actor plus visible context and allowed actions
+- observer calls receive round or completed-state context
 
-1. request a response for one role
-2. parse the response
-3. validate it against the stage contract
-4. normalize accepted data where the stage requires canonical fields
-5. merge the result into workflow state
+Accepted outputs are parsed, validated, normalized, and then merged into workflow state. Machine
+tokens such as actor ids and action ids remain exact even when the prompt language is Korean.
 
-Structured output is a product contract, not just a formatting preference. It allows later stages
-to reason over actors, events, actions, reports, and metrics.
+## Metrics
 
-## Validation And Recovery
+Every model-backed step emits `model.metrics` when it completes. Metrics include:
 
-Validation is stage-specific.
+- role
+- step
+- attempt
+- time to first token
+- duration
+- input/output/total token counts when available
+- whether token data came from the provider or was unavailable
 
-- Planning checks that cast, actions, and events are internally consistent.
-- Actor generation checks that generated actors match planned cast slots.
-- Runtime checks that scene updates affect the selected event and selected actors.
-- Finalization checks that report sections can be rendered from the completed trace.
+These events are written to `events.jsonl` and streamed to the web app.
 
-When a response is malformed, the system may retry or use the repair role if that stage allows
-recovery. Runtime may use explicit default behavior for bounded scene advancement, but that default
-must remain visible through logs and errors.
+## Recovery
 
-## Observability
+Stages retry empty or malformed responses where the current workflow defines a retry path. When a
+repair path exists, the `repair` role receives the invalid output and allowed shape. If recovery is
+not possible, the run fails explicitly.
 
-Every run records model-call metadata in `simulation.log.jsonl`.
-
-The log supports:
-
-- role-level timing inspection
-- token and usage summaries when available
-- recovery and default tracking
-- per-stage performance comparison
-- analysis of how model calls contributed to the final report
-
-The event log is also the source for derived analysis artifacts.
+Runtime may use explicit no-action behavior only where that behavior is part of the current actor
+decision contract.
 
 ## Related Docs
 
-- data contracts: [`contracts.md`](./contracts.md)
-- configuration concepts: [`configuration.md`](./configuration.md)
+- configuration: [`configuration.md`](./configuration.md)
+- contracts: [`contracts.md`](./contracts.md)
 - workflow stages: [`workflows/README.md`](./workflows/README.md)
