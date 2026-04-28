@@ -12,4 +12,18 @@ describe("MarkdownContent", () => {
     expect(html).not.toContain("<script")
     expect(html).toContain("katex")
   })
+
+  test("renders bold actor labels", () => {
+    const html = renderToStaticMarkup(<MarkdownContent content="**[A, B, C]**" />)
+
+    expect(html).toContain("<strong>[A, B, C]</strong>")
+  })
+
+  test("separates a bold actor label from an attached list marker", () => {
+    const html = renderToStaticMarkup(<MarkdownContent content="**[A, B, C]**- item" />)
+
+    expect(html).toContain("<strong>[A, B, C]</strong>")
+    expect(html).toContain("<ul>")
+    expect(html).toContain("<li>item</li>")
+  })
 })

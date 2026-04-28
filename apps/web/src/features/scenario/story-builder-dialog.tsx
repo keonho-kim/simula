@@ -160,7 +160,7 @@ export function StoryBuilderDialog({
               <h3 className="text-sm font-semibold">{t.generatedDraft}</h3>
             </div>
             <ScrollArea className="h-[390px] rounded-lg bg-background/70 p-4 ring-1 ring-border/60">
-              <MarkdownContent content={draft} fallback="No draft yet." />
+              <MarkdownContent content={draft} fallback={t.noDraftYet} />
             </ScrollArea>
             <Button
               disabled={!draft.trim()}

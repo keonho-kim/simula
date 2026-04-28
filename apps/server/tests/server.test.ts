@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { defaultSettings } from "@simula/core"
+import { MODEL_ROLES, defaultSettings } from "@simula/core"
+import type { LLMSettings, ModelProvider } from "@simula/shared"
 
 const port = 3917
 const baseUrl = `http://localhost:${port}`
@@ -36,9 +37,7 @@ afterAll(async () => {
 describe("server API", () => {
   test("creates, runs, streams, and reports a completed run", async () => {
     const settings = defaultSettings()
-    for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].apiKey = "unit-test-api-key"
-    }
+    setProviderKey(settings, "unit-test-api-key")
     await fetch(`${baseUrl}/api/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -99,9 +98,9 @@ describe("server API", () => {
 
   test("logs retry attempts when a role node returns empty text", async () => {
     const settings = defaultSettings()
-    for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].apiKey = role === "planner" ? "unit-test-empty-key" : "unit-test-api-key"
-    }
+    setProviderKey(settings, "unit-test-api-key")
+    settings.roles.planner.provider = "litellm"
+    settings.providers.litellm.apiKey = "unit-test-empty-key"
     await fetch(`${baseUrl}/api/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -153,9 +152,76 @@ describe("server API", () => {
     expect(sample.controls.numCast).toBeGreaterThan(0)
   })
 
+  test("retains provider secrets and lists OpenAI-compatible models", async () => {
+    const modelServer = Bun.serve({
+      port: 0,
+      fetch(request) {
+        const url = new URL(request.url)
+        if (url.pathname === "/v1/models" && request.headers.get("authorization") === "Bearer provider-secret") {
+          return Response.json({ data: [{ id: "local-model-a" }, { id: "local-model-b" }] })
+        }
+        return Response.json({ error: "unauthorized" }, { status: 401 })
+      },
+    })
+
+    try {
+      const settings = defaultSettings()
+      settings.roles.actor.provider = "lmstudio"
+      settings.roles.actor.model = "local-model-a"
+      settings.providers.lmstudio.baseUrl = `http://localhost:${modelServer.port}/v1`
+      settings.providers.lmstudio.apiKey = "provider-secret"
+
+      await fetch(`${baseUrl}/api/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings }),
+      })
+
+      const sanitized = (await fetch(`${baseUrl}/api/settings`).then((response) => response.json())) as {
+        settings: LLMSettings
+      }
+      expect(sanitized.settings.providers.lmstudio.apiKey).toBe("********")
+
+      await fetch(`${baseUrl}/api/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: sanitized.settings }),
+      })
+
+      const modelsResponse = await fetch(`${baseUrl}/api/settings/models`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: "lmstudio",
+          connection: sanitized.settings.providers.lmstudio,
+        }),
+      })
+      const body = (await modelsResponse.json()) as { models: string[] }
+      expect(modelsResponse.ok).toBe(true)
+      expect(body.models).toEqual(["local-model-a", "local-model-b"])
+    } finally {
+      modelServer.stop(true)
+    }
+  })
+
+  test("returns an explicit error when model discovery fails", async () => {
+    const response = await fetch(`${baseUrl}/api/settings/models`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: "lmstudio",
+        connection: { baseUrl: "" },
+      }),
+    })
+    const body = (await response.json()) as { error: string }
+
+    expect(response.status).toBe(400)
+    expect(body.error).toContain("Base URL is required")
+  })
+
   test("drafts a scenario with the StoryBuilder role", async () => {
     const settings = defaultSettings()
-    settings.storyBuilder.apiKey = "unit-test-api-key"
+    settings.providers.openai.apiKey = "unit-test-api-key"
     await fetch(`${baseUrl}/api/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -220,4 +286,11 @@ async function pollRun(runId: string, status: "completed" | "failed") {
     await Bun.sleep(100)
   }
   throw new Error(`Run did not reach ${status}.`)
+}
+
+function setProviderKey(settings: LLMSettings, apiKey: string, provider: ModelProvider = "openai"): void {
+  settings.providers[provider].apiKey = apiKey
+  for (const role of MODEL_ROLES) {
+    settings.roles[role].provider = provider
+  }
 }

@@ -41,7 +41,7 @@ ${recentContext}`
 }
 
 export function resolveActorContextTokenBudget(scenario: ScenarioInput, settings: LLMSettings): number {
-  return scenario.controls.actorContextTokenBudget ?? settings.actor.contextTokenBudget ?? DEFAULT_ACTOR_CONTEXT_TOKEN_BUDGET
+  return scenario.controls.actorContextTokenBudget ?? settings.roles.actor.contextTokenBudget ?? DEFAULT_ACTOR_CONTEXT_TOKEN_BUDGET
 }
 
 export async function compressActorContext(

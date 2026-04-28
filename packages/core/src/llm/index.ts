@@ -11,9 +11,9 @@ import type {
   ModelProvider,
   ModelRole,
   PlannerTraceStep,
-  RoleSettings,
+  ResolvedRoleSettings,
 } from "@simula/shared"
-import { isOpenAICompatibleProvider } from "../settings"
+import { isOpenAICompatibleProvider, resolveRoleSettings } from "../settings"
 
 export interface RoleTextResult {
   text: string
@@ -35,7 +35,7 @@ export async function invokeRoleTextWithMetrics(
   attempt: number,
   prompt: string
 ): Promise<RoleTextResult> {
-  const config = settings[role]
+  const config = resolveRoleSettings(settings, role)
   const startedAt = performance.now()
 
   const model = createChatModel(config)
@@ -72,7 +72,7 @@ type StreamingChatModel = {
   stream(prompt: string): Promise<AsyncIterable<{ content: unknown; usage_metadata?: unknown }>>
 }
 
-export function createChatModel(config: RoleSettings): StreamingChatModel {
+export function createChatModel(config: ResolvedRoleSettings): StreamingChatModel {
   if (config.provider === "anthropic") {
     return new ChatAnthropic({
       apiKey: config.apiKey,
@@ -122,7 +122,7 @@ function apiKeyForOpenAICompatibleProvider(provider: ModelProvider, apiKey: stri
   return apiKey?.trim() || provider
 }
 
-function buildOpenAIModelKwargs(config: RoleSettings): Record<string, unknown> {
+function buildOpenAIModelKwargs(config: ResolvedRoleSettings): Record<string, unknown> {
   const kwargs: Record<string, unknown> = { ...(config.extraBody ?? {}) }
   if (config.seed !== undefined) {
     kwargs.seed = config.seed

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import type { UiTexts } from "@/lib/i18n"
 import { MarkdownContent } from "@/shared/ui/markdown-content"
 import { useRunStore } from "@/store/run-store"
 
@@ -44,19 +45,21 @@ interface ActorHistoryItem {
 }
 
 export function ActorCardRail({
+  t,
   selectedActorId,
   onActorSelect,
 }: {
+  t: UiTexts
   selectedActorId?: string
   onActorSelect: (actorId: string) => void
 }) {
-  const { actors } = useActorPanelData()
+  const { actors } = useActorPanelData(t)
 
   return (
     <aside className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60">
       <div className="border-b border-border/60 px-4 py-3">
-        <h2 className="font-heading text-sm font-semibold">Actors</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Cards, live state, and latest activity.</p>
+        <h2 className="font-heading text-sm font-semibold">{t.actors}</h2>
+        <p className="mt-1 text-xs text-muted-foreground">{t.actorsDescription}</p>
       </div>
       <ScrollArea className="min-h-0 flex-1 p-3">
         <div className="grid gap-2 pr-3">
@@ -81,13 +84,13 @@ export function ActorCardRail({
                 </Badge>
               </div>
               <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                {actor.latestActivity || actor.intent || "Waiting for activity."}
+                {actor.latestActivity || actor.intent || t.waitingForActivity}
               </p>
             </button>
           )) : (
             <div className="rounded-md border border-dashed border-border/80 bg-muted/30 p-4 text-sm">
-              <p className="font-medium">No actors yet</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">Actor cards appear after generation.</p>
+              <p className="font-medium">{t.noActorsYet}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">{t.noActorsYetDescription}</p>
             </div>
           )}
         </div>
@@ -97,14 +100,16 @@ export function ActorCardRail({
 }
 
 export function ActorDetailDialog({
+  t,
   actorId,
   onOpenChange,
 }: {
+  t: UiTexts
   actorId?: string
   onOpenChange: (open: boolean) => void
 }) {
   const [filter, setFilter] = useState<HistoryFilter>("all")
-  const { actors, history } = useActorPanelData()
+  const { actors, history } = useActorPanelData(t)
   const actor = actors.find((item) => item.id === actorId)
   const actorHistory = useMemo(
     () => actorId ? filterHistory(history.filter((item) => item.id.startsWith(`${actorId}:`)), filter) : [],
@@ -127,29 +132,29 @@ export function ActorDetailDialog({
                 <section className="rounded-md bg-muted/20 p-4">
                   <div className="flex items-center gap-2">
                     <BrainIcon className="size-4 text-muted-foreground" />
-                    <h3 className="text-xs font-semibold uppercase text-muted-foreground">Actor Card</h3>
+                    <h3 className="text-xs font-semibold uppercase text-muted-foreground">{t.actorCard}</h3>
                   </div>
-                  <ActorField label="Background" value={actor.backgroundHistory} />
-                  <ActorField label="Personality" value={actor.personality} />
-                  <ActorField label="Preference" value={actor.preference} />
-                  <ActorField label="Private goal" value={actor.privateGoal} />
-                  <ActorField label="Context summary" value={actor.contextSummary || "No compressed context yet."} />
+                  <ActorField label={t.actorBackground} value={actor.backgroundHistory} />
+                  <ActorField label={t.actorPersonality} value={actor.personality} />
+                  <ActorField label={t.actorPreference} value={actor.preference} />
+                  <ActorField label={t.actorPrivateGoal} value={actor.privateGoal} />
+                  <ActorField label={t.actorContextSummary} value={actor.contextSummary || t.actorNoCompressedContext} />
                 </section>
 
                 <section className="flex min-h-0 flex-col overflow-hidden rounded-md bg-muted/20">
                   <div className="grid grid-cols-4 gap-2 p-3">
-                    <ActorStat label="total" value={stats.total} />
-                    <ActorStat label="out" value={stats.outgoing} />
-                    <ActorStat label="in" value={stats.incoming} />
-                    <ActorStat label="msg" value={stats.messages} />
+                    <ActorStat label={t.actorTotal} value={stats.total} />
+                    <ActorStat label={t.actorOut} value={stats.outgoing} />
+                    <ActorStat label={t.actorIn} value={stats.incoming} />
+                    <ActorStat label={t.actorMsg} value={stats.messages} />
                   </div>
                   <div className="border-y border-border/70 px-3 py-2">
                     <Tabs value={filter} onValueChange={(value) => setFilter(value as HistoryFilter)}>
                       <TabsList className="grid h-auto w-full grid-cols-4 bg-background/70">
-                        <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
-                        <TabsTrigger value="outgoing" className="text-xs">Out</TabsTrigger>
-                        <TabsTrigger value="incoming" className="text-xs">In</TabsTrigger>
-                        <TabsTrigger value="message" className="text-xs">Msg</TabsTrigger>
+                        <TabsTrigger value="all" className="text-xs">{t.actorAll}</TabsTrigger>
+                        <TabsTrigger value="outgoing" className="text-xs">{t.actorOutgoingShort}</TabsTrigger>
+                        <TabsTrigger value="incoming" className="text-xs">{t.actorIncomingShort}</TabsTrigger>
+                        <TabsTrigger value="message" className="text-xs">{t.actorMessageShort}</TabsTrigger>
                       </TabsList>
                     </Tabs>
                   </div>
@@ -160,9 +165,9 @@ export function ActorDetailDialog({
                       </div>
                     ) : (
                       <div className="rounded-md border border-dashed border-border/80 bg-background/60 p-4 text-sm">
-                        <p className="font-medium">No history yet</p>
+                        <p className="font-medium">{t.noHistoryYet}</p>
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          This actor has not sent, received, or produced a visible model step yet.
+                          {t.noHistoryYetDescription}
                         </p>
                       </div>
                     )}
@@ -177,7 +182,7 @@ export function ActorDetailDialog({
   )
 }
 
-function useActorPanelData(): { actors: ActorSummary[]; history: ActorHistoryItem[] } {
+function useActorPanelData(t: UiTexts): { actors: ActorSummary[]; history: ActorHistoryItem[] } {
   const timeline = useRunStore((state) => state.timeline)
   const replayIndex = useRunStore((state) => state.replayIndex)
   const liveEvents = useRunStore((state) => state.liveEvents)
@@ -185,8 +190,8 @@ function useActorPanelData(): { actors: ActorSummary[]; history: ActorHistoryIte
   const frame = timeline[replayIndex] ?? timeline.at(-1)
   const actorNames = useMemo(() => buildActorNameMap(frame?.nodes ?? [], liveEvents, runState?.actors ?? []), [frame, liveEvents, runState?.actors])
   const history = useMemo(
-    () => buildActorHistory(liveEvents, runState?.interactions ?? [], actorNames),
-    [actorNames, liveEvents, runState?.interactions]
+    () => buildActorHistory(liveEvents, runState?.interactions ?? [], actorNames, t),
+    [actorNames, liveEvents, runState?.interactions, t]
   )
   const actors = useMemo(
     () => buildActorSummaries(runState?.actors ?? [], frame?.nodes ?? [], liveEvents, history),
@@ -296,28 +301,29 @@ function buildActorNameMap(
 function buildActorHistory(
   liveEvents: RunEvent[],
   stateInteractions: Interaction[],
-  actorNames: Map<string, string>
+  actorNames: Map<string, string>,
+  t: UiTexts
 ): ActorHistoryItem[] {
   const items: ActorHistoryItem[] = []
   const seen = new Set<string>()
 
   for (const event of liveEvents) {
     if (event.type === "interaction.recorded") {
-      addInteractionHistory(items, seen, event.interaction, actorNames, event.timestamp)
+      addInteractionHistory(items, seen, event.interaction, actorNames, t, event.timestamp)
     }
     if (event.type === "actor.message") {
-      addMessageHistory(items, seen, event.actorId, event.timestamp, "Actor message", event.content)
+      addMessageHistory(items, seen, event.actorId, event.timestamp, t.actorMessage, event.content)
     }
     if (event.type === "model.message" && event.role === "actor") {
       const parsed = parseActorModelMessage(event.content, actorNames)
       if (parsed) {
-        addMessageHistory(items, seen, parsed.actorId, event.timestamp, `Model ${parsed.step}`, parsed.content)
+        addMessageHistory(items, seen, parsed.actorId, event.timestamp, `${t.modelStep} ${parsed.step}`, parsed.content)
       }
     }
   }
 
   for (const interaction of stateInteractions) {
-    addInteractionHistory(items, seen, interaction, actorNames)
+    addInteractionHistory(items, seen, interaction, actorNames, t)
   }
 
   return items.sort((a, b) => historySortValue(a) - historySortValue(b))
@@ -344,6 +350,7 @@ function addInteractionHistory(
   seen: Set<string>,
   interaction: Interaction,
   actorNames: Map<string, string>,
+  t: UiTexts,
   timestamp?: string
 ): void {
   const targetNames = interaction.targetActorIds.map((targetId) => actorNames.get(targetId) ?? targetId)
@@ -356,8 +363,8 @@ function addInteractionHistory(
       type: "outgoing",
       roundIndex: interaction.roundIndex,
       timestamp,
-      title: "Action taken",
-      counterpart: `To ${targetNames.join(", ") || "self"}`,
+      title: t.actionTaken,
+      counterpart: `${t.to} ${targetNames.join(", ") || t.self}`,
       content: interaction.content,
       visibility: interaction.visibility,
       actionType: interaction.actionType,
@@ -374,8 +381,8 @@ function addInteractionHistory(
       type: "incoming",
       roundIndex: interaction.roundIndex,
       timestamp,
-      title: "Received interaction",
-      counterpart: `From ${sourceName}`,
+      title: t.receivedInteraction,
+      counterpart: `${t.from} ${sourceName}`,
       content: interaction.content,
       visibility: interaction.visibility,
       actionType: interaction.actionType,

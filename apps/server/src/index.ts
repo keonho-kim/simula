@@ -9,13 +9,19 @@ import {
   readScenarioSample,
   runSimulation,
   sanitizeSettings,
+  isOpenAICompatibleProvider,
 } from "@simula/core"
 import type {
   CreateRunRequest,
   LLMSettings,
+  LLMSettingsInput,
+  ModelProvider,
+  ProviderSettings,
   RunEvent,
   RunManifest,
   ScenarioInput,
+  SettingsModelsRequest,
+  SettingsModelsResponse,
   StoryBuilderDraftRequest,
 } from "@simula/shared"
 
@@ -63,13 +69,24 @@ async function route(request: Request, url: URL): Promise<Response> {
   }
 
   if (parts[1] === "settings") {
-    if (request.method === "GET") {
+    if (parts.length === 2 && request.method === "GET") {
       return json({ settings: sanitizeSettings(await readSettings()) })
     }
-    if (request.method === "PUT") {
+    if (parts.length === 2 && request.method === "PUT") {
       const payload = (await request.json()) as { settings: LLMSettings }
       await writeSettings(payload.settings)
       return json({ settings: sanitizeSettings(await readSettings()) })
+    }
+    if (parts[2] === "models" && request.method === "POST") {
+      try {
+        const payload = (await request.json()) as SettingsModelsRequest
+        return json(await listProviderModels(payload))
+      } catch (error) {
+        return json(
+          { error: error instanceof Error ? error.message : "Failed to load models." },
+          { status: 400 }
+        )
+      }
     }
   }
 
@@ -269,10 +286,10 @@ async function writeSettings(settings: LLMSettings): Promise<void> {
   await writeFile(SETTINGS_PATH, `${JSON.stringify(normalized, null, 2)}\n`, "utf8")
 }
 
-async function readEnvTomlSettings(): Promise<Partial<LLMSettings>> {
+async function readEnvTomlSettings(): Promise<LLMSettingsInput> {
   try {
     const parsed = Bun.TOML.parse(await readFile(ENV_TOML_PATH, "utf8")) as {
-      settings?: Partial<LLMSettings>
+      settings?: LLMSettingsInput
     }
     return parsed.settings ?? {}
   } catch (error) {
@@ -285,9 +302,9 @@ async function readEnvTomlSettings(): Promise<Partial<LLMSettings>> {
   }
 }
 
-async function readSavedSettings(): Promise<Partial<LLMSettings>> {
+async function readSavedSettings(): Promise<LLMSettingsInput> {
   try {
-    return JSON.parse(await readFile(SETTINGS_PATH, "utf8")) as Partial<LLMSettings>
+    return JSON.parse(await readFile(SETTINGS_PATH, "utf8")) as LLMSettingsInput
   } catch (error) {
     if (isMissingFileError(error)) {
       return {}
@@ -300,13 +317,63 @@ async function readSavedSettings(): Promise<Partial<LLMSettings>> {
 
 function mergeRetainedSecrets(next: LLMSettings, previous: LLMSettings): LLMSettings {
   const merged = normalizeSettings(next)
-  for (const role of Object.keys(merged) as Array<keyof LLMSettings>) {
-    if (merged[role].apiKey === "********") {
-      merged[role].apiKey = previous[role].apiKey
+  for (const provider of Object.keys(merged.providers) as ModelProvider[]) {
+    if (merged.providers[provider].apiKey === "********") {
+      merged.providers[provider].apiKey = previous.providers[provider].apiKey
     }
-    merged[role].extraHeaders = mergeRetainedHeaders(merged[role].extraHeaders, previous[role].extraHeaders)
+    merged.providers[provider].extraHeaders = mergeRetainedHeaders(
+      merged.providers[provider].extraHeaders,
+      previous.providers[provider].extraHeaders
+    )
   }
   return merged
+}
+
+async function listProviderModels(payload: SettingsModelsRequest): Promise<SettingsModelsResponse> {
+  const provider = payload.provider
+  if (!isOpenAICompatibleProvider(provider)) {
+    throw new Error(`${provider} does not support model discovery.`)
+  }
+  const connection = mergeModelRequestConnection(provider, payload.connection, await readSettings())
+  if (!connection.baseUrl?.trim()) {
+    throw new Error("Base URL is required to load models.")
+  }
+
+  const response = await fetch(modelsUrl(connection.baseUrl), {
+    headers: modelRequestHeaders(connection),
+  })
+  if (!response.ok) {
+    throw new Error(`Failed to load models: ${response.status} ${response.statusText}`)
+  }
+  const body = await response.json() as { data?: Array<{ id?: unknown }> }
+  const models = (body.data ?? [])
+    .map((model) => model.id)
+    .filter((id): id is string => typeof id === "string" && id.length > 0)
+  return { models }
+}
+
+function mergeModelRequestConnection(
+  provider: ModelProvider,
+  connection: ProviderSettings,
+  settings: LLMSettings
+): ProviderSettings {
+  const previous = settings.providers[provider]
+  return {
+    ...connection,
+    apiKey: connection.apiKey === "********" ? previous.apiKey : connection.apiKey,
+    extraHeaders: mergeRetainedHeaders(connection.extraHeaders, previous.extraHeaders),
+  }
+}
+
+function modelsUrl(baseUrl: string): string {
+  return `${baseUrl.replace(/\/+$/, "")}/models`
+}
+
+function modelRequestHeaders(connection: ProviderSettings): Record<string, string> {
+  return {
+    ...(connection.apiKey?.trim() ? { Authorization: `Bearer ${connection.apiKey}` } : {}),
+    ...(connection.extraHeaders ?? {}),
+  }
 }
 
 function mergeRetainedHeaders(

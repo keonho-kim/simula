@@ -80,10 +80,8 @@ test("supports scenario builder, samples, history, and Korean locale", async ({ 
 async function setUnitTestApiKeys(page: Page) {
   const settingsResponse = await page.request.get("/api/settings")
   const { settings } = (await settingsResponse.json()) as {
-    settings: Record<string, { apiKey?: string }>
+    settings: { providers: { openai: { apiKey?: string } } }
   }
-  for (const role of Object.keys(settings)) {
-    settings[role] = { ...settings[role], apiKey: "unit-test-api-key" }
-  }
+  settings.providers.openai.apiKey = "unit-test-api-key"
   await page.request.put("/api/settings", { data: { settings } })
 }

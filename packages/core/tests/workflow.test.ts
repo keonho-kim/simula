@@ -4,20 +4,19 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import {
   RunStore,
+  MODEL_ROLES,
   applyInteractionContext,
   applyPreRoundDigestContext,
   defaultSettings,
   emptyActorContext,
   runSimulation,
 } from "../src"
-import type { ActorState, Interaction, RunEvent } from "@simula/shared"
+import type { ActorState, Interaction, LLMSettings, ModelProvider, RunEvent } from "@simula/shared"
 
 describe("simulation workflow", () => {
   test("emits lifecycle events and returns a report", async () => {
     const settings = defaultSettings()
-    for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].apiKey = "unit-test-api-key"
-    }
+    setProviderKey(settings, "unit-test-api-key")
     const events: RunEvent[] = []
     const state = await runSimulation({
       runId: "test-run",
@@ -132,9 +131,9 @@ describe("simulation workflow", () => {
 
   test("fails after five empty model responses and logs retry attempts", async () => {
     const settings = defaultSettings()
-    for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].apiKey = role === "planner" ? "unit-test-empty-key" : "unit-test-api-key"
-    }
+    setProviderKey(settings, "unit-test-api-key")
+    settings.roles.planner.provider = "litellm"
+    settings.providers.litellm.apiKey = "unit-test-empty-key"
     const events: RunEvent[] = []
 
     await expect(
@@ -172,9 +171,7 @@ describe("simulation workflow", () => {
 
   test("runs with fast mode while preserving actor action counts", async () => {
     const settings = defaultSettings()
-    for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].apiKey = "unit-test-api-key"
-    }
+    setProviderKey(settings, "unit-test-api-key")
     const events: RunEvent[] = []
     const state = await runSimulation({
       runId: "fast-run",
@@ -207,9 +204,7 @@ describe("simulation workflow", () => {
 
   test("uses max round as the actor activity round count", async () => {
     const settings = defaultSettings()
-    for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].apiKey = "unit-test-api-key"
-    }
+    setProviderKey(settings, "unit-test-api-key")
     const state = await runSimulation({
       runId: "round-run",
       settings,
@@ -228,9 +223,7 @@ describe("simulation workflow", () => {
 
   test("extends max round by five when coordinator returns continue at the boundary", async () => {
     const settings = defaultSettings()
-    for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].apiKey = "unit-test-api-key"
-    }
+    setProviderKey(settings, "unit-test-api-key")
     const state = await runSimulation({
       runId: "extend-run",
       settings,
@@ -302,6 +295,13 @@ function testActor(id: string): ActorState {
     memory: [],
     relationships: {},
     contextSummary: "",
+  }
+}
+
+function setProviderKey(settings: LLMSettings, apiKey: string, provider: ModelProvider = "openai"): void {
+  settings.providers[provider].apiKey = apiKey
+  for (const role of MODEL_ROLES) {
+    settings.roles[role].provider = provider
   }
 }
 

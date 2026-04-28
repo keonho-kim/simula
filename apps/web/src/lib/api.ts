@@ -2,12 +2,15 @@ import type {
   CreateRunRequest,
   ExportKindResponse,
   LLMSettings,
+  ModelProvider,
+  ProviderSettings,
   RunManifest,
   RunEvent,
   ScenarioSampleDetail,
   ScenarioSampleSummary,
   ScenarioInput,
   SettingsResponse,
+  SettingsModelsResponse,
   SimulationState,
   GraphTimelineFrame,
   StoryBuilderDraftRequest,
@@ -72,6 +75,14 @@ export async function saveSettings(settings: LLMSettings): Promise<LLMSettings> 
     body: JSON.stringify({ settings }),
   })
   return data.settings
+}
+
+export async function fetchProviderModels(provider: ModelProvider, connection: ProviderSettings): Promise<string[]> {
+  const data = await request<SettingsModelsResponse>("/api/settings/models", {
+    method: "POST",
+    body: JSON.stringify({ provider, connection }),
+  })
+  return data.models
 }
 
 export async function fetchReport(runId: string): Promise<string> {

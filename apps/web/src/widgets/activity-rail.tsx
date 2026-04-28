@@ -2,10 +2,8 @@ import { useMemo, useState } from "react"
 import {
   AlertCircleIcon,
   BrainIcon,
-  ClockIcon,
   GaugeIcon,
   ListIcon,
-  RadioIcon,
   RouteIcon,
   SparklesIcon,
   WrenchIcon,
@@ -30,10 +28,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import type { UiTexts } from "@/lib/i18n"
 import { MarkdownContent } from "@/shared/ui/markdown-content"
 import { useRunStore } from "@/store/run-store"
 
-const PERCENTILES = [50, 75, 90, 95, 99] as const
 const ROLE_BUTTONS: RolePanelRole[] = ["planner", "generator", "coordinator", "observer", "repair"]
 const STANDARD_TRACE_STEPS: RoleTraceStep[] = ["thought", "target", "action", "intent"]
 const PLANNER_TRACE_STEPS: PlannerTraceStep[] = [
@@ -83,14 +81,14 @@ interface RoleSummary {
   logs: LogItem[]
 }
 
-export function ActivityRail() {
+export function ActivityRail({ t }: { t: UiTexts }) {
   const events = useRunStore((state) => state.liveEvents)
   const runState = useRunStore((state) => state.runState)
   const [logsOpen, setLogsOpen] = useState(false)
   const [selectedRole, setSelectedRole] = useState<RolePanelRole>()
-  const logItems = useMemo(() => buildLogItems(events), [events])
-  const roleSummaries = useMemo(() => buildRoleSummaries(events, runState), [events, runState])
-  const metrics = useMemo(() => buildMetricSummary(events), [events])
+  const logItems = useMemo(() => buildLogItems(events, t), [events, t])
+  const roleSummaries = useMemo(() => buildRoleSummaries(events, runState, t), [events, runState, t])
+  const metricSamples = useMemo(() => countMetricSamples(events), [events])
   const selectedSummary = roleSummaries.find((summary) => summary.role === selectedRole)
 
   return (
@@ -98,11 +96,11 @@ export function ActivityRail() {
       <div className="border-b border-border/60 px-4 py-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="font-heading text-sm font-semibold">Activity</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Signals, role state, and model telemetry.</p>
+            <h2 className="font-heading text-sm font-semibold">{t.activity}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{t.activityDescription}</p>
           </div>
           <Badge variant="outline" className="rounded-md bg-background/70">
-            {events.length} events
+            {events.length} {t.events}
           </Badge>
         </div>
       </div>
@@ -110,43 +108,36 @@ export function ActivityRail() {
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="space-y-3 p-3">
           <div className="grid grid-cols-3 gap-2">
-            <SignalStat label="logs" value={logItems.length} />
-            <SignalStat label="roles" value={roleSummaries.filter((summary) => summary.status !== "idle").length} />
-            <SignalStat label="samples" value={metrics.samples} />
+            <SignalStat label={t.logs} value={logItems.length} />
+            <SignalStat label={t.rolesLabel} value={roleSummaries.filter((summary) => summary.status !== "idle").length} />
+            <SignalStat label={t.samples} value={metricSamples} />
           </div>
 
           <Button className="w-full justify-between" variant="outline" onClick={() => setLogsOpen(true)}>
             <span className="flex items-center gap-2">
               <ListIcon className="size-4" />
-              Open Logs
+              {t.openLogs}
             </span>
             <span className="font-mono text-xs text-muted-foreground">{logItems.length}</span>
           </Button>
 
           <section className="space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase text-muted-foreground">Role Signals</h3>
-              <span className="text-[10px] text-muted-foreground">non-actor</span>
+              <h3 className="text-xs font-semibold uppercase text-muted-foreground">{t.roleSignals}</h3>
+              <span className="text-[10px] text-muted-foreground">{t.nonActor}</span>
             </div>
             <div className="grid gap-2">
               {roleSummaries.map((summary) => (
-                <RoleSignalButton key={summary.role} summary={summary} onClick={() => setSelectedRole(summary.role)} />
+                <RoleSignalButton key={summary.role} summary={summary} t={t} onClick={() => setSelectedRole(summary.role)} />
               ))}
             </div>
           </section>
         </div>
 
-        <div className="mt-auto border-t border-border/60 bg-muted/20 p-3">
-          <div className="grid gap-3">
-            <TokenCounter value={metrics.totalTokens} />
-            <PercentileChart title="TTFT" unit="ms" values={metrics.ttft} />
-            <PercentileChart title="Duration" unit="ms" values={metrics.duration} />
-          </div>
-        </div>
       </div>
 
-      <LogDialog open={logsOpen} onOpenChange={setLogsOpen} items={logItems} />
-      <RoleDialog summary={selectedSummary} onOpenChange={(open) => !open && setSelectedRole(undefined)} />
+      <LogDialog open={logsOpen} onOpenChange={setLogsOpen} items={logItems} t={t} />
+      <RoleDialog summary={selectedSummary} t={t} onOpenChange={(open) => !open && setSelectedRole(undefined)} />
     </aside>
   )
 }
@@ -160,7 +151,7 @@ function SignalStat({ label, value }: { label: string; value: number }) {
   )
 }
 
-function RoleSignalButton({ summary, onClick }: { summary: RoleSummary; onClick: () => void }) {
+function RoleSignalButton({ summary, t, onClick }: { summary: RoleSummary; t: UiTexts; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -180,8 +171,8 @@ function RoleSignalButton({ summary, onClick }: { summary: RoleSummary; onClick:
           </div>
           <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{summary.preview}</p>
           <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
-            <span>{summary.messages.length} messages</span>
-            <span>{summary.metrics.length} metrics</span>
+            <span>{summary.messages.length} {t.messages}</span>
+            <span>{summary.metrics.length} {t.metrics}</span>
           </div>
         </div>
       </div>
@@ -197,17 +188,18 @@ function RoleIcon({ role }: { role: RolePanelRole }) {
   return <WrenchIcon className="size-4" />
 }
 
-function LogDialog({ open, onOpenChange, items }: {
+function LogDialog({ open, onOpenChange, items, t }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   items: LogItem[]
+  t: UiTexts
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[86svh] overflow-hidden sm:max-w-[860px]">
         <DialogHeader>
-          <DialogTitle>Runtime Logs</DialogTitle>
-          <DialogDescription>Execution logs and lifecycle events for the selected run.</DialogDescription>
+          <DialogTitle>{t.runtimeLogs}</DialogTitle>
+          <DialogDescription>{t.runtimeLogsDescription}</DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[64svh] pr-3">
           {items.length ? (
@@ -215,7 +207,7 @@ function LogDialog({ open, onOpenChange, items }: {
               {items.map((item) => <LogCard key={item.id} item={item} />)}
             </div>
           ) : (
-            <EmptyActivity title="No logs" body="Logs will appear here while the run executes." />
+            <EmptyActivity title={t.noLogs} body={t.noLogsDescription} />
           )}
         </ScrollArea>
       </DialogContent>
@@ -223,8 +215,9 @@ function LogDialog({ open, onOpenChange, items }: {
   )
 }
 
-function RoleDialog({ summary, onOpenChange }: {
+function RoleDialog({ summary, t, onOpenChange }: {
   summary: RoleSummary | undefined
+  t: UiTexts
   onOpenChange: (open: boolean) => void
 }) {
   if (!summary) {
@@ -242,30 +235,30 @@ function RoleDialog({ summary, onOpenChange }: {
         <ScrollArea className="min-h-0 flex-1 overflow-hidden pr-3">
           <div className="flex flex-col gap-5 pr-3 pb-1">
             <div className="grid gap-3 md:grid-cols-3">
-              <SignalStat label="messages" value={summary.messages.length} />
-              <SignalStat label="metrics" value={summary.metrics.length} />
-              <SignalStat label="logs" value={summary.logs.length} />
+              <SignalStat label={t.messages} value={summary.messages.length} />
+              <SignalStat label={t.metrics} value={summary.metrics.length} />
+              <SignalStat label={t.logs} value={summary.logs.length} />
             </div>
 
-            <LatestTelemetry metric={latestMetric} />
+            <LatestTelemetry metric={latestMetric} t={t} />
 
             <section className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-xs font-semibold uppercase text-muted-foreground">State Signals</h3>
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground">{t.stateSignals}</h3>
                 <Badge variant="outline" className="rounded-sm bg-background">{summary.status}</Badge>
               </div>
               {summary.sections.length ? (
                 <div className="divide-y divide-border/60 overflow-hidden rounded-md bg-muted/20">
                   {summary.sections.map((entry) => (
-                    <RoleSignalSection key={entry.step} entry={entry} />
+                    <RoleSignalSection key={entry.step} entry={entry} t={t} />
                   ))}
                 </div>
               ) : (
-                <EmptyActivity title="No state signal" body={summary.preview} />
+                <EmptyActivity title={t.noStateSignal} body={summary.preview} />
               )}
             </section>
 
-            <RawModelStream messages={summary.messages} />
+            <RawModelStream messages={summary.messages} t={t} />
           </div>
         </ScrollArea>
       </DialogContent>
@@ -273,18 +266,18 @@ function RoleDialog({ summary, onOpenChange }: {
   )
 }
 
-function LatestTelemetry({ metric }: { metric: ModelMetrics | undefined }) {
+function LatestTelemetry({ metric, t }: { metric: ModelMetrics | undefined; t: UiTexts }) {
   return (
     <section className="rounded-md bg-muted/20 p-3">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase text-muted-foreground">Latest Telemetry</h3>
-        <span className="text-[10px] uppercase text-muted-foreground">{metric ? "last sample" : "no sample"}</span>
+        <h3 className="text-xs font-semibold uppercase text-muted-foreground">{t.latestTelemetry}</h3>
+        <span className="text-[10px] uppercase text-muted-foreground">{metric ? t.lastSample : t.noSample}</span>
       </div>
       <div className="grid gap-2 sm:grid-cols-4">
         <MetricChip label="TTFT" value={metric ? `${metric.ttftMs}ms` : "-"} />
-        <MetricChip label="Duration" value={metric ? `${metric.durationMs}ms` : "-"} />
-        <MetricChip label="Tokens" value={metric ? metric.totalTokens.toLocaleString() : "-"} />
-        <MetricChip label="Attempt" value={metric ? String(metric.attempt) : "-"} />
+        <MetricChip label={t.metricDuration} value={metric ? `${metric.durationMs}ms` : "-"} />
+        <MetricChip label={t.metricTotalTokens} value={metric ? metric.totalTokens.toLocaleString() : "-"} />
+        <MetricChip label={t.metricAttempt} value={metric ? String(metric.attempt) : "-"} />
       </div>
     </section>
   )
@@ -309,20 +302,20 @@ function LogCard({ item }: { item: LogItem }) {
   )
 }
 
-function RoleSignalSection({ entry }: { entry: TraceEntry }) {
+function RoleSignalSection({ entry, t }: { entry: TraceEntry; t: UiTexts }) {
   return (
     <section className="px-4 py-4">
       <h4 className="text-[10px] font-semibold uppercase text-muted-foreground">{entry.label}</h4>
-      <MarkdownContent className="mt-2" content={entry.content} fallback="No signal yet." />
+      <MarkdownContent className="mt-2" content={entry.content} fallback={t.noSignalYet} />
     </section>
   )
 }
 
-function RawModelStream({ messages }: { messages: Array<{ content: string; timestamp: string }> }) {
+function RawModelStream({ messages, t }: { messages: Array<{ content: string; timestamp: string }>; t: UiTexts }) {
   return (
     <details className="rounded-md border border-border/70 bg-background/80 p-3">
       <summary className="cursor-pointer text-xs font-semibold uppercase text-muted-foreground">
-        Raw Model Stream ({messages.length})
+        {t.rawModelStream} ({messages.length})
       </summary>
       {messages.length ? (
         <div className="mt-3 flex flex-col gap-2">
@@ -334,7 +327,7 @@ function RawModelStream({ messages }: { messages: Array<{ content: string; times
           ))}
         </div>
       ) : (
-        <p className="mt-3 text-xs text-muted-foreground">No model messages for this role yet.</p>
+        <p className="mt-3 text-xs text-muted-foreground">{t.noModelMessages}</p>
       )}
     </details>
   )
@@ -349,7 +342,7 @@ function MetricChip({ label, value }: { label: string; value: string }) {
   )
 }
 
-function buildLogItems(events: RunEvent[]): LogItem[] {
+function buildLogItems(events: RunEvent[], t: UiTexts): LogItem[] {
   return events.flatMap((event, index): LogItem[] => {
     const id = `${event.type}-${index}`
     if (event.type === "log") {
@@ -362,13 +355,13 @@ function buildLogItems(events: RunEvent[]): LogItem[] {
       }]
     }
     if (event.type === "run.started") {
-      return [{ id, level: "info", title: "RUN STARTED", body: event.runId, timestamp: event.timestamp }]
+      return [{ id, level: "info", title: t.runStartedLogTitle, body: event.runId, timestamp: event.timestamp }]
     }
     if (event.type === "run.completed") {
-      return [{ id, level: "info", title: "RUN COMPLETED", body: event.stopReason, timestamp: event.timestamp }]
+      return [{ id, level: "info", title: t.runCompletedLogTitle, body: event.stopReason, timestamp: event.timestamp }]
     }
     if (event.type === "run.failed") {
-      return [{ id, level: "error", title: "RUN FAILED", body: event.error, timestamp: event.timestamp }]
+      return [{ id, level: "error", title: t.runFailedLogTitle, body: event.error, timestamp: event.timestamp }]
     }
     if (event.type === "node.failed") {
       return [{ id, level: "error", title: event.label, body: event.error, timestamp: event.timestamp }]
@@ -380,7 +373,7 @@ function buildLogItems(events: RunEvent[]): LogItem[] {
   })
 }
 
-function buildRoleSummaries(events: RunEvent[], runState: SimulationState | undefined): RoleSummary[] {
+function buildRoleSummaries(events: RunEvent[], runState: SimulationState | undefined, t: UiTexts): RoleSummary[] {
   return ROLE_BUTTONS.map((role) => {
     const trace = role === "repair" ? undefined : runState?.roleTraces.find((item) => item.role === role)
     const messages = events
@@ -389,13 +382,13 @@ function buildRoleSummaries(events: RunEvent[], runState: SimulationState | unde
     const metrics = events
       .filter((event): event is Extract<RunEvent, { type: "model.metrics" }> => event.type === "model.metrics" && event.metrics.role === role)
       .map((event) => event.metrics)
-    const logs = buildRoleLogs(events, role)
+    const logs = buildRoleLogs(events, role, t)
     return {
       role,
       label: roleLabel(role),
-      description: roleDescription(role),
+      description: roleDescription(role, t),
       status: roleStatus(events, role, trace, messages, logs),
-      preview: rolePreview(role, trace, messages, logs),
+      preview: rolePreview(role, trace, messages, logs, t),
       trace,
       messages,
       sections: buildRoleSections(role, trace, messages),
@@ -405,8 +398,8 @@ function buildRoleSummaries(events: RunEvent[], runState: SimulationState | unde
   })
 }
 
-function buildRoleLogs(events: RunEvent[], role: RolePanelRole): LogItem[] {
-  return buildLogItems(events).filter((item) => item.body.toLowerCase().includes(role) || item.title.toLowerCase().includes(role))
+function buildRoleLogs(events: RunEvent[], role: RolePanelRole, t: UiTexts): LogItem[] {
+  return buildLogItems(events, t).filter((item) => item.body.toLowerCase().includes(role) || item.title.toLowerCase().includes(role))
 }
 
 function roleStatus(
@@ -435,7 +428,8 @@ function rolePreview(
   role: RolePanelRole,
   trace: RoleTrace | undefined,
   messages: Array<{ content: string; timestamp: string }>,
-  logs: LogItem[]
+  logs: LogItem[],
+  t: UiTexts
 ): string {
   if (trace?.role === "planner") {
     return trace.simulationDirection || trace.conflictDynamics || trace.coreSituation
@@ -450,7 +444,7 @@ function rolePreview(
   if (latestMessage) return latestMessage
   const latestLog = logs.at(-1)?.body
   if (latestLog) return latestLog
-  return `${roleLabel(role)} has not produced a signal yet.`
+  return `${roleLabel(role)} ${t.roleNoSignal}`
 }
 
 function buildRoleSections(
@@ -583,112 +577,8 @@ function humanizeTraceStep(step: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-function buildMetricSummary(events: RunEvent[]): {
-  ttft: PercentilePoint[]
-  duration: PercentilePoint[]
-  totalTokens: number
-  samples: number
-} {
-  const modelMetrics = events
-    .filter((event): event is Extract<RunEvent, { type: "model.metrics" }> => event.type === "model.metrics")
-    .map((event) => event.metrics)
-  return {
-    ttft: buildPercentiles(modelMetrics.map((metric) => metric.ttftMs)),
-    duration: buildPercentiles(modelMetrics.map((metric) => metric.durationMs)),
-    totalTokens: modelMetrics.reduce((sum, metric) => sum + metric.totalTokens, 0),
-    samples: modelMetrics.length,
-  }
-}
-
-interface PercentilePoint {
-  label: string
-  value: number
-}
-
-function buildPercentiles(values: number[]): PercentilePoint[] {
-  return PERCENTILES.map((percent) => ({
-    label: `P${percent}`,
-    value: percentile(values, percent),
-  }))
-}
-
-function percentile(values: number[], percent: number): number {
-  const sorted = values.filter((value) => Number.isFinite(value)).toSorted((a, b) => a - b)
-  if (!sorted.length) {
-    return 0
-  }
-  const index = Math.ceil((percent / 100) * sorted.length) - 1
-  return Math.round(sorted[Math.max(0, Math.min(sorted.length - 1, index))] ?? 0)
-}
-
-function TokenCounter({ value }: { value: number }) {
-  const formatted = value.toLocaleString("en-US")
-  return (
-    <div className="rounded-md border border-border/80 bg-background p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <RadioIcon className="size-4 text-primary" />
-          <span className="text-xs font-semibold">Cumulative Tokens</span>
-        </div>
-        <span className="text-[10px] uppercase text-muted-foreground">received</span>
-      </div>
-      <div className="flex items-center font-mono text-2xl font-semibold text-primary">
-        {formatted.split("").map((char, index) =>
-          /\d/.test(char) ? <RollingDigit key={`${index}-${formatted.length}`} digit={Number(char)} /> : <span key={index}>{char}</span>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function RollingDigit({ digit }: { digit: number }) {
-  return (
-    <span className="relative inline-block h-[1em] w-[0.64em] overflow-hidden">
-      <span
-        className="absolute left-0 top-0 flex flex-col transition-transform duration-300 ease-out"
-        style={{ transform: `translateY(-${digit * 10}%)` }}
-      >
-        {Array.from({ length: 10 }, (_, value) => (
-          <span key={value} className="h-[1em] leading-none">
-            {value}
-          </span>
-        ))}
-      </span>
-    </span>
-  )
-}
-
-function PercentileChart({ title, unit, values }: { title: string; unit: string; values: PercentilePoint[] }) {
-  const maxValue = Math.max(...values.map((point) => point.value), 0)
-  return (
-    <div className="rounded-md border border-border/80 bg-background p-3">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ClockIcon className="size-4 text-muted-foreground" />
-          <span className="text-xs font-semibold">{title}</span>
-        </div>
-        <span className="font-mono text-[10px] text-muted-foreground">{unit}</span>
-      </div>
-      {maxValue ? (
-        <div className="space-y-2">
-          {values.map((point) => (
-            <div key={point.label} className="grid grid-cols-[34px_minmax(0,1fr)_52px] items-center gap-2 text-[11px]">
-              <span className="font-mono text-muted-foreground">{point.label}</span>
-              <div className="h-2 overflow-hidden rounded-sm bg-muted">
-                <div
-                  className="h-full rounded-sm bg-primary/80 transition-[width] duration-300"
-                  style={{ width: `${Math.max(6, (point.value / maxValue) * 100)}%` }}
-                />
-              </div>
-              <span className="text-right font-mono text-foreground">{point.value}</span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground">No samples</p>
-      )}
-    </div>
-  )
+function countMetricSamples(events: RunEvent[]): number {
+  return events.filter((event) => event.type === "model.metrics").length
 }
 
 function EmptyActivity({ title, body }: { title: string; body: string }) {
@@ -708,12 +598,12 @@ function roleLabel(role: RolePanelRole): string {
   return "Repair"
 }
 
-function roleDescription(role: RolePanelRole): string {
-  if (role === "planner") return "How the planner interpreted the scenario and shaped the simulation plan."
-  if (role === "generator") return "How the generator expanded actors, events, and available actions."
-  if (role === "coordinator") return "How the coordinator interpreted interaction pressure and actor movement."
-  if (role === "observer") return "How the observer summarized and evaluated the evolving run."
-  return "Repair and retry signals from validation or recovery paths."
+function roleDescription(role: RolePanelRole, t: UiTexts): string {
+  if (role === "planner") return t.roleDescriptionPlanner
+  if (role === "generator") return t.roleDescriptionGenerator
+  if (role === "coordinator") return t.roleDescriptionCoordinator
+  if (role === "observer") return t.roleDescriptionObserver
+  return t.roleDescriptionRepair
 }
 
 function logToneClass(level: LogItem["level"]): string {

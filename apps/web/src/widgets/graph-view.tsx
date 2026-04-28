@@ -1,16 +1,22 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react"
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject } from "react"
+import { DEFAULT_EDGE_CURVATURE, EdgeCurvedArrowProgram, indexParallelEdgesIndex } from "@sigma/edge-curve"
 import Graph from "graphology"
 import forceAtlas2 from "graphology-layout-forceatlas2"
 import { CrosshairIcon, SearchIcon, XIcon } from "lucide-react"
 import Sigma from "sigma"
-import type { GraphEdgeView, GraphNodeView, GraphTimelineFrame } from "@simula/shared"
+import type { EdgeProgramType } from "sigma/rendering"
+import type { GraphEdgeView, GraphNodeView, GraphTimelineFrame, RunEvent } from "@simula/shared"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import type { UiTexts } from "@/lib/i18n"
+import { useRunStore } from "@/store/run-store"
 
 interface GraphViewProps {
   frame?: GraphTimelineFrame
+  t: UiTexts
   selectedActorId?: string
   onActorSelect: (actorId: string | undefined) => void
+  showActorPopover?: boolean
 }
 
 type ActorGraph = Graph<GraphNodeAttributes, GraphEdgeAttributes>
@@ -29,12 +35,17 @@ interface GraphNodeAttributes {
 }
 
 interface GraphEdgeAttributes {
+  type: typeof EDGE_TYPE
   color: string
   size: number
   alpha: number
   visibility: GraphEdgeView["visibility"]
   latestContent: string
   weight: number
+  curvature?: number
+  parallelIndex?: number | null
+  parallelMinIndex?: number | null
+  parallelMaxIndex?: number | null
   zIndex?: number
 }
 
@@ -57,6 +68,23 @@ interface EdgeAnimationState {
   items: Map<string, EdgeAnimation>
 }
 
+interface ActorSignalBadge {
+  actorId: string
+  symbol: "!" | "?"
+  step: string
+  expiresAt: number
+}
+
+interface VisibleActorSignalBadge extends ActorSignalBadge {
+  position: NodeOverlayPosition
+}
+
+interface NodeOverlayPosition {
+  x: number
+  y: number
+  size: number
+}
+
 const ACTOR_COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#64748b", "#f43f5e"]
 const ACTIVE_COLOR = "#1f2a44"
 const MUTED_NODE_COLOR = "#d7dee8"
@@ -65,8 +93,12 @@ const LARGE_GRAPH_LABEL_THRESHOLD = 120
 const LAYOUT_ANIMATION_MS = 560
 const EDGE_ANIMATION_MS = 420
 const ACTIVE_NODE_TTL_MS = 1100
+const SIGNAL_BADGE_TTL_MS = 4000
+const ACTOR_POPOVER_WIDTH = 320
+const EDGE_TYPE = "curvedArrow"
 
-export function GraphView({ frame, selectedActorId, onActorSelect }: GraphViewProps) {
+export function GraphView({ frame, t, selectedActorId, onActorSelect, showActorPopover = false }: GraphViewProps) {
+  const liveEvents = useRunStore((state) => state.liveEvents)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<Sigma<GraphNodeAttributes, GraphEdgeAttributes> | null>(null)
   const graphRef = useRef<ActorGraph | null>(null)
@@ -81,8 +113,15 @@ export function GraphView({ frame, selectedActorId, onActorSelect }: GraphViewPr
   const selectedNodeRef = useRef<string | undefined>(undefined)
   const activeNodeIdsRef = useRef<Set<string>>(new Set())
   const [hoveredNodeId, setHoveredNodeId] = useState<string>()
+  const [overlayRevision, setOverlayRevision] = useState(0)
+  const [signalBadges, setSignalBadges] = useState<Record<string, ActorSignalBadge>>({})
+  const [visibleSignalBadges, setVisibleSignalBadges] = useState<VisibleActorSignalBadge[]>([])
+  const [selectedPopoverStyle, setSelectedPopoverStyle] = useState<CSSProperties>()
   const [query, setQuery] = useState("")
   const deferredQuery = useDeferredValue(query)
+  const requestOverlayRefresh = useCallback(() => {
+    setOverlayRevision((revision) => revision + 1)
+  }, [])
 
   const searchResults = useMemo(() => {
     const normalized = deferredQuery.trim().toLowerCase()
@@ -94,11 +133,119 @@ export function GraphView({ frame, selectedActorId, onActorSelect }: GraphViewPr
       .slice(0, 6)
   }, [deferredQuery, frame])
 
+  const actorNames = useMemo(() => buildActorNameMap(frame?.nodes ?? [], liveEvents), [frame?.nodes, liveEvents])
+  const selectedActor = useMemo(
+    () => frame?.nodes.find((node) => node.id === selectedActorId),
+    [frame?.nodes, selectedActorId]
+  )
+
+  const focusNode = useCallback((nodeId: string) => {
+    const graph = graphRef.current
+    const renderer = rendererRef.current
+    if (!graph || !renderer || !graph.hasNode(nodeId)) {
+      return
+    }
+    renderer.refresh()
+    const display = renderer.getNodeDisplayData(nodeId)
+    if (!display) {
+      return
+    }
+    const camera = renderer.getCamera()
+    const current = camera.getState()
+    void camera.animate(
+      { x: display.x, y: display.y, angle: 0, ratio: Math.min(current.ratio, 0.9) },
+      { duration: 320 }
+    ).then(requestOverlayRefresh)
+  }, [requestOverlayRefresh])
+
+  const selectAndFocusNode = useCallback((nodeId: string) => {
+    onActorSelect(nodeId)
+    focusNode(nodeId)
+  }, [focusNode, onActorSelect])
+
   useEffect(() => {
     selectedNodeRef.current = selectedActorId
     hoveredNodeRef.current = hoveredNodeId
     rendererRef.current?.refresh()
-  }, [hoveredNodeId, selectedActorId])
+    requestOverlayRefresh()
+  }, [hoveredNodeId, requestOverlayRefresh, selectedActorId])
+
+  useEffect(() => {
+    const renderer = rendererRef.current
+    const graph = graphRef.current
+    if (!selectedActorId) {
+      setSelectedPopoverStyle(undefined)
+    } else {
+      const selectedPosition = nodeOverlayPosition(renderer, graph, selectedActorId)
+      setSelectedPopoverStyle(selectedPosition ? actorPopoverStyle(renderer, selectedPosition) : undefined)
+    }
+
+    const now = Date.now()
+    const nextBadges = Object.values(signalBadges)
+      .filter((badge) => badge.expiresAt > now)
+      .map((badge) => {
+        const position = nodeOverlayPosition(renderer, graph, badge.actorId)
+        return position ? { ...badge, position } : undefined
+      })
+      .filter((badge): badge is VisibleActorSignalBadge => Boolean(badge))
+    setVisibleSignalBadges(nextBadges)
+  }, [overlayRevision, selectedActorId, signalBadges])
+
+  useEffect(() => {
+    if (selectedActorId) {
+      focusNode(selectedActorId)
+    }
+  }, [focusNode, selectedActorId])
+
+  useEffect(() => {
+    const now = Date.now()
+    const nextBadges = new Map<string, ActorSignalBadge>()
+    for (const event of liveEvents.slice(-50)) {
+      if (event.type !== "model.message" || event.role !== "actor") {
+        continue
+      }
+      const timestamp = Date.parse(event.timestamp)
+      if (!Number.isFinite(timestamp) || now - timestamp > SIGNAL_BADGE_TTL_MS || timestamp - now > 10_000) {
+        continue
+      }
+      const parsed = parseActorModelMessage(event.content, actorNames)
+      if (!parsed) {
+        continue
+      }
+      nextBadges.set(parsed.actorId, {
+        actorId: parsed.actorId,
+        symbol: signalSymbol(parsed.step),
+        step: parsed.step,
+        expiresAt: timestamp + SIGNAL_BADGE_TTL_MS,
+      })
+    }
+    if (!nextBadges.size) {
+      return
+    }
+    setSignalBadges((current) => {
+      const next = { ...current }
+      for (const [actorId, badge] of nextBadges) {
+        next[actorId] = badge
+      }
+      return next
+    })
+  }, [actorNames, liveEvents])
+
+  useEffect(() => {
+    const badges = Object.values(signalBadges)
+    if (!badges.length) {
+      return
+    }
+    const nextExpiry = Math.min(...badges.map((badge) => badge.expiresAt))
+    const timeoutId = window.setTimeout(() => {
+      const now = Date.now()
+      setSignalBadges((current) => Object.fromEntries(
+        Object.entries(current).filter(([, badge]) => badge.expiresAt > now)
+      ))
+      requestOverlayRefresh()
+    }, Math.max(0, nextExpiry - Date.now()) + 50)
+    return () => window.clearTimeout(timeoutId)
+  }, [requestOverlayRefresh, signalBadges])
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -109,10 +256,14 @@ export function GraphView({ frame, selectedActorId, onActorSelect }: GraphViewPr
     const edgeAnimation = edgeAnimationRef.current
     const graph: ActorGraph = new Graph({ type: "directed", multi: true })
     graphRef.current = graph
-    const renderer = new Sigma(graph, containerRef.current, {
+    const renderer = new Sigma<GraphNodeAttributes, GraphEdgeAttributes>(graph, containerRef.current, {
       allowInvalidContainer: true,
       defaultEdgeColor: MUTED_EDGE_COLOR,
+      defaultEdgeType: EDGE_TYPE,
       defaultNodeColor: MUTED_NODE_COLOR,
+      edgeProgramClasses: {
+        [EDGE_TYPE]: EdgeCurvedArrowProgram as unknown as EdgeProgramType<GraphNodeAttributes, GraphEdgeAttributes>,
+      },
       enableEdgeEvents: false,
       labelColor: { color: "#172033" },
       labelDensity: 0.08,
@@ -133,9 +284,11 @@ export function GraphView({ frame, selectedActorId, onActorSelect }: GraphViewPr
     })
 
     rendererRef.current = renderer
+    const updateOverlays = () => requestOverlayRefresh()
+    renderer.getCamera().on("updated", updateOverlays)
     renderer.on("enterNode", ({ node }) => setHoveredNodeId(node))
     renderer.on("leaveNode", () => setHoveredNodeId(undefined))
-    renderer.on("clickNode", ({ node }) => onActorSelect(node))
+    renderer.on("clickNode", ({ node }) => selectAndFocusNode(node))
     renderer.on("clickStage", () => onActorSelect(undefined))
 
     return () => {
@@ -145,11 +298,12 @@ export function GraphView({ frame, selectedActorId, onActorSelect }: GraphViewPr
         window.cancelAnimationFrame(activeRefreshRef.current)
         activeRefreshRef.current = undefined
       }
+      renderer.getCamera().off("updated", updateOverlays)
       renderer.kill()
       rendererRef.current = null
       graphRef.current = null
     }
-  }, [onActorSelect])
+  }, [onActorSelect, requestOverlayRefresh, selectAndFocusNode])
 
   useEffect(() => {
     if (!graphRef.current) {
@@ -164,10 +318,12 @@ export function GraphView({ frame, selectedActorId, onActorSelect }: GraphViewPr
       layoutRoundRef,
       layoutAnimationRef.current,
       edgeAnimationRef.current,
-      rendererRef.current
+      rendererRef.current,
+      requestOverlayRefresh
     )
     rendererRef.current?.refresh()
-  }, [frame])
+    requestOverlayRefresh()
+  }, [frame, requestOverlayRefresh])
 
   const resetCamera = () => {
     rendererRef.current?.getCamera().animate({ x: 0, y: 0, angle: 0, ratio: 1 }, { duration: 260 })
@@ -181,15 +337,15 @@ export function GraphView({ frame, selectedActorId, onActorSelect }: GraphViewPr
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Find actor"
+            placeholder={t.graphFindActor}
             className="h-8 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
           />
           {query ? (
-            <Button type="button" variant="ghost" size="icon" className="size-8" aria-label="Clear actor search" onClick={() => setQuery("")}>
+            <Button type="button" variant="ghost" size="icon" className="size-8" aria-label={t.graphClearActorSearch} onClick={() => setQuery("")}>
               <XIcon className="size-4" />
             </Button>
           ) : null}
-          <Button type="button" variant="ghost" size="icon" className="size-8" aria-label="Reset graph view" onClick={resetCamera}>
+          <Button type="button" variant="ghost" size="icon" className="size-8" aria-label={t.graphResetView} onClick={resetCamera}>
             <CrosshairIcon className="size-4" />
           </Button>
         </div>
@@ -201,7 +357,7 @@ export function GraphView({ frame, selectedActorId, onActorSelect }: GraphViewPr
                 key={actor.id}
                 type="button"
                 className="flex w-full items-center justify-between gap-3 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted"
-                onClick={() => onActorSelect(actor.id)}
+                onClick={() => selectAndFocusNode(actor.id)}
               >
                 <span className="truncate font-medium">{actor.label}</span>
                 <span className="shrink-0 text-muted-foreground">{actor.interactionCount}</span>
@@ -213,12 +369,43 @@ export function GraphView({ frame, selectedActorId, onActorSelect }: GraphViewPr
 
       <div ref={containerRef} className="h-full min-h-[520px] bg-[radial-gradient(circle_at_center,#f8fafc_1px,transparent_1px)] [background-size:24px_24px]" />
 
+      {visibleSignalBadges.map((badge) => (
+        <div
+          key={badge.actorId}
+          className="pointer-events-none absolute z-20 flex size-7 -translate-x-1/2 -translate-y-full items-center justify-center rounded-full border border-white bg-[#facc15] font-mono text-sm font-bold text-[#172033] shadow-[0_8px_20px_rgba(23,32,51,0.18)]"
+          style={{ left: badge.position.x, top: badge.position.y - badge.position.size - 10 }}
+          aria-label={`${t.graphActorSignal}: ${badge.step}`}
+        >
+          {badge.symbol}
+        </div>
+      ))}
+
+      {showActorPopover && selectedActor && selectedPopoverStyle ? (
+        <div
+          className="absolute z-20 rounded-md border border-border/80 bg-white/95 p-3 text-left shadow-[0_12px_32px_rgba(23,32,51,0.14)] backdrop-blur"
+          style={selectedPopoverStyle}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground">{selectedActor.label}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{selectedActor.role}</p>
+            </div>
+            <div className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+              {selectedActor.interactionCount}
+            </div>
+          </div>
+          <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">
+            {selectedActor.intent || t.graphNoIntent}
+          </p>
+        </div>
+      ) : null}
+
       {(frame?.nodes.length ?? 0) === 0 ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="max-w-[320px] text-center">
-            <p className="text-sm font-medium">No actor network yet</p>
+            <p className="text-sm font-medium">{t.graphNoActorNetwork}</p>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              Create and execute a run to watch relationships emerge.
+              {t.graphNoActorNetworkDescription}
             </p>
           </div>
         </div>
@@ -235,7 +422,8 @@ function writeGraphFrame(
   layoutRoundRef: MutableRefObject<number | undefined>,
   layoutAnimation: LayoutAnimationState,
   edgeAnimation: EdgeAnimationState,
-  renderer: Sigma<GraphNodeAttributes, GraphEdgeAttributes> | null
+  renderer: Sigma<GraphNodeAttributes, GraphEdgeAttributes> | null,
+  onPositionsChanged?: () => void
 ): void {
   if (!frame) {
     cancelAnimation(layoutAnimation)
@@ -308,6 +496,7 @@ function writeGraphFrame(
     if (graph.hasEdge(edge.id)) {
       const current = graph.getEdgeAttributes(edge.id)
       graph.mergeEdgeAttributes(edge.id, {
+        type: EDGE_TYPE,
         visibility: edge.visibility,
         latestContent: edge.latestContent,
         weight: edge.weight,
@@ -325,6 +514,7 @@ function writeGraphFrame(
       continue
     }
     const attributes: GraphEdgeAttributes = {
+      type: EDGE_TYPE,
       color: edgeColor(edge.visibility, 0.08),
       size: 0.2,
       alpha: 0.08,
@@ -342,6 +532,7 @@ function writeGraphFrame(
       duration: EDGE_ANIMATION_MS,
     })
   }
+  applyEdgeCurves(graph)
 
   if (
     frame.layoutRoundIndex !== undefined &&
@@ -354,7 +545,7 @@ function writeGraphFrame(
     const targetPositions = readNodePositions(graph)
     applyNodePositions(graph, startPositions)
     layoutRoundRef.current = frame.layoutRoundIndex
-    animateNodePositions(graph, renderer, nodePositions, layoutAnimation, targetPositions, LAYOUT_ANIMATION_MS)
+    animateNodePositions(graph, renderer, nodePositions, layoutAnimation, targetPositions, LAYOUT_ANIMATION_MS, onPositionsChanged)
   }
 }
 
@@ -364,7 +555,8 @@ function animateNodePositions(
   nodePositions: Map<string, Position>,
   animation: LayoutAnimationState,
   targetPositions: Map<string, Position>,
-  duration: number
+  duration: number,
+  onPositionsChanged?: () => void
 ): void {
   const startedAt = performance.now()
   const startPositions = readNodePositions(graph)
@@ -383,6 +575,7 @@ function animateNodePositions(
       nodePositions.set(nodeId, position)
     }
     renderer?.refresh()
+    onPositionsChanged?.()
     if (progress < 1) {
       animation.frameId = window.requestAnimationFrame(tick)
       return
@@ -483,6 +676,80 @@ function applyNodePositions(graph: ActorGraph, positions: Map<string, Position>)
       graph.mergeNodeAttributes(nodeId, position)
     }
   }
+}
+
+function nodeOverlayPosition(
+  renderer: Sigma<GraphNodeAttributes, GraphEdgeAttributes> | null,
+  graph: ActorGraph | null,
+  nodeId: string
+): NodeOverlayPosition | undefined {
+  if (!renderer || !graph || !graph.hasNode(nodeId)) {
+    return undefined
+  }
+  const attributes = graph.getNodeAttributes(nodeId)
+  const viewport = renderer.graphToViewport({ x: attributes.x, y: attributes.y })
+  return { ...viewport, size: attributes.size }
+}
+
+function actorPopoverStyle(
+  renderer: Sigma<GraphNodeAttributes, GraphEdgeAttributes> | null,
+  position: NodeOverlayPosition
+): CSSProperties | undefined {
+  if (!renderer) {
+    return undefined
+  }
+  const dimensions = renderer.getDimensions()
+  const width = Math.min(ACTOR_POPOVER_WIDTH, Math.max(220, dimensions.width - 24))
+  return {
+    left: clamp(position.x - width / 2, 12, Math.max(12, dimensions.width - width - 12)),
+    top: position.y + position.size + 18,
+    width,
+  }
+}
+
+function buildActorNameMap(nodes: GraphNodeView[], liveEvents: RunEvent[]): Map<string, string> {
+  const names = new Map<string, string>()
+  for (const node of nodes) {
+    names.set(node.id, node.label)
+  }
+  for (const event of liveEvents) {
+    if (event.type === "actors.ready") {
+      for (const actor of event.actors) {
+        names.set(actor.id, actor.label)
+      }
+    }
+    if (event.type === "actor.message") {
+      names.set(event.actorId, event.actorName)
+    }
+  }
+  return names
+}
+
+function parseActorModelMessage(content: string, actorNames: Map<string, string>): { actorId: string; step: string } | undefined {
+  const entries = [...actorNames.entries()].toSorted((a, b) => b[1].length - a[1].length)
+  for (const [actorId, name] of entries) {
+    if (!content.startsWith(`${name} `)) {
+      continue
+    }
+    const rest = content.slice(name.length + 1)
+    const separatorIndex = rest.indexOf(":")
+    if (separatorIndex < 1) {
+      continue
+    }
+    return {
+      actorId,
+      step: rest.slice(0, separatorIndex).trim(),
+    }
+  }
+  return undefined
+}
+
+function signalSymbol(step: string): "!" | "?" {
+  return step === "thought" || step === "context" ? "?" : "!"
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
 }
 
 function cancelAnimation(animation: LayoutAnimationState): void {
@@ -601,6 +868,28 @@ function edgeColor(visibility: GraphEdgeView["visibility"], alpha = edgeAlpha(vi
   if (visibility === "semi-public") return `rgba(16, 185, 129, ${alpha})`
   if (visibility === "private") return `rgba(139, 92, 246, ${alpha})`
   return `rgba(100, 116, 139, ${alpha})`
+}
+
+function applyEdgeCurves(graph: ActorGraph): void {
+  indexParallelEdgesIndex(graph)
+  graph.forEachEdge((edge, attributes) => {
+    const curvature = typeof attributes.parallelIndex === "number" && typeof attributes.parallelMaxIndex === "number"
+      ? parallelEdgeCurvature(attributes.parallelIndex, attributes.parallelMaxIndex)
+      : DEFAULT_EDGE_CURVATURE
+    graph.mergeEdgeAttributes(edge, { type: EDGE_TYPE, curvature })
+  })
+}
+
+function parallelEdgeCurvature(index: number, maxIndex: number): number {
+  if (maxIndex <= 0 || index === 0) {
+    return DEFAULT_EDGE_CURVATURE
+  }
+  if (index < 0) {
+    return -parallelEdgeCurvature(-index, maxIndex)
+  }
+  const amplitude = 3.5
+  const maxCurvature = amplitude * (1 - Math.exp(-maxIndex / amplitude)) * DEFAULT_EDGE_CURVATURE
+  return (maxCurvature * index) / maxIndex
 }
 
 function interpolate(from: number, to: number, progress: number): number {

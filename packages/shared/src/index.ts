@@ -52,12 +52,9 @@ export interface ScenarioInput {
 export interface RoleSettings {
   provider: ModelProvider
   model: string
-  apiKey?: string
-  baseUrl?: string
   temperature: number
   maxTokens: number
   timeoutSeconds: number
-  streamUsage?: boolean
   topP?: number
   topK?: number
   frequencyPenalty?: number
@@ -66,11 +63,28 @@ export interface RoleSettings {
   reasoningEffort?: "low" | "medium" | "high"
   contextTokenBudget?: number
   extraBody?: Record<string, unknown>
-  extraHeaders?: Record<string, string>
   safetySettings?: Array<Record<string, string>>
 }
 
-export type LLMSettings = Record<ModelRole, RoleSettings>
+export interface ProviderSettings {
+  baseUrl?: string
+  apiKey?: string
+  streamUsage?: boolean
+  extraHeaders?: Record<string, string>
+}
+
+export type ProviderSettingsMap = Record<ModelProvider, ProviderSettings>
+export type RoleSettingsMap = Record<ModelRole, RoleSettings>
+
+export interface LLMSettings {
+  providers: ProviderSettingsMap
+  roles: RoleSettingsMap
+}
+
+export type LegacyLLMSettings = Partial<Record<ModelRole, RoleSettings & ProviderSettings>>
+export type LLMSettingsInput = Partial<LLMSettings> | LegacyLLMSettings
+
+export type ResolvedRoleSettings = RoleSettings & ProviderSettings
 
 export interface RunArtifactPaths {
   manifest: string
@@ -311,6 +325,15 @@ export interface CreateRunRequest {
 
 export interface SettingsResponse {
   settings: LLMSettings
+}
+
+export interface SettingsModelsRequest {
+  provider: ModelProvider
+  connection: ProviderSettings
+}
+
+export interface SettingsModelsResponse {
+  models: string[]
 }
 
 export interface StoryBuilderMessage {

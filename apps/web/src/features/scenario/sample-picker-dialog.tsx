@@ -57,7 +57,7 @@ export function SamplePickerDialog({
                   <div className="min-w-0">
                     <h3 className="truncate text-sm font-semibold">{sample.title}</h3>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {sample.name} · {sample.controls.numCast} cast · {sample.controls.maxRound} rounds · {sample.controls.actionsPerType} actions/type
+                      {sample.name} · {sample.controls.numCast} {t.sampleCastUnit} · {sample.controls.maxRound} {t.sampleRoundsUnit} · {sample.controls.actionsPerType} {t.sampleActionsPerTypeUnit}
                     </p>
                   </div>
                   <Button

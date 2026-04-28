@@ -6,6 +6,7 @@ import {
   normalizeSettings,
   plannerDigestSummary,
   renderPromptLanguageGuide,
+  resolveRoleSettings,
 } from "../src"
 import { actorPrompts } from "../src/simulation/roles/actor/prompts"
 import { isValidActorAction, isValidActorTarget } from "../src/simulation/roles/actor/state"
@@ -326,20 +327,18 @@ describe("settings validation", () => {
   })
 
   test("includes StoryBuilder settings", () => {
-    expect(defaultSettings().storyBuilder.model).toBeTruthy()
+    expect(defaultSettings().roles.storyBuilder.model).toBeTruthy()
   })
 
   test("includes actor settings", () => {
-    expect(defaultSettings().actor.model).toBeTruthy()
-    expect(defaultSettings().actor.contextTokenBudget).toBe(2000)
+    expect(defaultSettings().roles.actor.model).toBeTruthy()
+    expect(defaultSettings().roles.actor.contextTokenBudget).toBe(2000)
   })
 
   test("validates actor context token budget", () => {
     const settings = defaultSettings()
-    for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].apiKey = "unit-test-api-key"
-    }
-    settings.actor.contextTokenBudget = 0
+    settings.providers.openai.apiKey = "unit-test-api-key"
+    settings.roles.actor.contextTokenBudget = 0
 
     expect(() => validateSettings(settings)).toThrow("contextTokenBudget for actor must be a positive integer.")
   })
@@ -356,16 +355,43 @@ describe("settings validation", () => {
       },
     } as Parameters<typeof normalizeSettings>[0])
 
-    expect(settings.actor.model).toBe("coordinator-model")
-    expect(settings.actor.apiKey).toBe("coordinator-key")
+    expect(settings.roles.actor.model).toBe("coordinator-model")
+    expect(settings.providers.anthropic.apiKey).toBe("coordinator-key")
+  })
+
+  test("promotes the first legacy provider connection", () => {
+    const settings = normalizeSettings({
+      storyBuilder: {
+        provider: "lmstudio",
+        model: "story-model",
+        apiKey: "first-key",
+        baseUrl: "http://first.test/v1",
+        temperature: 0.3,
+        maxTokens: 1000,
+        timeoutSeconds: 30,
+      },
+      planner: {
+        provider: "lmstudio",
+        model: "planner-model",
+        apiKey: "second-key",
+        baseUrl: "http://second.test/v1",
+        temperature: 0.3,
+        maxTokens: 1000,
+        timeoutSeconds: 30,
+      },
+    } as Parameters<typeof normalizeSettings>[0])
+
+    expect(settings.providers.lmstudio.apiKey).toBe("first-key")
+    expect(settings.providers.lmstudio.baseUrl).toBe("http://first.test/v1")
+    expect(settings.roles.planner.model).toBe("planner-model")
   })
 
   test("supports Gemini settings", () => {
     const settings = defaultSettings()
-    for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].provider = "gemini"
-      settings[role].model = "gemini-2.5-pro"
-      settings[role].apiKey = "google-key"
+    settings.providers.gemini.apiKey = "google-key"
+    for (const role of Object.keys(settings.roles) as Array<keyof typeof settings.roles>) {
+      settings.roles[role].provider = "gemini"
+      settings.roles[role].model = "gemini-2.5-pro"
     }
 
     expect(() => validateSettings(settings)).not.toThrow()
@@ -373,11 +399,11 @@ describe("settings validation", () => {
 
   test("allows OpenAI-compatible local providers without API keys", () => {
     const settings = defaultSettings()
-    for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].provider = "ollama"
-      settings[role].model = "llama3.1"
-      settings[role].apiKey = ""
-      settings[role].baseUrl = "http://localhost:11434/v1"
+    settings.providers.ollama.apiKey = ""
+    settings.providers.ollama.baseUrl = "http://localhost:11434/v1"
+    for (const role of Object.keys(settings.roles) as Array<keyof typeof settings.roles>) {
+      settings.roles[role].provider = "ollama"
+      settings.roles[role].model = "llama3.1"
     }
 
     expect(() => validateSettings(settings)).not.toThrow()
@@ -385,11 +411,11 @@ describe("settings validation", () => {
 
   test("requires base URL for OpenAI-compatible providers", () => {
     const settings = defaultSettings()
-    for (const role of Object.keys(settings) as Array<keyof typeof settings>) {
-      settings[role].provider = "vllm"
-      settings[role].model = "local-model"
-      settings[role].apiKey = ""
-      settings[role].baseUrl = ""
+    settings.providers.vllm.apiKey = ""
+    settings.providers.vllm.baseUrl = ""
+    for (const role of Object.keys(settings.roles) as Array<keyof typeof settings.roles>) {
+      settings.roles[role].provider = "vllm"
+      settings.roles[role].model = "local-model"
     }
 
     expect(() => validateSettings(settings)).toThrow("Base URL is required")
@@ -406,7 +432,7 @@ describe("settings validation", () => {
       },
     } as Parameters<typeof normalizeSettings>[0])
 
-    expect(settings.actor.baseUrl).toBe("http://localhost:1234/v1")
-    expect(settings.actor.reasoningEffort).toBe("medium")
+    expect(settings.providers.lmstudio.baseUrl).toBe("http://localhost:1234/v1")
+    expect(resolveRoleSettings(settings, "actor").reasoningEffort).toBe("medium")
   })
 })

@@ -4,9 +4,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
+import type { UiTexts } from "@/lib/i18n"
 import { useRunStore } from "@/store/run-store"
 
-export function ReplayDock() {
+export function ReplayDock({ t }: { t: UiTexts }) {
   const timeline = useRunStore((state) => state.timeline)
   const replayIndex = useRunStore((state) => state.replayIndex)
   const setReplayIndex = useRunStore((state) => state.setReplayIndex)
@@ -35,7 +36,7 @@ export function ReplayDock() {
       <div className="grid gap-3 lg:grid-cols-[auto_minmax(220px,1fr)_auto] lg:items-center">
         <div className="flex items-center gap-2">
           <Button
-            aria-label={playing ? "Pause replay" : "Play replay"}
+            aria-label={playing ? t.pauseReplay : t.playReplay}
             variant="outline"
             size="icon"
             disabled={!timeline.length}
@@ -44,7 +45,7 @@ export function ReplayDock() {
             {playing ? <PauseIcon /> : <PlayIcon />}
           </Button>
           <Button
-            aria-label="Reset replay"
+            aria-label={t.resetReplay}
             variant="ghost"
             size="icon"
             disabled={!timeline.length}
@@ -53,13 +54,13 @@ export function ReplayDock() {
             <RotateCcwIcon />
           </Button>
           <Badge variant="outline" className="rounded-md">
-            Replay
+            {t.replay}
           </Badge>
         </div>
 
         <div className="grid gap-2">
           <Input
-            aria-label="Replay timeline"
+            aria-label={t.replayTimeline}
             type="range"
             min={0}
             max={Math.max(0, timeline.length - 1)}
@@ -72,7 +73,7 @@ export function ReplayDock() {
 
         <div className="flex min-w-0 items-center justify-between gap-3 text-xs text-muted-foreground lg:justify-end">
           <span>{timeline.length ? `${replayIndex + 1}/${timeline.length}` : "0/0"}</span>
-          <span className="max-w-[360px] truncate">{frame?.timestamp ?? "No frame selected"}</span>
+          <span className="max-w-[360px] truncate">{frame?.timestamp ?? t.noFrameSelected}</span>
         </div>
       </div>
     </footer>

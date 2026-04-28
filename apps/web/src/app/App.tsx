@@ -20,7 +20,7 @@ import {
 } from "@/lib/api"
 import { useRunStore } from "@/store/run-store"
 import { ActivityRail } from "@/widgets/activity-rail"
-import { ActorCardRail, ActorDetailDialog } from "@/widgets/actor-panel"
+import { LlmMetricsPanel } from "@/widgets/llm-metrics-panel"
 import { ReplayDock } from "@/widgets/replay-dock"
 import { SimulationStage } from "@/widgets/simulation-stage"
 import { StartScreen } from "@/widgets/start-screen"
@@ -101,12 +101,12 @@ function App() {
       return run
     },
     onSuccess: async () => {
-      toast.success("Simulation started")
+      toast.success(t.simulationStartedToast)
       setScenarioPreviewOpen(false)
       setViewMode("simulation")
       await queryClient.invalidateQueries({ queryKey: ["runs"] })
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Run failed"),
+    onError: (error) => toast.error(error instanceof Error ? error.message : t.runFailedToast),
   })
 
   useEffect(() => {
@@ -304,10 +304,13 @@ function App() {
           t={t}
           onOpenChange={setScenarioPreviewOpen}
           onDraftChange={setScenarioDraft}
-          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSettings={() => {
+            setScenarioPreviewOpen(false)
+            setSettingsOpen(true)
+          }}
           onStart={startDraftRun}
         />
-        <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+        <SettingsDialog open={settingsOpen} t={t} onOpenChange={setSettingsOpen} />
       </>
     )
   }
@@ -341,14 +344,15 @@ function App() {
           }}
         />
 
-        <section className="grid min-h-0 flex-1 gap-4 py-4 xl:grid-cols-[260px_minmax(0,1fr)_340px] 2xl:grid-cols-[300px_minmax(0,1fr)_380px]">
-          <ActorCardRail selectedActorId={selectedActorId} onActorSelect={setSelectedActorId} />
-          <SimulationStage selectedActorId={selectedActorId} onActorSelect={selectActor} />
-          <ActivityRail />
-        </section>
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 py-4">
+          <LlmMetricsPanel t={t} />
+          <section className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
+            <SimulationStage t={t} selectedActorId={selectedActorId} onActorSelect={selectActor} showActorPopover />
+            <ActivityRail t={t} />
+          </section>
+        </div>
 
-        <ReplayDock />
-        <ActorDetailDialog actorId={selectedActorId} onOpenChange={(open) => !open && setSelectedActorId(undefined)} />
+        <ReplayDock t={t} />
         <Dialog
           open={Boolean(reportConfirmRunId && reportConfirmRunId === selectedRunId)}
           onOpenChange={(open) => {

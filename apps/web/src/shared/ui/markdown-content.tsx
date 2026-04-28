@@ -29,7 +29,7 @@ const sanitizeSchema = {
 }
 
 export function MarkdownContent({ content, fallback = "-", className, compact = false }: MarkdownContentProps) {
-  const source = content?.trim() || fallback
+  const source = normalizeMarkdownSource(content?.trim() || fallback)
   return (
     <div className={cn("simula-markdown", compact && "simula-markdown-compact", className)}>
       <ReactMarkdown
@@ -40,4 +40,21 @@ export function MarkdownContent({ content, fallback = "-", className, compact = 
       </ReactMarkdown>
     </div>
   )
+}
+
+export function normalizeMarkdownSource(source: string): string {
+  const lines = source.split("\n")
+  let inFence = false
+  return lines
+    .map((line) => {
+      if (line.trimStart().startsWith("```")) {
+        inFence = !inFence
+        return line
+      }
+      if (inFence) {
+        return line
+      }
+      return line.replace(/(\*\*\[[^\]\n]+\]\*\*)(?=(?:[-*+]\s+|\d+[.)]\s+))/g, "$1\n")
+    })
+    .join("\n")
 }
