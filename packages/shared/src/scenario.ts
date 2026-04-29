@@ -1,4 +1,5 @@
 export type PromptLanguage = "en" | "ko"
+export type PromptOutputLength = "short" | "medium" | "long"
 
 export interface ScenarioControls {
   numCast: number
@@ -7,6 +8,7 @@ export interface ScenarioControls {
   maxRound: number
   fastMode: boolean
   actorContextTokenBudget?: number
+  outputLength?: PromptOutputLength
 }
 
 export interface ScenarioInput {
@@ -28,4 +30,3 @@ export interface ScenarioSampleDetail {
   text: string
   controls: ScenarioControls
 }
-

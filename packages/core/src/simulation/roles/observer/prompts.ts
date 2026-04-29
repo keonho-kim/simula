@@ -1,4 +1,5 @@
 import type { RoleGraphOptions } from "../shared"
+import { compactLines, compactText, renderOutputLengthGuide, scalePromptLimit } from "../../../prompt"
 
 export const observerPrompts: RoleGraphOptions["prompts"] = {
   thought: (current) => {
@@ -7,22 +8,27 @@ export const observerPrompts: RoleGraphOptions["prompts"] = {
     const interactions = current.simulation.interactions
       .filter((item) => item.roundIndex === roundIndex)
       .map((item) => item.content)
-      .join(" ")
-    return `Observer thought. In one short paragraph, interpret what actually happened in round ${roundIndex}.
+      .slice(-8)
+    return `Observer thought. Return one short paragraph interpreting round ${roundIndex}.
+${renderOutputLengthGuide(current.scenario.controls, "observer thought")}
 
-Pre-round: ${digest?.preRound.content ?? "No pre-round digest."}
-Interactions: ${interactions || "No interactions."}`
+Pre-round: ${compactText(digest?.preRound.content ?? "No pre-round digest.", scalePromptLimit(350, current.scenario.controls))}
+Interactions:
+${interactions.length ? compactLines(interactions.map((item) => `- ${item}`), 8, scalePromptLimit(900, current.scenario.controls)) : "No interactions."}`
   },
   target: (current, partial) =>
-    `Observer target. In one sentence, name the key actor, event, or conflict to watch after round ${current.simulation.observerRoundIndex ?? current.simulation.roundDigests.length}.
+    `Observer target. Return one sentence naming the key actor, event, or conflict after round ${current.simulation.observerRoundIndex ?? current.simulation.roundDigests.length}.
+${renderOutputLengthGuide(current.scenario.controls, "observer target")}
 
-Thought: ${partial.thought}`,
+Thought: ${compactText(partial.thought, scalePromptLimit(350, current.scenario.controls))}`,
   action: (current, partial) =>
-    `Observer action. In one compact paragraph, write a user-facing summary for round ${current.simulation.observerRoundIndex ?? current.simulation.roundDigests.length}.
+    `Observer action. Return one compact paragraph summarizing round ${current.simulation.observerRoundIndex ?? current.simulation.roundDigests.length}.
+${renderOutputLengthGuide(current.scenario.controls, "observer summary")}
 
-Target: ${partial.target}`,
+Target: ${compactText(partial.target, scalePromptLimit(250, current.scenario.controls))}`,
   intent: (current, partial) =>
-    `Observer intent. In one sentence, explain what this round means for later analysis.
+    `Observer intent. Return one sentence on what this round means for later analysis.
+${renderOutputLengthGuide(current.scenario.controls, "observer intent")}
 
-Round ${current.simulation.observerRoundIndex ?? current.simulation.roundDigests.length} summary: ${partial.action}`,
+Summary: ${compactText(partial.action, scalePromptLimit(350, current.scenario.controls))}`,
 }

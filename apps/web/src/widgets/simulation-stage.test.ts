@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { GraphNodeView, RunEvent } from "@simula/shared"
-import { buildSimulationInterlude } from "./simulation-stage-interlude"
+import { buildInterludeStageView, buildSimulationInterlude } from "./simulation-stage-interlude"
 
 const runId = "run-test"
 const timestamp = "2026-04-28T00:00:00.000Z"
@@ -93,6 +93,76 @@ describe("buildSimulationInterlude", () => {
 
     expect(buildSimulationInterlude(events)).toBeUndefined()
   })
+
+  test("groups important interlude details by stage", () => {
+    const events = [
+      runStarted(),
+      modelMessage("planner", "coreSituation: A tense opening situation."),
+      modelMessage("generator", "roster: 1. A - Mayor"),
+      modelMessage("generator", "actor-1 role: Mayor"),
+      modelMessage("coordinator", "runtimeFrame: Round one opens in council chambers."),
+    ]
+
+    const view = buildInterludeStageView(events)
+
+    expect(view.activeStageId).toBe("coordinator")
+    expect(view.details.map((detail) => [detail.stageId, detail.stepLabel])).toEqual([
+      ["coordinator", "Runtime Frame"],
+      ["actorCards", "Role"],
+      ["generator", "Roster"],
+      ["planner", "Core Situation"],
+    ])
+  })
+
+  test("does not show actors as a separate interlude stage", () => {
+    const events = [
+      runStarted(),
+      actorsReady(),
+      roundCompleted(1),
+      modelMessage("actor", "A thought: I need leverage."),
+    ]
+
+    const view = buildInterludeStageView(events)
+
+    expect(view.stages.map((stage) => stage.id)).toEqual([
+      "planner",
+      "generator",
+      "actorCards",
+      "coordinator",
+      "observer",
+    ])
+    expect(view.activeStageId).toBe("coordinator")
+    expect(view.details[0]?.stageId).toBe("coordinator")
+    expect(view.details[0]?.stepLabel).toBe("Thought")
+  })
+
+  test("uses node events for stage status without showing them as details", () => {
+    const events = [
+      runStarted(),
+      nodeStarted("planner", "Planner"),
+      nodeCompleted("planner", "Planner"),
+      nodeStarted("generator", "Generator"),
+    ]
+
+    const view = buildInterludeStageView(events)
+
+    expect(view.details).toEqual([])
+    expect(view.stages.find((stage) => stage.id === "planner")?.status).toBe("done")
+    expect(view.stages.find((stage) => stage.id === "generator")?.status).toBe("active")
+  })
+
+  test("marks actor cards done when actors are ready", () => {
+    const events = [
+      runStarted(),
+      modelMessage("generator", "actor-1 role: Mayor"),
+      actorsReady(),
+    ]
+
+    const view = buildInterludeStageView(events)
+
+    expect(view.stages.find((stage) => stage.id === "actorCards")?.status).toBe("done")
+    expect(view.details[0]?.stageId).toBe("actorCards")
+  })
 })
 
 function runStarted(): RunEvent {
@@ -101,6 +171,10 @@ function runStarted(): RunEvent {
 
 function nodeStarted(nodeId: string, label: string): RunEvent {
   return { type: "node.started", runId, timestamp, nodeId, label }
+}
+
+function nodeCompleted(nodeId: string, label: string): RunEvent {
+  return { type: "node.completed", runId, timestamp, nodeId, label }
 }
 
 function modelMessage(role: Extract<RunEvent, { type: "model.message" }>["role"], content: string): RunEvent {

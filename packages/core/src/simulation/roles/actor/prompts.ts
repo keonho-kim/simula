@@ -1,4 +1,5 @@
 import type { ActorTraceStep } from "@simula/shared"
+import { compactLines, compactText, renderOutputLengthGuide, scalePromptLimit } from "../../../prompt"
 import { actorPromptContext } from "../../context"
 import type { ActorGraphState } from "./state"
 import { targetActors } from "./state"
@@ -12,34 +13,30 @@ export type ActorPromptStep = Exclude<ActorTraceStep, "context">
 
 export const actorPrompts: Record<ActorPromptStep, ActorPromptBuilder> = {
   thought: (state) =>
-    `Actor thought. In one short paragraph, judge the situation only as ${state.actor.name}.
-Use only the information this actor is allowed to know: public context, their own memory, their private profile, and coordinator guidance.
-Do not use hidden information from other actors unless it is already in this actor's memory or visible context.
+    `Actor thought. As ${state.actor.name}, return one short paragraph using only visible context and private profile.
+${renderOutputLengthGuide(state.scenario.controls, "actor thought")}
 
-Scenario: ${state.scenario.text}
-Planner scenario digest:
-${state.plannerDigest}
+Digest: ${compactText(state.plannerDigest, scalePromptLimit(650, state.scenario.controls))}
 Round ${state.roundIndex}: ${state.event.title}. ${state.event.summary}
-Pre-round: ${state.roundDigest.preRound.content}
-Visible context:
-${actorPromptContext(state.actor)}
-Actor role: ${state.actor.role}
-Actor background history: ${state.actor.backgroundHistory}
-Actor personality: ${state.actor.personality}
-Actor preference: ${state.actor.preference}
-Actor goal: ${state.actor.privateGoal}
-Runtime directive: ${coordinatorDirective(state.coordinatorTrace.runtimeFrame, "runtimeFrame", "Runtime Frame")}
-Routing directive: ${coordinatorDirective(state.coordinatorTrace.actorRouting, "actorRouting", "Actor Routing")}
-Interaction policy: ${coordinatorDirective(state.coordinatorTrace.interactionPolicy, "interactionPolicy", "Interaction Policy")}
-Outcome direction: ${coordinatorDirective(state.coordinatorTrace.outcomeDirection, "outcomeDirection", "Outcome Direction")}`,
+Pre-round: ${compactText(state.roundDigest.preRound.content, scalePromptLimit(300, state.scenario.controls))}
+Context:
+${actorPromptContext(state.actor, state.scenario.controls)}
+Profile: ${state.actor.role}; ${compactText(state.actor.backgroundHistory, scalePromptLimit(220, state.scenario.controls))}; ${compactText(state.actor.personality, scalePromptLimit(160, state.scenario.controls))}; wants ${compactText(state.actor.preference, scalePromptLimit(180, state.scenario.controls))}.
+Guidance:
+${compactLines([
+  `Frame: ${coordinatorDirective(state.coordinatorTrace.runtimeFrame, "runtimeFrame", "Runtime Frame")}`,
+  `Routing: ${coordinatorDirective(state.coordinatorTrace.actorRouting, "actorRouting", "Actor Routing")}`,
+  `Policy: ${coordinatorDirective(state.coordinatorTrace.interactionPolicy, "interactionPolicy", "Interaction Policy")}`,
+  `Outcome: ${coordinatorDirective(state.coordinatorTrace.outcomeDirection, "outcomeDirection", "Outcome Direction")}`,
+], 4, scalePromptLimit(700, state.scenario.controls))}`,
   target: (state, partial) =>
     `Actor target.
 Return exactly one allowed output.
 Use an actor id when this actor should direct the action at another actor.
 Use None only when the next action is clearly solitary or has no direct recipient.
-Do not explain. Do not use actor names. Do not use Markdown. Do not add punctuation.
+No explanation, names, markdown, or punctuation.
 
-Thought: ${partial.thought}
+Thought: ${compactText(partial.thought, 350)}
 Allowed outputs:
 ${targetActors(state)
   .map((actor) => `- ${actor.id} (${actor.name}, ${actor.role})`)
@@ -50,7 +47,7 @@ ${targetActors(state)
 Return exactly one allowed output.
 Use an action id when this actor should act this round.
 Use no_action only when holding position is the best choice.
-Do not explain. Do not use action labels. Do not use Markdown. Do not add punctuation.
+No explanation, labels, markdown, or punctuation.
 
 Round: ${state.roundIndex}
 Target: ${partial.target}
@@ -58,18 +55,20 @@ Allowed outputs:
 ${state.actor.actions.map((action) => `- ${action.id} (${action.label}). ${action.expectedOutcome}`).join("\n")}
 - no_action (hold position this round)`,
   intent: (state, partial) =>
-    `Actor intent. In one sentence, explain why ${state.actor.name} chose this action for round ${state.roundIndex}.
+    `Actor intent. Return one sentence explaining ${state.actor.name}'s choice in round ${state.roundIndex}.
+${renderOutputLengthGuide(state.scenario.controls, "actor intent")}
 
 Target: ${partial.target}
 Action: ${partial.action}`,
   message: (state, partial) =>
     `Actor message. Return one short spoken line as ${state.actor.name}, or None if this actor does not speak.
-Do not explain the message. Do not wrap it in JSON.
+${renderOutputLengthGuide(state.scenario.controls, "actor message")}
+No explanation or JSON.
 
-Thought: ${partial.thought}
+Thought: ${compactText(partial.thought, scalePromptLimit(300, state.scenario.controls))}
 Target: ${partial.target}
 Action: ${partial.action}
-Intent: ${partial.intent}`,
+Intent: ${compactText(partial.intent, scalePromptLimit(240, state.scenario.controls))}`,
 }
 
 function coordinatorDirective(value: string, step: string, label: string): string {

@@ -1,9 +1,8 @@
 import { DEFAULT_EDGE_CURVATURE, indexParallelEdgesIndex } from "@sigma/edge-curve"
 import forceAtlas2 from "graphology-layout-forceatlas2"
 import type { GraphEdgeView } from "@simula/shared"
-import { ACTIVE_COLOR, ACTOR_COLORS, LARGE_GRAPH_LABEL_THRESHOLD, MUTED_EDGE_COLOR, MUTED_NODE_COLOR } from "./constants"
+import { LARGE_GRAPH_LABEL_THRESHOLD, MUTED_EDGE_COLOR, MUTED_NODE_COLOR } from "./constants"
 import { EDGE_TYPE, type ActorGraph, type GraphEdgeAttributes, type GraphNodeAttributes, type Position } from "./types"
-import { hashString } from "./math"
 
 export function reduceNode(
   graph: ActorGraph,
@@ -24,10 +23,10 @@ export function reduceNode(
   const renderLabel = shouldRenderLabel(graph, related, active, data)
   return {
     ...data,
-    color: active || node === focusNodeId ? ACTIVE_COLOR : related ? data.color : MUTED_NODE_COLOR,
+    color: active || node === focusNodeId ? graphIntensityColor(Math.max(data.interactionCount, data.degree)) : related ? data.color : MUTED_NODE_COLOR,
     label: renderLabel ? data.label : "",
     forceLabel: renderLabel,
-    size: active || node === focusNodeId ? data.size + 2 : data.size,
+    size: active || node === focusNodeId ? data.size + 4 : data.size,
     zIndex: active || node === focusNodeId ? 2 : related ? 1 : 0,
   }
 }
@@ -42,8 +41,8 @@ export function reduceEdge(
     const selected = edge === state.selectedEdgeId
     return {
       ...data,
-      color: selected ? data.color : MUTED_EDGE_COLOR,
-      size: selected ? data.size + 1.2 : Math.max(0.5, data.size * 0.35),
+      color: selected ? edgeColor(data.weight, 0.96) : MUTED_EDGE_COLOR,
+      size: selected ? data.size + 2.5 : Math.max(0.7, data.size * 0.28),
       zIndex: selected ? 2 : 0,
     }
   }
@@ -56,8 +55,8 @@ export function reduceEdge(
   const related = source === focusNodeId || target === focusNodeId
   return {
     ...data,
-    color: related ? data.color : MUTED_EDGE_COLOR,
-    size: related ? data.size + 0.8 : Math.max(0.5, data.size * 0.45),
+    color: related ? edgeColor(data.weight, 0.9) : MUTED_EDGE_COLOR,
+    size: related ? data.size + 1.8 : Math.max(0.7, data.size * 0.32),
     zIndex: related ? 1 : 0,
   }
 }
@@ -85,30 +84,41 @@ export function forceAtlasOptions(order: number): Parameters<typeof forceAtlas2.
   }
 }
 
-export function nodeSize(degree: number): number {
-  return Math.min(16, 6 + Math.sqrt(degree + 1) * 2)
-}
-
-export function actorColor(id: string): string {
-  return ACTOR_COLORS[hashString(id) % ACTOR_COLORS.length] ?? ACTOR_COLORS[0]
+export function nodeSize(degree: number, interactionCount = 0): number {
+  const structuralSize = Math.sqrt(Math.max(0, degree) + 1) * 1.4
+  const activitySize = Math.sqrt(Math.max(0, interactionCount)) * 3.2
+  return Math.min(28, 7 + structuralSize + activitySize)
 }
 
 export function edgeSize(edge: GraphEdgeView): number {
-  return Math.min(7, 1 + Math.sqrt(edge.weight) * 1.15)
+  return Math.min(13, 1.8 + Math.sqrt(Math.max(0, edge.weight)) * 2.15)
 }
 
-export function edgeAlpha(visibility: GraphEdgeView["visibility"]): number {
-  if (visibility === "public") return 0.62
-  if (visibility === "semi-public") return 0.58
-  if (visibility === "private") return 0.56
-  return 0.42
+export function edgeAlpha(weight: number): number {
+  const level = intensityLevel(weight)
+  if (level === "none") return 0.28
+  if (level === "low") return 0.56
+  if (level === "medium") return 0.7
+  if (level === "high") return 0.82
+  return 0.92
 }
 
-export function edgeColor(visibility: GraphEdgeView["visibility"], alpha = edgeAlpha(visibility)): string {
-  if (visibility === "public") return `rgba(59, 130, 246, ${alpha})`
-  if (visibility === "semi-public") return `rgba(16, 185, 129, ${alpha})`
-  if (visibility === "private") return `rgba(139, 92, 246, ${alpha})`
-  return `rgba(100, 116, 139, ${alpha})`
+export function graphIntensityColor(value: number): string {
+  const level = intensityLevel(value)
+  if (level === "none") return MUTED_NODE_COLOR
+  if (level === "low") return "#93c5fd"
+  if (level === "medium") return "#4c8df6"
+  if (level === "high") return "#6d5bd0"
+  return "#be3455"
+}
+
+export function edgeColor(weight: number, alpha = edgeAlpha(weight)): string {
+  const level = intensityLevel(weight)
+  if (level === "none") return `rgba(102, 112, 133, ${alpha})`
+  if (level === "low") return `rgba(147, 197, 253, ${alpha})`
+  if (level === "medium") return `rgba(76, 141, 246, ${alpha})`
+  if (level === "high") return `rgba(109, 91, 208, ${alpha})`
+  return `rgba(190, 52, 85, ${alpha})`
 }
 
 export function applyEdgeCurves(graph: ActorGraph): void {
@@ -141,4 +151,12 @@ function parallelEdgeCurvature(index: number, maxIndex: number): number {
   const amplitude = 3.5
   const maxCurvature = amplitude * (1 - Math.exp(-maxIndex / amplitude)) * DEFAULT_EDGE_CURVATURE
   return (maxCurvature * index) / maxIndex
+}
+
+function intensityLevel(value: number): "none" | "low" | "medium" | "high" | "veryHigh" {
+  if (value <= 0) return "none"
+  if (value <= 2) return "low"
+  if (value <= 5) return "medium"
+  if (value <= 10) return "high"
+  return "veryHigh"
 }

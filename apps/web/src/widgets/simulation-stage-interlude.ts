@@ -3,6 +3,31 @@ import type { UiTexts } from "@/lib/i18n"
 
 const ACTOR_CARD_STEPS = new Set(["role", "backgroundHistory", "personality", "preference"])
 const ROLE_NODE_IDS = new Set(["planner", "generator", "coordinator", "observer"])
+const INTERLUDE_STAGES: Array<{ id: InterludeStageId; label: string }> = [
+  { id: "planner", label: "Planner" },
+  { id: "generator", label: "Generator" },
+  { id: "actorCards", label: "Actor Cards" },
+  { id: "coordinator", label: "Coordinator" },
+  { id: "observer", label: "Observer" },
+]
+
+export type InterludeStageId = "planner" | "generator" | "actorCards" | "coordinator" | "observer"
+export type InterludeStageStatus = "waiting" | "active" | "done"
+
+export interface InterludeStage {
+  id: InterludeStageId
+  label: string
+  status: InterludeStageStatus
+}
+
+export interface InterludeStageDetail {
+  id: string
+  stageId: InterludeStageId
+  title: string
+  stepLabel: string
+  message: string
+  roundIndex?: number
+}
 
 export interface SimulationInterludeState {
   title: string
@@ -10,6 +35,9 @@ export interface SimulationInterludeState {
   stepLabel: string
   message: string
   actorCardProgress?: string
+  activeStageId?: InterludeStageId
+  stages: InterludeStage[]
+  details: InterludeStageDetail[]
 }
 
 export function buildSimulationInterlude(events: RunEvent[], t?: UiTexts): SimulationInterludeState | undefined {
@@ -38,12 +66,72 @@ export function buildSimulationInterlude(events: RunEvent[], t?: UiTexts): Simul
   const boundaryIndex = Math.max(0, latestRoundCompletedIndex)
   const signal = latestInterludeSignal(scopedEvents, boundaryIndex, t)
   const actorCardProgress = buildActorCardProgress(scopedEvents, t)
+  const stageView = buildInterludeStageView(scopedEvents, t)
   return {
     title: interludeTitle(signal.role, actorsReadyIndex >= 0, t),
     roleLabel: roleLabel(signal.role),
     stepLabel: signal.stepLabel,
     message: signal.message,
     actorCardProgress,
+    activeStageId: stageView.activeStageId,
+    stages: stageView.stages,
+    details: stageView.details,
+  }
+}
+
+export function buildInterludeStageView(
+  events: RunEvent[],
+  t?: UiTexts
+): { activeStageId?: InterludeStageId; stages: InterludeStage[]; details: InterludeStageDetail[] } {
+  const completed = new Set<InterludeStageId>()
+  const seen = new Set<InterludeStageId>()
+  const details: InterludeStageDetail[] = []
+  let activeStageId: InterludeStageId | undefined
+
+  events.forEach((event, index) => {
+    const eventStage = stageIdFromEvent(event)
+    if (eventStage) {
+      seen.add(eventStage)
+      activeStageId = eventStage
+    }
+    if (event.type === "node.completed") {
+      const completedStage = stageIdFromNodeId(event.nodeId)
+      if (completedStage) {
+        completed.add(completedStage)
+      }
+    }
+    if (event.type === "actors.ready") {
+      completed.add("actorCards")
+    }
+    if (event.type === "round.completed") {
+      completed.add("coordinator")
+    }
+
+    const detail = interludeDetailFromEvent(event, index, t)
+    if (detail) {
+      details.push(detail)
+    }
+  })
+
+  if (!activeStageId) {
+    activeStageId = "planner"
+  }
+
+  const activeIndex = INTERLUDE_STAGES.findIndex((stage) => stage.id === activeStageId)
+  const stages = INTERLUDE_STAGES.map((stage, index) => {
+    let status: InterludeStageStatus = "waiting"
+    if (completed.has(stage.id) || (activeIndex >= 0 && index < activeIndex && seen.has(stage.id))) {
+      status = "done"
+    } else if (stage.id === activeStageId) {
+      status = completed.has(stage.id) ? "done" : "active"
+    }
+    return { ...stage, status }
+  })
+
+  return {
+    activeStageId,
+    stages,
+    details: details.reverse(),
   }
 }
 
@@ -106,6 +194,85 @@ function buildActorCardProgress(events: RunEvent[], t?: UiTexts): string | undef
   const completedSteps = [...actorCards.values()].reduce((sum, steps) => sum + steps.size, 0)
   const stepUnit = completedSteps === 1 ? (t?.actorCardStepSingular ?? "step") : (t?.actorCardStepPlural ?? "steps")
   return completedSteps ? `${completedSteps} ${stepUnit}` : undefined
+}
+
+function interludeDetailFromEvent(event: RunEvent, index: number, t?: UiTexts): InterludeStageDetail | undefined {
+  if (event.type === "model.message") {
+    const parsed = parseModelMessageStep(event.content)
+    const stageId = stageIdFromModelMessage(event)
+    return {
+      id: `model-${index}`,
+      stageId,
+      title: stageId === "actorCards" ? t?.actorCards ?? "Actor Cards" : roleLabel(event.role),
+      stepLabel: parsed.step ? traceStepLabel(parsed.step) : t?.interludeThinking ?? "Thinking",
+      message: parsed.content || event.content,
+    }
+  }
+  if (event.type === "actors.ready") {
+    return {
+      id: `actors-ready-${index}`,
+      stageId: "actorCards",
+      title: t?.actorCards ?? "Actor Cards",
+      stepLabel: t?.actorCardsReady ?? "ready",
+      message: t?.interludeActorsReadyMessage?.replace("{count}", String(event.actors.length)) ?? `${event.actors.length} actor cards are ready.`,
+    }
+  }
+  if (event.type === "round.completed") {
+    return {
+      id: `round-${event.roundIndex}`,
+      stageId: "coordinator",
+      title: `${t?.roundReadyTitle ?? "Round ready"} ${event.roundIndex}`,
+      stepLabel: t?.roundReadyStep ?? "Waiting for confirmation",
+      message: t?.roundReadyMessage ?? "Review the current network state before the next round begins.",
+      roundIndex: event.roundIndex,
+    }
+  }
+  return undefined
+}
+
+function stageIdFromEvent(event: RunEvent): InterludeStageId | undefined {
+  if (event.type === "model.message") {
+    return stageIdFromModelMessage(event)
+  }
+  if (event.type === "node.started" || event.type === "node.completed" || event.type === "node.failed") {
+    return stageIdFromNodeId(event.nodeId)
+  }
+  if (event.type === "actors.ready") {
+    return "actorCards"
+  }
+  if (event.type === "actor.message") {
+    return "coordinator"
+  }
+  if (event.type === "round.completed") {
+    return "coordinator"
+  }
+  return undefined
+}
+
+function stageIdFromModelMessage(event: Extract<RunEvent, { type: "model.message" }>): InterludeStageId {
+  if (event.role === "generator" && isActorCardMessage(event.content)) {
+    return "actorCards"
+  }
+  if (event.role === "planner") return "planner"
+  if (event.role === "generator") return "generator"
+  if (event.role === "coordinator") return "coordinator"
+  if (event.role === "actor") return "coordinator"
+  if (event.role === "observer") return "observer"
+  return "coordinator"
+}
+
+function stageIdFromNodeId(nodeId: string): InterludeStageId | undefined {
+  if (nodeId === "planner") return "planner"
+  if (nodeId === "generator") return "generator"
+  if (nodeId === "coordinator") return "coordinator"
+  if (nodeId === "observer") return "observer"
+  return undefined
+}
+
+function isActorCardMessage(content: string): boolean {
+  const match = content.match(/^actor-\d+\s+([^:：]+)\s*[:：]/)
+  const step = match?.[1]?.trim()
+  return Boolean(step && ACTOR_CARD_STEPS.has(step))
 }
 
 function isActorActionMessage(event: RunEvent): boolean {

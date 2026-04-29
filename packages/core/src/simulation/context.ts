@@ -1,9 +1,15 @@
-import type { ActorContextMemory, ActorState, Interaction, LLMSettings, RoundDigest, RunEvent, ScenarioInput } from "@simula/shared"
+import type { ActorContextMemory, ActorState, Interaction, LLMSettings, RoundDigest, RunEvent, ScenarioControls, ScenarioInput } from "@simula/shared"
 import { invokeRoleTextWithMetrics } from "../llm"
 import { withPromptLanguageGuide } from "../language"
-import { DEFAULT_ACTOR_CONTEXT_TOKEN_BUDGET } from "../settings"
+import { compactLines, compactText, renderOutputLengthGuide, scalePromptLimit } from "../prompt"
+import { DEFAULT_ACTOR_CONTEXT_TOKEN_BUDGET, MAX_ACTOR_CONTEXT_TOKEN_BUDGET } from "../settings"
 
 const MAX_CONTEXT_COMPRESSION_ATTEMPTS = 5
+const ACTOR_MEMORY_PROMPT_CHARS = 240
+const ACTOR_RECENT_CONTEXT_CHARS = 360
+const CONTEXT_COMPRESSION_INPUT_CHARS = 520
+const CONTEXT_SUMMARY_CHARS = 520
+const CONTEXT_EVENT_CHARS = 280
 
 export function emptyActorContext(): ActorContextMemory {
   return {
@@ -24,24 +30,25 @@ export function contextUsedByActor(actor: ActorState): string[] {
   ].filter(Boolean).slice(-12)
 }
 
-export function actorPromptContext(actor: ActorState): string {
+export function actorPromptContext(actor: ActorState, controls?: ScenarioControls): string {
   const recent = [
     ...actor.context.public.map((entry) => `public: ${entry}`),
     ...Object.values(actor.context.semiPublic).flat().map((entry) => `semi-public/private participant only: ${entry}`),
     ...Object.values(actor.context.private).flat().map((entry) => `private participant only: ${entry}`),
     ...actor.context.solitary.map((entry) => `solitary: ${entry}`),
-  ].slice(-8)
+  ].slice(-6)
   const recentContext = recent.length ? recent.join("\n") : "No runtime context yet."
   return actor.contextSummary
-    ? `Compressed context: ${actor.contextSummary}
+    ? `Memory: ${compactText(actor.contextSummary, scalePromptLimit(ACTOR_MEMORY_PROMPT_CHARS, controls))}
 Recent context:
-${recentContext}`
+${compactLines(recentContext.split("\n"), 4, scalePromptLimit(ACTOR_RECENT_CONTEXT_CHARS, controls))}`
     : `Recent context:
-${recentContext}`
+${compactLines(recentContext.split("\n"), 4, scalePromptLimit(ACTOR_RECENT_CONTEXT_CHARS, controls))}`
 }
 
 export function resolveActorContextTokenBudget(scenario: ScenarioInput, settings: LLMSettings): number {
-  return scenario.controls.actorContextTokenBudget ?? settings.roles.actor.contextTokenBudget ?? DEFAULT_ACTOR_CONTEXT_TOKEN_BUDGET
+  const budget = scenario.controls.actorContextTokenBudget ?? settings.roles.actor.contextTokenBudget ?? DEFAULT_ACTOR_CONTEXT_TOKEN_BUDGET
+  return Math.min(budget, MAX_ACTOR_CONTEXT_TOKEN_BUDGET)
 }
 
 export async function compressActorContext(
@@ -56,20 +63,17 @@ export async function compressActorContext(
   }
 ): Promise<ActorState> {
   const context = fullActorContext(actor)
+  const tokenBudget = Math.min(input.tokenBudget, MAX_ACTOR_CONTEXT_TOKEN_BUDGET)
   for (let attempt = 1; attempt <= MAX_CONTEXT_COMPRESSION_ATTEMPTS; attempt += 1) {
     const prompt = withPromptLanguageGuide(
-      `Actor context compression for ${actor.name}.
-Return a compact first-person memory summary for this actor in no more than ${input.tokenBudget} tokens.
-Use only the context below. Preserve actionable facts, unresolved pressures, relationships, and commitments.
-Do not add facts from other actors unless they are visible in this actor's context.
+      `Compress memory for ${actor.name}. Return at most 3 short first-person lines.
+${renderOutputLengthGuide(input.scenario.controls, "actor memory")}
+Keep only actionable facts, pressure, commitment.
 
-Actor role: ${actor.role}
-Actor personality: ${actor.personality}
-Actor preference: ${actor.preference}
-Actor private goal: ${actor.privateGoal}
-Previous compressed context: ${actor.contextSummary || "None"}
-Visible context:
-${context || "No runtime context yet."}`,
+Profile: ${actor.role}; ${compactText(actor.personality, scalePromptLimit(100, input.scenario.controls))}; wants ${compactText(actor.preference, scalePromptLimit(120, input.scenario.controls))}.
+Previous: ${compactText(actor.contextSummary || "None", scalePromptLimit(220, input.scenario.controls))}
+Context:
+${context ? compactLines(context.split("\n"), 5, scalePromptLimit(CONTEXT_COMPRESSION_INPUT_CHARS, input.scenario.controls)) : "No runtime context yet."}`,
       input.scenario.language
     )
     const result = await invokeRoleTextWithMetrics(input.settings, "actor", "context", attempt, prompt)
@@ -79,14 +83,14 @@ ${context || "No runtime context yet."}`,
       timestamp: timestamp(),
       metrics: result.metrics,
     })
-    const summary = normalizeContextSummary(result.text, input.tokenBudget)
+    const summary = normalizeContextSummary(result.text, tokenBudget, input.scenario.controls)
     if (summary) {
       await input.emit({
         type: "model.message",
         runId: input.runId,
         timestamp: timestamp(),
         role: "actor",
-        content: `${actor.name} context: ${summary}`,
+        content: `${actor.name} context: ${compactText(summary, scalePromptLimit(CONTEXT_EVENT_CHARS, input.scenario.controls))}`,
       })
       return { ...actor, contextSummary: summary }
     }
@@ -181,9 +185,9 @@ function fullActorContext(actor: ActorState): string {
   ].join("\n")
 }
 
-function normalizeContextSummary(value: string, tokenBudget: number): string {
+function normalizeContextSummary(value: string, tokenBudget: number, controls: ScenarioControls): string {
   const trimmed = value.replace(/```[\s\S]*?```/g, "").replace(/\s+/g, " ").trim()
-  const maxCharacters = tokenBudget * 4
+  const maxCharacters = Math.min(tokenBudget * 2, scalePromptLimit(CONTEXT_SUMMARY_CHARS, controls))
   return trimmed.length > maxCharacters ? trimmed.slice(0, maxCharacters).trim() : trimmed
 }
 

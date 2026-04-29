@@ -66,7 +66,7 @@ export function queueEdgeAnimation(
       graph.mergeEdgeAttributes(id, {
         size: interpolate(item.fromSize, item.toSize, progress),
         alpha,
-        color: edgeColor(item.visibility, alpha),
+        color: edgeColor(item.weight, alpha),
       })
       if (progress >= 1) {
         animation.items.delete(id)
@@ -148,4 +148,3 @@ function refreshActiveNodes(
   activeNodeIdsRef.current = active
   renderer?.refresh()
 }
-

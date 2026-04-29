@@ -24,6 +24,7 @@ Scenario controls:
 | `maxRound` | actor activity round count |
 | `fastMode` | enables dependency-safe parallel work inside a run |
 | `actorContextTokenBudget` | optional actor context compression budget |
+| `outputLength` | optional LLM response length: `short`, `medium`, or `long` |
 
 ## Settings Contract
 

@@ -6,6 +6,7 @@ import type {
 } from "@simula/shared"
 import { invokeRoleText } from "../llm"
 import { withPromptLanguageGuide } from "../language"
+import { renderOutputLengthGuide } from "../prompt"
 import { validateRoleSettings } from "../settings"
 
 export async function draftScenario(
@@ -19,19 +20,19 @@ export async function draftScenario(
 }
 
 function renderStoryBuilderPrompt(request: StoryBuilderDraftRequest): string {
-  return `You are StoryBuilder for Simula, an actor-based virtual simulation system.
-Create a compact simulation-ready scenario draft as markdown/plain text.
-The scenario must describe the purpose, end condition, core situation, actor pressure, and likely interaction dynamics.
-Write concrete actor-driven material. Avoid generic creative-writing advice.
-Requested cast size: ${request.controls.numCast}.
-Requested max rounds: ${request.controls.maxRound ?? 8}.
-Allow additional cast: ${request.controls.allowAdditionalCast ? "true" : "false"}.
-Actions per visibility type: ${request.controls.actionsPerType}.
+  return `StoryBuilder for Simula.
+Draft a compact simulation scenario with purpose, end condition, core situation, actor pressure, interaction dynamics.
+${renderOutputLengthGuide(request.controls, "scenario draft")}
+Concrete actor-driven material only.
+Cast: ${request.controls.numCast}
+Max rounds: ${request.controls.maxRound ?? 8}
+Additional cast: ${request.controls.allowAdditionalCast ? "yes" : "no"}
+Actions per visibility: ${request.controls.actionsPerType}
 
 Conversation:
 ${renderConversation(request.messages)}
 
-Return only the scenario draft. Do not wrap it in code fences.`
+Return only the draft. No code fences.`
 }
 
 function renderConversation(messages: StoryBuilderMessage[]): string {

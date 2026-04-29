@@ -31,6 +31,7 @@ Optional:
 - `max_round`: positive integer, defaults to `8`
 - `fast_mode`: boolean, defaults to `false`
 - `actor_context_token_budget`: positive integer, uses the actor role default when omitted
+- `output_length`: `short`, `medium`, or `long`; defaults to `short`
 
 Example:
 
@@ -39,6 +40,7 @@ Example:
 num_cast: 8
 allow_additional_cast: true
 max_round: 8
+output_length: short
 ---
 ```
 

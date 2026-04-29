@@ -1,4 +1,4 @@
-import type { ScenarioControls, ScenarioInput } from "@simula/shared"
+import type { PromptOutputLength, ScenarioControls, ScenarioInput } from "@simula/shared"
 
 const FRONTMATTER_PATTERN = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/
 
@@ -30,7 +30,7 @@ export function parseScenarioControls(frontmatter: string): ScenarioControls {
     }
     const key = trimmed.slice(0, separatorIndex).trim()
     const value = trimmed.slice(separatorIndex + 1).trim()
-    if (!["num_cast", "allow_additional_cast", "actions_per_type", "max_round", "fast_mode", "actor_context_token_budget"].includes(key)) {
+    if (!["num_cast", "allow_additional_cast", "actions_per_type", "max_round", "fast_mode", "actor_context_token_budget", "output_length"].includes(key)) {
       throw new Error(`Unsupported scenario control: ${key}`)
     }
     values.set(key, value)
@@ -51,6 +51,7 @@ export function parseScenarioControls(frontmatter: string): ScenarioControls {
     actorContextTokenBudget: values.has("actor_context_token_budget")
       ? parsePositiveInteger(values.get("actor_context_token_budget") ?? "", "actor_context_token_budget")
       : undefined,
+    outputLength: parseOutputLength(values.get("output_length") ?? "short"),
   }
 }
 
@@ -64,6 +65,7 @@ export function normalizeScenarioControls(controls: Partial<ScenarioControls>): 
     actorContextTokenBudget: controls.actorContextTokenBudget === undefined
       ? undefined
       : parsePositiveInteger(String(controls.actorContextTokenBudget), "actor_context_token_budget"),
+    outputLength: parseOutputLength(controls.outputLength ?? "short"),
   }
 }
 
@@ -83,4 +85,11 @@ function parseBoolean(value: string): boolean {
     return false
   }
   throw new Error("allow_additional_cast must be true or false.")
+}
+
+function parseOutputLength(value: string): PromptOutputLength {
+  if (value === "short" || value === "medium" || value === "long") {
+    return value
+  }
+  throw new Error("output_length must be short, medium, or long.")
 }

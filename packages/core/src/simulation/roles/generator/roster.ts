@@ -12,7 +12,7 @@ export async function createActorRoster(
 ): Promise<ActorRosterEntry[]> {
   const expectedCount = state.scenario.controls.numCast
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const prompt = withPromptLanguageGuide(renderRosterPrompt(expectedCount, plannerDigest), state.scenario.language)
+    const prompt = withPromptLanguageGuide(renderRosterPrompt(expectedCount, plannerDigest, state.scenario.text), state.scenario.language)
     const result = await invokeRoleTextWithMetrics(state.settings, "generator", "roster", attempt, prompt)
     await emit({
       type: "model.metrics",
@@ -23,13 +23,7 @@ export async function createActorRoster(
 
     try {
       const roster = parseActorRoster(result.text, expectedCount)
-      await emit({
-        type: "model.message",
-        runId: state.runId,
-        timestamp: timestamp(),
-        role: "generator",
-        content: `roster: ${roster.map((entry) => `${entry.name} - ${entry.roleSeed}`).join("; ")}`,
-      })
+      await emitRosterMessage(state.runId, roster, emit)
       return roster
     } catch (error) {
       await emit({
@@ -48,16 +42,65 @@ export async function createActorRoster(
 }
 
 export function parseActorRoster(value: string, expectedCount: number): ActorRosterEntry[] {
-  const entries = value
-    .split("\n")
-    .map((line) => parseRosterLine(line))
-    .filter((entry): entry is Omit<ActorRosterEntry, "index"> => Boolean(entry))
-    .map((entry, index) => ({ ...entry, index: index + 1 }))
+  const semicolonEntries = parseSemicolonRoster(value)
+  const entries = semicolonEntries.length ? semicolonEntries : parseLineRoster(value)
 
   if (entries.length !== expectedCount) {
     throw new Error(`expected ${expectedCount} roster entries but received ${entries.length}`)
   }
 
+  validateUniqueRosterNames(entries)
+  return entries
+}
+
+export function renderRosterPrompt(expectedCount: number, plannerDigest: string, scenarioText: string): string {
+  return `Generator roster.
+Return exactly one line with ${expectedCount} entries.
+Format exactly: <name>: <short role>; <name>: <short role>; <name>: <short role>
+Use exact person, organization, or line names that appear in the scenario.
+If the scenario has a "Key Actors" or "주요 등장 인물" section, treat that section's bullet names as the authoritative actor candidates.
+Prefer those named actor candidates over places, meetings, channels, topics, or abstract events.
+Do not invent Korean names, generic placeholders, or new people when named scenario actors exist.
+No JSON, markdown, headings, numbering, bullets, explanations, or line breaks.
+
+Scenario:
+${scenarioText}
+
+Planner scenario digest:
+${plannerDigest}`
+}
+
+function parseSemicolonRoster(value: string): ActorRosterEntry[] {
+  return stripRosterPrefix(value)
+    .split(";")
+    .map((item) => parseRosterPair(item))
+    .filter((entry): entry is Omit<ActorRosterEntry, "index"> => Boolean(entry))
+    .map((entry, index) => ({ ...entry, index: index + 1 }))
+}
+
+function parseLineRoster(value: string): ActorRosterEntry[] {
+  return stripRosterPrefix(value)
+    .split("\n")
+    .map((line) => parseRosterLine(line))
+    .filter((entry): entry is Omit<ActorRosterEntry, "index"> => Boolean(entry))
+    .map((entry, index) => ({ ...entry, index: index + 1 }))
+}
+
+async function emitRosterMessage(
+  runId: string,
+  roster: ActorRosterEntry[],
+  emit: (event: RunEvent) => Promise<void>
+): Promise<void> {
+  await emit({
+    type: "model.message",
+    runId,
+    timestamp: timestamp(),
+    role: "generator",
+    content: `roster: ${roster.map((entry) => `${entry.name} - ${entry.roleSeed}`).join("; ")}`,
+  })
+}
+
+function validateUniqueRosterNames(entries: ActorRosterEntry[]): void {
   const seen = new Set<string>()
   for (const entry of entries) {
     const key = normalizeRosterName(entry.name)
@@ -69,20 +112,6 @@ export function parseActorRoster(value: string, expectedCount: number): ActorRos
     }
     seen.add(key)
   }
-
-  return entries
-}
-
-function renderRosterPrompt(expectedCount: number, plannerDigest: string): string {
-  return `Generator actor roster.
-Create exactly ${expectedCount} unique actor names with rough role seeds.
-Return plain text only. Do not use JSON, markdown tables, headings, or explanations.
-Format each line exactly as: <number>. <unique actor name> - <short role seed>
-Names must not repeat or describe the same person twice.
-
-Requested actors: ${expectedCount}
-Planner scenario digest:
-${plannerDigest}`
 }
 
 function parseRosterLine(line: string): Omit<ActorRosterEntry, "index"> | undefined {
@@ -104,6 +133,29 @@ function parseRosterLine(line: string): Omit<ActorRosterEntry, "index"> | undefi
     throw new Error(`invalid roster line: ${line.trim()}`)
   }
   return { name, roleSeed }
+}
+
+function parseRosterPair(value: string): Omit<ActorRosterEntry, "index"> | undefined {
+  const normalized = value.trim()
+  if (!normalized) {
+    return undefined
+  }
+
+  const separatorIndex = normalized.search(/\s*[:：]\s*/)
+  if (separatorIndex < 1) {
+    return undefined
+  }
+
+  const name = cleanRosterField(normalized.slice(0, separatorIndex))
+  const roleSeed = cleanRosterField(normalized.slice(separatorIndex + 1).replace(/^[:：]\s*/, ""))
+  if (!name || !roleSeed) {
+    return undefined
+  }
+  return { name, roleSeed }
+}
+
+function stripRosterPrefix(value: string): string {
+  return value.trim().replace(/^\s*(?:generator\s+)?(?:actor\s+)?roster\s*[:：]\s*/i, "")
 }
 
 function cleanRosterField(value: string): string {

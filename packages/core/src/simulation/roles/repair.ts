@@ -47,9 +47,9 @@ export async function repairExactChoice(input: RepairChoiceInput): Promise<strin
 }
 
 export function buildRepairChoicePrompt(input: Pick<RepairChoiceInput, "sourceRole" | "sourceStep" | "sourceId" | "invalidText" | "allowedOutputs">): string {
-  return `Repair an invalid ${input.sourceRole}.${input.sourceStep} response.
+  return `Repair ${input.sourceRole}.${input.sourceStep}.
 Return exactly one allowed output from the list.
-Do not explain. Do not use Markdown. Do not add punctuation. Do not translate the output.
+No explanation, markdown, punctuation, or translation.
 
 Source: ${input.sourceRole}${input.sourceId ? ` ${input.sourceId}` : ""}
 Invalid response:

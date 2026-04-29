@@ -11,6 +11,7 @@ import type {
 } from "@simula/shared"
 import { invokeRoleTextWithMetrics } from "../../../llm"
 import { withPromptLanguageGuide } from "../../../language"
+import { scalePromptLimit } from "../../../prompt"
 import {
   applyInteractionContext,
   applyPreRoundDigestContext,
@@ -297,7 +298,7 @@ async function runCoordinatorTextNode(
       timestamp: timestamp(),
       metrics: result.metrics,
     })
-    const response = normalizeCoordinatorText(result.text, step)
+    const response = normalizeCoordinatorText(result.text, step, state)
     if (response) {
       await emit({
         type: "model.message",
@@ -409,14 +410,15 @@ async function resolveEventInjection(
   )
 }
 
-function normalizeCoordinatorText(value: string, step: CoordinatorTraceStep): string {
+function normalizeCoordinatorText(value: string, step: CoordinatorTraceStep, state: WorkflowState): string {
   const trimmed = value.replace(/```[\s\S]*?```/g, "").replace(/\s+/g, " ").trim()
   const labels = [step, coordinatorStepLabel(step), coordinatorStepLabel(step).replace(/\s+/g, "")]
   const withoutPrefix = labels.reduce((current, label) => {
     const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
     return current.replace(new RegExp(`^\\s*(?:\\*\\*)?${escaped}(?:\\*\\*)?\\s*[:：-]\\s*`, "i"), "")
   }, trimmed)
-  return withoutPrefix.length > 1200 ? withoutPrefix.slice(0, 1200).trim() : withoutPrefix
+  const maxCharacters = scalePromptLimit(700, state.scenario.controls)
+  return withoutPrefix.length > maxCharacters ? withoutPrefix.slice(0, maxCharacters).trim() : withoutPrefix
 }
 
 function coordinatorStepLabel(step: CoordinatorTraceStep): string {

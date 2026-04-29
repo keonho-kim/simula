@@ -1,4 +1,4 @@
-import type { ScenarioControls } from "@simula/shared"
+import type { PromptOutputLength, ScenarioControls } from "@simula/shared"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -17,6 +17,13 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import type { UiTexts } from "@/lib/i18n"
 import { MarkdownContent } from "@/shared/ui/markdown-content"
@@ -115,12 +122,38 @@ export function ScenarioPreviewDialog({
               <FieldDescription>{t.maxRoundHelp}</FieldDescription>
             </Field>
             <Field>
+              <FieldLabel htmlFor="preview-output-length">{t.outputLength}</FieldLabel>
+              <Select
+                value={draft.controls.outputLength ?? "short"}
+                onValueChange={(outputLength) =>
+                  onDraftChange({
+                    ...draft,
+                    controls: {
+                      ...draft.controls,
+                      outputLength: outputLength as PromptOutputLength,
+                    },
+                  })
+                }
+              >
+                <SelectTrigger id="preview-output-length" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="short">{t.outputLengthShort}</SelectItem>
+                  <SelectItem value="medium">{t.outputLengthMedium}</SelectItem>
+                  <SelectItem value="long">{t.outputLengthLong}</SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>{t.outputLengthHelp}</FieldDescription>
+            </Field>
+            <Field>
               <FieldLabel htmlFor="preview-context-token-budget">{t.actorContextTokens}</FieldLabel>
               <Input
                 id="preview-context-token-budget"
                 type="number"
                 min={1}
-                value={draft.controls.actorContextTokenBudget ?? 2000}
+                max={400}
+                value={draft.controls.actorContextTokenBudget ?? 400}
                 onChange={(event) =>
                   onDraftChange({
                     ...draft,

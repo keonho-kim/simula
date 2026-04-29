@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useMutation } from "@tanstack/react-query"
 import { SparklesIcon } from "lucide-react"
-import type { PromptLanguage, ScenarioControls, StoryBuilderMessage } from "@simula/shared"
+import type { PromptLanguage, PromptOutputLength, ScenarioControls, StoryBuilderMessage } from "@simula/shared"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -19,6 +19,13 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { draftScenario } from "@/lib/api"
@@ -49,7 +56,8 @@ export function StoryBuilderDialog({
     actionsPerType: 3,
     maxRound: 8,
     fastMode: false,
-    actorContextTokenBudget: 2000,
+    actorContextTokenBudget: 400,
+    outputLength: "short",
   })
   const mutation = useMutation({
     mutationFn: draftScenario,
@@ -85,7 +93,7 @@ export function StoryBuilderDialog({
                 onChange={(event) => setIdea(event.target.value)}
               />
             </Field>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[120px_120px_140px_minmax(0,1fr)]">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[120px_120px_140px_150px_minmax(0,1fr)]">
               <Field>
                 <FieldLabel htmlFor="builder-cast-size">{t.castSize}</FieldLabel>
                 <Input
@@ -121,6 +129,24 @@ export function StoryBuilderDialog({
                     setControls({ ...controls, actionsPerType: Number(event.target.value) })
                   }
                 />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="builder-output-length">{t.outputLength}</FieldLabel>
+                <Select
+                  value={controls.outputLength ?? "short"}
+                  onValueChange={(outputLength) =>
+                    setControls({ ...controls, outputLength: outputLength as PromptOutputLength })
+                  }
+                >
+                  <SelectTrigger id="builder-output-length" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="short">{t.outputLengthShort}</SelectItem>
+                    <SelectItem value="medium">{t.outputLengthMedium}</SelectItem>
+                    <SelectItem value="long">{t.outputLengthLong}</SelectItem>
+                  </SelectContent>
+                </Select>
               </Field>
               <Field orientation="horizontal" className="items-start rounded-md bg-muted/40 p-3">
                 <Switch

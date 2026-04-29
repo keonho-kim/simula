@@ -45,7 +45,7 @@ export interface EdgeAnimation {
   toSize: number
   fromAlpha: number
   toAlpha: number
-  visibility: GraphEdgeView["visibility"]
+  weight: number
 }
 
 export interface EdgeAnimationState {

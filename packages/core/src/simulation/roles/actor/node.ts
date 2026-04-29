@@ -1,6 +1,7 @@
 import type { ActorTraceStep, RunEvent } from "@simula/shared"
 import { invokeRoleTextWithMetrics } from "../../../llm"
 import { withPromptLanguageGuide } from "../../../language"
+import { scalePromptLimit } from "../../../prompt"
 import { repairExactChoice } from "../repair"
 import type { ActorPromptBuilder } from "./prompts"
 import type { ActorGraphState } from "./state"
@@ -38,7 +39,7 @@ export async function runActorTextNode(
       metrics: result.metrics,
     })
 
-    const response = validate ? result.text.trim() : normalizePlainText(result.text)
+    const response = validate ? result.text.trim() : normalizePlainText(result.text, state)
     if (response && (!validate || validate(response, state))) {
       await emit({
         type: "model.message",
@@ -87,9 +88,10 @@ export async function runActorTextNode(
   throw new Error(`actor.${step} for ${state.actor.id} failed after ${MAX_ATTEMPTS} invalid responses.`)
 }
 
-function normalizePlainText(value: string): string {
+function normalizePlainText(value: string, state: ActorGraphState): string {
   const trimmed = value.replace(/```[\s\S]*?```/g, "").replace(/\s+/g, " ").trim()
-  return trimmed.length > 1200 ? trimmed.slice(0, 1200).trim() : trimmed
+  const maxCharacters = scalePromptLimit(700, state.scenario.controls)
+  return trimmed.length > maxCharacters ? trimmed.slice(0, maxCharacters).trim() : trimmed
 }
 
 function preview(value: string): string {

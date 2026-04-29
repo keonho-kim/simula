@@ -1,6 +1,7 @@
 import type { ModelRole, RoleTraceStep, RunEvent } from "@simula/shared"
 import { invokeRoleTextWithMetrics } from "../../../llm"
 import { withPromptLanguageGuide } from "../../../language"
+import { scalePromptLimit } from "../../../prompt"
 import type { WorkflowState } from "../../state"
 import type { PromptBuilder } from "./types"
 
@@ -23,7 +24,7 @@ export async function runPlainTextNode(
       timestamp: timestamp(),
       metrics: result.metrics,
     })
-    const response = normalizePlainText(result.text)
+    const response = normalizePlainText(result.text, state)
     if (response) {
       await emit({
         type: "model.message",
@@ -47,9 +48,10 @@ export async function runPlainTextNode(
   throw new Error(`${role}.${step} failed after ${MAX_ATTEMPTS} empty responses.`)
 }
 
-function normalizePlainText(value: string): string {
+function normalizePlainText(value: string, state: WorkflowState): string {
   const trimmed = value.replace(/```[\s\S]*?```/g, "").replace(/\s+/g, " ").trim()
-  return trimmed.length > 1200 ? trimmed.slice(0, 1200).trim() : trimmed
+  const maxCharacters = scalePromptLimit(700, state.scenario.controls)
+  return trimmed.length > maxCharacters ? trimmed.slice(0, maxCharacters).trim() : trimmed
 }
 
 function timestamp(): string {

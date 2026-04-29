@@ -5,8 +5,13 @@ import {
   defaultSettings,
   normalizeSettings,
   plannerDigestSummary,
+  compactLines,
+  compactText,
   renderPromptLanguageGuide,
+  renderOutputLengthGuide,
+  resolveActorContextTokenBudget,
   resolveRoleSettings,
+  scalePromptLimit,
 } from "../src"
 import { actorPrompts } from "../src/simulation/roles/actor/prompts"
 import { isValidActorAction, isValidActorTarget } from "../src/simulation/roles/actor/state"
@@ -15,7 +20,7 @@ import { coordinatorPrompts } from "../src/simulation/roles/coordinator/prompts"
 import { buildRepairChoicePrompt } from "../src/simulation/roles/repair"
 import type { ActorGraphState } from "../src/simulation/roles/actor"
 import { initialActorCardState } from "../src/simulation/roles/generator/card-state"
-import { parseActorRoster } from "../src/simulation/roles/generator/roster"
+import { parseActorRoster, renderRosterPrompt } from "../src/simulation/roles/generator/roster"
 import type { WorkflowState } from "../src/simulation/state"
 import type { SimulationState } from "@simula/shared"
 
@@ -23,7 +28,7 @@ describe("scenario parsing", () => {
   test("parses frontmatter controls and body", () => {
     const scenario = parseScenarioDocument(`---\nnum_cast: 3\nallow_additional_cast: false\n---\nA crisis unfolds.`)
 
-    expect(scenario.controls).toEqual({ numCast: 3, allowAdditionalCast: false, actionsPerType: 3, maxRound: 8, fastMode: false })
+    expect(scenario.controls).toEqual({ numCast: 3, allowAdditionalCast: false, actionsPerType: 3, maxRound: 8, fastMode: false, outputLength: "short" })
     expect(scenario.text).toBe("A crisis unfolds.")
   })
 
@@ -55,6 +60,20 @@ describe("scenario parsing", () => {
     )
 
     expect(scenario.controls.actorContextTokenBudget).toBe(1200)
+  })
+
+  test("parses output length from frontmatter", () => {
+    const scenario = parseScenarioDocument(
+      `---\nnum_cast: 2\noutput_length: medium\n---\nA crisis unfolds.`
+    )
+
+    expect(scenario.controls.outputLength).toBe("medium")
+  })
+
+  test("rejects unsupported output length", () => {
+    expect(() => parseScenarioDocument(`---\nnum_cast: 2\noutput_length: huge\n---\nA crisis unfolds.`)).toThrow(
+      "output_length must be short, medium, or long"
+    )
   })
 
   test("parses max round from frontmatter", () => {
@@ -153,6 +172,45 @@ describe("scenario parsing", () => {
     ])
   })
 
+  test("parses semicolon actor roster", () => {
+    expect(parseActorRoster("도널드 트럼프 미국 대통령: 미국 대통령; JD 밴스와 백악관 협상 라인: 협상 라인", 2)).toEqual([
+      { index: 1, name: "도널드 트럼프 미국 대통령", roleSeed: "미국 대통령" },
+      { index: 2, name: "JD 밴스와 백악관 협상 라인", roleSeed: "협상 라인" },
+    ])
+  })
+
+  test("keeps roster prompt on exact scenario names", () => {
+    const prompt = renderRosterPrompt(
+      2,
+      "Planner digest.",
+      "도널드 트럼프 미국 대통령과 JD 밴스와 백악관 협상 라인이 충돌한다."
+    )
+
+    expect(prompt).toContain("<name>: <short role>; <name>: <short role>")
+    expect(prompt).toContain("Use exact person, organization, or line names")
+    expect(prompt).toContain("authoritative actor candidates")
+    expect(prompt).toContain("places, meetings, channels")
+    expect(prompt).toContain("Do not invent Korean names")
+    expect(prompt).toContain("도널드 트럼프 미국 대통령")
+  })
+
+  test("keeps named actor section in roster prompt", () => {
+    const scenario = [
+      "Context before actors. ".repeat(120),
+      "## 주요 등장 인물",
+      "- 도널드 트럼프 미국 대통령: 예측불가 압박을 극대화한다.",
+      "- JD 밴스와 백악관 협상 라인: 최종 제안과 봉쇄 완화를 조율한다.",
+      "- 혁명수비대와 해상·프록시 라인: 해협 교란과 우회 압박을 검토한다.",
+      "## 압력과 전환점",
+      "- 이슬라마바드 고위급 협상은 결렬된 절차이지 actor가 아니다.",
+    ].join("\n")
+
+    const prompt = renderRosterPrompt(3, "Planner digest.", scenario)
+
+    expect(prompt).toContain("혁명수비대와 해상·프록시 라인")
+    expect(prompt).toContain("이슬라마바드 고위급 협상은 결렬된 절차")
+  })
+
   test("rejects duplicate actor roster names", () => {
     expect(() => parseActorRoster("1. Dana - Channel lead\n2. Dana - Consumer advocate", 2)).toThrow(
       "duplicate actor name"
@@ -163,6 +221,7 @@ describe("scenario parsing", () => {
     const state = buildActorChoiceState()
 
     expect(actorPrompts.target(state, { thought: "Pressure is visible." })).toContain("- actor-2")
+    expect(actorPrompts.target({ ...state, scenario: { ...state.scenario, controls: { ...state.scenario.controls, outputLength: "long" } } }, { thought: "Pressure is visible." })).not.toContain("detailed")
     expect(actorPrompts.action(state, { target: "actor-2" })).toContain("- actor-1-public-1")
     expect(isValidActorTarget("actor-2", state)).toBe(true)
     expect(isValidActorTarget("None", state)).toBe(true)
@@ -188,6 +247,62 @@ describe("scenario parsing", () => {
     expect(prompt).toContain("- actor-1-public-1")
     expect(prompt).toContain("- no_action")
     expect(prompt).toContain("Return exactly one allowed output")
+  })
+
+  test("compacts long prompt inputs", () => {
+    expect(compactText("alpha ".repeat(300), 80).length).toBeLessThanOrEqual(80)
+    expect(compactLines(["one", "two", "three", "four"], 2, 40)).toBe("three\nfour")
+    expect(compactLines(["alpha ".repeat(50), "beta ".repeat(50)], 2, 90).length).toBeLessThanOrEqual(90)
+  })
+
+  test("scales prompt length guide by output length", () => {
+    expect(renderOutputLengthGuide({ outputLength: "short" })).toContain("concise")
+    expect(renderOutputLengthGuide({ outputLength: "medium" })).toContain("moderate")
+    expect(renderOutputLengthGuide({ outputLength: "long" })).toContain("detailed")
+    expect(scalePromptLimit(100, { outputLength: "short" })).toBe(100)
+    expect(scalePromptLimit(100, { outputLength: "medium" })).toBe(150)
+    expect(scalePromptLimit(100, { outputLength: "long" })).toBe(200)
+  })
+
+  test("keeps actor card background prompt on planner digest", () => {
+    const simulation = buildDigestSimulation()
+    const prompt = actorCardPrompts.backgroundHistory(
+      initialActorCardState({
+        runId: "digest-run",
+        scenario: simulation.scenario,
+        settings: defaultSettings(),
+        actorIndex: 1,
+        assignedName: "Actor 1",
+        roleSeed: "Primary decision maker",
+        fullRoster: [
+          { index: 1, name: "Actor 1", roleSeed: "Primary decision maker" },
+          { index: 2, name: "Actor 2", roleSeed: "External stakeholder" },
+        ],
+        plannerDigest: plannerDigestSummary(simulation.plan, simulation.scenario.text),
+        emit: async () => {},
+      })
+    )
+
+    expect(prompt).not.toContain("Roster:")
+    expect(prompt).not.toContain("Actor 2")
+    expect(prompt).toContain("Planner scenario digest")
+    expect(prompt).toContain("Actor pressures: Stakeholders face cost.")
+  })
+
+  test("actor thought uses compact digest instead of the full scenario body", () => {
+    const state = buildActorChoiceState()
+    const scenarioMarker = "FULL_SCENARIO_BODY_SHOULD_NOT_BE_INCLUDED"
+    const prompt = actorPrompts.thought({
+      ...state,
+      scenario: {
+        ...state.scenario,
+        text: `${scenarioMarker} ${"long ".repeat(200)}`,
+      },
+      plannerDigest: "Compact digest for actor reasoning.",
+    }, {})
+
+    expect(prompt).toContain("Compact digest for actor reasoning.")
+    expect(prompt).not.toContain(scenarioMarker)
   })
 })
 
@@ -332,7 +447,7 @@ describe("settings validation", () => {
 
   test("includes actor settings", () => {
     expect(defaultSettings().roles.actor.model).toBeTruthy()
-    expect(defaultSettings().roles.actor.contextTokenBudget).toBe(2000)
+    expect(defaultSettings().roles.actor.contextTokenBudget).toBe(400)
   })
 
   test("validates actor context token budget", () => {
@@ -341,6 +456,20 @@ describe("settings validation", () => {
     settings.roles.actor.contextTokenBudget = 0
 
     expect(() => validateSettings(settings)).toThrow("contextTokenBudget for actor must be a positive integer.")
+  })
+
+  test("caps actor context token budget for compact prompts", () => {
+    const settings = defaultSettings()
+    settings.roles.actor.contextTokenBudget = 1200
+
+    expect(resolveActorContextTokenBudget({
+      text: "A crisis unfolds.",
+      controls: { numCast: 2, actionsPerType: 3, maxRound: 8, fastMode: false, allowAdditionalCast: true },
+    }, settings)).toBe(400)
+    expect(resolveActorContextTokenBudget({
+      text: "A crisis unfolds.",
+      controls: { numCast: 2, actionsPerType: 3, maxRound: 8, fastMode: false, allowAdditionalCast: true, actorContextTokenBudget: 1200 },
+    }, settings)).toBe(400)
   })
 
   test("migrates coordinator settings to actor settings", () => {

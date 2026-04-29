@@ -13,14 +13,14 @@ import {
 } from "./animation"
 import { buildNodeDegree } from "./metrics"
 import {
-  actorColor,
   applyEdgeCurves,
   edgeAlpha,
   edgeColor,
   edgeSize,
   forceAtlasOptions,
+  graphIntensityColor,
   initialPosition,
-    nodeSize,
+  nodeSize,
 } from "./styles"
 import { EDGE_TYPE, type ActorGraph, type EdgeAnimationState, type GraphEdgeAttributes, type GraphNodeAttributes, type LayoutAnimationState, type Position } from "./types"
 
@@ -73,8 +73,8 @@ export function writeGraphFrame(
       intent: node.intent,
       interactionCount: node.interactionCount,
       degree,
-      size: nodeSize(degree),
-      color: actorColor(node.id),
+      size: nodeSize(degree, node.interactionCount),
+      color: graphIntensityColor(node.interactionCount),
       x: position.x,
       y: position.y,
     }
@@ -106,7 +106,7 @@ export function writeGraphFrame(
       continue
     }
     const targetSize = edgeSize(edge)
-    const targetAlpha = edgeAlpha(edge.visibility)
+    const targetAlpha = edgeAlpha(edge.weight)
     if (graph.hasEdge(edge.id)) {
       const current = graph.getEdgeAttributes(edge.id)
       graph.mergeEdgeAttributes(edge.id, {
@@ -117,7 +117,7 @@ export function writeGraphFrame(
       })
       if (current.weight !== edge.weight || current.visibility !== edge.visibility) {
         queueEdgeAnimation(graph, renderer, edgeAnimation, edge.id, {
-          visibility: edge.visibility,
+          weight: edge.weight,
           fromSize: current.size,
           toSize: targetSize,
           fromAlpha: current.alpha,
@@ -129,7 +129,7 @@ export function writeGraphFrame(
     }
     const attributes: GraphEdgeAttributes = {
       type: EDGE_TYPE,
-      color: edgeColor(edge.visibility, 0.08),
+      color: edgeColor(edge.weight, 0.08),
       size: 0.2,
       alpha: 0.08,
       visibility: edge.visibility,
@@ -138,7 +138,7 @@ export function writeGraphFrame(
     }
     graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target, attributes)
     queueEdgeAnimation(graph, renderer, edgeAnimation, edge.id, {
-      visibility: edge.visibility,
+      weight: edge.weight,
       fromSize: attributes.size,
       toSize: targetSize,
       fromAlpha: attributes.alpha,
