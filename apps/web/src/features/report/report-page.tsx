@@ -22,6 +22,7 @@ import type { UiTexts } from "@/lib/i18n"
 import { MarkdownContent } from "@/shared/ui/markdown-content"
 import { useRunStore } from "@/store/run-store"
 import { ActorCardRail, ActorDetailDialog } from "@/widgets/actor-panel"
+import { EdgeDetailDialog } from "@/widgets/graph-view/edge-detail-dialog"
 import { ReplayDock } from "@/widgets/replay-dock"
 import { SimulationStage } from "@/widgets/simulation-stage"
 import {
@@ -46,6 +47,8 @@ interface ReportPageProps {
 export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExport }: ReportPageProps) {
   const [replayOpen, setReplayOpen] = useState(false)
   const [selectedActorId, setSelectedActorId] = useState<string>()
+  const [actorDetailOpen, setActorDetailOpen] = useState(false)
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string>()
   const [actorFilter, setActorFilter] = useState<ActorFilter>("all")
   const [systemRoleFilter, setSystemRoleFilter] = useState<ReportSystemRole>("planner")
   const liveEvents = useRunStore((state) => state.liveEvents)
@@ -68,7 +71,31 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
     ?? [...events].reverse().find((event) => event.type === "report.delta")?.content
 
   const selectActorFromTimeline = (actorId: string) => {
+    setSelectedEdgeId(undefined)
     setSelectedActorId(actorId)
+    setActorDetailOpen(true)
+  }
+  const selectActorFromRail = (actorId: string) => {
+    setSelectedEdgeId(undefined)
+    setSelectedActorId(actorId)
+    setActorDetailOpen(true)
+  }
+  const selectActorFromGraph = (actorId: string | undefined) => {
+    setSelectedEdgeId(undefined)
+    setSelectedActorId(actorId)
+    if (!actorId) {
+      setActorDetailOpen(false)
+    }
+  }
+  const expandActor = (actorId: string) => {
+    setSelectedEdgeId(undefined)
+    setSelectedActorId(actorId)
+    setActorDetailOpen(true)
+  }
+  const selectEdge = (edgeId: string | undefined) => {
+    setActorDetailOpen(false)
+    setSelectedActorId(undefined)
+    setSelectedEdgeId(edgeId)
   }
 
   return (
@@ -100,8 +127,8 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
           </div>
         </header>
 
-        <section className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)_520px] 2xl:grid-cols-[300px_minmax(0,1fr)_560px]">
-          <ActorCardRail t={t} selectedActorId={selectedActorId} onActorSelect={setSelectedActorId} />
+        <section className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)_520px]">
+          <ActorCardRail t={t} selectedActorId={selectedActorId} onActorSelect={selectActorFromRail} />
 
           <div className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60">
             <Tabs defaultValue="timeline" className="min-h-0 flex-1 gap-0">
@@ -156,13 +183,17 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
             </Tabs>
           </div>
 
-          <aside className="flex min-h-0 flex-col gap-3">
+          <aside className="flex min-h-0 flex-col gap-3 xl:col-span-2 2xl:col-span-1">
             <SimulationStage
               className="min-h-[460px]"
               graphClassName="min-h-[300px]"
               t={t}
               selectedActorId={selectedActorId}
-              onActorSelect={setSelectedActorId}
+              onActorSelect={selectActorFromGraph}
+              onActorExpand={expandActor}
+              selectedEdgeId={selectedEdgeId}
+              onEdgeSelect={selectEdge}
+              showActorPopover
               actions={
                 <Button aria-label={t.maximizeReplay} variant="ghost" size="icon" onClick={() => setReplayOpen(true)}>
                   <Maximize2Icon />
@@ -185,13 +216,23 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
               graphClassName="min-h-[58svh]"
               t={t}
               selectedActorId={selectedActorId}
-              onActorSelect={setSelectedActorId}
+              onActorSelect={selectActorFromGraph}
+              onActorExpand={expandActor}
+              selectedEdgeId={selectedEdgeId}
+              onEdgeSelect={selectEdge}
+              showActorPopover
             />
             <ReplayDock t={t} />
           </div>
         </DialogContent>
       </Dialog>
-      <ActorDetailDialog t={t} actorId={selectedActorId} onOpenChange={(open) => !open && setSelectedActorId(undefined)} />
+      <ActorDetailDialog
+        t={t}
+        actorId={selectedActorId}
+        open={actorDetailOpen}
+        onOpenChange={(open) => setActorDetailOpen(open)}
+      />
+      <EdgeDetailDialog t={t} edgeId={selectedEdgeId} onOpenChange={(open) => !open && setSelectedEdgeId(undefined)} />
     </main>
   )
 }

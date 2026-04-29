@@ -12,13 +12,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import {
+  cancelRun,
+  continueRun,
   createRun,
   fetchRun,
   fetchRuns,
   startRun,
 } from "@/lib/api"
+import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field"
+import { Switch } from "@/components/ui/switch"
 import { useRunStore } from "@/store/run-store"
+import { ActorDetailDialog } from "@/widgets/actor-panel"
 import { ActivityRail } from "@/widgets/activity-rail"
+import { EdgeDetailDialog } from "@/widgets/graph-view/edge-detail-dialog"
 import { LlmMetricsPanel } from "@/widgets/llm-metrics-panel"
 import { ReplayDock } from "@/widgets/replay-dock"
 import { SimulationStage } from "@/widgets/simulation-stage"
@@ -35,6 +41,7 @@ import { StoryBuilderDialog } from "@/features/scenario/story-builder-dialog"
 import { SettingsDialog } from "@/features/settings/settings-dialog"
 import { useLocaleText } from "@/lib/i18n"
 import { downloadExport } from "./download-export"
+import { nextRoundContinuation } from "./round-continuation"
 import { useRunEventStream } from "./use-run-event-stream"
 
 type ViewMode = "home" | "simulation" | "report"
@@ -47,6 +54,7 @@ function App() {
   const resetLiveState = useRunStore((state) => state.resetLiveState)
   const pushEvents = useRunStore((state) => state.pushEvents)
   const syncRunDetail = useRunStore((state) => state.syncRunDetail)
+  const liveEvents = useRunStore((state) => state.liveEvents)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>("home")
   const viewModeRef = useRef<ViewMode>("home")
@@ -55,8 +63,14 @@ function App() {
   const [samplePickerOpen, setSamplePickerOpen] = useState(false)
   const [runHistoryOpen, setRunHistoryOpen] = useState(false)
   const [selectedActorId, setSelectedActorId] = useState<string>()
+  const [actorDetailOpen, setActorDetailOpen] = useState(false)
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string>()
   const [reportConfirmRunId, setReportConfirmRunId] = useState<string>()
   const [scenarioPreviewOpen, setScenarioPreviewOpen] = useState(false)
+  const [autoContinue, setAutoContinue] = useState(false)
+  const [roundPromptIndex, setRoundPromptIndex] = useState<number>()
+  const [roundAction, setRoundAction] = useState<"continue" | "cancel">()
+  const [handledRoundIndexes, setHandledRoundIndexes] = useState<Set<number>>(new Set<number>())
   const uploadInputRef = useRef<HTMLInputElement>(null)
   const [scenarioDraft, setScenarioDraft] = useState<ScenarioDraft>({
     sourceName: "pasted-scenario.md",
@@ -78,6 +92,11 @@ function App() {
       await queryClient.invalidateQueries({ queryKey: ["runs"] })
       setScenarioPreviewOpen(false)
       setReportConfirmRunId(undefined)
+      setSelectedActorId(undefined)
+      setActorDetailOpen(false)
+      setSelectedEdgeId(undefined)
+      setRoundPromptIndex(undefined)
+      setHandledRoundIndexes(new Set<number>())
       viewModeRef.current = "simulation"
       setViewMode("simulation")
       await startRun(run.id)
@@ -119,6 +138,12 @@ function App() {
     )
   }, [selectedRunQuery.data, syncRunDetail])
 
+  useEffect(() => {
+    if (liveEvents.some((event) => event.type === "run.completed" || event.type === "run.failed" || event.type === "run.canceled")) {
+      setRoundPromptIndex(undefined)
+    }
+  }, [liveEvents])
+
   useRunEventStream({
     selectedRunId,
     selectedRunIdRef,
@@ -128,6 +153,24 @@ function App() {
     pushEvents,
     setReportConfirmRunId,
   })
+
+  useEffect(() => {
+    if (!selectedRunId || roundPromptIndex !== undefined) {
+      return
+    }
+    const decision = nextRoundContinuation(liveEvents, handledRoundIndexes, autoContinue)
+    if (!decision) {
+      return
+    }
+    if (decision.mode === "prompt") {
+      setRoundPromptIndex(decision.roundIndex)
+      return
+    }
+    setHandledRoundIndexes((current) => new Set(current).add(decision.roundIndex))
+    void continueRun(selectedRunId, decision.roundIndex).catch((error) => {
+      toast.error(error instanceof Error ? error.message : t.roundContinueFailed)
+    })
+  }, [autoContinue, handledRoundIndexes, liveEvents, roundPromptIndex, selectedRunId, t.roundContinueFailed])
 
   const selectedRun = runsQuery.data?.find((run) => run.id === selectedRunId)
   const selectedRunStatus = selectedRunQuery.data?.run.status ?? selectedRun?.status
@@ -140,13 +183,31 @@ function App() {
     void downloadExport(selectedRunId, kind)
   }
   const selectActor = useCallback((actorId: string | undefined) => {
+    setSelectedEdgeId(undefined)
     setSelectedActorId(actorId)
+    if (!actorId) {
+      setActorDetailOpen(false)
+    }
+  }, [])
+  const expandActor = useCallback((actorId: string) => {
+    setSelectedEdgeId(undefined)
+    setSelectedActorId(actorId)
+    setActorDetailOpen(true)
+  }, [])
+  const selectEdge = useCallback((edgeId: string | undefined) => {
+    setActorDetailOpen(false)
+    setSelectedActorId(undefined)
+    setSelectedEdgeId(edgeId)
   }, [])
 
   const selectRun = (runId: string | undefined) => {
     selectedRunIdRef.current = runId
     setSelectedActorId(undefined)
+    setActorDetailOpen(false)
+    setSelectedEdgeId(undefined)
     setReportConfirmRunId(undefined)
+    setRoundPromptIndex(undefined)
+    setHandledRoundIndexes(new Set<number>())
     setSelectedRunId(runId)
     const run = runsQuery.data?.find((item) => item.id === runId)
     if (run?.status === "completed") {
@@ -165,6 +226,44 @@ function App() {
       controls: scenarioDraft.controls,
       language: promptLanguage,
     })
+  }
+
+  const continueRound = async () => {
+    if (!selectedRunId || roundPromptIndex === undefined) {
+      return
+    }
+    const roundIndex = roundPromptIndex
+    setRoundAction("continue")
+    try {
+      setHandledRoundIndexes((current) => new Set(current).add(roundIndex))
+      setRoundPromptIndex(undefined)
+      await continueRun(selectedRunId, roundIndex)
+    } catch (error) {
+      setHandledRoundIndexes((current) => {
+        const next = new Set(current)
+        next.delete(roundIndex)
+        return next
+      })
+      setRoundPromptIndex(roundIndex)
+      toast.error(error instanceof Error ? error.message : t.roundContinueFailed)
+    } finally {
+      setRoundAction(undefined)
+    }
+  }
+
+  const cancelCurrentRun = async () => {
+    if (!selectedRunId) {
+      return
+    }
+    setRoundAction("cancel")
+    try {
+      await cancelRun(selectedRunId)
+      setRoundPromptIndex(undefined)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t.roundStopFailed)
+    } finally {
+      setRoundAction(undefined)
+    }
   }
 
   const loadScenarioFile = (file: File) => {
@@ -245,9 +344,11 @@ function App() {
           open={scenarioPreviewOpen}
           draft={scenarioDraft}
           isStarting={isStarting}
+          autoContinue={autoContinue}
           t={t}
           onOpenChange={setScenarioPreviewOpen}
           onDraftChange={setScenarioDraft}
+          onAutoContinueChange={setAutoContinue}
           onOpenSettings={() => {
             setScenarioPreviewOpen(false)
             setSettingsOpen(true)
@@ -291,12 +392,27 @@ function App() {
         <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-4 py-4">
           <LlmMetricsPanel t={t} />
           <section className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
-            <SimulationStage t={t} selectedActorId={selectedActorId} onActorSelect={selectActor} showActorPopover />
+            <SimulationStage
+              t={t}
+              selectedActorId={selectedActorId}
+              onActorSelect={selectActor}
+              onActorExpand={expandActor}
+              selectedEdgeId={selectedEdgeId}
+              onEdgeSelect={selectEdge}
+              showActorPopover
+            />
             <ActivityRail t={t} />
           </section>
         </div>
 
         <ReplayDock t={t} />
+        <ActorDetailDialog
+          t={t}
+          actorId={selectedActorId}
+          open={actorDetailOpen}
+          onOpenChange={(open) => setActorDetailOpen(open)}
+        />
+        <EdgeDetailDialog t={t} edgeId={selectedEdgeId} onOpenChange={(open) => !open && setSelectedEdgeId(undefined)} />
         <Dialog
           open={Boolean(reportConfirmRunId && reportConfirmRunId === selectedRunId)}
           onOpenChange={(open) => {
@@ -322,6 +438,40 @@ function App() {
                 }}
               >
                 {t.reportConfirmOpen}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={roundPromptIndex !== undefined} onOpenChange={() => undefined}>
+          <DialogContent showCloseButton={false}>
+            <DialogHeader>
+              <DialogTitle>{t.roundContinueTitle}</DialogTitle>
+              <DialogDescription>{t.roundContinueDescription}</DialogDescription>
+            </DialogHeader>
+            <Field orientation="horizontal" className="items-start rounded-md bg-muted/40 p-3">
+              <Switch
+                id="round-auto-continue"
+                checked={autoContinue}
+                onCheckedChange={setAutoContinue}
+              />
+              <FieldContent>
+                <FieldLabel htmlFor="round-auto-continue">{t.autoContinue}</FieldLabel>
+                <FieldDescription>{t.autoContinueHelp}</FieldDescription>
+              </FieldContent>
+            </Field>
+            <DialogFooter className="sm:items-center">
+              <Button
+                variant="outline"
+                disabled={Boolean(roundAction)}
+                onClick={() => void cancelCurrentRun()}
+              >
+                {roundAction === "cancel" ? t.roundStopPending : t.roundStop}
+              </Button>
+              <Button
+                disabled={Boolean(roundAction)}
+                onClick={() => void continueRound()}
+              >
+                {roundAction === "continue" ? t.roundContinuePending : t.roundContinue}
               </Button>
             </DialogFooter>
           </DialogContent>

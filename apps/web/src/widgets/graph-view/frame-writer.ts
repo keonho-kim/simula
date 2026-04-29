@@ -11,6 +11,7 @@ import {
   queueEdgeAnimation,
   readNodePositions,
 } from "./animation"
+import { buildNodeDegree } from "./metrics"
 import {
   actorColor,
   applyEdgeCurves,
@@ -19,7 +20,7 @@ import {
   edgeSize,
   forceAtlasOptions,
   initialPosition,
-  nodeSize,
+    nodeSize,
 } from "./styles"
 import { EDGE_TYPE, type ActorGraph, type EdgeAnimationState, type GraphEdgeAttributes, type GraphNodeAttributes, type LayoutAnimationState, type Position } from "./types"
 
@@ -62,14 +63,17 @@ export function writeGraphFrame(
     }
   }
 
+  const degreeByNode = buildNodeDegree(nodes, frame?.edges ?? [])
   nodes.forEach((node, index) => {
+    const degree = degreeByNode.get(node.id) ?? 0
     const position = nodePositions.get(node.id) ?? initialPosition(index, nodes.length)
     const attributes: GraphNodeAttributes = {
       label: node.label,
       role: node.role,
       intent: node.intent,
       interactionCount: node.interactionCount,
-      size: nodeSize(node),
+      degree,
+      size: nodeSize(degree),
       color: actorColor(node.id),
       x: position.x,
       y: position.y,
@@ -81,6 +85,7 @@ export function writeGraphFrame(
         role: attributes.role,
         intent: attributes.intent,
         interactionCount: attributes.interactionCount,
+        degree: attributes.degree,
         size: attributes.size,
         color: attributes.color,
       })
@@ -157,4 +162,3 @@ export function writeGraphFrame(
     animateNodePositions(graph, renderer, nodePositions, layoutAnimation, targetPositions, LAYOUT_ANIMATION_MS, onPositionsChanged)
   }
 }
-

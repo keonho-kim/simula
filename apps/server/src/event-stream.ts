@@ -3,6 +3,11 @@ import type { RunStore } from "@simula/core"
 
 export type Subscriptions = Map<string, Set<(event: RunEvent) => void>>
 
+interface StreamEventsOptions {
+  onSubscribe?: (runId: string) => void
+  onEmpty?: (runId: string) => void
+}
+
 export async function appendAndPublish(
   store: RunStore,
   subscriptions: Subscriptions,
@@ -22,7 +27,12 @@ export async function appendAndPublish(
   }
 }
 
-export function streamEvents(store: RunStore, subscriptions: Subscriptions, runId: string): Response {
+export function streamEvents(
+  store: RunStore,
+  subscriptions: Subscriptions,
+  runId: string,
+  options: StreamEventsOptions = {}
+): Response {
   const encoder = new TextEncoder()
   let send: ((event: RunEvent) => void) | undefined
   const stream = new ReadableStream<Uint8Array>({
@@ -35,6 +45,7 @@ export function streamEvents(store: RunStore, subscriptions: Subscriptions, runI
       const set = subscriptions.get(runId) ?? new Set<(event: RunEvent) => void>()
       set.add(send)
       subscriptions.set(runId, set)
+      options.onSubscribe?.(runId)
       controller.enqueue(encoder.encode(": connected\n\n"))
     },
     cancel() {
@@ -45,6 +56,7 @@ export function streamEvents(store: RunStore, subscriptions: Subscriptions, runI
       set.delete(send)
       if (set.size === 0) {
         subscriptions.delete(runId)
+        options.onEmpty?.(runId)
       }
     },
   })
@@ -70,4 +82,3 @@ function publish(subscriptions: Subscriptions, runId: string, event: RunEvent): 
 function formatSse(event: RunEvent): string {
   return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`
 }
-

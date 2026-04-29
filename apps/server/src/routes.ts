@@ -11,13 +11,17 @@ import { SAMPLE_ROOT } from "./config"
 import { streamEvents, type Subscriptions } from "./event-stream"
 import { listProviderModels } from "./model-discovery"
 import { json, text } from "./responses"
-import { startRun } from "./run-controller"
+import type { RoundContinuationStore } from "./round-continuation"
+import { cancelRun, continueRunRound, startRun } from "./run-controller"
 import { readSettings, writeSettings } from "./settings-store"
 
 export interface RouteContext {
   store: RunStore
   subscriptions: Subscriptions
   runningRuns: Set<string>
+  roundContinuations: RoundContinuationStore
+  onRunStreamSubscribe?: (runId: string) => void
+  onRunStreamEmpty?: (runId: string) => void
 }
 
 export async function route(context: RouteContext, request: Request, url: URL): Promise<Response> {
@@ -122,10 +126,23 @@ async function routeRunDetail(
     })
   }
   if (parts[3] === "start" && request.method === "POST") {
-    return startRun(context.store, context.subscriptions, context.runningRuns, runId)
+    return startRun(context.store, context.subscriptions, context.runningRuns, context.roundContinuations, runId)
+  }
+  if (parts[3] === "continue" && request.method === "POST") {
+    const payload = (await request.json()) as { roundIndex?: number }
+    if (!Number.isInteger(payload.roundIndex) || (payload.roundIndex ?? 0) < 1) {
+      return json({ error: "roundIndex must be a positive integer." }, { status: 400 })
+    }
+    return continueRunRound(context.runningRuns, context.roundContinuations, runId, payload.roundIndex as number)
+  }
+  if (parts[3] === "cancel" && request.method === "POST") {
+    return cancelRun(context.runningRuns, context.roundContinuations, runId)
   }
   if (parts[3] === "events" && request.method === "GET") {
-    return streamEvents(context.store, context.subscriptions, runId)
+    return streamEvents(context.store, context.subscriptions, runId, {
+      onSubscribe: context.onRunStreamSubscribe,
+      onEmpty: context.onRunStreamEmpty,
+    })
   }
   if (parts[3] === "report" && request.method === "GET") {
     return text(await context.store.readReport(runId), "text/markdown")
@@ -140,4 +157,3 @@ async function routeRunDetail(
   }
   return json({ error: "Not found" }, { status: 404 })
 }
-

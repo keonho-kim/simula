@@ -1,6 +1,6 @@
 import { DEFAULT_EDGE_CURVATURE, indexParallelEdgesIndex } from "@sigma/edge-curve"
 import forceAtlas2 from "graphology-layout-forceatlas2"
-import type { GraphEdgeView, GraphNodeView } from "@simula/shared"
+import type { GraphEdgeView } from "@simula/shared"
 import { ACTIVE_COLOR, ACTOR_COLORS, LARGE_GRAPH_LABEL_THRESHOLD, MUTED_EDGE_COLOR, MUTED_NODE_COLOR } from "./constants"
 import { EDGE_TYPE, type ActorGraph, type GraphEdgeAttributes, type GraphNodeAttributes, type Position } from "./types"
 import { hashString } from "./math"
@@ -9,20 +9,24 @@ export function reduceNode(
   graph: ActorGraph,
   node: string,
   data: GraphNodeAttributes,
-  state: { activeNodeIds: Set<string>; hoveredNodeId?: string; selectedNodeId?: string }
+  state: { activeNodeIds: Set<string>; hoveredNodeId?: string; selectedNodeId?: string; selectedEdgeId?: string }
 ): Partial<GraphNodeAttributes> {
   const focusNodeId = state.selectedNodeId ?? state.hoveredNodeId
-  const focusExists = Boolean(focusNodeId && graph.hasNode(focusNodeId))
-  const related =
-    !focusExists ||
-    node === focusNodeId ||
-    graph.hasEdge(node, focusNodeId as string) ||
-    graph.hasEdge(focusNodeId as string, node)
+  const focusNodeExists = Boolean(focusNodeId && graph.hasNode(focusNodeId))
+  const focusEdgeExists = Boolean(state.selectedEdgeId && graph.hasEdge(state.selectedEdgeId))
+  const related = focusEdgeExists
+    ? graph.source(state.selectedEdgeId as string) === node || graph.target(state.selectedEdgeId as string) === node
+    : !focusNodeExists ||
+      node === focusNodeId ||
+      graph.hasEdge(node, focusNodeId as string) ||
+      graph.hasEdge(focusNodeId as string, node)
   const active = state.activeNodeIds.has(node)
+  const renderLabel = shouldRenderLabel(graph, related, active, data)
   return {
     ...data,
     color: active || node === focusNodeId ? ACTIVE_COLOR : related ? data.color : MUTED_NODE_COLOR,
-    label: shouldRenderLabel(graph, related, active, data) ? data.label : "",
+    label: renderLabel ? data.label : "",
+    forceLabel: renderLabel,
     size: active || node === focusNodeId ? data.size + 2 : data.size,
     zIndex: active || node === focusNodeId ? 2 : related ? 1 : 0,
   }
@@ -32,8 +36,17 @@ export function reduceEdge(
   graph: ActorGraph,
   edge: string,
   data: GraphEdgeAttributes,
-  state: { hoveredNodeId?: string; selectedNodeId?: string }
+  state: { hoveredNodeId?: string; selectedNodeId?: string; selectedEdgeId?: string }
 ): Partial<GraphEdgeAttributes> {
+  if (state.selectedEdgeId) {
+    const selected = edge === state.selectedEdgeId
+    return {
+      ...data,
+      color: selected ? data.color : MUTED_EDGE_COLOR,
+      size: selected ? data.size + 1.2 : Math.max(0.5, data.size * 0.35),
+      zIndex: selected ? 2 : 0,
+    }
+  }
   const focusNodeId = state.selectedNodeId ?? state.hoveredNodeId
   if (!focusNodeId || !graph.hasNode(focusNodeId)) {
     return data
@@ -72,8 +85,8 @@ export function forceAtlasOptions(order: number): Parameters<typeof forceAtlas2.
   }
 }
 
-export function nodeSize(node: GraphNodeView): number {
-  return Math.min(14, 5 + Math.sqrt(node.interactionCount + 1) * 1.8)
+export function nodeSize(degree: number): number {
+  return Math.min(16, 6 + Math.sqrt(degree + 1) * 2)
 }
 
 export function actorColor(id: string): string {
@@ -81,7 +94,7 @@ export function actorColor(id: string): string {
 }
 
 export function edgeSize(edge: GraphEdgeView): number {
-  return Math.min(5, 1 + edge.weight * 0.7)
+  return Math.min(7, 1 + Math.sqrt(edge.weight) * 1.15)
 }
 
 export function edgeAlpha(visibility: GraphEdgeView["visibility"]): number {
@@ -113,9 +126,9 @@ function shouldRenderLabel(graph: ActorGraph, related: boolean, active: boolean,
     return true
   }
   if (graph.order > LARGE_GRAPH_LABEL_THRESHOLD) {
-    return related && data.size >= 10
+    return related && data.size >= 9
   }
-  return related || data.size >= 9
+  return related || data.size >= 8
 }
 
 function parallelEdgeCurvature(index: number, maxIndex: number): number {
@@ -129,4 +142,3 @@ function parallelEdgeCurvature(index: number, maxIndex: number): number {
   const maxCurvature = amplitude * (1 - Math.exp(-maxIndex / amplitude)) * DEFAULT_EDGE_CURVATURE
   return (maxCurvature * index) / maxIndex
 }
-

@@ -37,6 +37,7 @@ export const simulationActivityTexts = {
     runStartedLogTitle: "RUN STARTED",
     runCompletedLogTitle: "RUN COMPLETED",
     runFailedLogTitle: "RUN FAILED",
+    runCanceledLogTitle: "RUN CANCELED",
     roleNoSignal: "has not produced a signal yet.",
     roleDescriptionPlanner: "How the planner interpreted the scenario and shaped the simulation plan.",
     roleDescriptionGenerator: "How the generator expanded actors, events, and available actions.",
@@ -82,6 +83,7 @@ export const simulationActivityTexts = {
     runStartedLogTitle: "RUN STARTED",
     runCompletedLogTitle: "RUN COMPLETED",
     runFailedLogTitle: "RUN FAILED",
+    runCanceledLogTitle: "RUN CANCELED",
     roleNoSignal: "아직 생성된 신호가 없습니다.",
     roleDescriptionPlanner: "시나리오를 해석하고 시뮬레이션 계획을 구성한 방식입니다.",
     roleDescriptionGenerator: "인물, 사건, 가능한 행동을 확장한 방식입니다.",
@@ -90,4 +92,3 @@ export const simulationActivityTexts = {
     roleDescriptionRepair: "검증 또는 복구 경로에서 기록된 수정 및 재시도 신호입니다.",
   },
 } as const
-

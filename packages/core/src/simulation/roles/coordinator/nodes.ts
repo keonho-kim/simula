@@ -67,7 +67,9 @@ export function createCoordinatorStepNode(
 export async function coordinatorNode(
   state: WorkflowState,
   emit: (event: RunEvent) => Promise<void>,
-  roundDelayMs = 0
+  roundDelayMs = 0,
+  waitForNextRound?: (roundIndex: number) => Promise<void>,
+  isCanceled?: () => boolean
 ): Promise<Partial<WorkflowState>> {
   const trace = getCoordinatorTrace(state.simulation)
   const events = (state.simulation.plan?.majorEvents ?? []).map((event) => ({ ...event }))
@@ -80,13 +82,11 @@ export async function coordinatorNode(
   const contextTokenBudget = resolveActorContextTokenBudget(state.scenario, state.settings)
 
   for (let roundIndex = 1; roundIndex <= maxRound; roundIndex += 1) {
-    const injectionResult = await runCoordinatorValidatedNode(
+    throwIfCanceled(isCanceled)
+    const injectionResult = await resolveEventInjection(
       workflowSnapshot(state, actors, interactions, roundDigests, events, maxRound),
-      "eventInjection",
-      coordinatorPrompts.eventInjection,
       emit,
-      (value) => selectEventInjection(value, events),
-      () => eventInjectionAllowedOutputs(events)
+      events
     )
     coordinatorTrace = updateCoordinatorTrace(coordinatorTrace, "eventInjection", injectionResult.text, injectionResult.retries)
     const event = eventForInjection(injectionResult.text, events) ?? continuityEvent(roundIndex)
@@ -144,6 +144,7 @@ export async function coordinatorNode(
         })
       )
     )
+    throwIfCanceled(isCanceled)
     if (injectedEvent) {
       injectedEvent.status = "completed"
     }
@@ -163,6 +164,7 @@ export async function coordinatorNode(
       () => ["continue", "stop", "complete"]
     )
     coordinatorTrace = updateCoordinatorTrace(coordinatorTrace, "progressDecision", progressResult.text, progressResult.retries)
+    throwIfCanceled(isCanceled)
     if (progressResult.text === "complete") {
       stopReason = "simulation_done"
       break
@@ -209,7 +211,9 @@ export async function coordinatorNode(
         break
       }
     }
-    if (roundIndex < maxRound && roundDelayMs > 0) {
+    if (roundIndex < maxRound && waitForNextRound) {
+      await waitForNextRound(roundIndex)
+    } else if (roundIndex < maxRound && roundDelayMs > 0) {
       await sleep(roundDelayMs)
     }
   }
@@ -237,6 +241,12 @@ export async function coordinatorNode(
       worldSummary,
       stopReason,
     },
+  }
+}
+
+function throwIfCanceled(isCanceled?: () => boolean): void {
+  if (isCanceled?.()) {
+    throw new Error("Run canceled.")
   }
 }
 
@@ -317,7 +327,8 @@ async function runCoordinatorValidatedNode(
   promptBuilder: CoordinatorPromptBuilder,
   emit: (event: RunEvent) => Promise<void>,
   select: (value: string) => string | undefined,
-  allowedOutputs: (state: WorkflowState) => string[]
+  allowedOutputs: (state: WorkflowState) => string[],
+  displayValue: (value: string) => string = (value) => value
 ): Promise<{ text: string; retries: number }> {
   const invalidResponses: string[] = []
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
@@ -341,7 +352,7 @@ async function runCoordinatorValidatedNode(
         runId: state.runId,
         timestamp: timestamp(),
         role: "coordinator",
-        content: `${step}: ${selected}`,
+        content: `${step}: ${displayValue(selected)}`,
       })
       return { text: selected, retries: attempt - 1 }
     }
@@ -362,7 +373,7 @@ async function runCoordinatorValidatedNode(
         runId: state.runId,
         timestamp: timestamp(),
         role: "coordinator",
-        content: `${step}: ${repairedSelection}`,
+        content: `${step}: ${displayValue(repairedSelection)}`,
       })
       return { text: repairedSelection, retries: attempt - 1 }
     }
@@ -376,6 +387,26 @@ async function runCoordinatorValidatedNode(
     })
   }
   throw new Error(`coordinator.${step} failed after ${MAX_ATTEMPTS} invalid responses.`)
+}
+
+async function resolveEventInjection(
+  state: WorkflowState,
+  emit: (event: RunEvent) => Promise<void>,
+  events: PlannedEvent[]
+): Promise<{ text: string; retries: number }> {
+  if (!events.some((event) => event.status === "pending")) {
+    return { text: "None", retries: 0 }
+  }
+
+  return runCoordinatorValidatedNode(
+    state,
+    "eventInjection",
+    coordinatorPrompts.eventInjection,
+    emit,
+    (value) => selectEventInjection(value, events),
+    () => eventInjectionAllowedOutputs(events),
+    (value) => eventInjectionDisplayValue(value, events)
+  )
 }
 
 function normalizeCoordinatorText(value: string, step: CoordinatorTraceStep): string {
@@ -454,6 +485,14 @@ function selectEventInjection(value: string, events: PlannedEvent[]): string | u
 
 function eventInjectionAllowedOutputs(events: PlannedEvent[]): string[] {
   return [...events.filter((event) => event.status === "pending").map((event) => event.id), "None"]
+}
+
+function eventInjectionDisplayValue(value: string, events: PlannedEvent[]): string {
+  if (value === "None") {
+    return "None"
+  }
+  const event = events.find((item) => item.id === value)
+  return event ? `${event.title}. ${event.summary}` : value
 }
 
 function eventForInjection(value: string, events: PlannedEvent[]): PlannedEvent | undefined {

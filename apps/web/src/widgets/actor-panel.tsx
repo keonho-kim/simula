@@ -102,10 +102,12 @@ export function ActorCardRail({
 export function ActorDetailDialog({
   t,
   actorId,
+  open,
   onOpenChange,
 }: {
   t: UiTexts
   actorId?: string
+  open?: boolean
   onOpenChange: (open: boolean) => void
 }) {
   const [filter, setFilter] = useState<HistoryFilter>("all")
@@ -116,10 +118,11 @@ export function ActorDetailDialog({
     [actorId, filter, history]
   )
   const stats = useMemo(() => buildHistoryStats(history.filter((item) => actorId && item.id.startsWith(`${actorId}:`))), [actorId, history])
+  const dialogOpen = Boolean(actor) && (open ?? true)
 
   return (
-    <Dialog open={Boolean(actor)} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[86svh] flex-col overflow-hidden sm:max-w-[980px]">
+    <Dialog open={dialogOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="flex h-[88svh] flex-col overflow-hidden sm:max-w-[1120px]">
         {actor ? (
           <>
             <DialogHeader className="shrink-0">
@@ -128,7 +131,7 @@ export function ActorDetailDialog({
             </DialogHeader>
 
             <ScrollArea className="min-h-0 flex-1 pr-3">
-              <div className="grid gap-4 pr-3 lg:grid-cols-[320px_minmax(0,1fr)]">
+              <div className="grid gap-4 pr-3 lg:grid-cols-[280px_minmax(0,1fr)]">
                 <section className="rounded-md bg-muted/20 p-4">
                   <div className="flex items-center gap-2">
                     <BrainIcon className="size-4 text-muted-foreground" />
@@ -142,6 +145,10 @@ export function ActorDetailDialog({
                 </section>
 
                 <section className="flex min-h-0 flex-col overflow-hidden rounded-md bg-muted/20">
+                  <div className="grid gap-3 border-b border-border/70 p-3 md:grid-cols-2">
+                    <ActorSummaryField label={t.actorCurrentIntent} value={actor.intent || t.graphNoIntent} />
+                    <ActorSummaryField label={t.actorLatestActivity} value={actor.latestActivity || t.waitingForActivity} />
+                  </div>
                   <div className="grid grid-cols-4 gap-2 p-3">
                     <ActorStat label={t.actorTotal} value={stats.total} />
                     <ActorStat label={t.actorOut} value={stats.outgoing} />
@@ -266,7 +273,7 @@ function buildActorSummaries(
     const actorId = item.id.split(":")[0]
     const actor = actorId ? summaries.get(actorId) : undefined
     if (actor) {
-      actor.latestActivity = item.content
+      actor.latestActivity ||= item.content
       actor.messageCount += item.type === "message" ? 1 : 0
     }
   }
@@ -326,7 +333,7 @@ function buildActorHistory(
     addInteractionHistory(items, seen, interaction, actorNames, t)
   }
 
-  return items.sort((a, b) => historySortValue(a) - historySortValue(b))
+  return items.sort((a, b) => historySortValue(b) - historySortValue(a))
 }
 
 function addMessageHistory(
@@ -452,6 +459,15 @@ function ActorStat({ label, value }: { label: string; value: number }) {
     <div className="rounded-md bg-background/70 px-2 py-2">
       <div className="font-mono text-base font-semibold leading-none">{value}</div>
       <div className="mt-1 text-[10px] uppercase text-muted-foreground">{label}</div>
+    </div>
+  )
+}
+
+function ActorSummaryField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md bg-background/70 p-3">
+      <div className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</div>
+      <MarkdownContent compact className="mt-1 line-clamp-3 text-xs leading-5" content={value} fallback="-" />
     </div>
   )
 }

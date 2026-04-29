@@ -9,7 +9,7 @@ import type {
 } from "./model"
 import type { Interaction, StopReason } from "./simulation"
 
-export type RunStatus = "created" | "running" | "completed" | "failed"
+export type RunStatus = "created" | "running" | "completed" | "failed" | "canceled"
 
 export interface RunArtifactPaths {
   manifest: string
@@ -59,4 +59,4 @@ export type RunEvent =
   | { type: "report.delta"; runId: string; timestamp: string; content: string }
   | { type: "run.completed"; runId: string; timestamp: string; stopReason: StopReason }
   | { type: "run.failed"; runId: string; timestamp: string; error: string }
-
+  | { type: "run.canceled"; runId: string; timestamp: string }

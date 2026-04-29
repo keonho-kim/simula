@@ -73,16 +73,16 @@ export function SettingsDialog({ open, t, onOpenChange }: SettingsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88svh] gap-4 overflow-hidden sm:max-w-[1120px]">
+      <DialogContent className="max-h-[92svh] gap-4 overflow-hidden sm:max-w-[1120px]">
         <DialogHeader>
           <DialogTitle>{t.settingsTitle}</DialogTitle>
           <DialogDescription>{t.settingsDescription}</DialogDescription>
         </DialogHeader>
 
         {draft ? (
-          <div className="grid min-h-0 gap-4 md:grid-cols-[240px_minmax(0,1fr)]">
+          <div className="grid min-h-0 gap-4 md:grid-cols-[220px_minmax(0,1fr)] lg:grid-cols-[240px_minmax(0,1fr)]">
             <SettingsSidebar page={page} t={t} onSelect={setPage} />
-            <ScrollArea className="max-h-[66svh] pr-3">
+            <ScrollArea className="max-h-[58svh] pr-2 sm:pr-3 md:max-h-[66svh]">
               {page === "providers" ? (
                 <ProvidersPage
                   settings={draft}

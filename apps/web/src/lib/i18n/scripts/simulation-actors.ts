@@ -12,6 +12,8 @@ export const simulationActorTexts = {
     actorPrivateGoal: "Private goal",
     actorContextSummary: "Context summary",
     actorNoCompressedContext: "No compressed context yet.",
+    actorCurrentIntent: "Current intent",
+    actorLatestActivity: "Latest activity",
     actorTotal: "total",
     actorOut: "out",
     actorIn: "in",
@@ -43,6 +45,8 @@ export const simulationActorTexts = {
     actorPrivateGoal: "Private goal",
     actorContextSummary: "Context summary",
     actorNoCompressedContext: "아직 압축된 맥락이 없습니다.",
+    actorCurrentIntent: "현재 의도",
+    actorLatestActivity: "최신 활동",
     actorTotal: "total",
     actorOut: "out",
     actorIn: "in",
@@ -62,4 +66,3 @@ export const simulationActorTexts = {
     self: "self",
   },
 } as const
-

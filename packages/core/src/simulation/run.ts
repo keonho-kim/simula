@@ -16,6 +16,8 @@ export interface SimulationRunInput {
   settings: LLMSettings
   emit: (event: RunEvent) => Promise<void>
   roundDelayMs?: number
+  waitForNextRound?: (roundIndex: number) => Promise<void>
+  isCanceled?: () => boolean
 }
 
 export async function runSimulation(input: SimulationRunInput): Promise<SimulationState> {
@@ -43,16 +45,38 @@ export async function runSimulation(input: SimulationRunInput): Promise<Simulati
     })
   }
 
+  const throwIfCanceled = () => {
+    if (input.isCanceled?.()) {
+      throw new Error("Run canceled.")
+    }
+  }
+  const runCancelableNode = async <T>(operation: () => Promise<T>): Promise<T> => {
+    throwIfCanceled()
+    const result = await operation()
+    throwIfCanceled()
+    return result
+  }
+
   const graph = new StateGraph(WorkflowAnnotation)
-    .addNode("planner", async (state) => runStage("planner", "Planner", state, input.emit, createPlannerGraph(input.emit)))
+    .addNode("planner", async (state) =>
+      runCancelableNode(() => runStage("planner", "Planner", state, input.emit, createPlannerGraph(input.emit)))
+    )
     .addNode("generator", async (state) =>
-      runStage("generator", "Generator", state, input.emit, createGeneratorGraph(input.emit))
+      runCancelableNode(() => runStage("generator", "Generator", state, input.emit, createGeneratorGraph(input.emit)))
     )
     .addNode("coordinator", async (state) =>
-      runStage("coordinator", "Coordinator", state, input.emit, createCoordinatorGraph(input.emit, input.roundDelayMs ?? 0))
+      runCancelableNode(() =>
+        runStage(
+          "coordinator",
+          "Coordinator",
+          state,
+          input.emit,
+          createCoordinatorGraph(input.emit, input.roundDelayMs ?? 0, input.waitForNextRound, input.isCanceled)
+        )
+      )
     )
-    .addNode("observer", async (state) => runObserverStage(state, input.emit))
-    .addNode("finalization", async (state) => finalizationNode(state, input.emit))
+    .addNode("observer", async (state) => runCancelableNode(() => runObserverStage(state, input.emit)))
+    .addNode("finalization", async (state) => runCancelableNode(() => finalizationNode(state, input.emit)))
     .addEdge(START, "planner")
     .addEdge("planner", "generator")
     .addEdge("generator", "coordinator")
@@ -71,4 +95,3 @@ export async function runSimulation(input: SimulationRunInput): Promise<Simulati
   })
   return finalState
 }
-

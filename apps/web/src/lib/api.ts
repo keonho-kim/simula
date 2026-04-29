@@ -64,6 +64,17 @@ export async function startRun(runId: string): Promise<void> {
   await request(`/api/runs/${runId}/start`, { method: "POST" })
 }
 
+export async function continueRun(runId: string, roundIndex: number): Promise<void> {
+  await request(`/api/runs/${runId}/continue`, {
+    method: "POST",
+    body: JSON.stringify({ roundIndex }),
+  })
+}
+
+export async function cancelRun(runId: string): Promise<void> {
+  await request(`/api/runs/${runId}/cancel`, { method: "POST" })
+}
+
 export async function fetchSettings(): Promise<LLMSettings> {
   const data = await request<SettingsResponse>("/api/settings")
   return data.settings

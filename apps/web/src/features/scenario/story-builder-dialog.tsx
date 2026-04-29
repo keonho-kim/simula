@@ -67,7 +67,7 @@ export function StoryBuilderDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88svh] overflow-hidden sm:max-w-[920px]">
+      <DialogContent className="max-h-[92svh] overflow-hidden sm:max-w-[920px]">
         <DialogHeader>
           <DialogTitle>{t.storyBuilder}</DialogTitle>
           <DialogDescription>{t.storyBuilderDescription}</DialogDescription>
@@ -85,7 +85,7 @@ export function StoryBuilderDialog({
                 onChange={(event) => setIdea(event.target.value)}
               />
             </Field>
-            <div className="grid gap-3 sm:grid-cols-[120px_120px_140px_minmax(0,1fr)]">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[120px_120px_140px_minmax(0,1fr)]">
               <Field>
                 <FieldLabel htmlFor="builder-cast-size">{t.castSize}</FieldLabel>
                 <Input
@@ -149,7 +149,7 @@ export function StoryBuilderDialog({
                 </FieldContent>
               </Field>
             </div>
-            <Button disabled={!idea.trim() || mutation.isPending} onClick={generateDraft}>
+            <Button className="w-full sm:w-auto" disabled={!idea.trim() || mutation.isPending} onClick={generateDraft}>
               <SparklesIcon data-icon="inline-start" />
               {t.generateDraft}
             </Button>
@@ -159,10 +159,11 @@ export function StoryBuilderDialog({
             <div>
               <h3 className="text-sm font-semibold">{t.generatedDraft}</h3>
             </div>
-            <ScrollArea className="h-[390px] rounded-lg bg-background/70 p-4 ring-1 ring-border/60">
+            <ScrollArea className="h-[34svh] rounded-md bg-background/70 p-4 ring-1 ring-border/60 lg:h-[390px]">
               <MarkdownContent content={draft} fallback={t.noDraftYet} />
             </ScrollArea>
             <Button
+              className="w-full sm:w-auto"
               disabled={!draft.trim()}
               onClick={() => {
                 onUseDraft(draft, controls)

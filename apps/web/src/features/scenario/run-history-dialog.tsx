@@ -33,23 +33,25 @@ export function RunHistoryDialog({
           <DialogTitle>{t.historyPicker}</DialogTitle>
           <DialogDescription>{t.historyPickerDescription}</DialogDescription>
         </DialogHeader>
-        <ScrollArea className="h-[52svh] pr-3">
+        <ScrollArea className="h-[52svh] pr-2 sm:pr-3">
           <div className="grid gap-3">
             {runs.length ? (
               runs.map((run) => (
                 <div
                   key={run.id}
-                  className="rounded-lg bg-background/70 p-4 ring-1 ring-border/60"
+                  className="rounded-md bg-background/70 p-4 ring-1 ring-border/60"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
-                      <h3 className="truncate text-sm font-semibold">{run.scenarioName ?? run.id}</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {run.status} · {run.createdAt}
+                      <h3 className="break-words text-sm font-semibold leading-5">{run.scenarioName ?? run.id}</h3>
+                      <p className="mt-1 flex flex-wrap gap-x-1.5 gap-y-1 text-xs leading-5 text-muted-foreground">
+                        <span>{run.status}</span>
+                        <span>· {run.createdAt}</span>
                       </p>
                     </div>
                     <Button
                       variant="outline"
+                      className="w-full sm:w-auto"
                       onClick={() => {
                         onOpenRun(run.id)
                         onOpenChange(false)
@@ -62,7 +64,7 @@ export function RunHistoryDialog({
                 </div>
               ))
             ) : (
-              <div className="rounded-lg border border-dashed border-border/80 bg-muted/30 p-4 text-sm text-muted-foreground">
+              <div className="rounded-md border border-dashed border-border/80 bg-muted/30 p-4 text-sm text-muted-foreground">
                 {t.noRuns}
               </div>
             )}

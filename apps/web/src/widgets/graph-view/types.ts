@@ -14,6 +14,8 @@ export interface GraphNodeAttributes {
   x: number
   y: number
   interactionCount: number
+  degree: number
+  forceLabel?: boolean
   zIndex?: number
 }
 
@@ -51,20 +53,8 @@ export interface EdgeAnimationState {
   items: Map<string, EdgeAnimation>
 }
 
-export interface ActorSignalBadge {
-  actorId: string
-  symbol: "!" | "?"
-  step: string
-  expiresAt: number
-}
-
-export interface VisibleActorSignalBadge extends ActorSignalBadge {
-  position: NodeOverlayPosition
-}
-
 export interface NodeOverlayPosition {
   x: number
   y: number
   size: number
 }
-

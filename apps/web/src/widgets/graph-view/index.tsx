@@ -1,42 +1,49 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { EdgeCurvedArrowProgram } from "@sigma/edge-curve"
 import Graph from "graphology"
-import { CrosshairIcon, SearchIcon, XIcon } from "lucide-react"
+import { CrosshairIcon, Maximize2Icon, SearchIcon, XIcon } from "lucide-react"
 import Sigma from "sigma"
 import type { EdgeProgramType } from "sigma/rendering"
 import type { GraphTimelineFrame } from "@simula/shared"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { UiTexts } from "@/lib/i18n"
-import { useRunStore } from "@/store/run-store"
-import { cancelAnimation, cancelEdgeAnimation, updateActiveNodes } from "./graph-view/animation"
-import { MUTED_EDGE_COLOR, MUTED_NODE_COLOR, SIGNAL_BADGE_TTL_MS } from "./graph-view/constants"
-import { writeGraphFrame } from "./graph-view/frame-writer"
-import { actorPopoverStyle, nodeOverlayPosition } from "./graph-view/overlays"
-import { buildActorNameMap, parseActorModelMessage, signalSymbol } from "./graph-view/signals"
-import { reduceEdge, reduceNode } from "./graph-view/styles"
+import { cancelAnimation, cancelEdgeAnimation, updateActiveNodes } from "./animation"
+import { MUTED_EDGE_COLOR, MUTED_NODE_COLOR } from "./constants"
+import { writeGraphFrame } from "./frame-writer"
+import { actorPopoverStyle, nodeOverlayPosition } from "./overlays"
+import { reduceEdge, reduceNode } from "./styles"
 import {
   EDGE_TYPE,
   type ActorGraph,
-  type ActorSignalBadge,
   type EdgeAnimationState,
   type GraphEdgeAttributes,
   type GraphNodeAttributes,
   type LayoutAnimationState,
   type Position,
-  type VisibleActorSignalBadge,
-} from "./graph-view/types"
+} from "./types"
 
 interface GraphViewProps {
   frame?: GraphTimelineFrame
   t: UiTexts
   selectedActorId?: string
   onActorSelect: (actorId: string | undefined) => void
+  onActorExpand?: (actorId: string) => void
+  selectedEdgeId?: string
+  onEdgeSelect?: (edgeId: string | undefined) => void
   showActorPopover?: boolean
 }
 
-export function GraphView({ frame, t, selectedActorId, onActorSelect, showActorPopover = false }: GraphViewProps) {
-  const liveEvents = useRunStore((state) => state.liveEvents)
+export function GraphView({
+  frame,
+  t,
+  selectedActorId,
+  onActorSelect,
+  onActorExpand,
+  selectedEdgeId,
+  onEdgeSelect,
+  showActorPopover = false,
+}: GraphViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<Sigma<GraphNodeAttributes, GraphEdgeAttributes> | null>(null)
   const graphRef = useRef<ActorGraph | null>(null)
@@ -49,11 +56,10 @@ export function GraphView({ frame, t, selectedActorId, onActorSelect, showActorP
   const activeRefreshRef = useRef<number | undefined>(undefined)
   const hoveredNodeRef = useRef<string | undefined>(undefined)
   const selectedNodeRef = useRef<string | undefined>(undefined)
+  const selectedEdgeRef = useRef<string | undefined>(undefined)
   const activeNodeIdsRef = useRef<Set<string>>(new Set())
   const [hoveredNodeId, setHoveredNodeId] = useState<string>()
   const [overlayRevision, setOverlayRevision] = useState(0)
-  const [signalBadges, setSignalBadges] = useState<Record<string, ActorSignalBadge>>({})
-  const [visibleSignalBadges, setVisibleSignalBadges] = useState<VisibleActorSignalBadge[]>([])
   const [selectedPopoverStyle, setSelectedPopoverStyle] = useState<CSSProperties>()
   const [query, setQuery] = useState("")
   const deferredQuery = useDeferredValue(query)
@@ -71,7 +77,6 @@ export function GraphView({ frame, t, selectedActorId, onActorSelect, showActorP
       .slice(0, 6)
   }, [deferredQuery, frame])
 
-  const actorNames = useMemo(() => buildActorNameMap(frame?.nodes ?? [], liveEvents), [frame?.nodes, liveEvents])
   const selectedActor = useMemo(
     () => frame?.nodes.find((node) => node.id === selectedActorId),
     [frame?.nodes, selectedActorId]
@@ -97,16 +102,23 @@ export function GraphView({ frame, t, selectedActorId, onActorSelect, showActorP
   }, [requestOverlayRefresh])
 
   const selectAndFocusNode = useCallback((nodeId: string) => {
+    onEdgeSelect?.(undefined)
     onActorSelect(nodeId)
     focusNode(nodeId)
-  }, [focusNode, onActorSelect])
+  }, [focusNode, onActorSelect, onEdgeSelect])
+
+  const selectEdge = useCallback((edgeId: string) => {
+    onActorSelect(undefined)
+    onEdgeSelect?.(edgeId)
+  }, [onActorSelect, onEdgeSelect])
 
   useEffect(() => {
     selectedNodeRef.current = selectedActorId
     hoveredNodeRef.current = hoveredNodeId
+    selectedEdgeRef.current = selectedEdgeId
     rendererRef.current?.refresh()
     requestOverlayRefresh()
-  }, [hoveredNodeId, requestOverlayRefresh, selectedActorId])
+  }, [hoveredNodeId, requestOverlayRefresh, selectedActorId, selectedEdgeId])
 
   useEffect(() => {
     const renderer = rendererRef.current
@@ -117,73 +129,13 @@ export function GraphView({ frame, t, selectedActorId, onActorSelect, showActorP
       const selectedPosition = nodeOverlayPosition(renderer, graph, selectedActorId)
       setSelectedPopoverStyle(selectedPosition ? actorPopoverStyle(renderer, selectedPosition) : undefined)
     }
-
-    const now = Date.now()
-    const nextBadges = Object.values(signalBadges)
-      .filter((badge) => badge.expiresAt > now)
-      .map((badge) => {
-        const position = nodeOverlayPosition(renderer, graph, badge.actorId)
-        return position ? { ...badge, position } : undefined
-      })
-      .filter((badge): badge is VisibleActorSignalBadge => Boolean(badge))
-    setVisibleSignalBadges(nextBadges)
-  }, [overlayRevision, selectedActorId, signalBadges])
+  }, [overlayRevision, selectedActorId])
 
   useEffect(() => {
     if (selectedActorId) {
       focusNode(selectedActorId)
     }
   }, [focusNode, selectedActorId])
-
-  useEffect(() => {
-    const now = Date.now()
-    const nextBadges = new Map<string, ActorSignalBadge>()
-    for (const event of liveEvents.slice(-50)) {
-      if (event.type !== "model.message" || event.role !== "actor") {
-        continue
-      }
-      const timestamp = Date.parse(event.timestamp)
-      if (!Number.isFinite(timestamp) || now - timestamp > SIGNAL_BADGE_TTL_MS || timestamp - now > 10_000) {
-        continue
-      }
-      const parsed = parseActorModelMessage(event.content, actorNames)
-      if (!parsed) {
-        continue
-      }
-      nextBadges.set(parsed.actorId, {
-        actorId: parsed.actorId,
-        symbol: signalSymbol(parsed.step),
-        step: parsed.step,
-        expiresAt: timestamp + SIGNAL_BADGE_TTL_MS,
-      })
-    }
-    if (!nextBadges.size) {
-      return
-    }
-    setSignalBadges((current) => {
-      const next = { ...current }
-      for (const [actorId, badge] of nextBadges) {
-        next[actorId] = badge
-      }
-      return next
-    })
-  }, [actorNames, liveEvents])
-
-  useEffect(() => {
-    const badges = Object.values(signalBadges)
-    if (!badges.length) {
-      return
-    }
-    const nextExpiry = Math.min(...badges.map((badge) => badge.expiresAt))
-    const timeoutId = window.setTimeout(() => {
-      const now = Date.now()
-      setSignalBadges((current) => Object.fromEntries(
-        Object.entries(current).filter(([, badge]) => badge.expiresAt > now)
-      ))
-      requestOverlayRefresh()
-    }, Math.max(0, nextExpiry - Date.now()) + 50)
-    return () => window.clearTimeout(timeoutId)
-  }, [requestOverlayRefresh, signalBadges])
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -202,22 +154,24 @@ export function GraphView({ frame, t, selectedActorId, onActorSelect, showActorP
       edgeProgramClasses: {
         [EDGE_TYPE]: EdgeCurvedArrowProgram as unknown as EdgeProgramType<GraphNodeAttributes, GraphEdgeAttributes>,
       },
-      enableEdgeEvents: false,
+      enableEdgeEvents: true,
       labelColor: { color: "#172033" },
-      labelDensity: 0.08,
+      labelDensity: 0.12,
       labelFont: "Geist Variable, sans-serif",
-      labelGridCellSize: 80,
-      labelRenderedSizeThreshold: 9,
+      labelGridCellSize: 64,
+      labelRenderedSizeThreshold: 7,
       renderEdgeLabels: false,
       zIndex: true,
       nodeReducer: (node, data) => reduceNode(graph, node, data, {
         activeNodeIds: activeNodeIdsRef.current,
         hoveredNodeId: hoveredNodeRef.current,
         selectedNodeId: selectedNodeRef.current,
+        selectedEdgeId: selectedEdgeRef.current,
       }),
       edgeReducer: (edge, data) => reduceEdge(graph, edge, data, {
         hoveredNodeId: hoveredNodeRef.current,
         selectedNodeId: selectedNodeRef.current,
+        selectedEdgeId: selectedEdgeRef.current,
       }),
     })
 
@@ -227,7 +181,11 @@ export function GraphView({ frame, t, selectedActorId, onActorSelect, showActorP
     renderer.on("enterNode", ({ node }) => setHoveredNodeId(node))
     renderer.on("leaveNode", () => setHoveredNodeId(undefined))
     renderer.on("clickNode", ({ node }) => selectAndFocusNode(node))
-    renderer.on("clickStage", () => onActorSelect(undefined))
+    renderer.on("clickEdge", ({ edge }) => selectEdge(edge))
+    renderer.on("clickStage", () => {
+      onActorSelect(undefined)
+      onEdgeSelect?.(undefined)
+    })
 
     return () => {
       cancelAnimation(layoutAnimation)
@@ -241,7 +199,7 @@ export function GraphView({ frame, t, selectedActorId, onActorSelect, showActorP
       rendererRef.current = null
       graphRef.current = null
     }
-  }, [onActorSelect, requestOverlayRefresh, selectAndFocusNode])
+  }, [onActorSelect, onEdgeSelect, requestOverlayRefresh, selectAndFocusNode, selectEdge])
 
   useEffect(() => {
     if (!graphRef.current) {
@@ -307,17 +265,6 @@ export function GraphView({ frame, t, selectedActorId, onActorSelect, showActorP
 
       <div ref={containerRef} className="h-full min-h-[520px] bg-[radial-gradient(circle_at_center,#f8fafc_1px,transparent_1px)] [background-size:24px_24px]" />
 
-      {visibleSignalBadges.map((badge) => (
-        <div
-          key={badge.actorId}
-          className="pointer-events-none absolute z-20 flex size-7 -translate-x-1/2 -translate-y-full items-center justify-center rounded-full border border-white bg-[#facc15] font-mono text-sm font-bold text-[#172033] shadow-[0_8px_20px_rgba(23,32,51,0.18)]"
-          style={{ left: badge.position.x, top: badge.position.y - badge.position.size - 10 }}
-          aria-label={`${t.graphActorSignal}: ${badge.step}`}
-        >
-          {badge.symbol}
-        </div>
-      ))}
-
       {showActorPopover && selectedActor && selectedPopoverStyle ? (
         <div
           className="absolute z-20 rounded-md border border-border/80 bg-white/95 p-3 text-left shadow-[0_12px_32px_rgba(23,32,51,0.14)] backdrop-blur"
@@ -328,8 +275,25 @@ export function GraphView({ frame, t, selectedActorId, onActorSelect, showActorP
               <p className="truncate text-sm font-semibold text-foreground">{selectedActor.label}</p>
               <p className="mt-1 truncate text-xs text-muted-foreground">{selectedActor.role}</p>
             </div>
-            <div className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-              {selectedActor.interactionCount}
+            <div className="flex shrink-0 items-center gap-1">
+              <div className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                {selectedActor.interactionCount}
+              </div>
+              {onActorExpand ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 rounded-sm"
+                  aria-label={t.actorExpand}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onActorExpand(selectedActor.id)
+                  }}
+                >
+                  <Maximize2Icon className="size-3.5" />
+                </Button>
+              ) : null}
             </div>
           </div>
           <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">

@@ -96,7 +96,7 @@ export class RunStore {
       encoding: "utf8",
       flag: "a",
     })
-    if (event.type === "run.completed" || event.type === "run.failed") {
+    if (event.type === "run.completed" || event.type === "run.failed" || event.type === "run.canceled") {
       await this.flushTimeline(event.runId)
     }
     if (event.type === "graph.delta") {
@@ -203,4 +203,3 @@ export class RunStore {
     await writeFile(this.path(runId, fileName), `${JSON.stringify(value, null, 2)}\n`, "utf8")
   }
 }
-

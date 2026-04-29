@@ -19,7 +19,7 @@ export function buildSimulationInterlude(events: RunEvent[], t?: UiTexts): Simul
   }
 
   const scopedEvents = events.slice(runStartedIndex)
-  if (scopedEvents.some((event) => event.type === "run.completed" || event.type === "run.failed")) {
+  if (scopedEvents.some((event) => event.type === "run.completed" || event.type === "run.failed" || event.type === "run.canceled")) {
     return undefined
   }
 
@@ -116,11 +116,18 @@ function isActorActionMessage(event: RunEvent): boolean {
 }
 
 function parseModelMessageStep(content: string): { step: string; content: string } {
-  const match = content.match(/^\s*(.+?)\s*[:：]\s*([\s\S]+)$/)
+  const normalized = stripRolePrefix(content)
+  const match = normalized.match(/^\s*(.+?)\s*[:：]\s*([\s\S]+)$/)
   const rawLabel = match?.[1]?.trim() ?? ""
-  const message = match?.[2]?.trim() ?? content.trim()
+  const message = stripRolePrefix(match?.[2]?.trim() ?? normalized.trim())
   const step = rawLabel.split(/\s+/).at(-1) ?? ""
   return { step, content: message }
+}
+
+function stripRolePrefix(content: string): string {
+  return content
+    .replace(/^\s*(?:Planner|Generator|Coordinator|Observer|Actor|Repair)\s*[:：]\s*/i, "")
+    .trim()
 }
 
 function interludeTitle(role: ModelRole, actorsReady: boolean, t?: UiTexts): string {

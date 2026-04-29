@@ -1,7 +1,7 @@
 import type { RoleTraceStep, SimulationRole, PlannerTraceStep, CoordinatorTraceStep } from "./model"
 import type { ScenarioInput } from "./scenario"
 
-export type StopReason = "" | "simulation_done" | "no_progress" | "failed"
+export type StopReason = "" | "simulation_done" | "no_progress" | "failed" | "canceled"
 export type ActionVisibility = "public" | "semi-public" | "private" | "solitary"
 export type ActorDecisionType = "action" | "no_action"
 
@@ -159,4 +159,3 @@ export interface SimulationState {
   stopReason: StopReason
   errors: string[]
 }
-

@@ -31,9 +31,11 @@ interface ScenarioPreviewDialogProps {
   open: boolean
   draft: ScenarioDraft
   isStarting: boolean
+  autoContinue: boolean
   t: UiTexts
   onOpenChange: (open: boolean) => void
   onDraftChange: (draft: ScenarioDraft) => void
+  onAutoContinueChange: (autoContinue: boolean) => void
   onOpenSettings: () => void
   onStart: () => void
 }
@@ -42,9 +44,11 @@ export function ScenarioPreviewDialog({
   open,
   draft,
   isStarting,
+  autoContinue,
   t,
   onOpenChange,
   onDraftChange,
+  onAutoContinueChange,
   onOpenSettings,
   onStart,
 }: ScenarioPreviewDialogProps) {
@@ -52,26 +56,27 @@ export function ScenarioPreviewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88svh] overflow-hidden sm:max-w-[880px]">
+      <DialogContent className="max-h-[92svh] overflow-hidden sm:max-w-[880px]">
         <DialogHeader>
           <DialogTitle>{t.scenarioPreview}</DialogTitle>
           <DialogDescription>{t.scenarioPreviewDescription}</DialogDescription>
         </DialogHeader>
 
-        <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
+        <div className="grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_250px]">
           <div className="flex min-h-0 flex-col gap-3">
             <div className="min-w-0">
               <h3 className="text-sm font-semibold">{t.scenarioText}</h3>
-              <p className="mt-1 truncate text-xs text-muted-foreground">
+              <p className="mt-1 break-all text-xs leading-5 text-muted-foreground">
                 {draft.sourceName}
               </p>
             </div>
-            <ScrollArea className="h-[52svh] rounded-lg bg-background/70 p-4 ring-1 ring-border/60">
+            <ScrollArea className="h-[34svh] rounded-md bg-background/70 p-4 ring-1 ring-border/60 lg:h-[52svh]">
               <MarkdownContent content={draft.text} />
             </ScrollArea>
           </div>
 
-          <FieldGroup>
+          <ScrollArea className="max-h-[32svh] pr-2 lg:max-h-none lg:pr-0">
+          <FieldGroup className="pr-1 lg:pr-0">
             <Field>
               <FieldLabel htmlFor="preview-num-cast">{t.castSize}</FieldLabel>
               <Input
@@ -160,10 +165,22 @@ export function ScenarioPreviewDialog({
                 <FieldDescription>{t.fastModeHelp}</FieldDescription>
               </FieldContent>
             </Field>
+            <Field orientation="horizontal" className="items-start rounded-md bg-muted/40 p-3">
+              <Switch
+                id="preview-auto-continue"
+                checked={autoContinue}
+                onCheckedChange={onAutoContinueChange}
+              />
+              <FieldContent>
+                <FieldLabel htmlFor="preview-auto-continue">{t.autoContinue}</FieldLabel>
+                <FieldDescription>{t.autoContinueHelp}</FieldDescription>
+              </FieldContent>
+            </Field>
           </FieldGroup>
+          </ScrollArea>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="sm:items-center">
           <Button variant="outline" onClick={onOpenSettings}>
             {t.settings}
           </Button>

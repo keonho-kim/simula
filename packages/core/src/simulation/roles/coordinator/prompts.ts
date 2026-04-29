@@ -40,14 +40,27 @@ Interaction policy: ${partial.interactionPolicy}`,
     const eventLines = pendingEvents.length
       ? pendingEvents.map((event) => `- ${event.id}: ${event.title}. ${event.summary}`).join("\n")
       : "- None"
-    return `Coordinator event injection.
-Choose one pending major event to inject into this round, or return None.
+    const recentInteractions = current.simulation.interactions
+      .filter((interaction) => interaction.roundIndex >= Math.max(1, roundIndex - 2))
+      .map((interaction) => `- R${interaction.roundIndex} ${interaction.content} Intent: ${interaction.intent}`)
+    const recentDigests = current.simulation.roundDigests.slice(-2).map((digest) => {
+      const injectedEvent = current.simulation.plan?.majorEvents.find((event) => event.id === digest.injectedEventId)
+      const eventLabel = injectedEvent ? `${injectedEvent.title}. ${injectedEvent.summary}` : "None"
+      return `- R${digest.roundIndex} injected event: ${eventLabel}; digest: ${digest.preRound.content}`
+    })
+    return `Coordinator event timing.
+Choose whether one pending major event is appropriate for the current moment, or return None.
 Return exactly one allowed output: an event id from the list, or None.
 Do not explain. Do not use event titles. Do not use Markdown. Do not add punctuation.
 
-Round: ${roundIndex}
+Current round: ${roundIndex}
+Max round: ${current.scenario.controls.maxRound}
 Pending events:
-${eventLines}`
+${eventLines}
+Recent interactions from the last two rounds:
+${recentInteractions.length ? recentInteractions.join("\n") : "- None"}
+Recent round digests and injected events:
+${recentDigests.length ? recentDigests.join("\n") : "- None"}`
   },
   progressDecision: (current) => {
     const roundIndex = current.simulation.roundDigests.length

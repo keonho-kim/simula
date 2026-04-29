@@ -34,6 +34,9 @@ export function buildLogItems(events: RunEvent[], t: UiTexts): LogItem[] {
     if (event.type === "run.failed") {
       return [{ id, level: "error", title: t.runFailedLogTitle, body: event.error, timestamp: event.timestamp }]
     }
+    if (event.type === "run.canceled") {
+      return [{ id, level: "warn", title: t.runCanceledLogTitle, body: "canceled", timestamp: event.timestamp }]
+    }
     if (event.type === "node.failed") {
       return [{ id, level: "error", title: event.label, body: event.error, timestamp: event.timestamp }]
     }

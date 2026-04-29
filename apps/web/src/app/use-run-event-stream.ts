@@ -18,6 +18,7 @@ const eventTypes: RunEvent["type"][] = [
   "report.delta",
   "run.completed",
   "run.failed",
+  "run.canceled",
 ]
 
 interface UseRunEventStreamInput {
@@ -66,7 +67,7 @@ export function useRunEventStream({
         ) {
           setReportConfirmRunId(event.runId)
         }
-        if (event.type === "run.completed" || event.type === "run.failed") {
+        if (event.type === "run.completed" || event.type === "run.failed" || event.type === "run.canceled") {
           void queryClient.invalidateQueries({ queryKey: ["runs"] })
           void queryClient.invalidateQueries({ queryKey: ["runs", selectedRunId] })
         }

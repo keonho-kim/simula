@@ -37,6 +37,20 @@ describe("buildSimulationInterlude", () => {
     expect(interlude?.actorCardProgress).toBe("ready")
   })
 
+  test("removes repeated role prefixes from interlude model messages", () => {
+    const events = [
+      runStarted(),
+      actorsReady(),
+      nodeStarted("coordinator", "Coordinator"),
+      modelMessage("coordinator", "Coordinator: runtimeFrame: Coordinator: The round is being framed."),
+    ]
+
+    const interlude = buildSimulationInterlude(events)
+
+    expect(interlude?.stepLabel).toBe("Runtime Frame")
+    expect(interlude?.message).toBe("The round is being framed.")
+  })
+
   test("hides the overlay once the first actor action starts", () => {
     const events = [
       runStarted(),
