@@ -1,5 +1,4 @@
 # Design System: Simula
-**Project ID:** local-simula
 
 ## 1. Visual Theme & Atmosphere
 

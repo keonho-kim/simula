@@ -36,10 +36,21 @@ export interface ActorAction {
 }
 
 export interface ActorContextMemory {
-  public: string[]
-  semiPublic: Record<string, string[]>
-  private: Record<string, string[]>
-  solitary: string[]
+  visible: ActorVisibleContextEntry[]
+}
+
+export type ActorVisibleContextKind = "event" | "out" | "in" | "observed" | "self"
+
+export interface ActorVisibleContextEntry {
+  id: string
+  kind: ActorVisibleContextKind
+  roundIndex: number
+  content: string
+  decisionType?: ActorDecisionType
+  visibility?: ActionVisibility
+  sourceActorId?: string
+  targetActorIds?: string[]
+  eventId?: string
 }
 
 export interface ActorDecision {
@@ -58,8 +69,16 @@ export interface PlannedEvent {
   id: string
   title: string
   summary: string
-  status: "pending" | "active" | "completed" | "missed"
+  status: "pending" | "active" | "partial" | "completed" | "missed"
   participantIds: string[]
+}
+
+export interface InjectedEvent {
+  id: string
+  roundIndex: number
+  sourceEventId: string
+  title: string
+  summary: string
 }
 
 export interface ScenarioDigest {
@@ -130,6 +149,7 @@ export interface CoordinatorTrace {
   interactionPolicy: string
   outcomeDirection: string
   eventInjection: string
+  eventResolution: string
   progressDecision: string
   extensionDecision: string
   retryCounts: Record<CoordinatorTraceStep, number>

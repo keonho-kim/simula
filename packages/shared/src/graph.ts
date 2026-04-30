@@ -8,6 +8,14 @@ export interface GraphNodeView {
   interactionCount: number
 }
 
+export interface ActorReadyView extends GraphNodeView {
+  backgroundHistory?: string
+  personality?: string
+  preference?: string
+  privateGoal?: string
+  contextSummary?: string
+}
+
 export interface GraphEdgeView {
   id: string
   source: string
@@ -28,4 +36,3 @@ export interface GraphTimelineFrame {
   logRefs: string[]
   layoutRoundIndex?: number
 }
-

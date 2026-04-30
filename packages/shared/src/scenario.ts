@@ -1,5 +1,6 @@
 export type PromptLanguage = "en" | "ko"
 export type PromptOutputLength = "short" | "medium" | "long"
+export type ScenarioLoadLevel = "low" | "middle" | "high"
 
 export interface ScenarioControls {
   numCast: number
@@ -9,6 +10,7 @@ export interface ScenarioControls {
   fastMode: boolean
   actorContextTokenBudget?: number
   outputLength?: PromptOutputLength
+  loadLevel?: ScenarioLoadLevel
 }
 
 export interface ScenarioInput {

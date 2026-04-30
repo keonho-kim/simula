@@ -23,8 +23,8 @@ export type CoordinatorTraceStep =
   | "interactionPolicy"
   | "outcomeDirection"
   | "eventInjection"
+  | "eventResolution"
   | "progressDecision"
   | "extensionDecision"
 export type GeneratorRosterStep = "roster"
 export type ActorCardStep = "role" | "backgroundHistory" | "personality" | "preference"
-

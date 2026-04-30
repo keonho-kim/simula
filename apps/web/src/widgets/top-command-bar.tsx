@@ -1,4 +1,5 @@
 import {
+  ArrowRightIcon,
   HomeIcon,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -7,14 +8,18 @@ import type { UiTexts } from "@/lib/i18n"
 
 interface TopCommandBarProps {
   selectedRunStatus?: string
+  showReportShortcut?: boolean
   t: UiTexts
   onHome: () => void
+  onReport?: () => void
 }
 
 export function TopCommandBar({
   selectedRunStatus,
+  showReportShortcut = false,
   t,
   onHome,
+  onReport,
 }: TopCommandBarProps) {
   return (
     <header className="sticky top-0 z-30 -mx-4 border-b border-border/60 bg-background/92 px-4 py-3 backdrop-blur lg:-mx-6 lg:px-6">
@@ -39,6 +44,12 @@ export function TopCommandBar({
             </p>
           </div>
         </div>
+        {showReportShortcut && onReport ? (
+          <Button className="rounded-md uppercase tracking-normal" onClick={onReport}>
+            {t.report}
+            <ArrowRightIcon data-icon="inline-end" />
+          </Button>
+        ) : null}
       </div>
     </header>
   )

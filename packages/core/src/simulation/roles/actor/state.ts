@@ -8,7 +8,7 @@ import type {
   RoundDigest,
   ScenarioInput,
 } from "@simula/shared"
-import { contextUsedByActor } from "../../context"
+import { contextUsedByActor } from "../../actor-memory"
 
 export interface ActorTrace {
   thought: string
@@ -70,8 +70,6 @@ export function applyActorTraceStep(
 
 export function buildActorDecision(state: ActorGraphState): ActorDecision {
   const selectedAction = normalizeActorAction(state.trace.action, state)
-  const selectedTarget = normalizeActorTarget(state.trace.target, state)
-  const message = normalizeActorMessage(state.trace.message)
   if (!selectedAction || selectedAction === "no_action") {
     return {
       actorId: state.actor.id,
@@ -79,7 +77,6 @@ export function buildActorDecision(state: ActorGraphState): ActorDecision {
       visibility: "solitary",
       targetActorIds: [],
       intent: state.trace.intent,
-      message,
       expectation: `Hold position while considering ${state.coordinatorTrace.outcomeDirection.toLowerCase()}.`,
       contextUsed: contextUsedByActor(state.actor),
     }
@@ -89,6 +86,11 @@ export function buildActorDecision(state: ActorGraphState): ActorDecision {
   if (!action) {
     throw new Error(`actor.${state.actor.id} selected an unknown action.`)
   }
+  const selectedTarget = normalizeActorTarget(state.trace.target, state)
+  if (action.visibility !== "solitary" && (!selectedTarget || selectedTarget === "none")) {
+    throw new Error(`actor.${state.actor.id} selected ${action.id} without a target.`)
+  }
+  const message = normalizeActorMessage(state.trace.message)
   const targetActorIds =
     action.visibility === "solitary" || selectedTarget === "none" || !selectedTarget ? [] : [selectedTarget]
   return {
@@ -130,11 +132,33 @@ export function normalizeActorMessage(value: string): string | undefined {
 }
 
 export function isValidActorTarget(value: string, state: ActorGraphState): boolean {
-  return Boolean(normalizeActorTarget(value, state))
+  return targetAllowedOutputs(state).includes(value.trim())
 }
 
 export function isValidActorAction(value: string, state: ActorGraphState): boolean {
-  return Boolean(normalizeActorAction(value, state))
+  return actionAllowedOutputs(state).includes(value.trim())
+}
+
+export function actionAllowedOutputs(state: ActorGraphState): string[] {
+  const actions =
+    targetActors(state).length === 0
+      ? state.actor.actions.filter((action) => action.visibility === "solitary")
+      : state.actor.actions
+  return [...actions.map((action) => action.id), "no_action"]
+}
+
+export function targetAllowedOutputs(state: ActorGraphState): string[] {
+  const selectedAction = normalizeActorAction(state.trace.action, state)
+  if (!selectedAction || selectedAction === "no_action") {
+    return ["None"]
+  }
+
+  const action = state.actor.actions.find((item) => item.id === selectedAction)
+  if (!action || action.visibility === "solitary") {
+    return ["None"]
+  }
+
+  return targetActors(state).map((actor) => actor.id)
 }
 
 export function targetActors(state: ActorGraphState): ActorState[] {

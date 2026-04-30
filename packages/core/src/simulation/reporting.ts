@@ -138,14 +138,17 @@ function renderActorContexts(actors: ActorState[]): string {
   }
   return actors
     .map((actor) => {
-      const semiPublic = Object.values(actor.context.semiPublic).flat()
-      const privateItems = Object.values(actor.context.private).flat()
+      const counts = actor.context.visible.reduce<Record<string, number>>((current, entry) => {
+        current[entry.kind] = (current[entry.kind] ?? 0) + 1
+        return current
+      }, {})
       return [
         `### ${actor.name}`,
-        `- Public: ${actor.context.public.length}`,
-        `- Semi-public: ${semiPublic.length}`,
-        `- Private: ${privateItems.length}`,
-        `- Solitary: ${actor.context.solitary.length}`,
+        `- Events: ${counts.event ?? 0}`,
+        `- Out: ${counts.out ?? 0}`,
+        `- In: ${counts.in ?? 0}`,
+        `- Observed: ${counts.observed ?? 0}`,
+        `- Self: ${counts.self ?? 0}`,
       ].join("\n")
     })
     .join("\n\n")
@@ -217,5 +220,7 @@ export function summarizeInteractions(interactions: Interaction[]): string {
 
 export function summarizeEvents(events: PlannedEvent[]): string {
   const completed = events.filter((event) => event.status === "completed").length
-  return `${completed}/${events.length} major events completed.`
+  const partial = events.filter((event) => event.status === "partial").length
+  const pending = events.filter((event) => event.status === "pending").length
+  return `${completed}/${events.length} major events completed; ${partial} partial; ${pending} pending.`
 }

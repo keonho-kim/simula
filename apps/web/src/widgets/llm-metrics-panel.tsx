@@ -22,7 +22,7 @@ const chartPadding = 3
 const baselineY = chartHeight - chartPadding
 
 export function LlmMetricsPanel({ t }: { t: UiTexts }) {
-  const events = useRunStore((state) => state.liveEvents)
+  const events = useRunStore((state) => state.metricEvents)
   const series = useMemo(() => buildMetricSeries(events, t), [events, t])
 
   return (

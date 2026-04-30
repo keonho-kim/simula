@@ -277,6 +277,13 @@ select {
     border-top: 1px solid var(--border);
   }
 
+  .simula-markdown mark[data-markdown-diff="added"] {
+    border-radius: 0.25rem;
+    background: color-mix(in srgb, #16a34a 18%, transparent);
+    color: inherit;
+    padding: 0.08rem 0.2rem;
+  }
+
   .simula-markdown .katex-display {
     max-width: 100%;
     overflow-x: auto;

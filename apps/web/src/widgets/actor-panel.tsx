@@ -10,14 +10,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { UiTexts } from "@/lib/i18n"
 import { MarkdownContent } from "@/shared/ui/markdown-content"
 import { useRunStore } from "@/store/run-store"
 
-type HistoryFilter = "all" | "outgoing" | "incoming" | "message"
+export type HistoryFilter = "all" | "outgoing" | "incoming" | "message"
 
-interface ActorSummary {
+export interface ActorSummary {
   id: string
   name: string
   role: string
@@ -32,13 +32,14 @@ interface ActorSummary {
   messageCount: number
 }
 
-interface ActorHistoryItem {
+export interface ActorHistoryItem {
   id: string
   type: "outgoing" | "incoming" | "message"
   roundIndex?: number
   timestamp?: string
   title: string
   counterpart?: string
+  counterpartName: string
   content: string
   visibility?: Interaction["visibility"]
   actionType?: string
@@ -130,25 +131,38 @@ export function ActorDetailDialog({
               <DialogDescription>{actor.role}</DialogDescription>
             </DialogHeader>
 
-            <ScrollArea className="min-h-0 flex-1 pr-3">
-              <div className="grid gap-4 pr-3 lg:grid-cols-[280px_minmax(0,1fr)]">
-                <section className="rounded-md bg-muted/20 p-4">
-                  <div className="flex items-center gap-2">
-                    <BrainIcon className="size-4 text-muted-foreground" />
-                    <h3 className="text-xs font-semibold uppercase text-muted-foreground">{t.actorCard}</h3>
-                  </div>
-                  <ActorField label={t.actorBackground} value={actor.backgroundHistory} />
-                  <ActorField label={t.actorPersonality} value={actor.personality} />
-                  <ActorField label={t.actorPreference} value={actor.preference} />
-                  <ActorField label={t.actorPrivateGoal} value={actor.privateGoal} />
-                  <ActorField label={t.actorContextSummary} value={actor.contextSummary || t.actorNoCompressedContext} />
-                </section>
+            <Tabs defaultValue="actor-info" className="min-h-0 flex-1 gap-3">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="actor-info">{t.actorInfoTab}</TabsTrigger>
+                <TabsTrigger value="msg">{t.actorMessagesTab}</TabsTrigger>
+              </TabsList>
 
-                <section className="flex min-h-0 flex-col overflow-hidden rounded-md bg-muted/20">
-                  <div className="grid gap-3 border-b border-border/70 p-3 md:grid-cols-2">
-                    <ActorSummaryField label={t.actorCurrentIntent} value={actor.intent || t.graphNoIntent} />
-                    <ActorSummaryField label={t.actorLatestActivity} value={actor.latestActivity || t.waitingForActivity} />
+              <TabsContent value="actor-info" className="min-h-0 overflow-hidden">
+                <ScrollArea className="h-full pr-3">
+                  <div className="grid gap-4 pr-3 lg:grid-cols-2">
+                    <section className="rounded-md bg-muted/20 p-4">
+                      <div className="flex items-center gap-2">
+                        <BrainIcon className="size-4 text-muted-foreground" />
+                        <h3 className="text-xs font-semibold uppercase text-muted-foreground">{t.actorInfoTab}</h3>
+                      </div>
+                      <ActorField label={t.actorBackground} value={actor.backgroundHistory} />
+                      <ActorField label={t.actorPersonality} value={actor.personality} />
+                      <ActorField label={t.actorPreference} value={actor.preference} />
+                      <ActorField label={t.actorPrivateGoal} value={actor.privateGoal} />
+                    </section>
+                    <section className="rounded-md bg-muted/20 p-4">
+                      <ActorSummaryField label={t.actorCurrentIntent} value={actor.intent || t.graphNoIntent} />
+                      <div className="mt-3">
+                        <ActorSummaryField label={t.actorLatestActivity} value={actor.latestActivity || t.waitingForActivity} />
+                      </div>
+                      <ActorField label={t.actorContextSummary} value={actor.contextSummary || t.actorNoCompressedContext} />
+                    </section>
                   </div>
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="msg" className="min-h-0 overflow-hidden">
+                <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-md bg-muted/20">
                   <div className="grid grid-cols-4 gap-2 p-3">
                     <ActorStat label={t.actorTotal} value={stats.total} />
                     <ActorStat label={t.actorOut} value={stats.outgoing} />
@@ -165,9 +179,9 @@ export function ActorDetailDialog({
                       </TabsList>
                     </Tabs>
                   </div>
-                  <div className="min-h-0 flex-1 p-3">
+                  <ScrollArea className="min-h-0 flex-1 p-3">
                     {actorHistory.length ? (
-                      <div className="space-y-2">
+                      <div className="flex flex-col gap-2 pr-3">
                         {actorHistory.map((item) => <ActorHistoryCard key={item.id} item={item} />)}
                       </div>
                     ) : (
@@ -178,10 +192,10 @@ export function ActorDetailDialog({
                         </p>
                       </div>
                     )}
-                  </div>
+                  </ScrollArea>
                 </section>
-              </div>
-            </ScrollArea>
+              </TabsContent>
+            </Tabs>
           </>
         ) : null}
       </DialogContent>
@@ -192,25 +206,25 @@ export function ActorDetailDialog({
 function useActorPanelData(t: UiTexts): { actors: ActorSummary[]; history: ActorHistoryItem[] } {
   const timeline = useRunStore((state) => state.timeline)
   const replayIndex = useRunStore((state) => state.replayIndex)
-  const liveEvents = useRunStore((state) => state.liveEvents)
+  const actorEvents = useRunStore((state) => state.actorEvents)
   const runState = useRunStore((state) => state.runState)
   const frame = timeline[replayIndex] ?? timeline.at(-1)
-  const actorNames = useMemo(() => buildActorNameMap(frame?.nodes ?? [], liveEvents, runState?.actors ?? []), [frame, liveEvents, runState?.actors])
+  const actorNames = useMemo(() => buildActorNameMap(frame?.nodes ?? [], actorEvents, runState?.actors ?? []), [actorEvents, frame, runState?.actors])
   const history = useMemo(
-    () => buildActorHistory(liveEvents, runState?.interactions ?? [], actorNames, t),
-    [actorNames, liveEvents, runState?.interactions, t]
+    () => buildActorHistory(actorEvents, runState?.interactions ?? [], actorNames, t),
+    [actorEvents, actorNames, runState?.interactions, t]
   )
   const actors = useMemo(
-    () => buildActorSummaries(runState?.actors ?? [], frame?.nodes ?? [], liveEvents, history),
-    [frame?.nodes, history, liveEvents, runState?.actors]
+    () => buildActorSummaries(runState?.actors ?? [], frame?.nodes ?? [], actorEvents, history),
+    [actorEvents, frame?.nodes, history, runState?.actors]
   )
   return { actors, history }
 }
 
-function buildActorSummaries(
+export function buildActorSummaries(
   stateActors: ActorState[],
   nodes: GraphNodeView[],
-  liveEvents: RunEvent[],
+  actorEvents: RunEvent[],
   history: ActorHistoryItem[]
 ): ActorSummary[] {
   const summaries = new Map<string, ActorSummary>()
@@ -247,25 +261,24 @@ function buildActorSummaries(
       messageCount: current?.messageCount ?? 0,
     })
   }
-  for (const event of liveEvents) {
+  for (const event of actorEvents) {
     if (event.type === "actors.ready") {
       for (const actor of event.actors) {
-        if (!summaries.has(actor.id)) {
-          summaries.set(actor.id, {
-            id: actor.id,
-            name: actor.label,
-            role: actor.role,
-            intent: actor.intent,
-            backgroundHistory: "",
-            personality: "",
-            preference: "",
-            privateGoal: "",
-            contextSummary: "",
-            interactionCount: actor.interactionCount,
-            latestActivity: "",
-            messageCount: 0,
-          })
-        }
+        const current = summaries.get(actor.id)
+        summaries.set(actor.id, {
+          id: actor.id,
+          name: current?.name ?? actor.label,
+          role: current?.role ?? actor.role,
+          intent: current?.intent || actor.intent,
+          backgroundHistory: current?.backgroundHistory || actor.backgroundHistory || "",
+          personality: current?.personality || actor.personality || "",
+          preference: current?.preference || actor.preference || "",
+          privateGoal: current?.privateGoal || actor.privateGoal || "",
+          contextSummary: current?.contextSummary || actor.contextSummary || "",
+          interactionCount: current?.interactionCount ?? actor.interactionCount,
+          latestActivity: current?.latestActivity ?? "",
+          messageCount: current?.messageCount ?? 0,
+        })
       }
     }
   }
@@ -282,7 +295,7 @@ function buildActorSummaries(
 
 function buildActorNameMap(
   nodes: GraphNodeView[],
-  liveEvents: RunEvent[],
+  actorEvents: RunEvent[],
   actors: Array<{ id: string; name: string }>
 ): Map<string, string> {
   const names = new Map<string, string>()
@@ -292,7 +305,7 @@ function buildActorNameMap(
   for (const node of nodes) {
     names.set(node.id, node.label)
   }
-  for (const event of liveEvents) {
+  for (const event of actorEvents) {
     if (event.type === "actors.ready") {
       for (const actor of event.actors) {
         names.set(actor.id, actor.label)
@@ -305,8 +318,8 @@ function buildActorNameMap(
   return names
 }
 
-function buildActorHistory(
-  liveEvents: RunEvent[],
+export function buildActorHistory(
+  actorEvents: RunEvent[],
   stateInteractions: Interaction[],
   actorNames: Map<string, string>,
   t: UiTexts
@@ -314,17 +327,19 @@ function buildActorHistory(
   const items: ActorHistoryItem[] = []
   const seen = new Set<string>()
 
-  for (const event of liveEvents) {
+  let currentRoundIndex: number | undefined
+  for (const event of actorEvents) {
     if (event.type === "interaction.recorded") {
+      currentRoundIndex = event.interaction.roundIndex
       addInteractionHistory(items, seen, event.interaction, actorNames, t, event.timestamp)
     }
     if (event.type === "actor.message") {
-      addMessageHistory(items, seen, event.actorId, event.timestamp, t.actorMessage, event.content)
+      addMessageHistory(items, seen, event.actorId, event.timestamp, currentRoundIndex, t.actorMessage, t.self.toUpperCase(), event.content)
     }
     if (event.type === "model.message" && event.role === "actor") {
       const parsed = parseActorModelMessage(event.content, actorNames)
       if (parsed) {
-        addMessageHistory(items, seen, parsed.actorId, event.timestamp, `${t.modelStep} ${parsed.step}`, parsed.content)
+        addMessageHistory(items, seen, parsed.actorId, event.timestamp, currentRoundIndex, `${t.modelStep} ${parsed.step}`, t.self.toUpperCase(), parsed.content)
       }
     }
   }
@@ -333,7 +348,7 @@ function buildActorHistory(
     addInteractionHistory(items, seen, interaction, actorNames, t)
   }
 
-  return items.sort((a, b) => historySortValue(b) - historySortValue(a))
+  return items.sort(compareHistoryItems)
 }
 
 function addMessageHistory(
@@ -341,7 +356,9 @@ function addMessageHistory(
   seen: Set<string>,
   actorId: string,
   timestamp: string,
+  roundIndex: number | undefined,
   title: string,
+  counterpartName: string,
   content: string
 ): void {
   const id = `${actorId}:message:${timestamp}:${title}:${content}`
@@ -349,7 +366,7 @@ function addMessageHistory(
     return
   }
   seen.add(id)
-  items.push({ id, type: "message", timestamp, title, content })
+  items.push({ id, type: "message", roundIndex, timestamp, title, counterpartName, content })
 }
 
 function addInteractionHistory(
@@ -360,9 +377,14 @@ function addInteractionHistory(
   t: UiTexts,
   timestamp?: string
 ): void {
-  const targetNames = interaction.targetActorIds.map((targetId) => actorNames.get(targetId) ?? targetId)
+  const targetNames = interaction.targetActorIds
+    .filter((targetId) => targetId !== interaction.sourceActorId)
+    .map((targetId) => actorNames.get(targetId) ?? targetId)
   const sourceName = actorNames.get(interaction.sourceActorId) ?? interaction.sourceActorId
   const sourceId = `${interaction.sourceActorId}:outgoing:${interaction.id}`
+  const counterpartName = interaction.decisionType === "no_action"
+    ? "HELD"
+    : targetNames.join(", ") || "SOLO"
   if (!seen.has(sourceId)) {
     seen.add(sourceId)
     items.push({
@@ -371,13 +393,18 @@ function addInteractionHistory(
       roundIndex: interaction.roundIndex,
       timestamp,
       title: t.actionTaken,
-      counterpart: `${t.to} ${targetNames.join(", ") || t.self}`,
+      counterpart: counterpartName,
+      counterpartName,
       content: interaction.content,
       visibility: interaction.visibility,
       actionType: interaction.actionType,
     })
   }
   for (const targetId of interaction.targetActorIds) {
+    if (targetId === interaction.sourceActorId) {
+      continue
+    }
+
     const targetItemId = `${targetId}:incoming:${interaction.id}`
     if (seen.has(targetItemId)) {
       continue
@@ -390,6 +417,7 @@ function addInteractionHistory(
       timestamp,
       title: t.receivedInteraction,
       counterpart: `${t.from} ${sourceName}`,
+      counterpartName: sourceName,
       content: interaction.content,
       visibility: interaction.visibility,
       actionType: interaction.actionType,
@@ -417,7 +445,7 @@ function parseActorModelMessage(content: string, actorNames: Map<string, string>
   return undefined
 }
 
-function filterHistory(history: ActorHistoryItem[], filter: HistoryFilter): ActorHistoryItem[] {
+export function filterHistory(history: ActorHistoryItem[], filter: HistoryFilter): ActorHistoryItem[] {
   return filter === "all" ? history : history.filter((item) => item.type === filter)
 }
 
@@ -433,6 +461,14 @@ function buildHistoryStats(history: ActorHistoryItem[]): {
     incoming: history.filter((item) => item.type === "incoming").length,
     messages: history.filter((item) => item.type === "message").length,
   }
+}
+
+function compareHistoryItems(a: ActorHistoryItem, b: ActorHistoryItem): number {
+  const roundDelta = (b.roundIndex ?? -1) - (a.roundIndex ?? -1)
+  if (roundDelta !== 0) {
+    return roundDelta
+  }
+  return historySortValue(b) - historySortValue(a)
 }
 
 function historySortValue(item: ActorHistoryItem): number {
@@ -474,6 +510,7 @@ function ActorSummaryField({ label, value }: { label: string; value: string }) {
 
 function ActorHistoryCard({ item }: { item: ActorHistoryItem }) {
   const Icon = item.type === "outgoing" ? ArrowUpRightIcon : item.type === "incoming" ? ArrowDownLeftIcon : MessageSquareIcon
+  const roundLabel = item.roundIndex === undefined ? "ROUND -" : `ROUND ${item.roundIndex}`
   return (
     <div className="rounded-md bg-background/80 p-3">
       <div className="flex items-start gap-2">
@@ -482,10 +519,7 @@ function ActorHistoryCard({ item }: { item: ActorHistoryItem }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-semibold">{item.title}</span>
-            {item.roundIndex !== undefined ? (
-              <Badge variant="secondary" className="h-4 rounded-sm px-1.5 text-[10px]">R{item.roundIndex}</Badge>
-            ) : null}
+            <span className="text-xs font-semibold uppercase">{roundLabel} | {item.counterpartName}</span>
             {item.visibility ? (
               <Badge variant="outline" className="h-4 rounded-sm bg-white px-1.5 text-[10px]">{item.visibility}</Badge>
             ) : null}
@@ -493,7 +527,7 @@ function ActorHistoryCard({ item }: { item: ActorHistoryItem }) {
               <Badge variant="outline" className="h-4 rounded-sm bg-white px-1.5 text-[10px]">{item.actionType}</Badge>
             ) : null}
           </div>
-          {item.counterpart ? <p className="mt-1 truncate text-[11px] text-muted-foreground">{item.counterpart}</p> : null}
+          <p className="mt-1 truncate text-[11px] text-muted-foreground">{item.title}</p>
           <MarkdownContent compact className="mt-2" content={item.content} fallback="-" />
           {item.timestamp ? <time className="mt-2 block font-mono text-[10px] text-muted-foreground">{timeLabel(item.timestamp)}</time> : null}
         </div>

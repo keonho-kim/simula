@@ -1,4 +1,4 @@
-import type { GraphNodeView, GraphTimelineFrame } from "./graph"
+import type { ActorReadyView, GraphTimelineFrame } from "./graph"
 import type {
   ActorCardStep,
   ActorTraceStep,
@@ -7,7 +7,7 @@ import type {
   ModelRole,
   PlannerTraceStep,
 } from "./model"
-import type { Interaction, StopReason } from "./simulation"
+import type { InjectedEvent, Interaction, StopReason } from "./simulation"
 
 export type RunStatus = "created" | "running" | "completed" | "failed" | "canceled"
 
@@ -50,7 +50,8 @@ export type RunEvent =
   | { type: "node.failed"; runId: string; timestamp: string; nodeId: string; label: string; error: string }
   | { type: "model.message"; runId: string; timestamp: string; role: ModelRole; content: string }
   | { type: "model.metrics"; runId: string; timestamp: string; metrics: ModelMetrics }
-  | { type: "actors.ready"; runId: string; timestamp: string; actors: GraphNodeView[] }
+  | { type: "actors.ready"; runId: string; timestamp: string; actors: ActorReadyView[] }
+  | { type: "event.injected"; runId: string; timestamp: string; event: InjectedEvent }
   | { type: "interaction.recorded"; runId: string; timestamp: string; interaction: Interaction }
   | { type: "actor.message"; runId: string; timestamp: string; actorId: string; actorName: string; content: string }
   | { type: "round.completed"; runId: string; timestamp: string; roundIndex: number }

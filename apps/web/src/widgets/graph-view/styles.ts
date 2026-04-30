@@ -63,7 +63,7 @@ export function reduceEdge(
 
 export function initialPosition(index: number, total = 1): Position {
   const angle = index * 2.399963229728653
-  const radius = 2 + Math.sqrt(index + 1) * (total > 300 ? 2.8 : 1.8)
+  const radius = 3 + Math.sqrt(index + 1) * (total > 300 ? 3.6 : 2.4)
   return {
     x: Math.cos(angle) * radius,
     y: Math.sin(angle) * radius,
@@ -72,14 +72,15 @@ export function initialPosition(index: number, total = 1): Position {
 
 export function forceAtlasOptions(order: number): Parameters<typeof forceAtlas2.assign>[1] {
   return {
-    iterations: order > 300 ? 12 : order > 100 ? 35 : 80,
+    iterations: order > 300 ? 18 : order > 100 ? 45 : 100,
     getEdgeWeight: "weight",
     settings: {
+      adjustSizes: true,
       barnesHutOptimize: order > 80,
-      edgeWeightInfluence: 0.8,
-      gravity: order > 300 ? 1.4 : 0.8,
-      scalingRatio: order > 300 ? 24 : 12,
-      slowDown: order > 300 ? 4 : 2,
+      edgeWeightInfluence: 0.45,
+      gravity: order > 300 ? 1.05 : order > 100 ? 0.75 : 0.55,
+      scalingRatio: order > 300 ? 36 : order > 100 ? 22 : 16,
+      slowDown: order > 300 ? 5 : 2.5,
     },
   }
 }
@@ -91,16 +92,16 @@ export function nodeSize(degree: number, interactionCount = 0): number {
 }
 
 export function edgeSize(edge: GraphEdgeView): number {
-  return Math.min(13, 1.8 + Math.sqrt(Math.max(0, edge.weight)) * 2.15)
+  return Math.min(14, 2.4 + Math.sqrt(Math.max(0, edge.weight)) * 2.35)
 }
 
 export function edgeAlpha(weight: number): number {
   const level = intensityLevel(weight)
-  if (level === "none") return 0.28
-  if (level === "low") return 0.56
-  if (level === "medium") return 0.7
-  if (level === "high") return 0.82
-  return 0.92
+  if (level === "none") return 0.54
+  if (level === "low") return 0.82
+  if (level === "medium") return 0.88
+  if (level === "high") return 0.92
+  return 0.94
 }
 
 export function graphIntensityColor(value: number): string {
@@ -114,10 +115,10 @@ export function graphIntensityColor(value: number): string {
 
 export function edgeColor(weight: number, alpha = edgeAlpha(weight)): string {
   const level = intensityLevel(weight)
-  if (level === "none") return `rgba(102, 112, 133, ${alpha})`
-  if (level === "low") return `rgba(147, 197, 253, ${alpha})`
-  if (level === "medium") return `rgba(76, 141, 246, ${alpha})`
-  if (level === "high") return `rgba(109, 91, 208, ${alpha})`
+  if (level === "none") return `rgba(52, 64, 84, ${alpha})`
+  if (level === "low") return `rgba(37, 99, 235, ${alpha})`
+  if (level === "medium") return `rgba(8, 126, 164, ${alpha})`
+  if (level === "high") return `rgba(91, 72, 190, ${alpha})`
   return `rgba(190, 52, 85, ${alpha})`
 }
 

@@ -1,5 +1,5 @@
 import type { ActionVisibility, ActorAction, ActorState } from "@simula/shared"
-import { emptyActorContext } from "../../context"
+import { emptyActorContext } from "../../actor-memory"
 
 const VISIBILITIES: ActionVisibility[] = ["public", "semi-public", "private", "solitary"]
 

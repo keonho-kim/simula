@@ -3,6 +3,7 @@ num_cast: 14
 allow_additional_cast: false
 max_round: 8
 output_length: short
+load_level: middle
 ---
 
 # 시나리오 01

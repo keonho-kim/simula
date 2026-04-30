@@ -72,6 +72,10 @@ function applyInteraction(
   interaction: Interaction,
   activeNodeIds: string[]
 ): void {
+  if (interaction.decisionType === "no_action") {
+    return
+  }
+
   const source = nodes.find((node) => node.id === interaction.sourceActorId)
   if (source) {
     source.interactionCount += 1
@@ -80,6 +84,10 @@ function applyInteraction(
   }
 
   for (const targetId of interaction.targetActorIds) {
+    if (targetId === interaction.sourceActorId) {
+      continue
+    }
+
     const target = nodes.find((node) => node.id === targetId)
     if (target) {
       target.interactionCount += 1

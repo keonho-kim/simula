@@ -158,12 +158,7 @@ function createActor(id: string, name: string) {
     privateGoal: "",
     intent: "",
     actions: [],
-    context: {
-      public: [],
-      semiPublic: {},
-      private: {},
-      solitary: [],
-    },
+    context: { visible: [] },
     contextSummary: "",
     memory: [],
     relationships: {},

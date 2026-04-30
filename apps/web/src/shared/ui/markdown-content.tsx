@@ -15,6 +15,7 @@ interface MarkdownContentProps {
 
 const sanitizeSchema = {
   ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames ?? []), "mark"],
   attributes: {
     ...defaultSchema.attributes,
     code: [
@@ -24,6 +25,11 @@ const sanitizeSchema = {
     span: [
       ...(defaultSchema.attributes?.span ?? []),
       ["className", "math-inline", "math-display"],
+    ],
+    mark: [
+      ...(defaultSchema.attributes?.mark ?? []),
+      ["data-markdown-diff", "added"],
+      ["dataMarkdownDiff", "added"],
     ],
   },
 }

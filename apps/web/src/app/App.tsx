@@ -174,6 +174,9 @@ function App() {
 
   const selectedRun = runsQuery.data?.find((run) => run.id === selectedRunId)
   const selectedRunStatus = selectedRunQuery.data?.run.status ?? selectedRun?.status
+  const selectedRunCompleted =
+    selectedRunStatus === "completed" ||
+    liveEvents.some((event) => event.type === "run.completed" && event.runId === selectedRunId)
   const isStarting = startDraftMutation.isPending
 
   const downloadSelectedExport = (kind: "json" | "jsonl" | "md") => {
@@ -381,11 +384,17 @@ function App() {
       <div className="mx-auto flex min-h-svh w-full max-w-[1720px] flex-col px-4 py-3 lg:px-6">
         <TopCommandBar
           selectedRunStatus={selectedRunStatus}
+          showReportShortcut={selectedRunCompleted}
           t={t}
           onHome={() => {
             setReportConfirmRunId(undefined)
             viewModeRef.current = "home"
             setViewMode("home")
+          }}
+          onReport={() => {
+            setReportConfirmRunId(undefined)
+            viewModeRef.current = "report"
+            setViewMode("report")
           }}
         />
 

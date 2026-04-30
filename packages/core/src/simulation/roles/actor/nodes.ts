@@ -3,10 +3,12 @@ import { actorPrompts, type ActorPromptStep } from "./prompts"
 import { runActorTextNode } from "./node"
 import {
   applyActorTraceStep,
+  actionAllowedOutputs,
   buildActorDecision,
   isValidActorAction,
   isValidActorTarget,
-  targetActors,
+  normalizeActorAction,
+  targetAllowedOutputs,
   type ActorGraphState,
 } from "./state"
 
@@ -15,6 +17,18 @@ export function createActorStepNode(
   emit: (event: RunEvent) => Promise<void>
 ): (state: ActorGraphState) => Promise<Partial<ActorGraphState>> {
   return async (state) => {
+    const selectedAction = normalizeActorAction(state.trace.action, state)
+    if (step === "target" && (!selectedAction || selectedAction === "no_action")) {
+      return {
+        trace: applyActorTraceStep(state.trace, step, "None", 0),
+      }
+    }
+    if (step === "message" && (!selectedAction || selectedAction === "no_action")) {
+      return {
+        trace: applyActorTraceStep(state.trace, step, "None", 0),
+      }
+    }
+
     const partial = {
       thought: state.trace.thought,
       target: state.trace.target,
@@ -41,10 +55,10 @@ function actorAllowedOutputs(
   step: ActorPromptStep
 ): ((state: ActorGraphState) => string[]) | undefined {
   if (step === "target") {
-    return (state) => [...targetActors(state).map((actor) => actor.id), "None"]
+    return targetAllowedOutputs
   }
   if (step === "action") {
-    return (state) => [...state.actor.actions.map((action) => action.id), "no_action"]
+    return actionAllowedOutputs
   }
   return undefined
 }

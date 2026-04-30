@@ -4,9 +4,16 @@ import {
   parseScenarioDocument,
   readScenarioSample,
   sanitizeSettings,
+  streamDraftScenario,
   type RunStore,
 } from "@simula/core"
-import type { CreateRunRequest, LLMSettings, SettingsModelsRequest, StoryBuilderDraftRequest } from "@simula/shared"
+import type {
+  CreateRunRequest,
+  LLMSettings,
+  SettingsModelsRequest,
+  StoryBuilderDraftRequest,
+  StoryBuilderStreamEvent,
+} from "@simula/shared"
 import { SAMPLE_ROOT } from "./config"
 import { streamEvents, type Subscriptions } from "./event-stream"
 import { listProviderModels } from "./model-discovery"
@@ -35,6 +42,17 @@ export async function route(context: RouteContext, request: Request, url: URL): 
   }
 
   if (parts[1] === "story-builder" && parts[2] === "draft" && request.method === "POST") {
+    if (parts[3] === "stream") {
+      try {
+        const payload = (await request.json()) as StoryBuilderDraftRequest
+        return streamStoryBuilderResponse(streamDraftScenario(payload, await readSettings()))
+      } catch (error) {
+        return json(
+          { error: error instanceof Error ? error.message : "StoryBuilder failed." },
+          { status: 400 }
+        )
+      }
+    }
     try {
       const payload = (await request.json()) as StoryBuilderDraftRequest
       return json(await draftScenario(payload, await readSettings()))
@@ -60,6 +78,33 @@ export async function route(context: RouteContext, request: Request, url: URL): 
   }
 
   return json({ error: "Not found" }, { status: 404 })
+}
+
+function streamStoryBuilderResponse(events: AsyncIterable<StoryBuilderStreamEvent>): Response {
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        for await (const event of events) {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`))
+        }
+      } catch (error) {
+        const event: StoryBuilderStreamEvent = {
+          type: "error",
+          error: error instanceof Error ? error.message : "StoryBuilder failed.",
+        }
+        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`))
+      } finally {
+        controller.close()
+      }
+    },
+  })
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "application/x-ndjson",
+      "Cache-Control": "no-cache",
+    },
+  })
 }
 
 async function routeSettings(parts: string[], request: Request): Promise<Response> {

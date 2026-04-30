@@ -15,6 +15,7 @@ import type {
   GraphTimelineFrame,
   StoryBuilderDraftRequest,
   StoryBuilderDraftResponse,
+  StoryBuilderStreamEvent,
 } from "@simula/shared"
 
 export interface RunDetailResponse {
@@ -46,6 +47,41 @@ export async function draftScenario(requestBody: StoryBuilderDraftRequest): Prom
     method: "POST",
     body: JSON.stringify(requestBody),
   })
+}
+
+export async function streamDraftScenario(
+  requestBody: StoryBuilderDraftRequest,
+  onEvent: (event: StoryBuilderStreamEvent) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const response = await fetch("/api/story-builder/draft/stream", {
+    method: "POST",
+    body: JSON.stringify(requestBody),
+    signal,
+    headers: { "Content-Type": "application/json" },
+  })
+  if (!response.ok) {
+    throw new Error(await response.text())
+  }
+  if (!response.body) {
+    throw new Error("StoryBuilder stream is unavailable.")
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ""
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) {
+      break
+    }
+    buffer += decoder.decode(value, { stream: true })
+    buffer = readStoryBuilderStreamLines(buffer, onEvent)
+  }
+
+  buffer += decoder.decode()
+  readStoryBuilderStreamLines(`${buffer}\n`, onEvent)
 }
 
 export async function fetchScenarioSamples(): Promise<ScenarioSampleSummary[]> {
@@ -110,6 +146,25 @@ export async function fetchExport(runId: string, kind: ExportKindResponse["kind"
     throw new Error(await response.text())
   }
   return response.text()
+}
+
+function readStoryBuilderStreamLines(
+  buffer: string,
+  onEvent: (event: StoryBuilderStreamEvent) => void
+): string {
+  const lines = buffer.split("\n")
+  const rest = lines.pop() ?? ""
+  for (const line of lines) {
+    if (!line.trim()) {
+      continue
+    }
+    const event = JSON.parse(line) as StoryBuilderStreamEvent
+    onEvent(event)
+    if (event.type === "error") {
+      throw new Error(event.error)
+    }
+  }
+  return rest
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

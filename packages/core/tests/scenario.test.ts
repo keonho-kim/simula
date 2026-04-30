@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { join } from "node:path"
 import {
   parseScenarioDocument,
   validateSettings,
@@ -9,26 +10,32 @@ import {
   compactText,
   renderPromptLanguageGuide,
   renderOutputLengthGuide,
+  renderStoryBuilderChangeSummaryPrompt,
+  renderStoryBuilderPrompt,
   resolveActorContextTokenBudget,
   resolveRoleSettings,
   scalePromptLimit,
+  listScenarioSamples,
+  streamDraftScenario,
+  storyBuilderFallbackDraft,
 } from "../src"
 import { actorPrompts } from "../src/simulation/roles/actor/prompts"
-import { isValidActorAction, isValidActorTarget } from "../src/simulation/roles/actor/state"
+import { buildActorDecision, isValidActorAction, isValidActorTarget } from "../src/simulation/roles/actor/state"
 import { actorCardPrompts } from "../src/simulation/roles/generator/card-prompts"
 import { coordinatorPrompts } from "../src/simulation/roles/coordinator/prompts"
+import { eventInjectionAllowedOutputs } from "../src/simulation/event-injection"
 import { buildRepairChoicePrompt } from "../src/simulation/roles/repair"
 import type { ActorGraphState } from "../src/simulation/roles/actor"
 import { initialActorCardState } from "../src/simulation/roles/generator/card-state"
 import { parseActorRoster, renderRosterPrompt } from "../src/simulation/roles/generator/roster"
 import type { WorkflowState } from "../src/simulation/state"
-import type { SimulationState } from "@simula/shared"
+import type { PlannedEvent, SimulationState } from "@simula/shared"
 
 describe("scenario parsing", () => {
   test("parses frontmatter controls and body", () => {
     const scenario = parseScenarioDocument(`---\nnum_cast: 3\nallow_additional_cast: false\n---\nA crisis unfolds.`)
 
-    expect(scenario.controls).toEqual({ numCast: 3, allowAdditionalCast: false, actionsPerType: 3, maxRound: 8, fastMode: false, outputLength: "short" })
+    expect(scenario.controls).toEqual({ numCast: 3, allowAdditionalCast: false, actionsPerType: 3, maxRound: 8, fastMode: false, outputLength: "short", loadLevel: "middle" })
     expect(scenario.text).toBe("A crisis unfolds.")
   })
 
@@ -70,6 +77,28 @@ describe("scenario parsing", () => {
     expect(scenario.controls.outputLength).toBe("medium")
   })
 
+  test("parses load level from frontmatter", () => {
+    for (const loadLevel of ["low", "middle", "high"] as const) {
+      const scenario = parseScenarioDocument(
+        `---\nnum_cast: 2\nload_level: ${loadLevel}\n---\nA crisis unfolds.`
+      )
+
+      expect(scenario.controls.loadLevel).toBe(loadLevel)
+    }
+  })
+
+  test("defaults missing load level to middle", () => {
+    const scenario = parseScenarioDocument(`---\nnum_cast: 2\n---\nA crisis unfolds.`)
+
+    expect(scenario.controls.loadLevel).toBe("middle")
+  })
+
+  test("rejects unsupported load level", () => {
+    expect(() => parseScenarioDocument(`---\nnum_cast: 2\nload_level: medium\n---\nA crisis unfolds.`)).toThrow(
+      "load_level must be low, middle, or high"
+    )
+  })
+
   test("rejects unsupported output length", () => {
     expect(() => parseScenarioDocument(`---\nnum_cast: 2\noutput_length: huge\n---\nA crisis unfolds.`)).toThrow(
       "output_length must be short, medium, or long"
@@ -80,6 +109,27 @@ describe("scenario parsing", () => {
     const scenario = parseScenarioDocument(`---\nnum_cast: 2\nmax_round: 4\n---\nA crisis unfolds.`)
 
     expect(scenario.controls.maxRound).toBe(4)
+  })
+
+  test("loads all scenario samples with load levels", async () => {
+    const samples = await listScenarioSamples(join(process.cwd(), "senario.samples"))
+    const sampleNames = new Set(samples.map((sample) => sample.name))
+
+    expect(samples.every((sample) => ["low", "middle", "high"].includes(sample.controls.loadLevel ?? ""))).toBe(true)
+    expect(sampleNames).toEqual(new Set([
+      "01_consumer_marketing_launch.md",
+      "02_wargame_iran_us.md",
+      "03_startup_boardroom_crisis.md",
+      "04_city_hall_disaster_response.md",
+      "05_korean_enterprise_promo_approval_conflict.md",
+      "06_new_technology_internal_conflict.md",
+      "07_relationship_triangle_conflict.md",
+      "08_family_clinic_care_decision.md",
+      "09_apartment_redevelopment_committee.md",
+      "10_regional_bank_social_media_run.md",
+      "11_airport_weather_disruption_command.md",
+      "12_hospital_network_ransomware_coordination.md",
+    ]))
   })
 
   test("renders prompt language guide without changing machine-readable tokens", () => {
@@ -124,6 +174,7 @@ describe("scenario parsing", () => {
         interactionPolicy: "Respect visibility boundaries.",
         outcomeDirection: "Advance the conflict.",
         eventInjection: "",
+        eventResolution: "",
         progressDecision: "",
         extensionDecision: "",
         retryCounts: {
@@ -132,6 +183,7 @@ describe("scenario parsing", () => {
           interactionPolicy: 0,
           outcomeDirection: 0,
           eventInjection: 0,
+          eventResolution: 0,
           progressDecision: 0,
           extensionDecision: 0,
         },
@@ -190,6 +242,8 @@ describe("scenario parsing", () => {
     expect(prompt).toContain("Use exact person, organization, or line names")
     expect(prompt).toContain("authoritative actor candidates")
     expect(prompt).toContain("places, meetings, channels")
+    expect(prompt).toContain("speaking-capable decision maker")
+    expect(prompt).toContain("Never use products, product lines, promotions")
     expect(prompt).toContain("Do not invent Korean names")
     expect(prompt).toContain("도널드 트럼프 미국 대통령")
   })
@@ -211,6 +265,68 @@ describe("scenario parsing", () => {
     expect(prompt).toContain("이슬라마바드 고위급 협상은 결렬된 절차")
   })
 
+  test("keeps partial events available for coordinator injection", () => {
+    const events = [
+      plannedEvent("event-1", "pending"),
+      plannedEvent("event-2", "partial"),
+      plannedEvent("event-3", "completed"),
+    ]
+    const state = buildCoordinatorPromptState(events)
+    const prompt = coordinatorPrompts.eventInjection(state, {})
+
+    expect(eventInjectionAllowedOutputs(events)).toEqual(["event-1", "event-2", "None"])
+    expect(prompt).toContain("- event-1 (pending): Event 1.")
+    expect(prompt).toContain("- event-2 (partial): Event 2.")
+    expect(prompt).not.toContain("event-3")
+  })
+
+  test("asks coordinator to resolve injected events as completed or partial", () => {
+    const state = buildCoordinatorPromptState([plannedEvent("event-1", "active")])
+    state.simulation.roundDigests = [{
+      roundIndex: 1,
+      preRound: { elapsedTime: "Opening", content: "Injected event." },
+      afterRound: { content: "" },
+      injectedEventId: "event-1",
+    }]
+    state.simulation.interactions = [{
+      id: "interaction-1",
+      roundIndex: 1,
+      sourceActorId: "actor-1",
+      targetActorIds: [],
+      actionType: "actor-1-public-1",
+      content: "Actor 1 deferred responsibility.",
+      eventId: "event-1",
+      visibility: "public",
+      decisionType: "action",
+      intent: "Delay commitment.",
+      expectation: "Pressure remains.",
+    }]
+
+    const prompt = coordinatorPrompts.eventResolution(state, {})
+
+    expect(prompt).toContain("Return exactly one allowed output: completed or partial")
+    expect(prompt).toContain("Use completed only when")
+    expect(prompt).toContain("Use partial when")
+    expect(prompt).toContain("event-1: Event 1.")
+    expect(prompt).toContain("Actor 1 deferred responsibility.")
+  })
+
+  test("blocks coordinator completion guidance while events are unresolved", () => {
+    const state = buildCoordinatorPromptState([plannedEvent("event-1", "partial")])
+    state.simulation.roundDigests = [{
+      roundIndex: 1,
+      preRound: { elapsedTime: "Opening", content: "Injected event." },
+      afterRound: { content: "" },
+      injectedEventId: "event-1",
+    }]
+
+    const prompt = coordinatorPrompts.progressDecision(state, {})
+
+    expect(prompt).toContain("Use complete only when there are no unresolved pending or partial events.")
+    expect(prompt).toContain("Unresolved events:")
+    expect(prompt).toContain("- event-1 (partial): Event 1.")
+  })
+
   test("rejects duplicate actor roster names", () => {
     expect(() => parseActorRoster("1. Dana - Channel lead\n2. Dana - Consumer advocate", 2)).toThrow(
       "duplicate actor name"
@@ -219,19 +335,81 @@ describe("scenario parsing", () => {
 
   test("requires exact actor and action ids for actor choices", () => {
     const state = buildActorChoiceState()
+    const actionState = {
+      ...state,
+      trace: { ...state.trace, action: "actor-1-public-1" },
+    }
+    const noActionState = {
+      ...state,
+      trace: { ...state.trace, action: "no_action" },
+    }
 
-    expect(actorPrompts.target(state, { thought: "Pressure is visible." })).toContain("- actor-2")
-    expect(actorPrompts.target({ ...state, scenario: { ...state.scenario, controls: { ...state.scenario.controls, outputLength: "long" } } }, { thought: "Pressure is visible." })).not.toContain("detailed")
-    expect(actorPrompts.action(state, { target: "actor-2" })).toContain("- actor-1-public-1")
-    expect(isValidActorTarget("actor-2", state)).toBe(true)
-    expect(isValidActorTarget("None", state)).toBe(true)
-    expect(isValidActorTarget("Actor 2", state)).toBe(false)
-    expect(isValidActorTarget("actor-2.", state)).toBe(false)
-    expect(isValidActorTarget("none", state)).toBe(false)
+    const targetPrompt = actorPrompts.target(state, { thought: "Pressure is visible.", action: "actor-1-public-1" })
+    const allowedTargetOutputs = targetPrompt.split("Allowed outputs:\n")[1]?.split("\nTarget context:")[0]
+
+    expect(allowedTargetOutputs).toBe("- actor-2")
+    expect(targetPrompt).toContain("Target context:\nactor-2: Actor 2")
+    expect(allowedTargetOutputs).not.toContain("Target history.")
+    expect(actorPrompts.target({ ...state, scenario: { ...state.scenario, controls: { ...state.scenario.controls, outputLength: "long" } } }, { thought: "Pressure is visible.", action: "actor-1-public-1" })).not.toContain("detailed")
+    expect(actorPrompts.action(state, { thought: "Pressure is visible." })).toContain("- actor-1-public-1")
+    expect(isValidActorTarget("actor-2", actionState)).toBe(true)
+    expect(isValidActorTarget("None", actionState)).toBe(false)
+    expect(isValidActorTarget("None", noActionState)).toBe(true)
+    expect(isValidActorTarget("Actor 2", actionState)).toBe(false)
+    expect(isValidActorTarget("actor-2.", actionState)).toBe(false)
+    expect(isValidActorTarget("none", noActionState)).toBe(false)
     expect(isValidActorAction("actor-1-public-1", state)).toBe(true)
     expect(isValidActorAction("no_action", state)).toBe(true)
     expect(isValidActorAction("Public move 1", state)).toBe(false)
     expect(isValidActorAction("None", state)).toBe(false)
+  })
+
+  test("guides actor choices toward realistic access paths", () => {
+    const state = buildActorChoiceState()
+    const actionPrompt = actorPrompts.action(state, { thought: "Pressure is visible." })
+    const targetPrompt = actorPrompts.target(state, { thought: "Pressure is visible.", action: "actor-1-public-1" })
+
+    expect(actionPrompt).toContain("channels this actor can realistically use")
+    expect(actionPrompt).toContain("Do not jump to private or semi-public contact")
+    expect(targetPrompt).toContain("realistic access path")
+    expect(targetPrompt).toContain("Avoid unrealistic leaps")
+    expect(targetPrompt).not.toContain("If direct contact would be awkward")
+    expect(targetPrompt).toContain("Return exactly one allowed output from Allowed outputs")
+    expect(targetPrompt).toContain("Target context:\nactor-2: Actor 2")
+    expect(targetPrompt).toContain("Target history.")
+  })
+
+  test("keeps no-action silent and preserves targets for real actions", () => {
+    const state = buildActorChoiceState()
+    const noAction = buildActorDecision({
+      ...state,
+      trace: {
+        ...state.trace,
+        action: "no_action",
+        target: "actor-2",
+        intent: "Hold position.",
+        message: "We need to talk.",
+      },
+    })
+
+    expect(noAction.decisionType).toBe("no_action")
+    expect(noAction.targetActorIds).toEqual([])
+    expect(noAction.message).toBeUndefined()
+
+    const action = buildActorDecision({
+      ...state,
+      trace: {
+        ...state.trace,
+        action: "actor-1-public-1",
+        target: "actor-2",
+        intent: "Push the issue.",
+        message: "We need a concrete answer now.",
+      },
+    })
+
+    expect(action.decisionType).toBe("action")
+    expect(action.targetActorIds).toEqual(["actor-2"])
+    expect(action.message).toBe("We need a concrete answer now.")
   })
 
   test("builds repair prompt with raw invalid output and exact allowed values", () => {
@@ -306,6 +484,165 @@ describe("scenario parsing", () => {
   })
 })
 
+describe("story builder", () => {
+  test("renders sample-shaped fallback drafts", () => {
+    const draft = storyBuilderFallbackDraft([
+      { role: "user", content: "A hospital board delays a risky emergency expansion." },
+    ])
+
+    expect(draft).toContain("# Scenario Draft")
+    expect(draft).toContain("## Purpose and End Condition")
+    expect(draft).toContain("## Core Situation")
+    expect(draft).toContain("## Key Actors")
+    expect(draft).toContain("## Channels")
+    expect(draft).toContain("## Immediate Action Units")
+    expect(draft).toContain("## Behavioral Realism Rules")
+    expect(draft).toContain("A hospital board delays a risky emergency expansion.")
+  })
+
+  test("instructs StoryBuilder to revise with conversation context", () => {
+    const prompt = renderStoryBuilderPrompt({
+      messages: [
+        { role: "user", content: "A city council faces a controversial infrastructure vote." },
+        { role: "assistant", content: "# Scenario Draft\n\n## Core Situation\n- First draft." },
+        { role: "user", content: "Make the finance pressure sharper." },
+      ],
+      controls: {
+        numCast: 5,
+        allowAdditionalCast: false,
+        actionsPerType: 2,
+        maxRound: 6,
+        fastMode: false,
+        outputLength: "short",
+      },
+      language: "en",
+    })
+
+    expect(prompt).toContain("same structure as Simula sample scenario files")
+    expect(prompt).toContain("Do not include YAML frontmatter")
+    expect(prompt).toContain("Cast: 5")
+    expect(prompt).toContain("Max rounds: 6")
+    expect(prompt).toContain("Actions per visibility: 2")
+    expect(prompt).toContain("Assistant: # Scenario Draft")
+    expect(prompt).toContain("User: Make the finance pressure sharper.")
+  })
+
+  test("streams initial drafts without a change summary", async () => {
+    const settings = defaultSettings()
+    settings.providers.openai.apiKey = "unit-test-api-key"
+    const events = []
+    for await (const event of streamDraftScenario(
+      {
+        messages: [{ role: "user", content: "A council debates a flood wall." }],
+        controls: {
+          numCast: 4,
+          allowAdditionalCast: true,
+          actionsPerType: 3,
+          maxRound: 8,
+          fastMode: false,
+          outputLength: "short",
+        },
+      },
+      settings,
+      {
+        invokeText: async () => "# Scenario Draft\n\n## Core Situation\n- Flood wall conflict.",
+      }
+    )) {
+      events.push(event)
+    }
+
+    expect(events.some((event) => event.type === "draft")).toBe(true)
+    expect(events.some((event) => event.type === "summary")).toBe(false)
+    expect(events.filter((event) => event.type === "progress").map((event) => event.stage)).toEqual([
+      "draft",
+      "draft",
+    ])
+  })
+
+  test("streams revised drafts before the reflected change summary", async () => {
+    const settings = defaultSettings()
+    settings.providers.openai.apiKey = "unit-test-api-key"
+    const events = []
+    for await (const event of streamDraftScenario(
+      {
+        messages: [
+          { role: "user", content: "A council debates a flood wall." },
+          { role: "assistant", content: "# Scenario Draft\n\n## Core Situation\n- First draft." },
+          { role: "user", content: "Make the finance pressure sharper." },
+        ],
+        controls: {
+          numCast: 4,
+          allowAdditionalCast: true,
+          actionsPerType: 3,
+          maxRound: 8,
+          fastMode: false,
+          outputLength: "short",
+        },
+      },
+      settings,
+      {
+        invokeText: async () => "# Scenario Draft\n\n## Core Situation\n- Finance pressure is sharper.",
+        streamText: async (_prompt, onDelta) => {
+          await onDelta("Sharpened finance ")
+          await onDelta("pressure.")
+          return "Sharpened finance pressure."
+        },
+      }
+    )) {
+      events.push(event)
+    }
+
+    expect(events.map((event) => event.type)).toEqual([
+      "progress",
+      "draft",
+      "progress",
+      "progress",
+      "summary_delta",
+      "summary_delta",
+      "summary",
+      "progress",
+    ])
+    expect(events.find((event) => event.type === "draft")).toEqual({
+      type: "draft",
+      text: "# Scenario Draft\n\n## Core Situation\n- Finance pressure is sharper.",
+    })
+    expect(
+      events
+        .filter((event) => event.type === "summary_delta")
+        .map((event) => event.content)
+        .join("")
+    ).toBe("Sharpened finance pressure.")
+  })
+
+  test("renders a prompt for reflected change summaries", () => {
+    const prompt = renderStoryBuilderChangeSummaryPrompt(
+      {
+        messages: [
+          { role: "user", content: "A council debates a flood wall." },
+          { role: "assistant", content: "# Scenario Draft\n\n## Core Situation\n- First draft." },
+          { role: "user", content: "Make the finance pressure sharper." },
+        ],
+        controls: {
+          numCast: 4,
+          allowAdditionalCast: true,
+          actionsPerType: 3,
+          maxRound: 8,
+          fastMode: false,
+          outputLength: "short",
+        },
+      },
+      "# Scenario Draft\n\n## Core Situation\n- Finance pressure is sharper."
+    )
+
+    expect(prompt).toContain("Latest user request:")
+    expect(prompt).toContain("Make the finance pressure sharper.")
+    expect(prompt).toContain("Previous draft:")
+    expect(prompt).toContain("First draft.")
+    expect(prompt).toContain("Revised draft:")
+    expect(prompt).toContain("Finance pressure is sharper.")
+  })
+})
+
 function buildDigestSimulation(): SimulationState {
   return {
     runId: "digest-run",
@@ -345,12 +682,7 @@ function buildDigestSimulation(): SimulationState {
         privateGoal: "Keep authority.",
         intent: "Choose a path.",
         actions: [],
-        context: {
-          public: [],
-          semiPublic: {},
-          private: {},
-          solitary: [],
-        },
+        context: { visible: [] },
         memory: [],
         relationships: {},
         contextSummary: "",
@@ -364,6 +696,29 @@ function buildDigestSimulation(): SimulationState {
     reportMarkdown: "",
     stopReason: "",
     errors: [],
+  }
+}
+
+function buildCoordinatorPromptState(events: PlannedEvent[]): WorkflowState {
+  const simulation = buildDigestSimulation()
+  return {
+    runId: "coordinator-prompt-run",
+    scenario: simulation.scenario,
+    settings: defaultSettings(),
+    simulation: {
+      ...simulation,
+      plan: simulation.plan ? { ...simulation.plan, majorEvents: events } : simulation.plan,
+    },
+  }
+}
+
+function plannedEvent(id: string, status: PlannedEvent["status"]): PlannedEvent {
+  return {
+    id,
+    title: `Event ${id.replace("event-", "")}`,
+    summary: `Summary for ${id}.`,
+    status,
+    participantIds: ["actor-1"],
   }
 }
 
@@ -390,6 +745,7 @@ function buildActorChoiceState(): ActorGraphState {
     ...actor,
     id: "actor-2",
     name: "Actor 2",
+    backgroundHistory: "Target history.",
     actions: [],
   }
   return {
@@ -413,6 +769,7 @@ function buildActorChoiceState(): ActorGraphState {
       interactionPolicy: "Respect boundaries.",
       outcomeDirection: "Advance conflict.",
       eventInjection: "",
+      eventResolution: "",
       progressDecision: "",
       extensionDecision: "",
       retryCounts: {
@@ -421,6 +778,7 @@ function buildActorChoiceState(): ActorGraphState {
         interactionPolicy: 0,
         outcomeDirection: 0,
         eventInjection: 0,
+        eventResolution: 0,
         progressDecision: 0,
         extensionDecision: 0,
       },

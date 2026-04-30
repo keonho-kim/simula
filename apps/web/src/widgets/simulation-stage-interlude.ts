@@ -51,19 +51,17 @@ export function buildSimulationInterlude(events: RunEvent[], t?: UiTexts): Simul
     return undefined
   }
 
-  const actorsReadyIndex = lastIndexOf(scopedEvents, (event) => event.type === "actors.ready")
-  const latestActorActionIndex = lastIndexOf(scopedEvents, isActorActionMessage)
-  const latestRoundCompletedIndex = lastIndexOf(scopedEvents, (event) => event.type === "round.completed")
-  const shouldShow =
-    actorsReadyIndex < 0 ||
-    latestActorActionIndex < 0 ||
-    latestRoundCompletedIndex > latestActorActionIndex
-
-  if (!shouldShow) {
+  if (scopedEvents.some((event) => event.type === "event.injected")) {
     return undefined
   }
 
-  const boundaryIndex = Math.max(0, latestRoundCompletedIndex)
+  const latestActorActionIndex = lastIndexOf(scopedEvents, isActorActionMessage)
+  if (latestActorActionIndex >= 0) {
+    return undefined
+  }
+
+  const actorsReadyIndex = lastIndexOf(scopedEvents, (event) => event.type === "actors.ready")
+  const boundaryIndex = 0
   const signal = latestInterludeSignal(scopedEvents, boundaryIndex, t)
   const actorCardProgress = buildActorCardProgress(scopedEvents, t)
   const stageView = buildInterludeStageView(scopedEvents, t)
@@ -103,10 +101,6 @@ export function buildInterludeStageView(
     if (event.type === "actors.ready") {
       completed.add("actorCards")
     }
-    if (event.type === "round.completed") {
-      completed.add("coordinator")
-    }
-
     const detail = interludeDetailFromEvent(event, index, t)
     if (detail) {
       details.push(detail)
@@ -217,16 +211,6 @@ function interludeDetailFromEvent(event: RunEvent, index: number, t?: UiTexts): 
       message: t?.interludeActorsReadyMessage?.replace("{count}", String(event.actors.length)) ?? `${event.actors.length} actor cards are ready.`,
     }
   }
-  if (event.type === "round.completed") {
-    return {
-      id: `round-${event.roundIndex}`,
-      stageId: "coordinator",
-      title: `${t?.roundReadyTitle ?? "Round ready"} ${event.roundIndex}`,
-      stepLabel: t?.roundReadyStep ?? "Waiting for confirmation",
-      message: t?.roundReadyMessage ?? "Review the current network state before the next round begins.",
-      roundIndex: event.roundIndex,
-    }
-  }
   return undefined
 }
 
@@ -241,9 +225,6 @@ function stageIdFromEvent(event: RunEvent): InterludeStageId | undefined {
     return "actorCards"
   }
   if (event.type === "actor.message") {
-    return "coordinator"
-  }
-  if (event.type === "round.completed") {
     return "coordinator"
   }
   return undefined

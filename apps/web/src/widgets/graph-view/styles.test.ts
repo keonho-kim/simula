@@ -25,7 +25,7 @@ Object.defineProperty(globalThis, "WebGL2RenderingContext", {
   value: webGlRenderingContext,
 })
 
-const { edgeColor, edgeSize, graphIntensityColor, nodeSize } = await import("./styles")
+const { edgeAlpha, edgeColor, edgeSize, forceAtlasOptions, graphIntensityColor, nodeSize } = await import("./styles")
 
 describe("graph visual styles", () => {
   test("scales nodes by interaction count and degree", () => {
@@ -42,9 +42,46 @@ describe("graph visual styles", () => {
     const medium = edgeSize(edge(4))
     const strong = edgeSize(edge(16))
 
-    expect(weak).toBeGreaterThanOrEqual(3.9)
-    expect(medium - weak).toBeGreaterThan(1.5)
-    expect(strong - medium).toBeGreaterThan(3)
+    expect(weak).toBeGreaterThanOrEqual(4.7)
+    expect(medium - weak).toBeGreaterThan(2)
+    expect(strong - medium).toBeGreaterThan(4)
+  })
+
+  test("keeps edges visible across interaction intensities", () => {
+    expect(edgeAlpha(0)).toBeGreaterThanOrEqual(0.54)
+    expect(edgeAlpha(1)).toBeGreaterThanOrEqual(0.82)
+    expect(edgeAlpha(1)).toBeGreaterThan(edgeAlpha(0))
+    expect(edgeAlpha(4)).toBeGreaterThan(edgeAlpha(1))
+    expect(edgeAlpha(8)).toBeGreaterThan(edgeAlpha(4))
+    expect(edgeAlpha(12)).toBeGreaterThan(edgeAlpha(8))
+  })
+
+  test("uses node-size-aware force atlas spacing", () => {
+    const options = forceAtlasOptions(12)
+
+    expect(options.iterations).toBe(100)
+    expect(options.getEdgeWeight).toBe("weight")
+    expect(options.settings).toMatchObject({
+      adjustSizes: true,
+      barnesHutOptimize: false,
+      edgeWeightInfluence: 0.45,
+      gravity: 0.55,
+      scalingRatio: 16,
+      slowDown: 2.5,
+    })
+  })
+
+  test("keeps large graph force atlas settings bounded", () => {
+    const options = forceAtlasOptions(320)
+
+    expect(options.iterations).toBe(18)
+    expect(options.settings).toMatchObject({
+      adjustSizes: true,
+      barnesHutOptimize: true,
+      gravity: 1.05,
+      scalingRatio: 36,
+      slowDown: 5,
+    })
   })
 
   test("maps interaction intensity to distinct colors", () => {
@@ -53,6 +90,7 @@ describe("graph visual styles", () => {
     expect(graphIntensityColor(4)).not.toBe(graphIntensityColor(8))
     expect(graphIntensityColor(8)).not.toBe(graphIntensityColor(12))
     expect(edgeColor(1)).not.toBe(edgeColor(12))
+    expect(edgeColor(1)).toContain("37, 99, 235")
   })
 })
 

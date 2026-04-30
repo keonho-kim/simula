@@ -27,12 +27,24 @@ export async function invokeRoleText(
   return (await invokeRoleTextWithMetrics(settings, role, "draft", 1, prompt)).text
 }
 
+export async function invokeRoleTextStreaming(
+  settings: LLMSettings,
+  role: ModelRole,
+  step: ActorTraceStep | PlannerTraceStep | CoordinatorTraceStep | GeneratorRosterStep | ActorCardStep | "draft",
+  attempt: number,
+  prompt: string,
+  onDelta: (text: string) => Promise<void> | void
+): Promise<RoleTextResult> {
+  return invokeRoleTextWithMetrics(settings, role, step, attempt, prompt, onDelta)
+}
+
 export async function invokeRoleTextWithMetrics(
   settings: LLMSettings,
   role: ModelRole,
   step: ActorTraceStep | PlannerTraceStep | CoordinatorTraceStep | GeneratorRosterStep | ActorCardStep | "draft",
   attempt: number,
-  prompt: string
+  prompt: string,
+  onDelta?: (text: string) => Promise<void> | void
 ): Promise<RoleTextResult> {
   const config = resolveRoleSettings(settings, role)
   const startedAt = performance.now()
@@ -45,7 +57,11 @@ export async function invokeRoleTextWithMetrics(
 
   for await (const chunk of await model.stream(prompt)) {
     firstChunkAt ??= performance.now()
-    text += contentToText(chunk.content)
+    const delta = contentToText(chunk.content)
+    text += delta
+    if (delta) {
+      await onDelta?.(delta)
+    }
     usage = readUsage(chunk.usage_metadata) ?? usage
   }
 
@@ -66,4 +82,3 @@ export async function invokeRoleTextWithMetrics(
     },
   }
 }
-

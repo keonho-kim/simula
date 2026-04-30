@@ -1,6 +1,6 @@
 import type { ActorTraceStep } from "@simula/shared"
 import { compactLines, compactText, renderOutputLengthGuide, scalePromptLimit } from "../../../prompt"
-import { actorPromptContext } from "../../context"
+import { actorPromptContext } from "../../actor-memory"
 import type { ActorGraphState } from "./state"
 import { targetActors } from "./state"
 
@@ -31,28 +31,33 @@ ${compactLines([
 ], 4, scalePromptLimit(700, state.scenario.controls))}`,
   target: (state, partial) =>
     `Actor target.
-Return exactly one allowed output.
-Use an actor id when this actor should direct the action at another actor.
-Use None only when the next action is clearly solitary or has no direct recipient.
+Choose a direct target only when this actor has a realistic access path: existing relationship, shared team, formal meeting, public channel, operational chain, or clear scenario pressure.
+Avoid unrealistic leaps across hierarchy, geography, or organization boundaries.
 No explanation, names, markdown, or punctuation.
 
+Actor: ${state.actor.name} (${state.actor.role}). ${compactText(state.actor.backgroundHistory, scalePromptLimit(180, state.scenario.controls))}
 Thought: ${compactText(partial.thought, 350)}
+Action: ${actorActionSummary(state, partial.action)}
+Return exactly one allowed output from Allowed outputs.
+Use an actor id when the selected action is directed at another actor.
+Use None only when the selected action is no_action or solitary.
 Allowed outputs:
-${targetActors(state)
-  .map((actor) => `- ${actor.id} (${actor.name}, ${actor.role})`)
-  .join("\n")}
-- None`,
+${targetPromptOutputs(state, partial.action)}
+Target context:
+${targetPromptContext(state, partial.action)}`,
   action: (state, partial) =>
     `Actor action.
 Return exactly one allowed output.
 Use an action id when this actor should act this round.
 Use no_action only when holding position is the best choice.
+Stay within channels this actor can realistically use from their role, relationships, workplace, public position, or current event context.
+Do not jump to private or semi-public contact with distant executives, officials, or field actors unless the scenario context makes that access plausible.
 No explanation, labels, markdown, or punctuation.
 
 Round: ${state.roundIndex}
-Target: ${partial.target}
+Thought: ${compactText(partial.thought, scalePromptLimit(320, state.scenario.controls))}
 Allowed outputs:
-${state.actor.actions.map((action) => `- ${action.id} (${action.label}). ${action.expectedOutcome}`).join("\n")}
+${actionPromptOutputs(state)}
 - no_action (hold position this round)`,
   intent: (state, partial) =>
     `Actor intent. Return one sentence explaining ${state.actor.name}'s choice in round ${state.roundIndex}.
@@ -63,6 +68,7 @@ Action: ${partial.action}`,
   message: (state, partial) =>
     `Actor message. Return one short spoken line as ${state.actor.name}, or None if this actor does not speak.
 ${renderOutputLengthGuide(state.scenario.controls, "actor message")}
+If Action is no_action, return None.
 No explanation or JSON.
 
 Thought: ${compactText(partial.thought, scalePromptLimit(300, state.scenario.controls))}
@@ -77,4 +83,41 @@ function coordinatorDirective(value: string, step: string, label: string): strin
     const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
     return current.replace(new RegExp(`^\\s*(?:#{1,6}\\s*)?(?:\\*\\*)?${escapedAlias}(?:\\*\\*)?\\s*[:：-]\\s*`, "i"), "")
   }, value.trim())
+}
+
+function actorActionSummary(state: ActorGraphState, actionId: string | undefined): string {
+  const normalized = actionId?.trim()
+  if (!normalized || normalized === "no_action") {
+    return "no_action"
+  }
+  const action = state.actor.actions.find((item) => item.id === normalized)
+  return action ? `${action.id} (${action.visibility}, ${action.label})` : normalized
+}
+
+function actionPromptOutputs(state: ActorGraphState): string {
+  const actions =
+    targetActors(state).length === 0
+      ? state.actor.actions.filter((action) => action.visibility === "solitary")
+      : state.actor.actions
+  return actions.map((action) => `- ${action.id} (${action.label}). ${action.expectedOutcome}`).join("\n")
+}
+
+function targetPromptOutputs(state: ActorGraphState, actionId: string | undefined): string {
+  const normalized = actionId?.trim()
+  const action = state.actor.actions.find((item) => item.id === normalized)
+  if (!normalized || normalized === "no_action" || !action || action.visibility === "solitary") {
+    return "- None"
+  }
+  return targetActors(state).map((actor) => `- ${actor.id}`).join("\n")
+}
+
+function targetPromptContext(state: ActorGraphState, actionId: string | undefined): string {
+  const normalized = actionId?.trim()
+  const action = state.actor.actions.find((item) => item.id === normalized)
+  if (!normalized || normalized === "no_action" || !action || action.visibility === "solitary") {
+    return "- None"
+  }
+  return targetActors(state)
+    .map((actor) => `${actor.id}: ${actor.name} (${actor.role}). ${compactText(actor.backgroundHistory, scalePromptLimit(150, state.scenario.controls))}`)
+    .join("\n")
 }

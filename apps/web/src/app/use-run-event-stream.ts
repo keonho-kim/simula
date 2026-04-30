@@ -10,6 +10,7 @@ const eventTypes: RunEvent["type"][] = [
   "model.message",
   "model.metrics",
   "actors.ready",
+  "event.injected",
   "interaction.recorded",
   "actor.message",
   "round.completed",

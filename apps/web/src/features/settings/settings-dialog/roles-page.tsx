@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type Dispatch, type SetStateAction } from "react"
+import { useMemo, type Dispatch, type SetStateAction } from "react"
 import { useQuery } from "@tanstack/react-query"
 import type { LLMSettings, ModelRole, RoleSettings } from "@simula/shared"
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@/components/ui/field"
@@ -63,19 +63,13 @@ function RoleSection({ role, settings, t, setDraft, jsonDraft, setJsonDraft }: {
 }) {
   const active = settings.roles[role]
   const connection = settings.providers[active.provider]
+  const shouldLoadModels = isOpenAICompatible(active.provider)
   const modelsQuery = useQuery({
     queryKey: ["provider-models", role, active.provider, connection.baseUrl, connection.apiKey, connection.extraHeaders],
     queryFn: () => fetchProviderModels(active.provider, connection),
-    enabled: false,
+    enabled: shouldLoadModels,
     retry: false,
   })
-  const shouldLoadModels = isOpenAICompatible(active.provider)
-
-  useEffect(() => {
-    if (shouldLoadModels) {
-      void modelsQuery.refetch()
-    }
-  }, [shouldLoadModels, role, active.provider])
 
   const models = useMemo(() => {
     const fetched = modelsQuery.data ?? []
@@ -188,4 +182,3 @@ function ReasoningEffortField({ active, role, t, setDraft }: {
     </Field>
   )
 }
-

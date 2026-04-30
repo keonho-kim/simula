@@ -5,12 +5,14 @@ import { tmpdir } from "node:os"
 import {
   RunStore,
   MODEL_ROLES,
+  applyInjectedEventContext,
   applyInteractionContext,
-  applyPreRoundDigestContext,
+  actorPromptContext,
   defaultSettings,
   emptyActorContext,
   runSimulation,
 } from "../src"
+import { buildTimelineFrame } from "../src/simulation/timeline"
 import type { ActorState, Interaction, LLMSettings, ModelProvider, RunEvent } from "@simula/shared"
 
 describe("simulation workflow", () => {
@@ -67,15 +69,16 @@ describe("simulation workflow", () => {
         )
       )
     ).toBe(true)
-    expect(state.actors.every((actor) => actor.context.public.length > 0)).toBe(true)
-    expect(state.actors.some((actor) => Object.keys(actor.context.semiPublic).length > 0)).toBe(true)
-    expect(state.actors.some((actor) => Object.keys(actor.context.private).length > 0)).toBe(true)
+    expect(events.filter((event) => event.type === "event.injected").length).toBeGreaterThan(0)
+    expect(state.actors.every((actor) => actor.context.visible.some((entry) => entry.kind === "event"))).toBe(true)
+    expect(state.actors.every((actor) => actor.context.visible.some((entry) => entry.kind === "self" || entry.kind === "out"))).toBe(true)
+    expect(state.actors.some((actor) => actor.context.visible.some((entry) => entry.kind === "in"))).toBe(true)
     expect(state.roundDigests).toHaveLength(3)
     expect(state.roundReports).toHaveLength(3)
     expect(state.roundReports.map((report) => report.roundIndex)).toEqual([1, 2, 3])
     expect(state.roundDigests.every((digest) => digest.preRound.content)).toBe(true)
     expect(state.roundDigests.every((digest) => digest.afterRound.content)).toBe(true)
-    expect(state.actors.every((actor) => actor.context.public.some((entry) => entry.includes("pre-round")))).toBe(true)
+    expect(state.actors.every((actor) => actor.memory.some((entry) => entry.includes("EVENT | ROUND")))).toBe(true)
     expect(
       state.actors.every((actor) =>
         !actor.memory.some((entry) => entry.includes("After-round") || entry.includes("produced a"))
@@ -257,26 +260,83 @@ describe("simulation workflow", () => {
 
     const updated = applyInteractionContext(actors, interaction)
 
-    expect(updated[0]?.context.solitary).toHaveLength(1)
-    expect(updated[1]?.context.solitary).toHaveLength(0)
+    expect(updated[0]?.context.visible).toHaveLength(1)
+    expect(updated[0]?.context.visible[0]?.kind).toBe("self")
+    expect(updated[1]?.context.visible).toHaveLength(0)
   })
 
-  test("shares pre-round digest with actors without leaking after-round digest", () => {
+  test("does not feed no-action entries as own recent actions", () => {
     const actors = [testActor("actor-1"), testActor("actor-2")]
-    const updated = applyPreRoundDigestContext(actors, {
+    const updated = applyInteractionContext(actors, {
+      id: "no-action-1",
       roundIndex: 1,
-      preRound: {
-        elapsedTime: "Opening moment",
-        content: "A public pressure is visible.",
-      },
-      afterRound: {
-        content: "This user-facing summary must not be injected.",
-      },
+      sourceActorId: "actor-1",
+      targetActorIds: [],
+      actionType: "no_action",
+      content: "Actor 1 held back.",
+      eventId: "event-1",
+      visibility: "solitary",
+      decisionType: "no_action",
+      intent: "Wait and watch.",
+      expectation: "The situation may clarify.",
     })
 
-    expect(updated.every((actor) => actor.context.public.some((entry) => entry.includes("A public pressure")))).toBe(true)
+    const promptContext = actorPromptContext(updated[0] as ActorState)
+
+    expect(promptContext).toContain("Own recent actions:\n- None")
+    expect(promptContext).not.toContain("Actor 1 held back.")
+  })
+
+  test("shares injected events with actors as visible event context", () => {
+    const actors = [testActor("actor-1"), testActor("actor-2")]
+    const updated = applyInjectedEventContext(actors, {
+      id: "round-1-event-1",
+      roundIndex: 1,
+      sourceEventId: "event-1",
+      title: "Public pressure",
+      summary: "A public pressure is visible.",
+    })
+
+    expect(updated.every((actor) => actor.context.visible.some((entry) => entry.kind === "event" && entry.content.includes("A public pressure")))).toBe(true)
     expect(updated.every((actor) => actor.memory.some((entry) => entry.includes("A public pressure")))).toBe(true)
-    expect(updated.every((actor) => !actor.memory.some((entry) => entry.includes("user-facing summary")))).toBe(true)
+  })
+
+  test("does not count no-action or self-target interactions in graph timeline", () => {
+    const firstFrame = buildTimelineFrame(0, actorsReadyEvent())
+    const noActionFrame = buildTimelineFrame(1, interactionEvent({
+      id: "no-action-1",
+      roundIndex: 1,
+      sourceActorId: "actor-1",
+      targetActorIds: [],
+      actionType: "no_action",
+      content: "Actor 1 held back.",
+      eventId: "event-1",
+      visibility: "solitary",
+      decisionType: "no_action",
+      intent: "Wait.",
+      expectation: "Nothing changes.",
+    }), firstFrame)
+
+    expect(noActionFrame.nodes.find((node) => node.id === "actor-1")?.interactionCount).toBe(0)
+    expect(noActionFrame.edges).toEqual([])
+    expect(noActionFrame.activeNodeIds).toEqual([])
+
+    const selfTargetFrame = buildTimelineFrame(2, interactionEvent({
+      id: "self-target-1",
+      roundIndex: 2,
+      sourceActorId: "actor-1",
+      targetActorIds: ["actor-1"],
+      actionType: "public-action",
+      content: "Actor 1 loops back to self.",
+      eventId: "event-1",
+      visibility: "public",
+      decisionType: "action",
+      intent: "Act alone.",
+      expectation: "No relation changes.",
+    }), noActionFrame)
+
+    expect(selfTargetFrame.nodes.find((node) => node.id === "actor-1")?.interactionCount).toBe(1)
+    expect(selfTargetFrame.edges).toEqual([])
   })
 })
 
@@ -295,6 +355,27 @@ function testActor(id: string): ActorState {
     memory: [],
     relationships: {},
     contextSummary: "",
+  }
+}
+
+function actorsReadyEvent(): RunEvent {
+  return {
+    type: "actors.ready",
+    runId: "timeline-run",
+    timestamp: "2026-04-28T00:00:00.000Z",
+    actors: [
+      { id: "actor-1", label: "Actor 1", role: "Role 1", intent: "", interactionCount: 0 },
+      { id: "actor-2", label: "Actor 2", role: "Role 2", intent: "", interactionCount: 0 },
+    ],
+  }
+}
+
+function interactionEvent(interaction: Interaction): RunEvent {
+  return {
+    type: "interaction.recorded",
+    runId: "timeline-run",
+    timestamp: "2026-04-28T00:00:00.000Z",
+    interaction,
   }
 }
 

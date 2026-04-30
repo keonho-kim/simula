@@ -22,10 +22,14 @@ export async function runStage(
         role: actor.role,
         intent: actor.intent,
         interactionCount: 0,
+        backgroundHistory: actor.backgroundHistory,
+        personality: actor.personality,
+        preference: actor.preference,
+        privateGoal: actor.privateGoal,
+        contextSummary: actor.contextSummary,
       })),
     })
   }
   await emitNodeCompleted(state.runId, nodeId, label, emit)
   return { simulation: result.simulation }
 }
-

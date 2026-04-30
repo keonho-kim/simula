@@ -3,6 +3,7 @@ import type {
   ActorState,
   CoordinatorTrace,
   CoordinatorTraceStep,
+  InjectedEvent,
   Interaction,
   PlannedEvent,
   RoundDigest,
@@ -13,11 +14,22 @@ import { invokeRoleTextWithMetrics } from "../../../llm"
 import { withPromptLanguageGuide } from "../../../language"
 import { scalePromptLimit } from "../../../prompt"
 import {
+  applyInjectedEventContext,
   applyInteractionContext,
-  applyPreRoundDigestContext,
   compressActorContext,
   resolveActorContextTokenBudget,
-} from "../../context"
+} from "../../actor-memory"
+import {
+  buildPreRoundDigest,
+  continuityEvent,
+  eventForInjection,
+  eventInjectionAllowedOutputs,
+  eventInjectionDisplayValue,
+  injectedEventForRound,
+  isInjectableEvent,
+  selectEventInjection,
+} from "../../event-injection"
+import { applyActorDecision, buildInteraction } from "../../interactions"
 import { plannerDigestSummary } from "../../plan"
 import { summarizeEvents, summarizeInteractions } from "../../reporting"
 import { upsertRoleTrace } from "../../state"
@@ -27,9 +39,6 @@ import { repairExactChoice } from "../repair"
 import type { CoordinatorPromptBuilder } from "./prompts"
 import { coordinatorPrompts } from "./prompts"
 import {
-  applyActorDecision,
-  buildInteraction,
-  buildPreRoundDigest,
   coordinatorTracePartial,
   getCoordinatorTrace,
 } from "./state"
@@ -90,15 +99,23 @@ export async function coordinatorNode(
       events
     )
     coordinatorTrace = updateCoordinatorTrace(coordinatorTrace, "eventInjection", injectionResult.text, injectionResult.retries)
-    const event = eventForInjection(injectionResult.text, events) ?? continuityEvent(roundIndex)
-    const injectedEvent = events.find((item) => item.id === event.id)
-    if (injectedEvent) {
-      injectedEvent.status = "active"
+    const selectedEvent = eventForInjection(injectionResult.text, events)
+    const event = selectedEvent ?? continuityEvent(roundIndex)
+    let injectedEvent: InjectedEvent | undefined = undefined
+    if (selectedEvent) {
+      injectedEvent = injectedEventForRound(roundIndex, selectedEvent)
+      selectedEvent.status = "active"
+      await emit({
+        type: "event.injected",
+        runId: state.runId,
+        timestamp: new Date().toISOString(),
+        event: injectedEvent,
+      })
+      actors = applyInjectedEventContext(actors, injectedEvent)
     }
 
     const roundDigest = buildPreRoundDigest(roundIndex, injectedEvent)
     roundDigests.push(roundDigest)
-    actors = applyPreRoundDigestContext(actors, roundDigest)
     actors = await Promise.all(
       actors.map((actor) =>
         compressActorContext(actor, {
@@ -146,8 +163,22 @@ export async function coordinatorNode(
       )
     )
     throwIfCanceled(isCanceled)
-    if (injectedEvent) {
-      injectedEvent.status = "completed"
+    if (selectedEvent) {
+      const resolutionResult = await runCoordinatorValidatedNode(
+        workflowSnapshot(state, actors, interactions, roundDigests, events, maxRound),
+        "eventResolution",
+        coordinatorPrompts.eventResolution,
+        emit,
+        selectEventResolution,
+        () => ["completed", "partial"]
+      )
+      coordinatorTrace = updateCoordinatorTrace(
+        coordinatorTrace,
+        "eventResolution",
+        resolutionResult.text,
+        resolutionResult.retries
+      )
+      selectedEvent.status = resolutionResult.text === "partial" ? "partial" : "completed"
     }
     await emit({
       type: "round.completed",
@@ -167,8 +198,18 @@ export async function coordinatorNode(
     coordinatorTrace = updateCoordinatorTrace(coordinatorTrace, "progressDecision", progressResult.text, progressResult.retries)
     throwIfCanceled(isCanceled)
     if (progressResult.text === "complete") {
-      stopReason = "simulation_done"
-      break
+      if (hasUnresolvedEvents(events)) {
+        await emit({
+          type: "log",
+          runId: state.runId,
+          timestamp: new Date().toISOString(),
+          level: "info",
+          message: "Coordinator requested complete, but unresolved pending or partial events remain; continuing.",
+        })
+      } else {
+        stopReason = "simulation_done"
+        break
+      }
     }
     if (progressResult.text === "stop" && isNoProgressCandidate(roundIndex, interactions, roundDigests)) {
       stopReason = "no_progress"
@@ -395,7 +436,7 @@ async function resolveEventInjection(
   emit: (event: RunEvent) => Promise<void>,
   events: PlannedEvent[]
 ): Promise<{ text: string; retries: number }> {
-  if (!events.some((event) => event.status === "pending")) {
+  if (!events.some(isInjectableEvent)) {
     return { text: "None", retries: 0 }
   }
 
@@ -427,6 +468,7 @@ function coordinatorStepLabel(step: CoordinatorTraceStep): string {
   if (step === "interactionPolicy") return "Interaction Policy"
   if (step === "outcomeDirection") return "Outcome Direction"
   if (step === "eventInjection") return "Event Injection"
+  if (step === "eventResolution") return "Event Resolution"
   if (step === "progressDecision") return "Progress Decision"
   return "Extension Decision"
 }
@@ -475,50 +517,23 @@ function workflowSnapshot(
   }
 }
 
-function selectEventInjection(value: string, events: PlannedEvent[]): string | undefined {
-  const selected = value.trim()
-  if (selected === "None") {
-    return "None"
-  }
-  const pending = events.filter((event) => event.status === "pending")
-  const match = pending.find((event) => event.id === selected)
-  return match?.id
-}
-
-function eventInjectionAllowedOutputs(events: PlannedEvent[]): string[] {
-  return [...events.filter((event) => event.status === "pending").map((event) => event.id), "None"]
-}
-
-function eventInjectionDisplayValue(value: string, events: PlannedEvent[]): string {
-  if (value === "None") {
-    return "None"
-  }
-  const event = events.find((item) => item.id === value)
-  return event ? `${event.title}. ${event.summary}` : value
-}
-
-function eventForInjection(value: string, events: PlannedEvent[]): PlannedEvent | undefined {
-  return events.find((event) => event.id === value && event.status === "pending")
-}
-
-function continuityEvent(roundIndex: number): PlannedEvent {
-  return {
-    id: `round-${roundIndex}-continuity`,
-    title: "No new major event",
-    summary: "Actors continue from accumulated context and unresolved pressure.",
-    status: "active",
-    participantIds: [],
-  }
-}
-
 function selectProgressDecision(value: string): string | undefined {
   const selected = value.trim()
   return selected === "continue" || selected === "stop" || selected === "complete" ? selected : undefined
 }
 
+function selectEventResolution(value: string): string | undefined {
+  const selected = value.trim()
+  return selected === "completed" || selected === "partial" ? selected : undefined
+}
+
 function selectExtensionDecision(value: string): string | undefined {
   const selected = value.trim()
   return selected === "continue" || selected === "stop" ? selected : undefined
+}
+
+function hasUnresolvedEvents(events: PlannedEvent[]): boolean {
+  return events.some((event) => event.status === "pending" || event.status === "partial")
 }
 
 function isNoProgressCandidate(roundIndex: number, interactions: Interaction[], roundDigests: RoundDigest[]): boolean {

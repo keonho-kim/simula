@@ -1,4 +1,4 @@
-import type { PromptOutputLength, ScenarioControls, ScenarioInput } from "@simula/shared"
+import type { PromptOutputLength, ScenarioControls, ScenarioInput, ScenarioLoadLevel } from "@simula/shared"
 
 const FRONTMATTER_PATTERN = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/
 
@@ -30,7 +30,7 @@ export function parseScenarioControls(frontmatter: string): ScenarioControls {
     }
     const key = trimmed.slice(0, separatorIndex).trim()
     const value = trimmed.slice(separatorIndex + 1).trim()
-    if (!["num_cast", "allow_additional_cast", "actions_per_type", "max_round", "fast_mode", "actor_context_token_budget", "output_length"].includes(key)) {
+    if (!["num_cast", "allow_additional_cast", "actions_per_type", "max_round", "fast_mode", "actor_context_token_budget", "output_length", "load_level"].includes(key)) {
       throw new Error(`Unsupported scenario control: ${key}`)
     }
     values.set(key, value)
@@ -52,6 +52,7 @@ export function parseScenarioControls(frontmatter: string): ScenarioControls {
       ? parsePositiveInteger(values.get("actor_context_token_budget") ?? "", "actor_context_token_budget")
       : undefined,
     outputLength: parseOutputLength(values.get("output_length") ?? "short"),
+    loadLevel: parseLoadLevel(values.get("load_level") ?? "middle"),
   }
 }
 
@@ -66,6 +67,7 @@ export function normalizeScenarioControls(controls: Partial<ScenarioControls>): 
       ? undefined
       : parsePositiveInteger(String(controls.actorContextTokenBudget), "actor_context_token_budget"),
     outputLength: parseOutputLength(controls.outputLength ?? "short"),
+    loadLevel: parseLoadLevel(controls.loadLevel ?? "middle"),
   }
 }
 
@@ -92,4 +94,11 @@ function parseOutputLength(value: string): PromptOutputLength {
     return value
   }
   throw new Error("output_length must be short, medium, or long.")
+}
+
+function parseLoadLevel(value: string): ScenarioLoadLevel {
+  if (value === "low" || value === "middle" || value === "high") {
+    return value
+  }
+  throw new Error("load_level must be low, middle, or high.")
 }

@@ -1,8 +1,9 @@
 ---
-num_cast: 15
-allow_additional_cast: true
+num_cast: 8
+allow_additional_cast: false
 max_round: 8
 output_length: short
+load_level: middle
 ---
 
 # 시나리오 05

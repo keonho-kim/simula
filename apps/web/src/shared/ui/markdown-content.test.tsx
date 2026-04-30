@@ -26,4 +26,13 @@ describe("MarkdownContent", () => {
     expect(html).toContain("<ul>")
     expect(html).toContain("<li>item</li>")
   })
+
+  test("allows sanitized markdown diff marks", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownContent content={'<mark data-markdown-diff="added">changed</mark>'} />
+    )
+
+    expect(html).toContain('data-markdown-diff="added"')
+    expect(html).toContain("changed")
+  })
 })

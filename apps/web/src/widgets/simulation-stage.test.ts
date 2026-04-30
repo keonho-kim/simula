@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { GraphNodeView, RunEvent } from "@simula/shared"
+import { buildSimulationEventNotice } from "./simulation-event-notice"
 import { buildInterludeStageView, buildSimulationInterlude } from "./simulation-stage-interlude"
 
 const runId = "run-test"
@@ -62,7 +63,7 @@ describe("buildSimulationInterlude", () => {
     expect(buildSimulationInterlude(events)).toBeUndefined()
   })
 
-  test("shows the overlay again after a round completes until the next actor action", () => {
+  test("does not show the overlay again after the first actor action", () => {
     const events = [
       runStarted(),
       actorsReady(),
@@ -72,10 +73,7 @@ describe("buildSimulationInterlude", () => {
       modelMessage("actor", "B thought: The offer has a weakness."),
     ]
 
-    const interlude = buildSimulationInterlude(events)
-
-    expect(interlude?.roleLabel).toBe("Actor")
-    expect(interlude?.stepLabel).toBe("Thought")
+    expect(buildSimulationInterlude(events)).toBeUndefined()
   })
 
   test("hides the overlay after terminal events", () => {
@@ -89,6 +87,16 @@ describe("buildSimulationInterlude", () => {
         timestamp,
         stopReason: "simulation_done",
       } satisfies RunEvent,
+    ]
+
+    expect(buildSimulationInterlude(events)).toBeUndefined()
+  })
+
+  test("hides the overlay after an event is injected", () => {
+    const events = [
+      runStarted(),
+      actorsReady(),
+      eventInjected(1),
     ]
 
     expect(buildSimulationInterlude(events)).toBeUndefined()
@@ -118,7 +126,6 @@ describe("buildSimulationInterlude", () => {
     const events = [
       runStarted(),
       actorsReady(),
-      roundCompleted(1),
       modelMessage("actor", "A thought: I need leverage."),
     ]
 
@@ -134,6 +141,18 @@ describe("buildSimulationInterlude", () => {
     expect(view.activeStageId).toBe("coordinator")
     expect(view.details[0]?.stageId).toBe("coordinator")
     expect(view.details[0]?.stepLabel).toBe("Thought")
+  })
+
+  test("does not add round completed events to interlude details", () => {
+    const events = [
+      runStarted(),
+      actorsReady(),
+      roundCompleted(1),
+    ]
+
+    const view = buildInterludeStageView(events)
+
+    expect(view.details.map((detail) => detail.id)).not.toContain("round-1")
   })
 
   test("uses node events for stage status without showing them as details", () => {
@@ -165,6 +184,43 @@ describe("buildSimulationInterlude", () => {
   })
 })
 
+describe("buildSimulationEventNotice", () => {
+  test("shows the latest injected event until actor activity starts", () => {
+    const notice = buildSimulationEventNotice([
+      runStarted(),
+      actorsReady(),
+      eventInjected(1),
+    ])
+
+    expect(notice?.event.title).toBe("Public pressure")
+    expect(notice?.event.roundIndex).toBe(1)
+  })
+
+  test("hides the injected event notice after same-round interaction", () => {
+    expect(buildSimulationEventNotice([
+      runStarted(),
+      eventInjected(1),
+      interactionRecorded(1),
+    ])).toBeUndefined()
+  })
+
+  test("hides the injected event notice after same-round completion", () => {
+    expect(buildSimulationEventNotice([
+      runStarted(),
+      eventInjected(1),
+      roundCompleted(1),
+    ])).toBeUndefined()
+  })
+
+  test("hides a stale injected event notice when a later round proceeds without another event", () => {
+    expect(buildSimulationEventNotice([
+      runStarted(),
+      eventInjected(7),
+      roundCompleted(8),
+    ])).toBeUndefined()
+  })
+})
+
 function runStarted(): RunEvent {
   return { type: "run.started", runId, timestamp }
 }
@@ -191,4 +247,40 @@ function actorsReady(): RunEvent {
 
 function roundCompleted(roundIndex: number): RunEvent {
   return { type: "round.completed", runId, timestamp, roundIndex }
+}
+
+function eventInjected(roundIndex: number): RunEvent {
+  return {
+    type: "event.injected",
+    runId,
+    timestamp,
+    event: {
+      id: `round-${roundIndex}-event-1`,
+      roundIndex,
+      sourceEventId: "event-1",
+      title: "Public pressure",
+      summary: "A public pressure enters the round.",
+    },
+  }
+}
+
+function interactionRecorded(roundIndex: number): RunEvent {
+  return {
+    type: "interaction.recorded",
+    runId,
+    timestamp,
+    interaction: {
+      id: `round-${roundIndex}-actor-1`,
+      roundIndex,
+      sourceActorId: "actor-1",
+      targetActorIds: ["actor-2"],
+      actionType: "public-action",
+      content: "Actor 1 applies pressure.",
+      eventId: "event-1",
+      visibility: "public",
+      decisionType: "action",
+      intent: "Create pressure.",
+      expectation: "Actor 2 responds.",
+    },
+  }
 }

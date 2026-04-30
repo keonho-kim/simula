@@ -35,6 +35,7 @@ import {
 import { RoleDiagnosticsPanel } from "./report-page/role-diagnostics-panel"
 import { TimelinePanel } from "./report-page/timeline-panel"
 import { ExportButton } from "./report-page/ui"
+import { ReportMetricsDashboard } from "./report-page/metrics-dashboard"
 
 interface ReportPageProps {
   selectedRunId?: string
@@ -126,6 +127,8 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
             <ExportButton label={t.exportMarkdown} disabled={!selectedRunId} onClick={() => onExport("md")} />
           </div>
         </header>
+
+        <ReportMetricsDashboard events={events} t={t} />
 
         <section className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)_520px]">
           <ActorCardRail t={t} selectedActorId={selectedActorId} onActorSelect={selectActorFromRail} />
