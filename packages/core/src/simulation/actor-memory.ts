@@ -5,14 +5,15 @@ import type {
   InjectedEvent,
   Interaction,
   LLMSettings,
+  PromptOutputLength,
   RunEvent,
   ScenarioControls,
   ScenarioInput,
 } from "@simula/shared"
 import { invokeRoleTextWithMetrics } from "../llm"
-import { withPromptLanguageGuide } from "../language"
-import { compactLines, compactText, renderOutputLengthGuide, scalePromptLimit } from "../prompt"
-import { DEFAULT_ACTOR_CONTEXT_TOKEN_BUDGET, MAX_ACTOR_CONTEXT_TOKEN_BUDGET } from "../settings"
+import { withRolePromptGuide } from "../language"
+import { compactLines, compactText, resolvePromptOutputLength, scalePromptLimit } from "../prompt"
+import { emitModelTelemetry } from "./events"
 
 const MAX_CONTEXT_COMPRESSION_ATTEMPTS = 5
 const ACTOR_MEMORY_PROMPT_CHARS = 260
@@ -21,6 +22,11 @@ const CONTEXT_COMPRESSION_INPUT_CHARS = 700
 const CONTEXT_SUMMARY_CHARS = 520
 const CONTEXT_EVENT_CHARS = 280
 const MAX_RECENT_ITEMS_PER_SECTION = 4
+const ACTOR_MEMORY_SENTENCE_LIMITS: Record<PromptOutputLength, number> = {
+  short: 3,
+  medium: 5,
+  long: 10,
+}
 
 export function emptyActorContext(): ActorContextMemory {
   return { visible: [] }
@@ -54,11 +60,6 @@ Observed public activity:
 ${observed}`
 }
 
-export function resolveActorContextTokenBudget(scenario: ScenarioInput, settings: LLMSettings): number {
-  const budget = scenario.controls.actorContextTokenBudget ?? settings.roles.actor.contextTokenBudget ?? DEFAULT_ACTOR_CONTEXT_TOKEN_BUDGET
-  return Math.min(budget, MAX_ACTOR_CONTEXT_TOKEN_BUDGET)
-}
-
 export async function compressActorContext(
   actor: ActorState,
   input: {
@@ -66,32 +67,28 @@ export async function compressActorContext(
     scenario: ScenarioInput
     settings: LLMSettings
     roundIndex: number
-    tokenBudget: number
     emit: (event: RunEvent) => Promise<void>
   }
 ): Promise<ActorState> {
   const context = actor.context.visible.map(renderVisibleEntry).join("\n")
-  const tokenBudget = Math.min(input.tokenBudget, MAX_ACTOR_CONTEXT_TOKEN_BUDGET)
   for (let attempt = 1; attempt <= MAX_CONTEXT_COMPRESSION_ATTEMPTS; attempt += 1) {
-    const prompt = withPromptLanguageGuide(
-      `Compress memory for ${actor.name}. Return at most 3 short first-person lines.
-${renderOutputLengthGuide(input.scenario.controls, "actor memory")}
+    const prompt = withRolePromptGuide(
+      `Compress memory for ${actor.name}. ${renderActorMemoryLengthGuide(input.scenario.controls)}
 Keep only actionable facts, pressure, commitment, and important promises.
 
 Profile: ${actor.role}; ${compactText(actor.personality, scalePromptLimit(100, input.scenario.controls))}; wants ${compactText(actor.preference, scalePromptLimit(120, input.scenario.controls))}.
 Previous: ${compactText(actor.contextSummary || "None", scalePromptLimit(220, input.scenario.controls))}
 Visible history:
 ${context ? compactLines(context.split("\n"), 8, scalePromptLimit(CONTEXT_COMPRESSION_INPUT_CHARS, input.scenario.controls)) : "No visible runtime history yet."}`,
-      input.scenario.language
+      {
+        language: input.scenario.language,
+        settings: input.settings,
+        role: "actor",
+      }
     )
     const result = await invokeRoleTextWithMetrics(input.settings, "actor", "context", attempt, prompt)
-    await input.emit({
-      type: "model.metrics",
-      runId: input.runId,
-      timestamp: timestamp(),
-      metrics: result.metrics,
-    })
-    const summary = normalizeContextSummary(result.text, tokenBudget, input.scenario.controls)
+    await emitModelTelemetry(input.runId, result, input.emit, { actorId: actor.id, actorName: actor.name })
+    const summary = normalizeContextSummary(result.text, input.scenario.controls)
     if (summary) {
       await input.emit({
         type: "model.message",
@@ -112,6 +109,14 @@ ${context ? compactLines(context.split("\n"), 8, scalePromptLimit(CONTEXT_COMPRE
   }
 
   throw new Error(`actor.context for ${actor.id} failed after ${MAX_CONTEXT_COMPRESSION_ATTEMPTS} empty responses.`)
+}
+
+export function actorMemorySentenceLimit(controls?: Partial<Pick<ScenarioControls, "outputLength">>): number {
+  return ACTOR_MEMORY_SENTENCE_LIMITS[resolvePromptOutputLength(controls)]
+}
+
+export function renderActorMemoryLengthGuide(controls?: Partial<Pick<ScenarioControls, "outputLength">>): string {
+  return `Return at most ${actorMemorySentenceLimit(controls)} short first-person sentences.`
 }
 
 export function applyInjectedEventContext(actors: ActorState[], event: InjectedEvent): ActorState[] {
@@ -187,9 +192,9 @@ function renderVisibleEntry(entry: ActorVisibleContextEntry): string {
   return `${entry.kind.toUpperCase()} | ROUND ${entry.roundIndex} | ${entry.content}`
 }
 
-function normalizeContextSummary(value: string, tokenBudget: number, controls: ScenarioControls): string {
+function normalizeContextSummary(value: string, controls: ScenarioControls): string {
   const trimmed = value.replace(/```[\s\S]*?```/g, "").replace(/\s+/g, " ").trim()
-  const maxCharacters = Math.min(tokenBudget * 2, scalePromptLimit(CONTEXT_SUMMARY_CHARS, controls))
+  const maxCharacters = scalePromptLimit(CONTEXT_SUMMARY_CHARS, controls)
   return trimmed.length > maxCharacters ? trimmed.slice(0, maxCharacters).trim() : trimmed
 }
 

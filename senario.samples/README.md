@@ -36,8 +36,7 @@ Optional:
 - `actions_per_type`: positive integer, defaults to `3`
 - `max_round`: positive integer, defaults to `8`
 - `fast_mode`: boolean, defaults to `false`
-- `actor_context_token_budget`: positive integer, uses the actor role default when omitted
-- `output_length`: `short`, `medium`, or `long`; defaults to `short`
+- `output_length`: `short`, `medium`, or `long`; defaults to `short` and also controls actor memory compression length
 - `load_level`: `low`, `middle`, or `high`; defaults to `middle`
 
 Load levels describe the expected operational pressure of the sample:

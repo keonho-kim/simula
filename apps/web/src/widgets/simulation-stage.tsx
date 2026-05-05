@@ -1,10 +1,11 @@
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import type { RunEvent } from "@simula/shared"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { useRunStore } from "@/store/run-store"
 import { GraphView } from "@/widgets/graph-view"
-import { buildSimulationEventNotice, type SimulationEventNotice } from "@/widgets/simulation-event-notice"
+import { buildSimulationEventNotice } from "@/widgets/simulation-event-notice"
+import { SimulationEventNoticeCard } from "@/widgets/simulation-event-notice-card"
 import { buildSimulationInterlude, type InterludeStageStatus, type SimulationInterludeState } from "@/widgets/simulation-stage-interlude"
 import type { UiTexts } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -38,15 +39,21 @@ export function SimulationStage({
   onEdgeSelect,
   showActorPopover = false,
 }: SimulationStageProps) {
+  const [dismissedEventNoticeKeys, setDismissedEventNoticeKeys] = useState<Set<string>>(() => new Set())
   const timeline = useRunStore((state) => state.timeline)
   const replayIndex = useRunStore((state) => state.replayIndex)
   const liveEvents = useRunStore((state) => state.liveEvents)
+  const runState = useRunStore((state) => state.runState)
   const frame = timeline[replayIndex] ?? timeline.at(-1)
   const completedNodes = liveEvents.filter((event) => event.type === "node.completed").length
   const progress = Math.min(100, completedNodes * 25)
   const interlude = buildSimulationInterlude(liveEvents, t)
   const eventNotice = buildSimulationEventNotice(liveEvents)
+  const visibleEventNotice = eventNotice && !dismissedEventNoticeKeys.has(eventNotice.dismissalKey) ? eventNotice : undefined
   const terminal = hasTerminalEvent(liveEvents)
+  const dismissEventNotice = (dismissalKey: string) => {
+    setDismissedEventNoticeKeys((current) => new Set(current).add(dismissalKey))
+  }
 
   return (
     <section className={cn("flex min-h-0 flex-col rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60", className)}>
@@ -80,6 +87,7 @@ export function SimulationStage({
               selectedEdgeId={selectedEdgeId}
               onEdgeSelect={onEdgeSelect ?? noopEdgeSelect}
               showActorPopover={showActorPopover}
+              actors={runState?.actors}
             />
           </div>
           <SimulationInterludeOverlay
@@ -87,28 +95,10 @@ export function SimulationStage({
             terminal={terminal}
             t={t}
           />
-          <SimulationEventNoticeCard notice={eventNotice} t={t} />
+          <SimulationEventNoticeCard notice={visibleEventNotice} t={t} onDismiss={dismissEventNotice} />
         </div>
       </div>
     </section>
-  )
-}
-
-function SimulationEventNoticeCard({ notice, t }: { notice?: SimulationEventNotice; t: UiTexts }) {
-  if (!notice) {
-    return null
-  }
-
-  return (
-    <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-4">
-      <article className="w-[min(420px,calc(100%-32px))] rounded-lg border border-amber-300/80 bg-background/95 p-4 text-center shadow-lg ring-1 ring-amber-200/70">
-        <p className="text-xs font-semibold uppercase text-amber-700">
-          {t.eventInjectedRound.replace("{round}", String(notice.event.roundIndex))}
-        </p>
-        <h3 className="mt-2 text-base font-semibold text-foreground">{notice.event.title}</h3>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{notice.event.summary}</p>
-      </article>
-    </div>
   )
 }
 

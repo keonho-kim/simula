@@ -31,11 +31,12 @@ export function normalizeSettings(settings: LLMSettingsInput): LLMSettings {
 }
 
 export function applyRoleProviderDefaults(config: RoleSettings): RoleSettings {
+  const { contextTokenBudget: _removed, ...roleConfig } = config as RoleSettings & { contextTokenBudget?: unknown }
   const providerDefaults = ROLE_PROVIDER_DEFAULTS[config.provider] ?? {}
   return {
-    ...config,
+    ...roleConfig,
     ...Object.fromEntries(
-      Object.entries(providerDefaults).filter(([key]) => config[key as keyof RoleSettings] === undefined)
+      Object.entries(providerDefaults).filter(([key]) => roleConfig[key as keyof RoleSettings] === undefined)
     ),
   }
 }
@@ -98,4 +99,3 @@ function nonEmptyProviderSettings(settings: ProviderSettings): ProviderSettings 
 function isStructuredSettings(settings: LLMSettingsInput): settings is Partial<LLMSettings> {
   return typeof settings === "object" && settings !== null && ("providers" in settings || "roles" in settings)
 }
-

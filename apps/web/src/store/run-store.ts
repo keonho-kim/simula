@@ -79,7 +79,7 @@ function actorEvents(events: RunEvent[]): RunEvent[] {
       event.type === "actors.ready" ||
       event.type === "interaction.recorded" ||
       event.type === "actor.message" ||
-      (event.type === "model.message" && event.role === "actor")
+      event.type === "model.reasoning"
   )
 }
 
@@ -112,6 +112,9 @@ function eventKey(event: RunEvent): string {
   }
   if (event.type === "model.metrics") {
     return `${event.runId}:model.metrics:${event.metrics.role}:${event.metrics.step}:${event.metrics.attempt}:${event.timestamp}`
+  }
+  if (event.type === "model.reasoning") {
+    return `${event.runId}:model.reasoning:${event.role}:${event.step}:${event.attempt}:${event.actorId ?? ""}:${event.timestamp}`
   }
   return `${event.runId}:${event.type}:${event.timestamp}:${JSON.stringify(event)}`
 }

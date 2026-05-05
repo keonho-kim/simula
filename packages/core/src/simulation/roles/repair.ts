@@ -1,6 +1,7 @@
 import type { ActorTraceStep, CoordinatorTraceStep, RunEvent, ScenarioInput, LLMSettings } from "@simula/shared"
-import { invokeRoleTextWithMetrics } from "../../llm"
+import { invokeExactChoiceWithMetrics } from "../../llm"
 import { withPromptLanguageGuide } from "../../language"
+import { emitModelTelemetry, timestamp } from "../events"
 
 interface RepairChoiceInput {
   runId: string
@@ -16,13 +17,8 @@ interface RepairChoiceInput {
 
 export async function repairExactChoice(input: RepairChoiceInput): Promise<string | undefined> {
   const prompt = withPromptLanguageGuide(buildRepairChoicePrompt(input), input.scenario.language)
-  const result = await invokeRoleTextWithMetrics(input.settings, "repair", input.sourceStep, 1, prompt)
-  await input.emit({
-    type: "model.metrics",
-    runId: input.runId,
-    timestamp: timestamp(),
-    metrics: result.metrics,
-  })
+  const result = await invokeExactChoiceWithMetrics(input.settings, "repair", input.sourceStep, 1, prompt, input.allowedOutputs)
+  await emitModelTelemetry(input.runId, result, input.emit)
 
   const repaired = result.text.trim()
   if (input.allowedOutputs.includes(repaired)) {
@@ -62,8 +58,4 @@ ${input.allowedOutputs.map((output) => `- ${output}`).join("\n")}`
 function preview(value: string): string {
   const compact = value.replace(/\s+/g, " ").trim()
   return compact.length > 180 ? `${compact.slice(0, 180)}...` : compact || "<empty>"
-}
-
-function timestamp(): string {
-  return new Date().toISOString()
 }

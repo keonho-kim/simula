@@ -149,28 +149,6 @@ export function ScenarioPreviewDialog({
                   </Select>
                   <FieldDescription>{t.outputLengthHelp}</FieldDescription>
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor="preview-context-token-budget">
-                    {t.actorContextTokens}
-                  </FieldLabel>
-                  <Input
-                    id="preview-context-token-budget"
-                    type="number"
-                    min={1}
-                    max={400}
-                    value={draft.controls.actorContextTokenBudget ?? 400}
-                    onChange={(event) =>
-                      onDraftChange({
-                        ...draft,
-                        controls: {
-                          ...draft.controls,
-                          actorContextTokenBudget: Number(event.target.value),
-                        },
-                      })
-                    }
-                  />
-                  <FieldDescription>{t.actorContextTokensHelp}</FieldDescription>
-                </Field>
                 <FieldGroup className="gap-3">
                   <Field
                     orientation="horizontal"

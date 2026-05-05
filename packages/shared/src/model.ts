@@ -11,6 +11,7 @@ export type ModelRole =
 export type SimulationRole = "planner" | "generator" | "coordinator" | "observer"
 export type RoleTraceStep = "thought" | "target" | "action" | "intent"
 export type ActorTraceStep = RoleTraceStep | "message" | "context"
+export type ObserverTraceStep = "roundSummary"
 export type PlannerTraceStep =
   | "coreSituation"
   | "actorPressures"

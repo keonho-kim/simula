@@ -45,10 +45,21 @@ describe("report view model", () => {
           ttftMs: 10,
           durationMs: 30,
           inputTokens: 100,
+          reasoningTokens: 12,
           outputTokens: 20,
           totalTokens: 120,
           tokenSource: "provider",
         },
+      },
+      {
+        type: "model.reasoning",
+        runId: "run-1",
+        timestamp: "2026-04-28T00:00:01.500Z",
+        role: "planner",
+        step: "coreSituation",
+        attempt: 1,
+        content: "secret planner chain",
+        reasoningTokens: 12,
       },
       {
         type: "node.completed",
@@ -72,6 +83,7 @@ describe("report view model", () => {
 
     expect(planner?.messageCount).toBe(1)
     expect(planner?.metricCount).toBe(1)
+    expect(diagnostics.events.some((event) => event.kind === "think" && event.details === "secret planner chain")).toBe(true)
     expect(diagnostics.summaries.find((summary) => summary.role === "coordinator")?.nodeEventCount).toBe(1)
     expect(diagnostics.summaries.find((summary) => summary.role === "observer")?.logCount).toBe(1)
     expect(bodies).not.toContain("secret planner chain")
@@ -129,15 +141,11 @@ function createState(): SimulationState {
     roundDigests: [{
       roundIndex: 1,
       preRound: { elapsedTime: "1 hour", content: "Pressure increases." },
-      afterRound: { content: "The board conflict sharpens." },
     }],
     roundReports: [{
       roundIndex: 1,
       title: "Board pressure rises",
-      summary: "The leadership team starts trading concessions.",
-      keyInteractions: ["CEO calls CTO"],
-      actorImpacts: ["CFO gains leverage"],
-      unresolvedQuestions: ["Will the CEO accept restructuring?"],
+      roundSummary: "The leadership team starts trading concessions.",
     }],
     roleTraces: [],
     worldSummary: "Summary",

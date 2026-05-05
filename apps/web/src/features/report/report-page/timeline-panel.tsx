@@ -89,7 +89,6 @@ function TimelineRoundCard({
             {round.elapsedTime ? <Badge variant="secondary" className="rounded-sm">{round.elapsedTime}</Badge> : null}
           </div>
           <h3 className="mt-2 font-heading text-sm font-semibold">{round.title}</h3>
-          {round.summary ? <p className="mt-1 text-xs leading-5 text-muted-foreground">{round.summary}</p> : null}
         </div>
         <Badge variant="outline" className="rounded-md">
           {round.interactions.length} {t.interactions}
@@ -97,10 +96,10 @@ function TimelineRoundCard({
       </div>
 
       <div className="flex flex-col gap-3 p-4">
-        {round.preRound || round.afterRound ? (
+        {round.preRound || round.roundSummary ? (
           <div className="grid gap-3 md:grid-cols-2">
             {round.preRound ? <RoundNote label={t.preRound} value={round.preRound} /> : null}
-            {round.afterRound ? <RoundNote label={t.afterRound} value={round.afterRound} /> : null}
+            {round.roundSummary ? <RoundNote label={t.roundSummary} value={round.roundSummary} /> : null}
           </div>
         ) : null}
 
@@ -113,10 +112,6 @@ function TimelineRoundCard({
         ) : (
           <EmptyPanel title={t.noAdoptedInteractions} body={t.noAdoptedInteractionsDescription} compact />
         )}
-
-        <RoundList title={t.keyInteractions} items={round.keyInteractions} />
-        <RoundList title={t.actorImpacts} items={round.actorImpacts} />
-        <RoundList title={t.unresolvedQuestions} items={round.unresolvedQuestions} />
       </div>
     </article>
   )
@@ -168,20 +163,6 @@ function RoundNote({ label, value }: { label: string; value: string }) {
     <section className="rounded-md bg-muted/25 p-3">
       <h4 className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</h4>
       <p className="mt-1 text-xs leading-5">{value}</p>
-    </section>
-  )
-}
-
-function RoundList({ title, items }: { title: string; items: string[] }) {
-  if (!items.length) {
-    return null
-  }
-  return (
-    <section className="rounded-md bg-muted/20 p-3">
-      <h4 className="text-[10px] font-semibold uppercase text-muted-foreground">{title}</h4>
-      <ul className="mt-2 flex list-disc flex-col gap-1 pl-4 text-xs leading-5">
-        {items.map((item, index) => <li key={`${title}-${index}`}>{item}</li>)}
-      </ul>
     </section>
   )
 }

@@ -116,7 +116,6 @@ allow_additional_cast: true
 actions_per_type: 3
 max_round: 8
 fast_mode: false
-actor_context_token_budget: 400
 output_length: short
 ---
 Scenario body starts here.
@@ -129,9 +128,8 @@ Scenario body starts here.
 | `allow_additional_cast` | `true` | Allow the planner to include more than `num_cast` actors. |
 | `actions_per_type` | `3` | Number of generated actions for each visibility type. |
 | `max_round` | `8` | Number of actor activity rounds to run. |
-| `fast_mode` | `false` | Run dependency-safe actor and observer work in parallel. |
-| `actor_context_token_budget` | role default | Token budget for actor-facing context compression. Values above `400` are capped. |
-| `output_length` | `short` | LLM response length: `short`, `medium`, or `long`. |
+| `fast_mode` | `false` | Run dependency-safe actor work in parallel. |
+| `output_length` | `short` | LLM response length and actor memory compression length: `short`, `medium`, or `long`. |
 
 Sample scenario seeds live in [`senario.samples/`](./senario.samples/README.md).
 

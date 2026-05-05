@@ -75,7 +75,7 @@ function App() {
   const [scenarioDraft, setScenarioDraft] = useState<ScenarioDraft>({
     sourceName: "pasted-scenario.md",
     text: "",
-    controls: { numCast: 6, allowAdditionalCast: true, actionsPerType: 3, maxRound: 8, fastMode: false, actorContextTokenBudget: 400, outputLength: "short" },
+    controls: { numCast: 6, allowAdditionalCast: true, actionsPerType: 3, maxRound: 8, fastMode: false, outputLength: "short" },
   })
 
   const runsQuery = useQuery({ queryKey: ["runs"], queryFn: fetchRuns })

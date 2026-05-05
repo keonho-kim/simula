@@ -1,6 +1,7 @@
 import type { PlannerTrace, PlannerTraceStep, RunEvent } from "@simula/shared"
 import { invokeRoleTextWithMetrics } from "../../../llm"
-import { withPromptLanguageGuide } from "../../../language"
+import { withRolePromptGuide } from "../../../language"
+import { emitModelTelemetry } from "../../events"
 import { upsertRoleTrace } from "../../state"
 import type { WorkflowState } from "../../state"
 import type { PlannerPromptBuilder } from "./prompts"
@@ -47,14 +48,13 @@ async function runPlannerTextNode(
   emit: (event: RunEvent) => Promise<void>
 ): Promise<{ text: string; retries: number }> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const prompt = withPromptLanguageGuide(promptBuilder(state, partial), state.scenario.language)
-    const result = await invokeRoleTextWithMetrics(state.settings, "planner", step, attempt, prompt)
-    await emit({
-      type: "model.metrics",
-      runId: state.runId,
-      timestamp: timestamp(),
-      metrics: result.metrics,
+    const prompt = withRolePromptGuide(promptBuilder(state, partial), {
+      language: state.scenario.language,
+      settings: state.settings,
+      role: "planner",
     })
+    const result = await invokeRoleTextWithMetrics(state.settings, "planner", step, attempt, prompt)
+    await emitModelTelemetry(state.runId, result, emit)
     const response = step === "majorEvents" ? normalizePlannerMajorEvents(result.text) : normalizePlannerDigest(result.text)
     if (response) {
       await emit({

@@ -3,7 +3,7 @@ import type { WorkflowState } from "../../state"
 
 const STEPS: RoleTraceStep[] = ["thought", "target", "action", "intent"]
 
-export function getRoleTrace(state: WorkflowState, role: Exclude<SimulationRole, "planner" | "coordinator">): StandardRoleTrace {
+export function getRoleTrace(state: WorkflowState, role: Exclude<SimulationRole, "planner" | "coordinator" | "observer">): StandardRoleTrace {
   const trace = state.simulation.roleTraces.find((trace) => trace.role === role)
   return trace && isStandardRoleTrace(trace) ? trace : emptyRoleTrace(role)
 }
@@ -12,7 +12,7 @@ export function tracePartial(trace: StandardRoleTrace): Partial<Record<RoleTrace
   return Object.fromEntries(STEPS.map((step) => [step, trace[step]]))
 }
 
-function emptyRoleTrace(role: Exclude<SimulationRole, "planner" | "coordinator">): StandardRoleTrace {
+function emptyRoleTrace(role: Exclude<SimulationRole, "planner" | "coordinator" | "observer">): StandardRoleTrace {
   return {
     role,
     thought: "",
@@ -29,5 +29,5 @@ function emptyRoleTrace(role: Exclude<SimulationRole, "planner" | "coordinator">
 }
 
 function isStandardRoleTrace(trace: RoleTrace): trace is StandardRoleTrace {
-  return trace.role !== "planner" && trace.role !== "coordinator"
+  return trace.role !== "planner" && trace.role !== "coordinator" && trace.role !== "observer"
 }

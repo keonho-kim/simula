@@ -48,7 +48,8 @@ Policy: ${compactText(partial.interactionPolicy, scalePromptLimit(250, current.s
     const recentDigests = current.simulation.roundDigests.slice(-2).map((digest) => {
       const injectedEvent = current.simulation.plan?.majorEvents.find((event) => event.id === digest.injectedEventId)
       const eventLabel = injectedEvent ? `${injectedEvent.title}. ${injectedEvent.summary}` : "None"
-      return `- R${digest.roundIndex} injected event: ${eventLabel}; digest: ${digest.preRound.content}`
+      const report = current.simulation.roundReports.find((item) => item.roundIndex === digest.roundIndex)
+      return `- R${digest.roundIndex} injected event: ${eventLabel}; cue: ${digest.preRound.content}; observer: ${report?.roundSummary ?? "None"}`
     })
     return `Coordinator eventInjection.
 Choose one pending or partial event id, or None.

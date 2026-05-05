@@ -1,6 +1,7 @@
 import type { ActorRosterEntry, RunEvent } from "@simula/shared"
 import { invokeRoleTextWithMetrics } from "../../../llm"
-import { withPromptLanguageGuide } from "../../../language"
+import { withRolePromptGuide } from "../../../language"
+import { emitModelTelemetry } from "../../events"
 import type { WorkflowState } from "../../state"
 
 const MAX_ATTEMPTS = 5
@@ -12,14 +13,13 @@ export async function createActorRoster(
 ): Promise<ActorRosterEntry[]> {
   const expectedCount = state.scenario.controls.numCast
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const prompt = withPromptLanguageGuide(renderRosterPrompt(expectedCount, plannerDigest, state.scenario.text), state.scenario.language)
-    const result = await invokeRoleTextWithMetrics(state.settings, "generator", "roster", attempt, prompt)
-    await emit({
-      type: "model.metrics",
-      runId: state.runId,
-      timestamp: timestamp(),
-      metrics: result.metrics,
+    const prompt = withRolePromptGuide(renderRosterPrompt(expectedCount, plannerDigest, state.scenario.text), {
+      language: state.scenario.language,
+      settings: state.settings,
+      role: "generator",
     })
+    const result = await invokeRoleTextWithMetrics(state.settings, "generator", "roster", attempt, prompt)
+    await emitModelTelemetry(state.runId, result, emit)
 
     try {
       const roster = parseActorRoster(result.text, expectedCount)

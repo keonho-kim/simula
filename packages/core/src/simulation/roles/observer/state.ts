@@ -1,4 +1,4 @@
-import type { RoundReport, SimulationState } from "@simula/shared"
+import type { ObserverTrace, RoundReport, SimulationState } from "@simula/shared"
 
 export function applyObserverRound(state: SimulationState): SimulationState {
   const roundIndex = state.observerRoundIndex ?? state.roundDigests.length
@@ -9,26 +9,15 @@ export function applyObserverRound(state: SimulationState): SimulationState {
 
   return {
     ...state,
-    roundDigests: state.roundDigests.map((digest) =>
-      digest.roundIndex === roundIndex
-        ? {
-            ...digest,
-            afterRound: {
-              content: trace.action,
-            },
-          }
-        : digest
-    ),
-    roundReports: upsertRoundReport(state.roundReports, {
-      roundIndex,
-      title: `Round ${roundIndex}`,
-      summary: trace.action,
-      keyInteractions: state.interactions
-        .filter((interaction) => interaction.roundIndex === roundIndex)
-        .map((interaction) => interaction.content),
-      actorImpacts: [trace.target],
-      unresolvedQuestions: [trace.intent],
-    }),
+    roundReports: upsertRoundReport(state.roundReports, roundReportFromTrace(roundIndex, trace)),
+  }
+}
+
+function roundReportFromTrace(roundIndex: number, trace: ObserverTrace): RoundReport {
+  return {
+    roundIndex,
+    title: `Round ${roundIndex}`,
+    roundSummary: trace.roundSummary,
   }
 }
 

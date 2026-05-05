@@ -12,7 +12,6 @@ export interface RoleSettings {
   presencePenalty?: number
   seed?: number
   reasoningEffort?: "low" | "medium" | "high"
-  contextTokenBudget?: number
   extraBody?: Record<string, unknown>
   safetySettings?: Array<Record<string, string>>
 }
@@ -36,4 +35,3 @@ export type LegacyLLMSettings = Partial<Record<ModelRole, RoleSettings & Provide
 export type LLMSettingsInput = Partial<LLMSettings> | LegacyLLMSettings
 
 export type ResolvedRoleSettings = RoleSettings & ProviderSettings
-

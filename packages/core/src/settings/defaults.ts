@@ -1,5 +1,5 @@
 import type { LLMSettings, ModelProvider, ModelRole, ProviderSettings, RoleSettings } from "@simula/shared"
-import { DEFAULT_ACTOR_CONTEXT_TOKEN_BUDGET, MODEL_PROVIDERS, MODEL_ROLES } from "./constants"
+import { MODEL_PROVIDERS, MODEL_ROLES } from "./constants"
 
 export const PROVIDER_DEFAULTS: Record<ModelProvider, ProviderSettings> = {
   openai: { streamUsage: true },
@@ -20,7 +20,6 @@ export const ROLE_DEFAULTS: Record<ModelRole, RoleSettings> = Object.fromEntries
       temperature: role === "storyBuilder" ? 0.7 : role === "coordinator" || role === "actor" ? 0.4 : 0.2,
       maxTokens: role === "storyBuilder" ? 5000 : role === "repair" ? 2400 : 4096,
       timeoutSeconds: 60,
-      contextTokenBudget: role === "actor" ? DEFAULT_ACTOR_CONTEXT_TOKEN_BUDGET : undefined,
     } satisfies RoleSettings,
   ])
 ) as Record<ModelRole, RoleSettings>
@@ -28,7 +27,7 @@ export const ROLE_DEFAULTS: Record<ModelRole, RoleSettings> = Object.fromEntries
 export const ROLE_PROVIDER_DEFAULTS: Partial<Record<ModelProvider, Partial<RoleSettings>>> = {
   gemini: { model: "gemini-2.5-pro" },
   ollama: { model: "llama3.1" },
-  lmstudio: { model: "local-model", reasoningEffort: "medium" },
+  lmstudio: { model: "local-model" },
   vllm: { model: "local-model" },
   litellm: { model: "openai/gpt-5.4-mini" },
 }
@@ -47,4 +46,3 @@ export function defaultSettings(): LLMSettings {
 export function defaultsForProvider(provider: ModelProvider): ProviderSettings {
   return PROVIDER_DEFAULTS[provider] ?? {}
 }
-

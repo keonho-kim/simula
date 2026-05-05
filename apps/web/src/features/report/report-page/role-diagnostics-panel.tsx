@@ -122,7 +122,14 @@ function DiagnosticEventCard({ event }: { event: RoleDiagnosticEvent }) {
         </div>
         <time className="font-mono text-[10px] text-muted-foreground">{timeLabel(event.timestamp)}</time>
       </div>
-      <p className="mt-2 text-xs leading-5 text-muted-foreground">{event.body}</p>
+      {event.details ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs leading-5 text-muted-foreground">{event.body}</summary>
+          <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-muted-foreground">{event.details}</p>
+        </details>
+      ) : (
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">{event.body}</p>
+      )}
     </article>
   )
 }

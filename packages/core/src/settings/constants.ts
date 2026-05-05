@@ -21,5 +21,3 @@ export const MODEL_PROVIDERS: ModelProvider[] = [
 ]
 
 export const OPENAI_COMPATIBLE_PROVIDERS: ModelProvider[] = ["ollama", "lmstudio", "vllm", "litellm"]
-export const DEFAULT_ACTOR_CONTEXT_TOKEN_BUDGET = 400
-export const MAX_ACTOR_CONTEXT_TOKEN_BUDGET = 400

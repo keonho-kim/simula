@@ -26,7 +26,7 @@ export const roleLabels: Record<ModelRole, string> = {
 export const roleProviderDefaults: Partial<Record<ModelProvider, Partial<RoleSettings>>> = {
   gemini: { model: "gemini-2.5-pro" },
   ollama: { model: "llama3.1" },
-  lmstudio: { model: "local-model", reasoningEffort: "medium" },
+  lmstudio: { model: "local-model" },
   vllm: { model: "local-model" },
   litellm: { model: "openai/gpt-5.4-mini" },
 }
@@ -38,7 +38,6 @@ export const providerDefaults: Partial<Record<ModelProvider, ProviderSettings>> 
 }
 export const extraBodyExamples: Partial<Record<ModelProvider, string>> = {
   ollama: '{\n  "num_ctx": 8192\n}',
-  lmstudio: '{\n  "reasoning_effort": "medium"\n}',
   vllm: '{\n  "top_k": 50,\n  "min_p": 0.05,\n  "repetition_penalty": 1.05\n}',
   litellm: '{\n  "drop_params": true\n}',
 }
@@ -55,4 +54,3 @@ export function supportsReasoningEffort(provider: ModelProvider): boolean {
 export function providerLabel(provider: ModelProvider): string {
   return providers.find((item) => item.value === provider)?.label ?? provider
 }
-

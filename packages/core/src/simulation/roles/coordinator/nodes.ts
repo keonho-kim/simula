@@ -7,17 +7,18 @@ import type {
   Interaction,
   PlannedEvent,
   RoundDigest,
+  RoundReport,
+  RoleTrace,
   RunEvent,
   StopReason,
 } from "@simula/shared"
-import { invokeRoleTextWithMetrics } from "../../../llm"
-import { withPromptLanguageGuide } from "../../../language"
+import { invokeExactChoiceWithMetrics, invokeRoleTextWithMetrics } from "../../../llm"
+import { withPromptLanguageGuide, withRolePromptGuide } from "../../../language"
 import { scalePromptLimit } from "../../../prompt"
 import {
   applyInjectedEventContext,
   applyInteractionContext,
   compressActorContext,
-  resolveActorContextTokenBudget,
 } from "../../actor-memory"
 import {
   buildPreRoundDigest,
@@ -30,11 +31,13 @@ import {
   selectEventInjection,
 } from "../../event-injection"
 import { applyActorDecision, buildInteraction } from "../../interactions"
+import { emitModelTelemetry } from "../../events"
 import { plannerDigestSummary } from "../../plan"
-import { summarizeEvents, summarizeInteractions } from "../../reporting"
+import { renderReport, summarizeEvents, summarizeInteractions } from "../../reporting"
 import { upsertRoleTrace } from "../../state"
 import type { WorkflowState } from "../../state"
 import { createActorGraph, createActorGraphState } from "../actor"
+import { runObserverRound } from "../observer/nodes"
 import { repairExactChoice } from "../repair"
 import type { CoordinatorPromptBuilder } from "./prompts"
 import { coordinatorPrompts } from "./prompts"
@@ -87,14 +90,14 @@ export async function coordinatorNode(
   let coordinatorTrace = trace
   const interactions: Interaction[] = []
   const roundDigests: RoundDigest[] = []
+  let roundReports: RoundReport[] = [...state.simulation.roundReports]
+  let roleTraces: RoleTrace[] = state.simulation.roleTraces
   let maxRound = Math.max(1, state.scenario.controls.maxRound ?? 8)
   let stopReason: StopReason = "simulation_done"
-  const contextTokenBudget = resolveActorContextTokenBudget(state.scenario, state.settings)
-
   for (let roundIndex = 1; roundIndex <= maxRound; roundIndex += 1) {
     throwIfCanceled(isCanceled)
     const injectionResult = await resolveEventInjection(
-      workflowSnapshot(state, actors, interactions, roundDigests, events, maxRound),
+      workflowSnapshot(state, actors, interactions, roundDigests, roundReports, roleTraces, coordinatorTrace, events, maxRound),
       emit,
       events
     )
@@ -123,7 +126,6 @@ export async function coordinatorNode(
           scenario: state.scenario,
           settings: state.settings,
           roundIndex,
-          tokenBudget: contextTokenBudget,
           emit,
         })
       )
@@ -165,7 +167,7 @@ export async function coordinatorNode(
     throwIfCanceled(isCanceled)
     if (selectedEvent) {
       const resolutionResult = await runCoordinatorValidatedNode(
-        workflowSnapshot(state, actors, interactions, roundDigests, events, maxRound),
+        workflowSnapshot(state, actors, interactions, roundDigests, roundReports, roleTraces, coordinatorTrace, events, maxRound),
         "eventResolution",
         coordinatorPrompts.eventResolution,
         emit,
@@ -180,15 +182,9 @@ export async function coordinatorNode(
       )
       selectedEvent.status = resolutionResult.text === "partial" ? "partial" : "completed"
     }
-    await emit({
-      type: "round.completed",
-      runId: state.runId,
-      timestamp: new Date().toISOString(),
-      roundIndex,
-    })
 
     const progressResult = await runCoordinatorValidatedNode(
-      workflowSnapshot(state, actors, interactions, roundDigests, events, maxRound),
+      workflowSnapshot(state, actors, interactions, roundDigests, roundReports, roleTraces, coordinatorTrace, events, maxRound),
       "progressDecision",
       coordinatorPrompts.progressDecision,
       emit,
@@ -197,6 +193,7 @@ export async function coordinatorNode(
     )
     coordinatorTrace = updateCoordinatorTrace(coordinatorTrace, "progressDecision", progressResult.text, progressResult.retries)
     throwIfCanceled(isCanceled)
+    let stopAfterRound = false
     if (progressResult.text === "complete") {
       if (hasUnresolvedEvents(events)) {
         await emit({
@@ -208,14 +205,14 @@ export async function coordinatorNode(
         })
       } else {
         stopReason = "simulation_done"
-        break
+        stopAfterRound = true
       }
     }
     if (progressResult.text === "stop" && isNoProgressCandidate(roundIndex, interactions, roundDigests)) {
       stopReason = "no_progress"
-      break
+      stopAfterRound = true
     }
-    if (progressResult.text === "stop") {
+    if (progressResult.text === "stop" && !stopAfterRound) {
       await emit({
         type: "log",
         runId: state.runId,
@@ -224,9 +221,9 @@ export async function coordinatorNode(
         message: "Coordinator requested stop, but recent activity still shows possible progress; continuing generously.",
       })
     }
-    if (roundIndex === maxRound) {
+    if (!stopAfterRound && roundIndex === maxRound) {
       const extensionResult = await runCoordinatorValidatedNode(
-        workflowSnapshot(state, actors, interactions, roundDigests, events, maxRound),
+        workflowSnapshot(state, actors, interactions, roundDigests, roundReports, roleTraces, coordinatorTrace, events, maxRound),
         "extensionDecision",
         coordinatorPrompts.extensionDecision,
         emit,
@@ -250,8 +247,41 @@ export async function coordinatorNode(
         })
       } else {
         stopReason = isNoProgressCandidate(roundIndex, interactions, roundDigests) ? "no_progress" : "simulation_done"
-        break
+        stopAfterRound = true
       }
+    }
+    const observerInput = workflowSnapshot(
+      state,
+      actors,
+      interactions,
+      roundDigests,
+      roundReports,
+      roleTraces,
+      coordinatorTrace,
+      events,
+      maxRound
+    )
+    const observed = await runObserverRound(
+      {
+        ...observerInput,
+        simulation: {
+          ...observerInput.simulation,
+          observerRoundIndex: roundIndex,
+        },
+      },
+      emit
+    )
+    roundReports = observed.simulation.roundReports
+    roleTraces = observed.simulation.roleTraces
+    await emit({ type: "report.delta", runId: state.runId, timestamp: timestamp(), content: renderReport(observed.simulation) })
+    await emit({
+      type: "round.completed",
+      runId: state.runId,
+      timestamp: new Date().toISOString(),
+      roundIndex,
+    })
+    if (stopAfterRound) {
+      break
     }
     if (roundIndex < maxRound && waitForNextRound) {
       await waitForNextRound(roundIndex)
@@ -276,10 +306,8 @@ export async function coordinatorNode(
       actors,
       interactions,
       roundDigests,
-      roleTraces: [
-        ...state.simulation.roleTraces.filter((trace) => trace.role !== "coordinator"),
-        coordinatorTrace,
-      ],
+      roundReports,
+      roleTraces,
       worldSummary,
       stopReason,
     },
@@ -331,14 +359,13 @@ async function runCoordinatorTextNode(
   emit: (event: RunEvent) => Promise<void>
 ): Promise<{ text: string; retries: number }> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const prompt = withPromptLanguageGuide(promptBuilder(state, partial), state.scenario.language)
-    const result = await invokeRoleTextWithMetrics(state.settings, "coordinator", step, attempt, prompt)
-    await emit({
-      type: "model.metrics",
-      runId: state.runId,
-      timestamp: timestamp(),
-      metrics: result.metrics,
+    const prompt = withRolePromptGuide(promptBuilder(state, partial), {
+      language: state.scenario.language,
+      settings: state.settings,
+      role: "coordinator",
     })
+    const result = await invokeRoleTextWithMetrics(state.settings, "coordinator", step, attempt, prompt)
+    await emitModelTelemetry(state.runId, result, emit)
     const response = normalizeCoordinatorText(result.text, step, state)
     if (response) {
       await emit({
@@ -379,13 +406,8 @@ async function runCoordinatorValidatedNode(
       ? `\n\nPrevious invalid responses:\n${invalidResponses.map((item) => `- ${item}`).join("\n")}\nReturn one exact allowed output only:\n${allowed.map((item) => `- ${item}`).join("\n")}`
       : ""
     const prompt = withPromptLanguageGuide(promptBuilder(state, {}) + retryGuide, state.scenario.language)
-    const result = await invokeRoleTextWithMetrics(state.settings, "coordinator", step, attempt, prompt)
-    await emit({
-      type: "model.metrics",
-      runId: state.runId,
-      timestamp: timestamp(),
-      metrics: result.metrics,
-    })
+    const result = await invokeExactChoiceWithMetrics(state.settings, "coordinator", step, attempt, prompt, allowed)
+    await emitModelTelemetry(state.runId, result, emit)
     const response = result.text.trim()
     const selected = select(response)
     if (selected) {
@@ -494,6 +516,9 @@ function workflowSnapshot(
   actors: ActorState[],
   interactions: Interaction[],
   roundDigests: RoundDigest[],
+  roundReports: RoundReport[],
+  roleTraces: RoleTrace[],
+  coordinatorTrace: CoordinatorTrace,
   events: PlannedEvent[],
   maxRound: number
 ): WorkflowState {
@@ -511,6 +536,11 @@ function workflowSnapshot(
       actors,
       interactions,
       roundDigests,
+      roundReports,
+      roleTraces: [
+        ...roleTraces.filter((trace) => trace.role !== "coordinator"),
+        coordinatorTrace,
+      ],
       plan: state.simulation.plan ? { ...state.simulation.plan, majorEvents: events } : state.simulation.plan,
       worldSummary: `${summarizeInteractions(interactions)} ${summarizeEvents(events)}`,
     },

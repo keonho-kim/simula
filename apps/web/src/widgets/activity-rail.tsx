@@ -20,9 +20,10 @@ import {
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { UiTexts } from "@/lib/i18n"
+import { cn } from "@/lib/utils"
 import { MarkdownContent } from "@/shared/ui/markdown-content"
 import { useRunStore } from "@/store/run-store"
-import type { LogItem, RolePanelRole, RoleSummary, TraceEntry } from "./activity-rail/types"
+import type { LogItem, ReasoningEntry, RolePanelRole, RoleSummary, TraceEntry } from "./activity-rail/types"
 import {
   buildLogItems,
   buildRoleSummaries,
@@ -107,28 +108,50 @@ function RoleSignalButton({ summary, t, onClick }: { summary: RoleSummary; t: Ui
   return (
     <button
       type="button"
-      className="rounded-md border border-border/70 bg-background/80 p-3 text-left transition-colors hover:bg-background hover:ring-1 hover:ring-border"
+      className={roleSignalButtonClass(summary.status)}
       onClick={onClick}
     >
       <div className="flex items-start gap-2">
-        <div className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <div className={roleSignalIconClass(summary.status)}>
           <RoleIcon role={summary.role} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold">{summary.label}</span>
-            <Badge variant={summary.status === "failed" ? "destructive" : "secondary"} className="h-4 rounded-sm px-1.5 text-[10px]">
+            <Badge variant={summary.status === "failed" ? "destructive" : "secondary"} className={roleSignalBadgeClass(summary.status)}>
               {formatRoleStatus(summary.status, t)}
             </Badge>
           </div>
           <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{summary.preview}</p>
           <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground">
             <span>{formatCount(summary.messages.length, t.messageCountLabel, t)}</span>
+            <span>{formatCount(summary.reasoning.length, t.thinkingCountLabel, t)}</span>
             <span>{formatCount(summary.metrics.length, t.metricCountLabel, t)}</span>
           </div>
         </div>
       </div>
     </button>
+  )
+}
+
+export function roleSignalButtonClass(status: RoleSummary["status"]): string {
+  return cn(
+    "rounded-md border border-border/70 bg-background/80 p-3 text-left transition-colors hover:bg-background hover:ring-1 hover:ring-border",
+    status === "running" && "border-emerald-300 bg-emerald-50/80 ring-1 ring-emerald-200"
+  )
+}
+
+function roleSignalIconClass(status: RoleSummary["status"]): string {
+  return cn(
+    "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground",
+    status === "running" && "bg-emerald-100 text-emerald-700"
+  )
+}
+
+function roleSignalBadgeClass(status: RoleSummary["status"]): string {
+  return cn(
+    "h-4 rounded-sm px-1.5 text-[10px]",
+    status === "running" && "bg-emerald-100 text-emerald-800"
   )
 }
 
@@ -186,8 +209,9 @@ function RoleDialog({ summary, t, onOpenChange }: {
 
         <ScrollArea className="min-h-0 flex-1 overflow-hidden pr-3">
           <div className="flex flex-col gap-5 pr-3 pb-1">
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
               <SignalStat label={t.messages} value={summary.messages.length} />
+              <SignalStat label={t.think} value={summary.reasoning.length} />
               <SignalStat label={t.metrics} value={summary.metrics.length} />
               <SignalStat label={t.logs} value={summary.logs.length} />
             </div>
@@ -210,6 +234,7 @@ function RoleDialog({ summary, t, onOpenChange }: {
               )}
             </section>
 
+            <ReasoningStream items={summary.reasoning} t={t} />
             <RawModelStream messages={summary.messages} t={t} />
           </div>
         </ScrollArea>
@@ -225,10 +250,11 @@ function LatestTelemetry({ metric, t }: { metric: ModelMetrics | undefined; t: U
         <h3 className="text-xs font-semibold uppercase text-muted-foreground">{t.latestTelemetry}</h3>
         <span className="text-[10px] uppercase text-muted-foreground">{metric ? t.lastSample : t.noSample}</span>
       </div>
-      <div className="grid gap-2 sm:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-5">
         <MetricChip label="TTFT" value={metric ? `${metric.ttftMs}ms` : "-"} />
         <MetricChip label={t.metricDuration} value={metric ? `${metric.durationMs}ms` : "-"} />
         <MetricChip label={t.metricTotalTokens} value={metric ? metric.totalTokens.toLocaleString() : "-"} />
+        <MetricChip label={t.metricReasoningTokens} value={metric ? metric.reasoningTokens.toLocaleString() : "-"} />
         <MetricChip label={t.metricAttempt} value={metric ? String(metric.attempt) : "-"} />
       </div>
     </section>
@@ -260,6 +286,30 @@ function RoleSignalSection({ entry, t }: { entry: TraceEntry; t: UiTexts }) {
       <h4 className="text-[10px] font-semibold uppercase text-muted-foreground">{entry.label}</h4>
       <MarkdownContent className="mt-2" content={entry.content} fallback={t.noSignalYet} />
     </section>
+  )
+}
+
+function ReasoningStream({ items, t }: { items: ReasoningEntry[]; t: UiTexts }) {
+  return (
+    <details className="rounded-md border border-border/70 bg-background/80 p-3">
+      <summary className="cursor-pointer text-xs font-semibold uppercase text-muted-foreground">
+        {t.think} ({items.length})
+      </summary>
+      {items.length ? (
+        <div className="mt-3 flex flex-col gap-2">
+          {items.slice(-8).map((item) => (
+            <details key={item.id} className="rounded-md bg-muted/30 p-3">
+              <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                {item.step} · attempt {item.attempt} · {timeLabel(item.timestamp)} · {item.reasoningTokens.toLocaleString()} tokens
+              </summary>
+              <MarkdownContent compact className="mt-2" content={item.content} fallback="-" />
+            </details>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-muted-foreground">{t.noReasoningSignals}</p>
+      )}
+    </details>
   )
 }
 

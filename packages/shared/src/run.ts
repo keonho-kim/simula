@@ -5,6 +5,7 @@ import type {
   CoordinatorTraceStep,
   GeneratorRosterStep,
   ModelRole,
+  ObserverTraceStep,
   PlannerTraceStep,
 } from "./model"
 import type { InjectedEvent, Interaction, StopReason } from "./simulation"
@@ -33,11 +34,19 @@ export interface RunManifest {
 
 export interface ModelMetrics {
   role: ModelRole
-  step: ActorTraceStep | PlannerTraceStep | CoordinatorTraceStep | GeneratorRosterStep | ActorCardStep | "draft"
+  step:
+    | ActorTraceStep
+    | PlannerTraceStep
+    | CoordinatorTraceStep
+    | ObserverTraceStep
+    | GeneratorRosterStep
+    | ActorCardStep
+    | "draft"
   attempt: number
   ttftMs: number
   durationMs: number
   inputTokens: number
+  reasoningTokens: number
   outputTokens: number
   totalTokens: number
   tokenSource: "provider" | "unavailable"
@@ -49,6 +58,18 @@ export type RunEvent =
   | { type: "node.completed"; runId: string; timestamp: string; nodeId: string; label: string }
   | { type: "node.failed"; runId: string; timestamp: string; nodeId: string; label: string; error: string }
   | { type: "model.message"; runId: string; timestamp: string; role: ModelRole; content: string }
+  | {
+      type: "model.reasoning"
+      runId: string
+      timestamp: string
+      role: ModelRole
+      step: ModelMetrics["step"]
+      attempt: number
+      content: string
+      reasoningTokens: number
+      actorId?: string
+      actorName?: string
+    }
   | { type: "model.metrics"; runId: string; timestamp: string; metrics: ModelMetrics }
   | { type: "actors.ready"; runId: string; timestamp: string; actors: ActorReadyView[] }
   | { type: "event.injected"; runId: string; timestamp: string; event: InjectedEvent }

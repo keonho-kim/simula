@@ -1,7 +1,8 @@
 import type { ActorTraceStep, RunEvent } from "@simula/shared"
-import { invokeRoleTextWithMetrics } from "../../../llm"
-import { withPromptLanguageGuide } from "../../../language"
+import { invokeExactChoiceWithMetrics, invokeRoleTextWithMetrics } from "../../../llm"
+import { withPromptLanguageGuide, withRolePromptGuide } from "../../../language"
 import { scalePromptLimit } from "../../../prompt"
+import { emitModelTelemetry } from "../../events"
 import { repairExactChoice } from "../repair"
 import type { ActorPromptBuilder } from "./prompts"
 import type { ActorGraphState } from "./state"
@@ -24,20 +25,19 @@ export async function runActorTextNode(
       validate && invalidResponses.length
         ? `\n\nPrevious invalid responses:\n${invalidResponses.map((item) => `- ${item}`).join("\n")}\nReturn one exact allowed output only:\n${allowed.map((item) => `- ${item}`).join("\n")}`
         : ""
-    const prompt = withPromptLanguageGuide(promptBuilder(state, partial) + retryGuide, state.scenario.language)
-    const result = await invokeRoleTextWithMetrics(
-      state.settings,
-      "actor",
-      step,
-      attempt,
-      prompt
-    )
-    await emit({
-      type: "model.metrics",
-      runId: state.runId,
-      timestamp: timestamp(),
-      metrics: result.metrics,
-    })
+    const basePrompt = promptBuilder(state, partial) + retryGuide
+    const prompt =
+      validate && allowed.length
+        ? withPromptLanguageGuide(basePrompt, state.scenario.language)
+        : withRolePromptGuide(basePrompt, {
+            language: state.scenario.language,
+            settings: state.settings,
+            role: "actor",
+          })
+    const result = validate && allowed.length
+      ? await invokeExactChoiceWithMetrics(state.settings, "actor", step, attempt, prompt, allowed)
+      : await invokeRoleTextWithMetrics(state.settings, "actor", step, attempt, prompt)
+    await emitModelTelemetry(state.runId, result, emit, { actorId: state.actor.id, actorName: state.actor.name })
 
     const response = validate ? result.text.trim() : normalizePlainText(result.text, state)
     if (response && (!validate || validate(response, state))) {

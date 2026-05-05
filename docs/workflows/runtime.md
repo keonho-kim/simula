@@ -10,7 +10,8 @@ flowchart TD
     Select --> Actors["Select Actors"]
     Actors --> Decide["Actor Decisions"]
     Decide --> Context["Context Updates"]
-    Context --> Round["Round Digest"]
+    Context --> Observer["Observer Summaries"]
+    Observer --> Round["Round Complete"]
     Round --> Stop{"More rounds?"}
     Stop -->|Yes| Select
     Stop -->|No| Done["Completed Trace"]
@@ -26,6 +27,8 @@ Each round can:
 - update actor context and intent
 - emit actor messages
 - emit `interaction.recorded`
+- generate an observer round summary
+- emit `report.delta`
 - emit `round.completed`
 - contribute graph timeline frames
 
@@ -33,8 +36,8 @@ Each round can:
 
 ## Fast Mode
 
-When `fastMode` is true, dependency-safe actor decisions and observer round reports run in
-parallel while stages that depend on ordered state remain sequential.
+When `fastMode` is true, dependency-safe actor decisions run in parallel. Rounds and observer
+summaries remain sequential so each round can use prior observer summaries.
 
 The run emits a `log` event when fast mode is enabled.
 

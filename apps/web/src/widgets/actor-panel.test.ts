@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import type { Interaction, RunEvent } from "@simula/shared"
+import type { ActorState, Interaction, RunEvent } from "@simula/shared"
 import type { UiTexts } from "@/lib/i18n"
-import { buildActorHistory, buildActorSummaries, filterHistory } from "./actor-panel"
+import { buildActorHistory, buildActorReasoning, buildActorSummaries, filterHistory } from "./actor-panel"
 
 const timestamp = "2026-04-28T00:00:00.000Z"
 const t = {
@@ -56,6 +56,45 @@ describe("actor panel view model", () => {
     expect(filterHistory(history, "message")).toHaveLength(1)
   })
 
+  test("keeps actor model trace out of activity history", () => {
+    const history = buildActorHistory([
+      modelMessage("서연 intent: actor-2와 actor-1-public-1 행동을 선택했습니다."),
+      interactionRecorded("interaction-1", 1, "actor-1", ["actor-2"], "actor-1-public-1 reached actor-2."),
+      actorMessage("actor-1", "actor-2에게 actor-1-public-1을 제안합니다."),
+    ], [], actorNames(), t, stateActors()).filter((item) => item.id.startsWith("actor-1:"))
+
+    expect(history).toHaveLength(2)
+    expect(history.map((item) => item.title)).toEqual(["Action taken", "Actor message"])
+    expect(history.map((item) => item.content)).toEqual([
+      "Public move 1 reached 지훈.",
+      "지훈에게 Public move 1을 제안합니다.",
+    ])
+  })
+
+  test("summarizes latest activity without model trace or internal ids", () => {
+    const actors = buildActorSummaries(stateActors(), [], [
+      modelMessage("서연 intent: actor-2와 actor-1-public-1 행동을 선택했습니다."),
+      interactionRecorded("interaction-1", 1, "actor-1", ["actor-2"], "actor-1-public-1 reached actor-2."),
+    ], buildActorHistory([
+      interactionRecorded("interaction-1", 1, "actor-1", ["actor-2"], "actor-1-public-1 reached actor-2."),
+    ], [], actorNames(), t, stateActors()))
+
+    expect(actors.find((actor) => actor.id === "actor-1")?.latestActivity).toBe("Public move 1 reached 지훈.")
+    expect(actors.find((actor) => actor.id === "actor-1")?.messageCount).toBe(0)
+  })
+
+  test("keeps actor reasoning separate from activity history", () => {
+    const events = [
+      actorReasoning("actor-1", "서연", "intent", "thinking privately"),
+      actorMessage("actor-1", "Visible note."),
+    ]
+    const history = buildActorHistory(events, [], actorNames(), t).filter((item) => item.id.startsWith("actor-1:"))
+    const reasoning = buildActorReasoning(events)
+
+    expect(history).toHaveLength(1)
+    expect(reasoning).toMatchObject([{ actorId: "actor-1", content: "thinking privately" }])
+  })
+
   test("labels no-action and solitary activity without self targets", () => {
     const history = buildActorHistory([
       interactionRecorded("interaction-1", 1, "actor-1", [], "Actor 1 held back.", "no_action", "solitary"),
@@ -95,6 +134,47 @@ function actorNames(): Map<string, string> {
     ["actor-2", "지훈"],
     ["actor-3", "민지"],
   ])
+}
+
+function stateActors(): ActorState[] {
+  return [
+    {
+      id: "actor-1",
+      name: "서연",
+      role: "퍼포먼스 마케터",
+      backgroundHistory: "Checks every product claim against conversion data.",
+      personality: "Careful and data-driven.",
+      preference: "Prevent wasteful spend.",
+      privateGoal: "Protect her launch budget.",
+      intent: "Use actor-1-public-1 with actor-2.",
+      actions: [{
+        id: "actor-1-public-1",
+        visibility: "public",
+        label: "Public move 1",
+        intentHint: "Open pressure.",
+        expectedOutcome: "Public pressure increases.",
+      }],
+      context: { visible: [] },
+      contextSummary: "No compressed context yet.",
+      memory: [],
+      relationships: {},
+    },
+    {
+      id: "actor-2",
+      name: "지훈",
+      role: "엔지니어",
+      backgroundHistory: "Owns system reliability.",
+      personality: "Direct.",
+      preference: "Reduce risk.",
+      privateGoal: "Avoid blame.",
+      intent: "",
+      actions: [],
+      context: { visible: [] },
+      contextSummary: "",
+      memory: [],
+      relationships: {},
+    },
+  ]
 }
 
 function interactionRecorded(
@@ -146,5 +226,35 @@ function actorMessage(actorId: string, content: string): Extract<RunEvent, { typ
     actorId,
     actorName: actorNames().get(actorId) ?? actorId,
     content,
+  }
+}
+
+function modelMessage(content: string): Extract<RunEvent, { type: "model.message" }> {
+  return {
+    type: "model.message",
+    runId: "run-test",
+    timestamp,
+    role: "actor",
+    content,
+  }
+}
+
+function actorReasoning(
+  actorId: string,
+  actorName: string,
+  step: Extract<RunEvent, { type: "model.reasoning" }>["step"],
+  content: string
+): Extract<RunEvent, { type: "model.reasoning" }> {
+  return {
+    type: "model.reasoning",
+    runId: "run-test",
+    timestamp,
+    role: "actor",
+    step,
+    attempt: 1,
+    content,
+    reasoningTokens: 7,
+    actorId,
+    actorName,
   }
 }

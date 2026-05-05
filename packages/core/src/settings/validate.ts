@@ -46,15 +46,8 @@ export function validateRoleSettings(settings: LLMSettings, role: ModelRole): vo
   if (config.seed !== undefined && (!Number.isInteger(config.seed) || config.seed < 0)) {
     throw new Error(`seed for ${role} must be a non-negative integer.`)
   }
-  if (
-    config.contextTokenBudget !== undefined &&
-    (!Number.isInteger(config.contextTokenBudget) || config.contextTokenBudget < 1)
-  ) {
-    throw new Error(`contextTokenBudget for ${role} must be a positive integer.`)
-  }
 }
 
 export function isOpenAICompatibleProvider(provider: ModelProvider): boolean {
   return OPENAI_COMPATIBLE_PROVIDERS.includes(provider)
 }
-

@@ -44,6 +44,7 @@ function metricEvent(
       ttftMs,
       durationMs,
       inputTokens,
+      reasoningTokens: 0,
       outputTokens,
       totalTokens,
       tokenSource: "provider",

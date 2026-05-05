@@ -15,16 +15,23 @@ The server writes the completed state to `state.json` and the Markdown report to
 
 ## Report Shape
 
-The rendered report currently includes sections such as:
+The rendered report is a concise benchmark-style summary. It includes sections such as:
 
-- scenario digest
-- actor cards
-- round digests
-- round reports
-- role traces
+- outcome
+- benchmark summary
+- major event results
+- computed network dynamics
+- actor relationship map
+- round progression
+- cast
+- run metadata
 
 The report is a projection of completed workflow state. It should not introduce outcomes that were
 not represented in state.
+
+Raw actor messages, role diagnostics, and full interaction evidence remain available in
+`state.json`, `events.jsonl`, and `graph.timeline.json` rather than being duplicated in the
+human-readable Markdown report.
 
 ## Artifacts
 

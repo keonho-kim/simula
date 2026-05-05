@@ -11,9 +11,6 @@ export function buildPreRoundDigest(roundIndex: number, injectedEvent?: Injected
       elapsedTime,
       content,
     },
-    afterRound: {
-      content: "",
-    },
     injectedEventId: injectedEvent?.sourceEventId,
   }
 }

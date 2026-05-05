@@ -34,14 +34,14 @@ allow_additional_cast: true
 actions_per_type: 3
 max_round: 8
 fast_mode: false
-actor_context_token_budget: 400
 output_length: short
 ---
 Scenario body starts here.
 ```
 
-`num_cast` is required. Other controls are optional and default in code. `output_length` accepts `short`, `medium`, or `long`. Unsupported controls fail
-explicitly.
+`num_cast` is required. Other controls are optional and default in code. `output_length` accepts
+`short`, `medium`, or `long` and also controls actor memory compression length. Unsupported controls
+fail explicitly.
 
 Sample scenarios live in [`../senario.samples/`](../senario.samples/README.md).
 

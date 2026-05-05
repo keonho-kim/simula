@@ -9,6 +9,7 @@ import type {
   ScenarioInput,
 } from "@simula/shared"
 import { contextUsedByActor } from "../../actor-memory"
+import { sanitizeActorVisibleText } from "../../visible-text"
 
 export interface ActorTrace {
   thought: string
@@ -70,14 +71,18 @@ export function applyActorTraceStep(
 
 export function buildActorDecision(state: ActorGraphState): ActorDecision {
   const selectedAction = normalizeActorAction(state.trace.action, state)
+  const intent = sanitizeActorVisibleText(state.trace.intent, state.actors)
   if (!selectedAction || selectedAction === "no_action") {
     return {
       actorId: state.actor.id,
       decisionType: "no_action",
       visibility: "solitary",
       targetActorIds: [],
-      intent: state.trace.intent,
-      expectation: `Hold position while considering ${state.coordinatorTrace.outcomeDirection.toLowerCase()}.`,
+      intent,
+      expectation: sanitizeActorVisibleText(
+        `Hold position while considering ${state.coordinatorTrace.outcomeDirection.toLowerCase()}.`,
+        state.actors
+      ),
       contextUsed: contextUsedByActor(state.actor),
     }
   }
@@ -90,7 +95,7 @@ export function buildActorDecision(state: ActorGraphState): ActorDecision {
   if (action.visibility !== "solitary" && (!selectedTarget || selectedTarget === "none")) {
     throw new Error(`actor.${state.actor.id} selected ${action.id} without a target.`)
   }
-  const message = normalizeActorMessage(state.trace.message)
+  const message = normalizeActorMessage(sanitizeActorVisibleText(state.trace.message, state.actors))
   const targetActorIds =
     action.visibility === "solitary" || selectedTarget === "none" || !selectedTarget ? [] : [selectedTarget]
   return {
@@ -99,9 +104,9 @@ export function buildActorDecision(state: ActorGraphState): ActorDecision {
     decisionType: "action",
     visibility: action.visibility,
     targetActorIds,
-    intent: state.trace.intent,
+    intent,
     message,
-    expectation: action.expectedOutcome,
+    expectation: sanitizeActorVisibleText(action.expectedOutcome, state.actors),
     contextUsed: contextUsedByActor(state.actor),
   }
 }

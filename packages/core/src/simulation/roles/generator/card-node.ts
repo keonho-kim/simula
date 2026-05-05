@@ -1,6 +1,7 @@
 import type { ActorCardStep, RunEvent } from "@simula/shared"
 import { invokeRoleTextWithMetrics } from "../../../llm"
-import { withPromptLanguageGuide } from "../../../language"
+import { withRolePromptGuide } from "../../../language"
+import { emitModelTelemetry } from "../../events"
 import type { ActorCardPromptBuilder } from "./card-prompts"
 import type { ActorCardGraphState } from "./card-state"
 
@@ -31,14 +32,13 @@ async function runActorCardTextNode(
   promptBuilder: ActorCardPromptBuilder
 ): Promise<{ text: string; retries: number }> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const prompt = withPromptLanguageGuide(promptBuilder(state), state.scenario.language)
-    const result = await invokeRoleTextWithMetrics(state.settings, "generator", step, attempt, prompt)
-    await state.emit({
-      type: "model.metrics",
-      runId: state.runId,
-      timestamp: timestamp(),
-      metrics: result.metrics,
+    const prompt = withRolePromptGuide(promptBuilder(state), {
+      language: state.scenario.language,
+      settings: state.settings,
+      role: "generator",
     })
+    const result = await invokeRoleTextWithMetrics(state.settings, "generator", step, attempt, prompt)
+    await emitModelTelemetry(state.runId, result, state.emit)
     const response = normalizePlainText(result.text)
     if (response) {
       await state.emit({

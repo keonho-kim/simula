@@ -14,6 +14,11 @@ interface MetricSeries {
   points: MetricPoint[]
   latestValue: string
   display: "chart" | "total"
+  tokenBreakdown?: {
+    inputTokens: string
+    reasoningTokens: string
+    outputTokens: string
+  }
 }
 
 const chartWidth = 100
@@ -23,6 +28,11 @@ const baselineY = chartHeight - chartPadding
 
 export function LlmMetricsPanel({ t }: { t: UiTexts }) {
   const events = useRunStore((state) => state.metricEvents)
+
+  return <LlmMetricsPanelView events={events} t={t} />
+}
+
+export function LlmMetricsPanelView({ events, t }: { events: RunEvent[]; t: UiTexts }) {
   const series = useMemo(() => buildMetricSeries(events, t), [events, t])
 
   return (
@@ -45,9 +55,7 @@ function MetricPanel({ series, t }: { series: MetricSeries; t: UiTexts }) {
           <span className="shrink-0 text-[10px] text-muted-foreground">{hasSamples ? t.metricLive : t.metricIdle}</span>
         </div>
         {isTotal ? (
-          <div className="flex min-h-14 flex-1 items-center justify-end rounded-sm border border-border/70 bg-background px-3">
-            <div className="truncate font-mono text-3xl leading-none text-[#0284a8]">{series.latestValue}</div>
-          </div>
+          <TokenTotalPanel series={series} t={t} />
         ) : (
           <LineChart id={series.title} points={series.points} t={t} />
         )}
@@ -56,6 +64,30 @@ function MetricPanel({ series, t }: { series: MetricSeries; t: UiTexts }) {
         </div>
       </div>
     </article>
+  )
+}
+
+function TokenTotalPanel({ series, t }: { series: MetricSeries; t: UiTexts }) {
+  return (
+    <div className="flex min-h-14 flex-1 flex-col justify-between gap-2 rounded-sm border border-border/70 bg-background px-3 py-2">
+      <div className="flex min-h-9 items-center justify-end">
+        <div className="truncate font-mono text-3xl leading-none text-[#0284a8]">{series.latestValue}</div>
+      </div>
+      <div className="grid grid-cols-3 gap-2 border-t border-border/60 pt-2">
+        <TokenSubStat label={t.metricInputTokens} value={series.tokenBreakdown?.inputTokens ?? "0"} />
+        <TokenSubStat label={t.metricReasoningTokens} value={series.tokenBreakdown?.reasoningTokens ?? "0"} />
+        <TokenSubStat label={t.metricOutputTokens} value={series.tokenBreakdown?.outputTokens ?? "0"} />
+      </div>
+    </div>
+  )
+}
+
+function TokenSubStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="truncate text-[10px] font-medium uppercase text-muted-foreground">{label}</div>
+      <div className="truncate font-mono text-sm tabular-nums text-foreground">{value}</div>
+    </div>
   )
 }
 
@@ -96,12 +128,18 @@ function buildMetricSeries(events: RunEvent[], t: UiTexts): MetricSeries[] {
   const tokensPerSecond: MetricPoint[] = []
   const totalTokens: MetricPoint[] = []
   let cumulativeTokens = 0
+  let cumulativeInputTokens = 0
+  let cumulativeReasoningTokens = 0
+  let cumulativeOutputTokens = 0
 
   for (const event of metricEvents) {
     const timestamp = event.timestamp
     const metrics = event.metrics
     const tokensPerSecondValue = metrics.durationMs > 0 ? (metrics.totalTokens / metrics.durationMs) * 1000 : 0
     cumulativeTokens += metrics.totalTokens
+    cumulativeInputTokens += metrics.inputTokens
+    cumulativeReasoningTokens += metrics.reasoningTokens
+    cumulativeOutputTokens += metrics.outputTokens
 
     ttft.push({ timestamp, value: metrics.ttftMs })
     duration.push({ timestamp, value: metrics.durationMs })
@@ -137,6 +175,11 @@ function buildMetricSeries(events: RunEvent[], t: UiTexts): MetricSeries[] {
       points: totalTokens,
       latestValue: formatLatest(totalTokens, "tokens"),
       display: "total",
+      tokenBreakdown: {
+        inputTokens: cumulativeInputTokens.toLocaleString("en-US"),
+        reasoningTokens: cumulativeReasoningTokens.toLocaleString("en-US"),
+        outputTokens: cumulativeOutputTokens.toLocaleString("en-US"),
+      },
     },
   ]
 }

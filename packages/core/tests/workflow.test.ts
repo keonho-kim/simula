@@ -77,7 +77,7 @@ describe("simulation workflow", () => {
     expect(state.roundReports).toHaveLength(3)
     expect(state.roundReports.map((report) => report.roundIndex)).toEqual([1, 2, 3])
     expect(state.roundDigests.every((digest) => digest.preRound.content)).toBe(true)
-    expect(state.roundDigests.every((digest) => digest.afterRound.content)).toBe(true)
+    expect(state.roundReports.every((report) => report.roundSummary)).toBe(true)
     expect(state.actors.every((actor) => actor.memory.some((entry) => entry.includes("EVENT | ROUND")))).toBe(true)
     expect(
       state.actors.every((actor) =>
@@ -91,6 +91,8 @@ describe("simulation workflow", () => {
           ? trace.coreSituation && trace.actorPressures && trace.conflictDynamics && trace.simulationDirection
             : trace.role === "coordinator"
             ? trace.runtimeFrame && trace.actorRouting && trace.interactionPolicy && trace.outcomeDirection && trace.eventInjection && trace.progressDecision
+            : trace.role === "observer"
+            ? trace.roundSummary
             : trace.thought && trace.target && trace.action && trace.intent
       )
     ).toBe(true)
@@ -109,12 +111,24 @@ describe("simulation workflow", () => {
     expect(
       events.filter((event) => event.type === "model.metrics" && event.metrics.role === "actor" && event.metrics.step === "context")
     ).toHaveLength(9)
+    expect(
+      events
+        .filter((event) => event.type === "model.metrics" && event.metrics.role === "observer")
+        .map((event) => event.type === "model.metrics" ? event.metrics.step : "")
+    ).toEqual(["roundSummary", "roundSummary", "roundSummary"])
     expect(events.findIndex((event) => event.type === "model.message" && event.role === "actor")).toBeLessThan(
       events.findIndex((event) => event.type === "interaction.recorded")
     )
     expect(events.findIndex((event) => event.type === "round.completed" && event.roundIndex === 1)).toBeGreaterThan(
       events.findLastIndex((event) => event.type === "interaction.recorded" && event.interaction.roundIndex === 1)
     )
+    const firstRoundCompletedIndex = events.findIndex((event) => event.type === "round.completed" && event.roundIndex === 1)
+    expect(
+      events
+        .slice(0, firstRoundCompletedIndex)
+        .filter((event) => event.type === "model.metrics" && event.metrics.role === "observer")
+        .map((event) => event.type === "model.metrics" ? event.metrics.step : "")
+    ).toEqual(["roundSummary"])
     expect(state.plan?.backgroundStory).toBeTruthy()
     expect(state.plan?.scenarioDigest?.coreSituation).toBeTruthy()
     expect(state.plan?.scenarioDigest?.actorPressures).toBeTruthy()
@@ -124,11 +138,18 @@ describe("simulation workflow", () => {
     expect(state.plan?.majorEvents.every((event) => event.title.includes("Major Event"))).toBe(true)
     expect(state.plan?.actionCatalog.length).toBeGreaterThan(0)
     expect(state.reportMarkdown).toContain("# Simula Report")
-    expect(state.reportMarkdown).toContain("## Scenario Digest")
-    expect(state.reportMarkdown).toContain("## Actor Cards")
-    expect(state.reportMarkdown).toContain("## Round Digests")
-    expect(state.reportMarkdown).toContain("## Round Reports")
-    expect(state.reportMarkdown).toContain("## Role Traces")
+    expect(state.reportMarkdown).toContain("## Outcome")
+    expect(state.reportMarkdown).toContain("## Benchmark Summary")
+    expect(state.reportMarkdown).toContain("## Major Event Results")
+    expect(state.reportMarkdown).toContain("## Network Dynamics")
+    expect(state.reportMarkdown).toContain("## Actor Relationship Map")
+    expect(state.reportMarkdown).toContain("## Round Progression")
+    expect(state.reportMarkdown).toContain("## Cast")
+    expect(state.reportMarkdown).not.toContain("## Actor Cards")
+    expect(state.reportMarkdown).not.toContain("## Round Digests")
+    expect(state.reportMarkdown).not.toContain("## Round Reports")
+    expect(state.reportMarkdown).not.toContain("## Role Traces")
+    expect(state.reportMarkdown).not.toContain("I will state my position clearly.")
     expect(events.filter((event) => event.type === "report.delta")).toHaveLength(4)
   })
 
@@ -200,7 +221,7 @@ describe("simulation workflow", () => {
         (event) =>
           event.type === "log" &&
           event.message ===
-            "Fast Mode enabled; actor decisions and observer round reports run in parallel while dependency-sensitive stages remain sequential."
+            "Fast Mode enabled; actor decisions run in parallel while observer summaries and dependency-sensitive stages remain sequential."
       )
     ).toBe(true)
   })

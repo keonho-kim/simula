@@ -30,7 +30,7 @@ export function parseScenarioControls(frontmatter: string): ScenarioControls {
     }
     const key = trimmed.slice(0, separatorIndex).trim()
     const value = trimmed.slice(separatorIndex + 1).trim()
-    if (!["num_cast", "allow_additional_cast", "actions_per_type", "max_round", "fast_mode", "actor_context_token_budget", "output_length", "load_level"].includes(key)) {
+    if (!["num_cast", "allow_additional_cast", "actions_per_type", "max_round", "fast_mode", "output_length", "load_level"].includes(key)) {
       throw new Error(`Unsupported scenario control: ${key}`)
     }
     values.set(key, value)
@@ -48,9 +48,6 @@ export function parseScenarioControls(frontmatter: string): ScenarioControls {
     actionsPerType: parsePositiveInteger(values.get("actions_per_type") ?? "3", "actions_per_type"),
     maxRound: parsePositiveInteger(values.get("max_round") ?? "8", "max_round"),
     fastMode: parseBoolean(values.get("fast_mode") ?? "false"),
-    actorContextTokenBudget: values.has("actor_context_token_budget")
-      ? parsePositiveInteger(values.get("actor_context_token_budget") ?? "", "actor_context_token_budget")
-      : undefined,
     outputLength: parseOutputLength(values.get("output_length") ?? "short"),
     loadLevel: parseLoadLevel(values.get("load_level") ?? "middle"),
   }
@@ -63,9 +60,6 @@ export function normalizeScenarioControls(controls: Partial<ScenarioControls>): 
     actionsPerType: parsePositiveInteger(String(controls.actionsPerType ?? 3), "actions_per_type"),
     maxRound: parsePositiveInteger(String(controls.maxRound ?? 8), "max_round"),
     fastMode: controls.fastMode ?? false,
-    actorContextTokenBudget: controls.actorContextTokenBudget === undefined
-      ? undefined
-      : parsePositiveInteger(String(controls.actorContextTokenBudget), "actor_context_token_budget"),
     outputLength: parseOutputLength(controls.outputLength ?? "short"),
     loadLevel: parseLoadLevel(controls.loadLevel ?? "middle"),
   }

@@ -53,7 +53,6 @@ const defaultControls: ScenarioControls = {
   actionsPerType: 3,
   maxRound: 8,
   fastMode: false,
-  actorContextTokenBudget: 400,
   outputLength: "short",
 }
 

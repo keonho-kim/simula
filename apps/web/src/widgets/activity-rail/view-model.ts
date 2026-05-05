@@ -2,10 +2,12 @@ import type { RoleTrace, RunEvent, SimulationState } from "@simula/shared"
 import type { UiTexts } from "@/lib/i18n"
 import {
   COORDINATOR_TRACE_STEPS,
+  OBSERVER_TRACE_STEPS,
   PLANNER_TRACE_STEPS,
   ROLE_BUTTONS,
   STANDARD_TRACE_STEPS,
   type LogItem,
+  type ReasoningEntry,
   type RolePanelRole,
   type RoleStatus,
   type RoleSummary,
@@ -56,16 +58,18 @@ export function buildRoleSummaries(events: RunEvent[], runState: SimulationState
     const metrics = events
       .filter((event): event is Extract<RunEvent, { type: "model.metrics" }> => event.type === "model.metrics" && event.metrics.role === role)
       .map((event) => event.metrics)
+    const reasoning = buildReasoningEntries(events, role)
     const logs = buildRoleLogs(events, role, t)
     return {
       role,
       label: roleLabel(role),
       description: roleDescription(role, t),
-      status: roleStatus(events, role, trace, messages, logs),
-      preview: rolePreview(role, trace, messages, logs, t),
+      status: roleStatus(events, role, trace, messages, logs, reasoning),
+      preview: rolePreview(role, trace, messages, logs, reasoning, t),
       trace,
       messages,
       sections: buildRoleSections(role, trace, messages),
+      reasoning,
       metrics,
       logs,
     }
@@ -122,7 +126,8 @@ function roleStatus(
   role: RolePanelRole,
   trace: RoleTrace | undefined,
   messages: Array<{ content: string; timestamp: string }>,
-  logs: LogItem[]
+  logs: LogItem[],
+  reasoning: ReasoningEntry[]
 ): RoleStatus {
   if (logs.some((log) => log.level === "error")) {
     return "failed"
@@ -135,7 +140,7 @@ function roleStatus(
   if (latestNode?.type === "node.started") return "running"
   if (latestNode?.type === "node.completed") return "done"
   if (latestNode?.type === "node.failed") return "failed"
-  if (trace || messages.length) return "active"
+  if (trace || messages.length || reasoning.length) return "active"
   return "idle"
 }
 
@@ -144,6 +149,7 @@ function rolePreview(
   trace: RoleTrace | undefined,
   messages: Array<{ content: string; timestamp: string }>,
   logs: LogItem[],
+  reasoning: ReasoningEntry[],
   t: UiTexts
 ): string {
   if (trace?.role === "planner") {
@@ -152,12 +158,29 @@ function rolePreview(
   if (trace?.role === "coordinator") {
     return trace.outcomeDirection || trace.interactionPolicy || trace.runtimeFrame
   }
-  if (trace?.intent) return trace.intent
-  if (trace?.action) return trace.action
-  if (trace?.thought) return trace.thought
+  if (trace?.role === "observer") {
+    return trace.roundSummary
+  }
+  if (trace && "intent" in trace && trace.intent) return trace.intent
+  if (trace && "action" in trace && trace.action) return trace.action
+  if (trace && "thought" in trace && trace.thought) return trace.thought
   if (messages.length) return t.roleModelSignalCaptured
+  if (reasoning.length) return t.roleReasoningSignalCaptured
   if (logs.length) return t.roleLogSignalCaptured
   return t.roleNoSignal
+}
+
+function buildReasoningEntries(events: RunEvent[], role: RolePanelRole): ReasoningEntry[] {
+  return events
+    .filter((event): event is Extract<RunEvent, { type: "model.reasoning" }> => event.type === "model.reasoning" && event.role === role)
+    .map((event, index) => ({
+      id: `${event.runId}:${event.role}:${event.step}:${event.attempt}:${event.timestamp}:${index}`,
+      step: event.step,
+      attempt: event.attempt,
+      timestamp: event.timestamp,
+      content: event.content,
+      reasoningTokens: event.reasoningTokens,
+    }))
 }
 
 function buildRoleSections(
@@ -185,6 +208,13 @@ function traceEntries(trace: RoleTrace): TraceEntry[] {
   }
   if (trace.role === "coordinator") {
     return COORDINATOR_TRACE_STEPS.map((step) => ({
+      step,
+      label: traceStepLabel(step),
+      content: cleanTraceContent(trace[step], step, trace.role),
+    }))
+  }
+  if (trace.role === "observer") {
+    return OBSERVER_TRACE_STEPS.map((step) => ({
       step,
       label: traceStepLabel(step),
       content: cleanTraceContent(trace[step], step, trace.role),
@@ -245,6 +275,7 @@ function normalizeTraceStep(value: string, role: RolePanelRole): string {
 function roleTraceSteps(role: RolePanelRole): TraceStep[] {
   if (role === "planner") return [...PLANNER_TRACE_STEPS]
   if (role === "coordinator") return [...COORDINATOR_TRACE_STEPS]
+  if (role === "observer") return [...OBSERVER_TRACE_STEPS]
   return [...STANDARD_TRACE_STEPS]
 }
 
@@ -261,6 +292,7 @@ function traceStepLabel(step: string): string {
   if (step === "target") return "Target"
   if (step === "action") return "Action"
   if (step === "intent") return "Intent"
+  if (step === "roundSummary") return "Round Summary"
   return humanizeTraceStep(step)
 }
 

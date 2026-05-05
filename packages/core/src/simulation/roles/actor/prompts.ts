@@ -62,18 +62,20 @@ ${actionPromptOutputs(state)}
   intent: (state, partial) =>
     `Actor intent. Return one sentence explaining ${state.actor.name}'s choice in round ${state.roundIndex}.
 ${renderOutputLengthGuide(state.scenario.controls, "actor intent")}
+Natural-language output must use actor names and action labels, not internal ids.
 
-Target: ${partial.target}
-Action: ${partial.action}`,
+Target: ${targetSelectionSummary(state, partial.target)}
+Action: ${actorActionSummary(state, partial.action)}`,
   message: (state, partial) =>
     `Actor message. Return one short spoken line as ${state.actor.name}, or None if this actor does not speak.
 ${renderOutputLengthGuide(state.scenario.controls, "actor message")}
 If Action is no_action, return None.
+Natural-language output must use actor names and action labels, not internal ids.
 No explanation or JSON.
 
 Thought: ${compactText(partial.thought, scalePromptLimit(300, state.scenario.controls))}
-Target: ${partial.target}
-Action: ${partial.action}
+Target: ${targetSelectionSummary(state, partial.target)}
+Action: ${actorActionSummary(state, partial.action)}
 Intent: ${compactText(partial.intent, scalePromptLimit(240, state.scenario.controls))}`,
 }
 
@@ -92,6 +94,15 @@ function actorActionSummary(state: ActorGraphState, actionId: string | undefined
   }
   const action = state.actor.actions.find((item) => item.id === normalized)
   return action ? `${action.id} (${action.visibility}, ${action.label})` : normalized
+}
+
+function targetSelectionSummary(state: ActorGraphState, targetId: string | undefined): string {
+  const normalized = targetId?.trim()
+  if (!normalized || normalized === "None" || normalized === "none") {
+    return "None"
+  }
+  const target = state.actors.find((actor) => actor.id === normalized)
+  return target ? `${target.id} (${target.name}, ${target.role})` : normalized
 }
 
 function actionPromptOutputs(state: ActorGraphState): string {

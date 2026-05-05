@@ -4,7 +4,7 @@ import Graph from "graphology"
 import { CrosshairIcon, Maximize2Icon, SearchIcon, XIcon } from "lucide-react"
 import Sigma from "sigma"
 import type { EdgeProgramType } from "sigma/rendering"
-import type { GraphTimelineFrame } from "@simula/shared"
+import type { ActorState, GraphTimelineFrame } from "@simula/shared"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { UiTexts } from "@/lib/i18n"
@@ -13,6 +13,7 @@ import { MUTED_EDGE_COLOR, MUTED_NODE_COLOR } from "./constants"
 import { writeGraphFrame } from "./frame-writer"
 import { actorPopoverStyle, nodeOverlayPosition } from "./overlays"
 import { reduceEdge, reduceNode } from "./styles"
+import { sanitizeActorVisibleText } from "../actor-visible-text"
 import {
   EDGE_TYPE,
   type ActorGraph,
@@ -32,6 +33,7 @@ interface GraphViewProps {
   selectedEdgeId?: string
   onEdgeSelect?: (edgeId: string | undefined) => void
   showActorPopover?: boolean
+  actors?: ActorState[]
 }
 
 export function GraphView({
@@ -43,6 +45,7 @@ export function GraphView({
   selectedEdgeId,
   onEdgeSelect,
   showActorPopover = false,
+  actors = [],
 }: GraphViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const rendererRef = useRef<Sigma<GraphNodeAttributes, GraphEdgeAttributes> | null>(null)
@@ -81,6 +84,11 @@ export function GraphView({
     () => frame?.nodes.find((node) => node.id === selectedActorId),
     [frame?.nodes, selectedActorId]
   )
+  const actorNames = useMemo(
+    () => new Map([...(frame?.nodes ?? []).map((node) => [node.id, node.label] as const), ...actors.map((actor) => [actor.id, actor.name] as const)]),
+    [actors, frame?.nodes]
+  )
+  const selectedActorIntent = sanitizeActorVisibleText(selectedActor?.intent, actorNames, actors)
 
   const focusNode = useCallback((nodeId: string) => {
     const graph = graphRef.current
@@ -297,7 +305,7 @@ export function GraphView({
             </div>
           </div>
           <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">
-            {selectedActor.intent || t.graphNoIntent}
+            {selectedActorIntent || t.graphNoIntent}
           </p>
         </div>
       ) : null}

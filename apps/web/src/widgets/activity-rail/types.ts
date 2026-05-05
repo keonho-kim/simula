@@ -2,6 +2,7 @@ import type {
   CoordinatorTraceStep,
   ModelMetrics,
   ModelRole,
+  ObserverTraceStep,
   PlannerTraceStep,
   RoleTrace,
   RoleTraceStep,
@@ -9,6 +10,7 @@ import type {
 
 export const ROLE_BUTTONS: RolePanelRole[] = ["planner", "generator", "coordinator", "observer", "repair"]
 export const STANDARD_TRACE_STEPS: RoleTraceStep[] = ["thought", "target", "action", "intent"]
+export const OBSERVER_TRACE_STEPS: ObserverTraceStep[] = ["roundSummary"]
 export const PLANNER_TRACE_STEPS: PlannerTraceStep[] = [
   "coreSituation",
   "actorPressures",
@@ -26,12 +28,21 @@ export const COORDINATOR_TRACE_STEPS: CoordinatorTraceStep[] = [
   "extensionDecision",
 ]
 
-export type TraceStep = RoleTraceStep | PlannerTraceStep | CoordinatorTraceStep
+export type TraceStep = RoleTraceStep | PlannerTraceStep | CoordinatorTraceStep | ObserverTraceStep
 
 export interface TraceEntry {
   step: string
   label: string
   content: string
+}
+
+export interface ReasoningEntry {
+  id: string
+  step: string
+  attempt: number
+  timestamp: string
+  content: string
+  reasoningTokens: number
 }
 
 export type RolePanelRole = Exclude<ModelRole, "storyBuilder" | "actor">
@@ -54,6 +65,7 @@ export interface RoleSummary {
   trace?: RoleTrace
   messages: Array<{ content: string; timestamp: string }>
   sections: TraceEntry[]
+  reasoning: ReasoningEntry[]
   metrics: ModelMetrics[]
   logs: LogItem[]
 }

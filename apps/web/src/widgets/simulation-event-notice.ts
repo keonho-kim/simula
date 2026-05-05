@@ -2,6 +2,7 @@ import type { InjectedEvent, RunEvent } from "@simula/shared"
 
 export interface SimulationEventNotice {
   event: InjectedEvent
+  dismissalKey: string
 }
 
 export function buildSimulationEventNotice(events: RunEvent[]): SimulationEventNotice | undefined {
@@ -24,7 +25,7 @@ export function buildSimulationEventNotice(events: RunEvent[]): SimulationEventN
       event.type === "run.failed" ||
       event.type === "run.canceled"
   )
-  return hidden ? undefined : { event: injected.event }
+  return hidden ? undefined : { event: injected.event, dismissalKey: `${injected.runId}:${injected.event.id}` }
 }
 
 function lastIndexOf<T>(items: T[], predicate: (item: T) => boolean): number {

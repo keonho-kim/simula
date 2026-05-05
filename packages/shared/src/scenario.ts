@@ -8,7 +8,6 @@ export interface ScenarioControls {
   actionsPerType: number
   maxRound: number
   fastMode: boolean
-  actorContextTokenBudget?: number
   outputLength?: PromptOutputLength
   loadLevel?: ScenarioLoadLevel
 }

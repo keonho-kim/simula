@@ -1,7 +1,8 @@
 import type { ModelRole, RoleTraceStep, RunEvent } from "@simula/shared"
 import { invokeRoleTextWithMetrics } from "../../../llm"
-import { withPromptLanguageGuide } from "../../../language"
+import { withRolePromptGuide } from "../../../language"
 import { scalePromptLimit } from "../../../prompt"
+import { emitModelTelemetry } from "../../events"
 import type { WorkflowState } from "../../state"
 import type { PromptBuilder } from "./types"
 
@@ -16,14 +17,13 @@ export async function runPlainTextNode(
   emit: (event: RunEvent) => Promise<void>
 ): Promise<{ text: string; retries: number }> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const prompt = withPromptLanguageGuide(promptBuilder(state, partial), state.scenario.language)
-    const result = await invokeRoleTextWithMetrics(state.settings, role, step, attempt, prompt)
-    await emit({
-      type: "model.metrics",
-      runId: state.runId,
-      timestamp: timestamp(),
-      metrics: result.metrics,
+    const prompt = withRolePromptGuide(promptBuilder(state, partial), {
+      language: state.scenario.language,
+      settings: state.settings,
+      role,
     })
+    const result = await invokeRoleTextWithMetrics(state.settings, role, step, attempt, prompt)
+    await emitModelTelemetry(state.runId, result, emit)
     const response = normalizePlainText(result.text, state)
     if (response) {
       await emit({

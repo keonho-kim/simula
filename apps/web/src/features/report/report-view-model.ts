@@ -30,12 +30,8 @@ export interface ReportTimelineRound {
   roundIndex: number
   elapsedTime: string
   preRound: string
-  afterRound: string
   title: string
-  summary: string
-  keyInteractions: string[]
-  actorImpacts: string[]
-  unresolvedQuestions: string[]
+  roundSummary: string
   interactions: ReportTimelineItem[]
 }
 
@@ -54,9 +50,10 @@ export interface RoleDiagnosticEvent {
   id: string
   role: ReportSystemRole
   timestamp: string
-  kind: "node" | "message" | "metric" | "log"
+  kind: "node" | "message" | "metric" | "think" | "log"
   title: string
   body: string
+  details?: string
 }
 
 export const REPORT_SYSTEM_ROLES: ReportSystemRole[] = [
@@ -176,12 +173,8 @@ function ensureRound(
     roundIndex,
     elapsedTime: digest?.preRound.elapsedTime ?? "",
     preRound: digest?.preRound.content ?? "",
-    afterRound: digest?.afterRound.content ?? "",
     title: report?.title ?? `${t?.round ?? "Round"} ${roundIndex}`,
-    summary: report?.summary ?? "",
-    keyInteractions: report?.keyInteractions ?? [],
-    actorImpacts: report?.actorImpacts ?? [],
-    unresolvedQuestions: report?.unresolvedQuestions ?? [],
+    roundSummary: report?.roundSummary ?? "",
     interactions: [],
   }
   rounds.set(roundIndex, round)
@@ -214,6 +207,20 @@ function diagnosticEventsForRunEvent(event: RunEvent, index: number, t?: UiTexts
       kind: "metric",
       title: `${event.metrics.step} metrics`,
       body: `${event.metrics.totalTokens.toLocaleString()} ${t?.metricTotalTokens ?? "tokens"}, ${event.metrics.durationMs}ms ${t?.metricDuration ?? "duration"}, attempt ${event.metrics.attempt}.`,
+    }]
+  }
+  if (event.type === "model.reasoning") {
+    if (!isReportSystemRole(event.role)) {
+      return []
+    }
+    return [{
+      id: `${event.type}-${index}`,
+      role: event.role,
+      timestamp: event.timestamp,
+      kind: "think",
+      title: `${event.step} think`,
+      body: `${event.reasoningTokens.toLocaleString()} reasoning tokens, attempt ${event.attempt}.`,
+      details: event.content,
     }]
   }
   if (event.type === "node.started" || event.type === "node.completed" || event.type === "node.failed") {

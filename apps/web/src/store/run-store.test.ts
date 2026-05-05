@@ -61,6 +61,15 @@ describe("run store", () => {
     expect(useRunStore.getState().actorEvents).toEqual([interaction])
   })
 
+  test("does not keep actor model trace as actor activity", () => {
+    const trace = modelMessage("actor intent: internal trace")
+
+    useRunStore.getState().pushEvent(trace)
+
+    expect(useRunStore.getState().actorEvents).toEqual([])
+    expect(useRunStore.getState().liveEvents).toEqual([trace])
+  })
+
   test("deduplicates injected events by event id", () => {
     const injected = eventInjected("round-1-event-1")
 
@@ -95,6 +104,7 @@ function modelMetrics(
       ttftMs: 10,
       durationMs: 100,
       inputTokens: Math.floor(totalTokens / 2),
+      reasoningTokens: 0,
       outputTokens: Math.ceil(totalTokens / 2),
       totalTokens,
       tokenSource: "provider",
@@ -130,6 +140,16 @@ function interactionRecorded(id: string, roundIndex: number): Extract<RunEvent, 
       intent: "Create pressure.",
       expectation: "Actor 2 responds.",
     },
+  }
+}
+
+function modelMessage(content: string): Extract<RunEvent, { type: "model.message" }> {
+  return {
+    type: "model.message",
+    runId,
+    timestamp,
+    role: "actor",
+    content,
   }
 }
 

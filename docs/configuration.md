@@ -70,8 +70,6 @@ Each role setting contains:
 - optional sampling and provider fields such as `topP`, `topK`, penalties, seed, `reasoningEffort`,
   `streamUsage`, `extraBody`, `extraHeaders`, and `safetySettings`
 
-The actor role also supports `contextTokenBudget`; its default is `400`. Values above `400` are capped at runtime.
-
 ## Scenario Controls
 
 Scenario controls are read from flat frontmatter:
@@ -83,12 +81,12 @@ allow_additional_cast: true
 actions_per_type: 3
 max_round: 8
 fast_mode: false
-actor_context_token_budget: 400
 output_length: short
 ---
 ```
 
-`num_cast` is required. `output_length` accepts `short`, `medium`, or `long`. Unsupported keys fail explicitly.
+`num_cast` is required. `output_length` accepts `short`, `medium`, or `long` and also controls
+actor memory compression length: 3, 5, or 10 sentences respectively. Unsupported keys fail explicitly.
 
 ## Related Docs
 

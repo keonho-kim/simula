@@ -7,7 +7,7 @@ import type {
   StoryBuilderStreamEvent,
 } from "@simula/shared"
 import { invokeRoleText, invokeRoleTextStreaming } from "../llm"
-import { withPromptLanguageGuide } from "../language"
+import { withRolePromptGuide } from "../language"
 import { renderOutputLengthGuide } from "../prompt"
 import { validateRoleSettings } from "../settings"
 
@@ -190,7 +190,11 @@ async function createDraftNode(state: StoryBuilderGraphState): Promise<Partial<S
     status: "started",
     message: "Drafting the revised scenario.",
   })
-  const prompt = withPromptLanguageGuide(renderStoryBuilderPrompt(state.request), state.request.language)
+  const prompt = withRolePromptGuide(renderStoryBuilderPrompt(state.request), {
+    language: state.request.language,
+    settings: state.settings,
+    role: "storyBuilder",
+  })
   const generated = await invokeStoryBuilderText(state, prompt)
   const draft = generated || storyBuilderFallbackDraft(state.request.messages)
   await state.emit({ type: "draft", text: draft })
@@ -214,10 +218,11 @@ async function createChangeSummaryNode(state: StoryBuilderGraphState): Promise<P
     status: "started",
     message: "Summarizing the changes reflected in the draft.",
   })
-  const prompt = withPromptLanguageGuide(
-    renderStoryBuilderChangeSummaryPrompt(state.request, state.draft),
-    state.request.language
-  )
+  const prompt = withRolePromptGuide(renderStoryBuilderChangeSummaryPrompt(state.request, state.draft), {
+    language: state.request.language,
+    settings: state.settings,
+    role: "storyBuilder",
+  })
   const summary = await streamStoryBuilderText(state, prompt, async (content) => {
     await state.emit({ type: "summary_delta", content })
   })

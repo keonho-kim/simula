@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { UiTexts } from "@/lib/i18n"
 import { MarkdownContent } from "@/shared/ui/markdown-content"
 import { useRunStore } from "@/store/run-store"
+import { sanitizeActorVisibleText } from "./actor-visible-text"
 
 export type HistoryFilter = "all" | "outgoing" | "incoming" | "message"
 
@@ -43,6 +44,16 @@ export interface ActorHistoryItem {
   content: string
   visibility?: Interaction["visibility"]
   actionType?: string
+}
+
+export interface ActorReasoningItem {
+  id: string
+  actorId: string
+  step: string
+  attempt: number
+  timestamp: string
+  content: string
+  reasoningTokens: number
 }
 
 export function ActorCardRail({
@@ -112,11 +123,15 @@ export function ActorDetailDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const [filter, setFilter] = useState<HistoryFilter>("all")
-  const { actors, history } = useActorPanelData(t)
+  const { actors, history, reasoning } = useActorPanelData(t)
   const actor = actors.find((item) => item.id === actorId)
   const actorHistory = useMemo(
     () => actorId ? filterHistory(history.filter((item) => item.id.startsWith(`${actorId}:`)), filter) : [],
     [actorId, filter, history]
+  )
+  const actorReasoning = useMemo(
+    () => actorId ? reasoning.filter((item) => item.actorId === actorId) : [],
+    [actorId, reasoning]
   )
   const stats = useMemo(() => buildHistoryStats(history.filter((item) => actorId && item.id.startsWith(`${actorId}:`))), [actorId, history])
   const dialogOpen = Boolean(actor) && (open ?? true)
@@ -179,6 +194,7 @@ export function ActorDetailDialog({
                       </TabsList>
                     </Tabs>
                   </div>
+                  <ActorReasoningStream items={actorReasoning} t={t} />
                   <ScrollArea className="min-h-0 flex-1 p-3">
                     {actorHistory.length ? (
                       <div className="flex flex-col gap-2 pr-3">
@@ -203,7 +219,7 @@ export function ActorDetailDialog({
   )
 }
 
-function useActorPanelData(t: UiTexts): { actors: ActorSummary[]; history: ActorHistoryItem[] } {
+function useActorPanelData(t: UiTexts): { actors: ActorSummary[]; history: ActorHistoryItem[]; reasoning: ActorReasoningItem[] } {
   const timeline = useRunStore((state) => state.timeline)
   const replayIndex = useRunStore((state) => state.replayIndex)
   const actorEvents = useRunStore((state) => state.actorEvents)
@@ -211,14 +227,15 @@ function useActorPanelData(t: UiTexts): { actors: ActorSummary[]; history: Actor
   const frame = timeline[replayIndex] ?? timeline.at(-1)
   const actorNames = useMemo(() => buildActorNameMap(frame?.nodes ?? [], actorEvents, runState?.actors ?? []), [actorEvents, frame, runState?.actors])
   const history = useMemo(
-    () => buildActorHistory(actorEvents, runState?.interactions ?? [], actorNames, t),
-    [actorEvents, actorNames, runState?.interactions, t]
+    () => buildActorHistory(actorEvents, runState?.interactions ?? [], actorNames, t, runState?.actors ?? []),
+    [actorEvents, actorNames, runState?.actors, runState?.interactions, t]
   )
+  const reasoning = useMemo(() => buildActorReasoning(actorEvents), [actorEvents])
   const actors = useMemo(
     () => buildActorSummaries(runState?.actors ?? [], frame?.nodes ?? [], actorEvents, history),
     [actorEvents, frame?.nodes, history, runState?.actors]
   )
-  return { actors, history }
+  return { actors, history, reasoning }
 }
 
 export function buildActorSummaries(
@@ -227,18 +244,20 @@ export function buildActorSummaries(
   actorEvents: RunEvent[],
   history: ActorHistoryItem[]
 ): ActorSummary[] {
+  const actorNames = buildActorNameMap(nodes, actorEvents, stateActors)
+  const clean = (value: string | undefined) => sanitizeActorVisibleText(value, actorNames, stateActors)
   const summaries = new Map<string, ActorSummary>()
   for (const actor of stateActors) {
     summaries.set(actor.id, {
       id: actor.id,
       name: actor.name,
       role: actor.role,
-      intent: actor.intent,
+      intent: clean(actor.intent),
       backgroundHistory: actor.backgroundHistory,
       personality: actor.personality,
       preference: actor.preference,
       privateGoal: actor.privateGoal,
-      contextSummary: actor.contextSummary,
+      contextSummary: clean(actor.contextSummary),
       interactionCount: 0,
       latestActivity: "",
       messageCount: 0,
@@ -250,7 +269,7 @@ export function buildActorSummaries(
       id: node.id,
       name: current?.name ?? node.label,
       role: current?.role ?? node.role,
-      intent: node.intent || current?.intent || "",
+      intent: clean(node.intent) || current?.intent || "",
       backgroundHistory: current?.backgroundHistory ?? "",
       personality: current?.personality ?? "",
       preference: current?.preference ?? "",
@@ -269,12 +288,12 @@ export function buildActorSummaries(
           id: actor.id,
           name: current?.name ?? actor.label,
           role: current?.role ?? actor.role,
-          intent: current?.intent || actor.intent,
+          intent: current?.intent || clean(actor.intent),
           backgroundHistory: current?.backgroundHistory || actor.backgroundHistory || "",
           personality: current?.personality || actor.personality || "",
           preference: current?.preference || actor.preference || "",
           privateGoal: current?.privateGoal || actor.privateGoal || "",
-          contextSummary: current?.contextSummary || actor.contextSummary || "",
+          contextSummary: current?.contextSummary || clean(actor.contextSummary) || "",
           interactionCount: current?.interactionCount ?? actor.interactionCount,
           latestActivity: current?.latestActivity ?? "",
           messageCount: current?.messageCount ?? 0,
@@ -322,7 +341,8 @@ export function buildActorHistory(
   actorEvents: RunEvent[],
   stateInteractions: Interaction[],
   actorNames: Map<string, string>,
-  t: UiTexts
+  t: UiTexts,
+  actors: ActorState[] = []
 ): ActorHistoryItem[] {
   const items: ActorHistoryItem[] = []
   const seen = new Set<string>()
@@ -331,24 +351,32 @@ export function buildActorHistory(
   for (const event of actorEvents) {
     if (event.type === "interaction.recorded") {
       currentRoundIndex = event.interaction.roundIndex
-      addInteractionHistory(items, seen, event.interaction, actorNames, t, event.timestamp)
+      addInteractionHistory(items, seen, event.interaction, actorNames, t, actors, event.timestamp)
     }
     if (event.type === "actor.message") {
-      addMessageHistory(items, seen, event.actorId, event.timestamp, currentRoundIndex, t.actorMessage, t.self.toUpperCase(), event.content)
-    }
-    if (event.type === "model.message" && event.role === "actor") {
-      const parsed = parseActorModelMessage(event.content, actorNames)
-      if (parsed) {
-        addMessageHistory(items, seen, parsed.actorId, event.timestamp, currentRoundIndex, `${t.modelStep} ${parsed.step}`, t.self.toUpperCase(), parsed.content)
-      }
+      addMessageHistory(items, seen, event.actorId, event.timestamp, currentRoundIndex, t.actorMessage, t.self.toUpperCase(), sanitizeActorVisibleText(event.content, actorNames, actors))
     }
   }
 
   for (const interaction of stateInteractions) {
-    addInteractionHistory(items, seen, interaction, actorNames, t)
+    addInteractionHistory(items, seen, interaction, actorNames, t, actors)
   }
 
   return items.sort(compareHistoryItems)
+}
+
+export function buildActorReasoning(actorEvents: RunEvent[]): ActorReasoningItem[] {
+  return actorEvents
+    .filter((event): event is Extract<RunEvent, { type: "model.reasoning" }> => event.type === "model.reasoning" && event.role === "actor" && Boolean(event.actorId))
+    .map((event, index) => ({
+      id: `${event.runId}:${event.actorId}:${event.step}:${event.attempt}:${event.timestamp}:${index}`,
+      actorId: event.actorId ?? "",
+      step: event.step,
+      attempt: event.attempt,
+      timestamp: event.timestamp,
+      content: event.content,
+      reasoningTokens: event.reasoningTokens,
+    }))
 }
 
 function addMessageHistory(
@@ -375,6 +403,7 @@ function addInteractionHistory(
   interaction: Interaction,
   actorNames: Map<string, string>,
   t: UiTexts,
+  actors: ActorState[],
   timestamp?: string
 ): void {
   const targetNames = interaction.targetActorIds
@@ -395,7 +424,7 @@ function addInteractionHistory(
       title: t.actionTaken,
       counterpart: counterpartName,
       counterpartName,
-      content: interaction.content,
+      content: sanitizeActorVisibleText(interaction.content, actorNames, actors),
       visibility: interaction.visibility,
       actionType: interaction.actionType,
     })
@@ -418,31 +447,11 @@ function addInteractionHistory(
       title: t.receivedInteraction,
       counterpart: `${t.from} ${sourceName}`,
       counterpartName: sourceName,
-      content: interaction.content,
+      content: sanitizeActorVisibleText(interaction.content, actorNames, actors),
       visibility: interaction.visibility,
       actionType: interaction.actionType,
     })
   }
-}
-
-function parseActorModelMessage(content: string, actorNames: Map<string, string>): { actorId: string; step: string; content: string } | undefined {
-  const entries = [...actorNames.entries()].toSorted((a, b) => b[1].length - a[1].length)
-  for (const [actorId, name] of entries) {
-    if (!content.startsWith(`${name} `)) {
-      continue
-    }
-    const rest = content.slice(name.length + 1)
-    const separatorIndex = rest.indexOf(":")
-    if (separatorIndex < 1) {
-      continue
-    }
-    return {
-      actorId,
-      step: rest.slice(0, separatorIndex).trim(),
-      content: rest.slice(separatorIndex + 1).trim(),
-    }
-  }
-  return undefined
 }
 
 export function filterHistory(history: ActorHistoryItem[], filter: HistoryFilter): ActorHistoryItem[] {
@@ -533,6 +542,29 @@ function ActorHistoryCard({ item }: { item: ActorHistoryItem }) {
         </div>
       </div>
     </div>
+  )
+}
+
+function ActorReasoningStream({ items, t }: { items: ActorReasoningItem[]; t: UiTexts }) {
+  if (!items.length) {
+    return null
+  }
+  return (
+    <details className="border-b border-border/70 bg-background/60 px-3 py-2">
+      <summary className="cursor-pointer text-xs font-semibold uppercase text-muted-foreground">
+        {t.think} ({items.length})
+      </summary>
+      <div className="mt-2 flex flex-col gap-2">
+        {items.slice(-6).map((item) => (
+          <details key={item.id} className="rounded-md bg-muted/30 p-3">
+            <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+              {item.step} · attempt {item.attempt} · {timeLabel(item.timestamp)} · {item.reasoningTokens.toLocaleString()} tokens
+            </summary>
+            <MarkdownContent compact className="mt-2" content={item.content} fallback="-" />
+          </details>
+        ))}
+      </div>
+    </details>
   )
 }
 

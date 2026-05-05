@@ -22,8 +22,7 @@ flowchart LR
     Start["run.started"] --> Planner["planner"]
     Planner --> Generator["generator"]
     Generator --> Coordinator["coordinator"]
-    Coordinator --> Observer["observer"]
-    Observer --> Finalization["finalization"]
+    Coordinator --> Finalization["finalization"]
     Finalization --> Done["run.completed"]
 ```
 
@@ -49,6 +48,7 @@ The workflow emits:
 - actor readiness
 - interactions
 - actor messages
+- per-round observer summaries
 - round completion
 - report deltas
 - logs

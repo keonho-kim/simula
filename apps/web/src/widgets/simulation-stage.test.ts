@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import type { GraphNodeView, RunEvent } from "@simula/shared"
+import { renderToStaticMarkup } from "react-dom/server"
+import { dictionary } from "@/lib/i18n/dictionary"
 import { buildSimulationEventNotice } from "./simulation-event-notice"
+import { SimulationEventNoticeCard } from "./simulation-event-notice-card"
 import { buildInterludeStageView, buildSimulationInterlude } from "./simulation-stage-interlude"
 
 const runId = "run-test"
@@ -194,6 +197,7 @@ describe("buildSimulationEventNotice", () => {
 
     expect(notice?.event.title).toBe("Public pressure")
     expect(notice?.event.roundIndex).toBe(1)
+    expect(notice?.dismissalKey).toBe("run-test:round-1-event-1")
   })
 
   test("hides the injected event notice after same-round interaction", () => {
@@ -218,6 +222,24 @@ describe("buildSimulationEventNotice", () => {
       eventInjected(7),
       roundCompleted(8),
     ])).toBeUndefined()
+  })
+
+  test("renders a dismiss button for the injected event notice", () => {
+    const notice = buildSimulationEventNotice([
+      runStarted(),
+      eventInjected(1),
+    ])
+
+    const html = renderToStaticMarkup(
+      SimulationEventNoticeCard({
+        notice,
+        t: dictionary.en,
+        onDismiss: () => undefined,
+      })
+    )
+
+    expect(html).toContain('aria-label="Dismiss event notice"')
+    expect(html).toContain("Public pressure")
   })
 })
 

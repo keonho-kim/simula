@@ -8,6 +8,7 @@ const eventTypes: RunEvent["type"][] = [
   "node.completed",
   "node.failed",
   "model.message",
+  "model.reasoning",
   "model.metrics",
   "actors.ready",
   "event.injected",

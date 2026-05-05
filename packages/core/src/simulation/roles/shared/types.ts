@@ -4,7 +4,7 @@ import type { WorkflowState } from "../../state"
 export type PromptBuilder = (state: WorkflowState, partial: Partial<Record<RoleTraceStep, string>>) => string
 
 export interface RoleGraphOptions {
-  role: Exclude<SimulationRole, "planner" | "coordinator">
+  role: Exclude<SimulationRole, "planner" | "coordinator" | "observer">
   prompts: Record<RoleTraceStep, PromptBuilder>
   emit: (event: RunEvent) => Promise<void>
 }

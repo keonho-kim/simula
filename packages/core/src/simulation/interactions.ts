@@ -1,4 +1,5 @@
 import type { ActorDecision, ActorState, Interaction, PlannedEvent } from "@simula/shared"
+import { sanitizeActorVisibleText } from "./visible-text"
 
 export function applyActorDecision(actors: ActorState[], decision: ActorDecision): ActorState[] {
   return actors.map((actor) => {
@@ -37,12 +38,12 @@ export function buildInteraction(
     sourceActorId: actor.id,
     targetActorIds: decision.targetActorIds,
     actionType: decision.actionId ?? decision.decisionType,
-    content: interactionContent(actor, actors, event, decision),
+    content: sanitizeActorVisibleText(interactionContent(actor, actors, event, decision), actors),
     eventId: event.id,
     visibility: decision.visibility,
     decisionType: decision.decisionType,
-    intent: decision.intent,
-    expectation: decision.expectation,
+    intent: sanitizeActorVisibleText(decision.intent, actors),
+    expectation: sanitizeActorVisibleText(decision.expectation, actors),
   }
 }
 

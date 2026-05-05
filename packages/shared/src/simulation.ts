@@ -1,4 +1,4 @@
-import type { RoleTraceStep, SimulationRole, PlannerTraceStep, CoordinatorTraceStep } from "./model"
+import type { RoleTraceStep, SimulationRole, PlannerTraceStep, CoordinatorTraceStep, ObserverTraceStep } from "./model"
 import type { ScenarioInput } from "./scenario"
 
 export type StopReason = "" | "simulation_done" | "no_progress" | "failed" | "canceled"
@@ -108,28 +108,28 @@ export interface RoundDigest {
     elapsedTime: string
     content: string
   }
-  afterRound: {
-    content: string
-  }
   injectedEventId?: string
 }
 
 export interface RoundReport {
   roundIndex: number
   title: string
-  summary: string
-  keyInteractions: string[]
-  actorImpacts: string[]
-  unresolvedQuestions: string[]
+  roundSummary: string
 }
 
 export interface StandardRoleTrace {
-  role: Exclude<SimulationRole, "planner" | "coordinator">
+  role: Exclude<SimulationRole, "planner" | "coordinator" | "observer">
   thought: string
   target: string
   action: string
   intent: string
   retryCounts: Record<RoleTraceStep, number>
+}
+
+export interface ObserverTrace {
+  role: "observer"
+  roundSummary: string
+  retryCounts: Record<ObserverTraceStep, number>
 }
 
 export interface PlannerTrace {
@@ -155,7 +155,7 @@ export interface CoordinatorTrace {
   retryCounts: Record<CoordinatorTraceStep, number>
 }
 
-export type RoleTrace = PlannerTrace | CoordinatorTrace | StandardRoleTrace
+export type RoleTrace = PlannerTrace | CoordinatorTrace | ObserverTrace | StandardRoleTrace
 
 export interface SimulationState {
   runId: string

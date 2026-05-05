@@ -9,16 +9,21 @@ import {
   compactLines,
   compactText,
   renderPromptLanguageGuide,
+  renderPromptReasoningGuide,
   renderOutputLengthGuide,
   renderStoryBuilderChangeSummaryPrompt,
   renderStoryBuilderPrompt,
-  resolveActorContextTokenBudget,
   resolveRoleSettings,
   scalePromptLimit,
   listScenarioSamples,
   streamDraftScenario,
   storyBuilderFallbackDraft,
+  withRolePromptGuide,
 } from "../src"
+import { buildExactChoiceSettings, exactChoiceMessages, reasoningOnlyWarning } from "../src/llm"
+import { readUsage } from "../src/llm/usage"
+import { actorMemorySentenceLimit, renderActorMemoryLengthGuide } from "../src/simulation/actor-memory"
+import { emitModelTelemetry } from "../src/simulation/events"
 import { actorPrompts } from "../src/simulation/roles/actor/prompts"
 import { buildActorDecision, isValidActorAction, isValidActorTarget } from "../src/simulation/roles/actor/state"
 import { actorCardPrompts } from "../src/simulation/roles/generator/card-prompts"
@@ -61,12 +66,10 @@ describe("scenario parsing", () => {
     expect(scenario.controls.fastMode).toBe(true)
   })
 
-  test("parses actor context token budget from frontmatter", () => {
-    const scenario = parseScenarioDocument(
-      `---\nnum_cast: 2\nactor_context_token_budget: 1200\n---\nA crisis unfolds.`
-    )
-
-    expect(scenario.controls.actorContextTokenBudget).toBe(1200)
+  test("rejects actor context token budget frontmatter", () => {
+    expect(() =>
+      parseScenarioDocument(`---\nnum_cast: 2\nactor_context_token_budget: 1200\n---\nA crisis unfolds.`)
+    ).toThrow("Unsupported scenario control: actor_context_token_budget")
   })
 
   test("parses output length from frontmatter", () => {
@@ -164,7 +167,6 @@ describe("scenario parsing", () => {
       roundDigest: {
         roundIndex: 1,
         preRound: { elapsedTime: "Opening", content: "Pressure is visible." },
-        afterRound: { content: "" },
       },
       roundIndex: 1,
       coordinatorTrace: {
@@ -285,7 +287,6 @@ describe("scenario parsing", () => {
     state.simulation.roundDigests = [{
       roundIndex: 1,
       preRound: { elapsedTime: "Opening", content: "Injected event." },
-      afterRound: { content: "" },
       injectedEventId: "event-1",
     }]
     state.simulation.interactions = [{
@@ -316,7 +317,6 @@ describe("scenario parsing", () => {
     state.simulation.roundDigests = [{
       roundIndex: 1,
       preRound: { elapsedTime: "Opening", content: "Injected event." },
-      afterRound: { content: "" },
       injectedEventId: "event-1",
     }]
 
@@ -412,6 +412,34 @@ describe("scenario parsing", () => {
     expect(action.message).toBe("We need a concrete answer now.")
   })
 
+  test("keeps internal actor and action ids out of actor visible text", () => {
+    const state = buildActorChoiceState()
+    const prompt = actorPrompts.intent(state, {
+      target: "actor-2",
+      action: "actor-1-public-1",
+    })
+
+    expect(prompt).toContain("Target: actor-2 (Actor 2")
+    expect(prompt).toContain("Action: actor-1-public-1 (public, Public move 1)")
+    expect(prompt).toContain("use actor names and action labels")
+
+    const decision = buildActorDecision({
+      ...state,
+      trace: {
+        ...state.trace,
+        action: "actor-1-public-1",
+        target: "actor-2",
+        intent: "Confirm actor-2 through actor-1-public-1.",
+        message: "I will use actor-1-public-1 with actor-2.",
+      },
+    })
+
+    expect(decision.targetActorIds).toEqual(["actor-2"])
+    expect(decision.actionId).toBe("actor-1-public-1")
+    expect(decision.intent).toBe("Confirm Actor 2 through Public move 1.")
+    expect(decision.message).toBe("I will use Public move 1 with Actor 2.")
+  })
+
   test("builds repair prompt with raw invalid output and exact allowed values", () => {
     const prompt = buildRepairChoicePrompt({
       sourceRole: "actor",
@@ -440,6 +468,15 @@ describe("scenario parsing", () => {
     expect(scalePromptLimit(100, { outputLength: "short" })).toBe(100)
     expect(scalePromptLimit(100, { outputLength: "medium" })).toBe(150)
     expect(scalePromptLimit(100, { outputLength: "long" })).toBe(200)
+  })
+
+  test("maps actor memory compression length to output length", () => {
+    expect(actorMemorySentenceLimit({ outputLength: "short" })).toBe(3)
+    expect(actorMemorySentenceLimit({ outputLength: "medium" })).toBe(5)
+    expect(actorMemorySentenceLimit({ outputLength: "long" })).toBe(10)
+    expect(renderActorMemoryLengthGuide({ outputLength: "medium" })).toBe(
+      "Return at most 5 short first-person sentences."
+    )
   })
 
   test("keeps actor card background prompt on planner digest", () => {
@@ -759,7 +796,6 @@ function buildActorChoiceState(): ActorGraphState {
     roundDigest: {
       roundIndex: 1,
       preRound: { elapsedTime: "Opening", content: "Pressure is visible." },
-      afterRound: { content: "" },
     },
     roundIndex: 1,
     coordinatorTrace: {
@@ -805,29 +841,23 @@ describe("settings validation", () => {
 
   test("includes actor settings", () => {
     expect(defaultSettings().roles.actor.model).toBeTruthy()
-    expect(defaultSettings().roles.actor.contextTokenBudget).toBe(400)
   })
 
-  test("validates actor context token budget", () => {
-    const settings = defaultSettings()
-    settings.providers.openai.apiKey = "unit-test-api-key"
-    settings.roles.actor.contextTokenBudget = 0
+  test("drops removed actor context token budget settings", () => {
+    const settings = normalizeSettings({
+      roles: {
+        actor: {
+          provider: "openai",
+          model: "actor-model",
+          temperature: 0.4,
+          maxTokens: 1000,
+          timeoutSeconds: 60,
+          contextTokenBudget: 2000,
+        },
+      },
+    } as Parameters<typeof normalizeSettings>[0])
 
-    expect(() => validateSettings(settings)).toThrow("contextTokenBudget for actor must be a positive integer.")
-  })
-
-  test("caps actor context token budget for compact prompts", () => {
-    const settings = defaultSettings()
-    settings.roles.actor.contextTokenBudget = 1200
-
-    expect(resolveActorContextTokenBudget({
-      text: "A crisis unfolds.",
-      controls: { numCast: 2, actionsPerType: 3, maxRound: 8, fastMode: false, allowAdditionalCast: true },
-    }, settings)).toBe(400)
-    expect(resolveActorContextTokenBudget({
-      text: "A crisis unfolds.",
-      controls: { numCast: 2, actionsPerType: 3, maxRound: 8, fastMode: false, allowAdditionalCast: true, actorContextTokenBudget: 1200 },
-    }, settings)).toBe(400)
+    expect("contextTokenBudget" in settings.roles.actor).toBe(false)
   })
 
   test("migrates coordinator settings to actor settings", () => {
@@ -920,6 +950,148 @@ describe("settings validation", () => {
     } as Parameters<typeof normalizeSettings>[0])
 
     expect(settings.providers.lmstudio.baseUrl).toBe("http://localhost:1234/v1")
+    expect(resolveRoleSettings(settings, "actor").reasoningEffort).toBeUndefined()
+  })
+
+  test("preserves explicitly configured reasoning effort", () => {
+    const settings = normalizeSettings({
+      actor: {
+        provider: "lmstudio",
+        model: "local-model",
+        temperature: 0.4,
+        maxTokens: 4096,
+        timeoutSeconds: 60,
+        reasoningEffort: "medium",
+      },
+    } as Parameters<typeof normalizeSettings>[0])
+
     expect(resolveRoleSettings(settings, "actor").reasoningEffort).toBe("medium")
+  })
+
+  test("builds exact-choice settings without reasoning controls", () => {
+    const settings = normalizeSettings({
+      actor: {
+        provider: "lmstudio",
+        model: "local-model",
+        temperature: 0.4,
+        maxTokens: 4096,
+        timeoutSeconds: 60,
+        reasoningEffort: "medium",
+        extraBody: { reasoning_effort: "medium", seed: 7 },
+      },
+    } as Parameters<typeof normalizeSettings>[0])
+
+    const exact = buildExactChoiceSettings(settings, "actor")
+
+    expect(exact.temperature).toBe(0)
+    expect(exact.maxTokens).toBe(64)
+    expect(exact.reasoningEffort).toBeUndefined()
+    expect(exact.extraBody).toEqual({ seed: 7, reasoning_effort: "none" })
+    expect(resolveRoleSettings(settings, "actor").reasoningEffort).toBe("medium")
+  })
+
+  test("builds exact-choice chat messages", () => {
+    const messages = exactChoiceMessages("Choose one.", ["actor-1-public-1", "no_action"])
+
+    expect(messages).toEqual([
+      expect.objectContaining({ role: "system" }),
+      expect.objectContaining({ role: "user" }),
+    ])
+    expect(JSON.stringify(messages)).toContain("Do not reason")
+    expect(JSON.stringify(messages)).toContain("- actor-1-public-1")
+    expect(JSON.stringify(messages)).toContain("assistant content")
+    expect(JSON.stringify(messages)).not.toContain("thinking phase")
+  })
+
+  test("renders reasoning guide from configured effort", () => {
+    expect(renderPromptReasoningGuide(undefined)).toBe("")
+    expect(renderPromptReasoningGuide("low")).toContain("within 5 short sentences")
+    expect(renderPromptReasoningGuide("medium")).toContain("within 10 short sentences")
+    expect(renderPromptReasoningGuide("high")).toContain("within 3 compact paragraphs")
+  })
+
+  test("adds reasoning guide only to role-aware prompts", () => {
+    const settings = defaultSettings()
+    settings.roles.observer.reasoningEffort = "medium"
+
+    const prompt = withRolePromptGuide("Summarize the round.", {
+      language: "en",
+      settings,
+      role: "observer",
+    })
+
+    expect(prompt).toContain("Language: English")
+    expect(prompt).toContain("within 10 short sentences")
+    expect(prompt).toContain("Summarize the round.")
+    expect(withRolePromptGuide("Summarize the round.", { language: "en", settings, role: "actor" })).not.toContain(
+      "thinking phase"
+    )
+  })
+
+  test("diagnoses reasoning-only responses", () => {
+    const warning = reasoningOnlyWarning({
+      text: "",
+      metrics: {
+        role: "actor",
+        step: "action",
+        attempt: 1,
+        ttftMs: 1,
+        durationMs: 2,
+        inputTokens: 1,
+        reasoningTokens: 64,
+        outputTokens: 64,
+        totalTokens: 65,
+        tokenSource: "provider",
+      },
+      diagnostics: { reasoningContentObserved: true, reasoningContent: "thinking", finishReason: "length" },
+    })
+
+    expect(warning).toContain("completion budget was exhausted")
+  })
+
+  test("reads reasoning token usage from provider metadata", () => {
+    expect(readUsage({
+      input_tokens: 10,
+      output_tokens: 20,
+      total_tokens: 30,
+      output_token_details: { reasoning: 7 },
+    })?.reasoningTokens).toBe(7)
+    expect(readUsage({
+      input_tokens: 10,
+      output_tokens: 20,
+      total_tokens: 30,
+      completion_tokens_details: { reasoning_tokens: 8 },
+    })?.reasoningTokens).toBe(8)
+    expect(readUsage({
+      input_tokens: 10,
+      output_tokens: 20,
+      total_tokens: 30,
+      output_tokens_details: { reasoning_tokens: 9 },
+    })?.reasoningTokens).toBe(9)
+  })
+
+  test("emits reasoning telemetry when provider reports reasoning tokens", async () => {
+    const events: Array<{ type: string; content?: string }> = []
+    await emitModelTelemetry("run-1", {
+      text: "final",
+      metrics: {
+        role: "observer",
+        step: "roundSummary",
+        attempt: 1,
+        ttftMs: 1,
+        durationMs: 2,
+        inputTokens: 10,
+        reasoningTokens: 5,
+        outputTokens: 20,
+        totalTokens: 30,
+        tokenSource: "provider",
+      },
+      diagnostics: { reasoningContentObserved: false, reasoningContent: "" },
+    }, async (event) => {
+      events.push({ type: event.type, content: event.type === "model.reasoning" ? event.content : undefined })
+    })
+
+    expect(events.map((event) => event.type)).toEqual(["model.metrics", "model.reasoning"])
+    expect(events[1]?.content).toContain("not provided")
   })
 })
