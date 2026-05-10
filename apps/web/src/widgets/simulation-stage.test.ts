@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import type { GraphNodeView, RunEvent } from "@simula/shared"
+import type { ActorState, GraphNodeView, GraphTimelineFrame, RunEvent, SimulationState } from "@simula/shared"
 import { renderToStaticMarkup } from "react-dom/server"
 import { dictionary } from "@/lib/i18n/dictionary"
 import { buildSimulationEventNotice } from "./simulation-event-notice"
 import { SimulationEventNoticeCard } from "./simulation-event-notice-card"
 import { buildInterludeStageView, buildSimulationInterlude } from "./simulation-stage-interlude"
+import { buildSimulationStageStatus } from "./simulation-stage-status"
 
 const runId = "run-test"
 const timestamp = "2026-04-28T00:00:00.000Z"
@@ -243,6 +244,89 @@ describe("buildSimulationEventNotice", () => {
   })
 })
 
+describe("buildSimulationStageStatus", () => {
+  test("shows round one and all actors waiting after actors are ready", () => {
+    const status = buildSimulationStageStatus([
+      runStarted(),
+      statusActorsReady(["actor-1", "actor-2", "actor-3"]),
+    ], statusRunState(3, 8), [])
+
+    expect(status).toEqual({
+      currentRound: 1,
+      maxRound: 8,
+      respondedActors: 0,
+      totalActors: 3,
+      waitingActors: 3,
+    })
+  })
+
+  test("counts responded and waiting actors from current round interactions", () => {
+    const status = buildSimulationStageStatus([
+      runStarted(),
+      statusActorsReady(["actor-1", "actor-2", "actor-3"]),
+      eventInjected(2),
+      interactionRecordedBy(2, "actor-1"),
+      interactionRecordedBy(2, "actor-2"),
+    ], statusRunState(3, 8), [])
+
+    expect(status).toMatchObject({
+      currentRound: 2,
+      respondedActors: 2,
+      totalActors: 3,
+      waitingActors: 1,
+    })
+  })
+
+  test("shows no waiting actors after the current round completes", () => {
+    const status = buildSimulationStageStatus([
+      runStarted(),
+      statusActorsReady(["actor-1", "actor-2", "actor-3"]),
+      interactionRecordedBy(2, "actor-1"),
+      roundCompleted(2),
+    ], statusRunState(3, 8), [])
+
+    expect(status).toMatchObject({
+      currentRound: 2,
+      respondedActors: 3,
+      totalActors: 3,
+      waitingActors: 0,
+    })
+  })
+
+  test("keeps the last completed round after terminal events", () => {
+    const status = buildSimulationStageStatus([
+      runStarted(),
+      statusActorsReady(["actor-1", "actor-2"]),
+      roundCompleted(3),
+      {
+        type: "run.completed",
+        runId,
+        timestamp,
+        stopReason: "simulation_done",
+      },
+    ], statusRunState(2, 8), [])
+
+    expect(status).toMatchObject({
+      currentRound: 3,
+      respondedActors: 2,
+      waitingActors: 0,
+    })
+  })
+
+  test("falls back to latest timeline nodes when actor events and state are unavailable", () => {
+    const status = buildSimulationStageStatus([
+      runStarted(),
+      eventInjected(1),
+    ], undefined, [timelineFrame(["actor-1", "actor-2"])])
+
+    expect(status).toMatchObject({
+      currentRound: 1,
+      totalActors: 2,
+      waitingActors: 2,
+    })
+  })
+})
+
 function runStarted(): RunEvent {
   return { type: "run.started", runId, timestamp }
 }
@@ -287,14 +371,18 @@ function eventInjected(roundIndex: number): RunEvent {
 }
 
 function interactionRecorded(roundIndex: number): RunEvent {
+  return interactionRecordedBy(roundIndex, "actor-1")
+}
+
+function interactionRecordedBy(roundIndex: number, sourceActorId: string): RunEvent {
   return {
     type: "interaction.recorded",
     runId,
     timestamp,
     interaction: {
-      id: `round-${roundIndex}-actor-1`,
+      id: `round-${roundIndex}-${sourceActorId}`,
       roundIndex,
-      sourceActorId: "actor-1",
+      sourceActorId,
       targetActorIds: ["actor-2"],
       actionType: "public-action",
       content: "Actor 1 applies pressure.",
@@ -304,5 +392,82 @@ function interactionRecorded(roundIndex: number): RunEvent {
       intent: "Create pressure.",
       expectation: "Actor 2 responds.",
     },
+  }
+}
+
+function statusActorsReady(actorIds: string[]): RunEvent {
+  return {
+    type: "actors.ready",
+    runId,
+    timestamp,
+    actors: actorIds.map((actorId) => ({
+      id: actorId,
+      label: actorId,
+      role: "Actor",
+      intent: "",
+      interactionCount: 0,
+    })),
+  }
+}
+
+function statusRunState(actorCount: number, maxRound: number): SimulationState {
+  return {
+    runId,
+    scenario: {
+      sourceName: "scenario.md",
+      text: "Scenario",
+      controls: {
+        numCast: actorCount,
+        allowAdditionalCast: false,
+        actionsPerType: 1,
+        maxRound,
+        fastMode: true,
+      },
+    },
+    actors: Array.from({ length: actorCount }, (_, index) => actor(`actor-${index + 1}`)),
+    interactions: [],
+    roundDigests: [],
+    roundReports: [],
+    roleTraces: [],
+    worldSummary: "",
+    reportMarkdown: "",
+    stopReason: "",
+    errors: [],
+  }
+}
+
+function actor(id: string): ActorState {
+  return {
+    id,
+    name: id,
+    role: "Actor",
+    backgroundHistory: "",
+    personality: "",
+    preference: "",
+    privateGoal: "",
+    intent: "",
+    actions: [],
+    context: { visible: [] },
+    contextSummary: "",
+    memory: [],
+    relationships: {},
+  }
+}
+
+function timelineFrame(actorIds: string[]): GraphTimelineFrame {
+  return {
+    index: 0,
+    timestamp,
+    nodes: actorIds.map((actorId) => ({
+      id: actorId,
+      label: actorId,
+      role: "Actor",
+      intent: "",
+      interactionCount: 0,
+    })),
+    edges: [],
+    activeNodeIds: [],
+    messages: [],
+    logRefs: [],
   }
 }

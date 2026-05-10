@@ -31,7 +31,8 @@ export function normalizeSettings(settings: LLMSettingsInput): LLMSettings {
 }
 
 export function applyRoleProviderDefaults(config: RoleSettings): RoleSettings {
-  const { contextTokenBudget: _removed, ...roleConfig } = config as RoleSettings & { contextTokenBudget?: unknown }
+  const roleConfig = { ...(config as RoleSettings & { contextTokenBudget?: unknown }) }
+  delete roleConfig.contextTokenBudget
   const providerDefaults = ROLE_PROVIDER_DEFAULTS[config.provider] ?? {}
   return {
     ...roleConfig,

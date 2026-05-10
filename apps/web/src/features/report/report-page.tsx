@@ -2,10 +2,12 @@ import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
   ActivityIcon,
+  BarChart3Icon,
   BotIcon,
   FileTextIcon,
   HomeIcon,
   Maximize2Icon,
+  UsersRoundIcon,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -32,10 +34,11 @@ import {
   type ActorFilter,
   type ReportSystemRole,
 } from "./report-view-model"
+import { buildReportAnalysisViewModel } from "./report-analysis-view-model"
+import { ReportAnalysisDashboard } from "./report-page/analysis-dashboard"
 import { RoleDiagnosticsPanel } from "./report-page/role-diagnostics-panel"
 import { TimelinePanel } from "./report-page/timeline-panel"
 import { ExportButton } from "./report-page/ui"
-import { ReportMetricsDashboard } from "./report-page/metrics-dashboard"
 
 interface ReportPageProps {
   selectedRunId?: string
@@ -64,6 +67,7 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
   const runState = runQuery.data?.state ?? storedRunState
   const events = runQuery.data?.events ?? liveEvents
   const actorOptions = useMemo(() => buildActorOptions(runState), [runState])
+  const analysisModel = useMemo(() => buildReportAnalysisViewModel(runState), [runState])
   const timelineRounds = useMemo(() => buildReportTimeline(runState, actorFilter, t), [actorFilter, runState, t])
   const roleDiagnostics = useMemo(() => buildRoleDiagnostics(events, t), [events, t])
   const selectedRoleSummary = roleDiagnostics.summaries.find((summary) => summary.role === systemRoleFilter)
@@ -128,84 +132,109 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
           </div>
         </header>
 
-        <ReportMetricsDashboard events={events} t={t} />
+        <Tabs defaultValue="analysis-dashboard" className="min-h-0 flex-1 gap-3">
+          <TabsList className="grid w-full max-w-[520px] grid-cols-2">
+            <TabsTrigger value="analysis-dashboard" className="text-xs">
+              <BarChart3Icon data-icon="inline-start" />
+              {t.analysisDashboardTab}
+            </TabsTrigger>
+            <TabsTrigger value="actors-stage" className="text-xs">
+              <UsersRoundIcon data-icon="inline-start" />
+              {t.actorsStageTab}
+            </TabsTrigger>
+          </TabsList>
 
-        <section className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)_520px]">
-          <ActorCardRail t={t} selectedActorId={selectedActorId} onActorSelect={selectActorFromRail} />
-
-          <div className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60">
-            <Tabs defaultValue="timeline" className="min-h-0 flex-1 gap-0">
+          <TabsContent value="analysis-dashboard" className="min-h-0 overflow-hidden">
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
                 <div>
-                  <h2 className="font-heading text-sm font-semibold">{t.simulationEvents}</h2>
-                  <p className="mt-1 text-xs text-muted-foreground">{t.simulationEventsDescription}</p>
+                  <h2 className="font-heading text-sm font-semibold">{t.reportAnalysis}</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">{t.reportAnalysisDescription}</p>
                 </div>
-                <TabsList className="grid grid-cols-3">
-                  <TabsTrigger value="timeline" className="text-xs">
-                    <ActivityIcon data-icon="inline-start" />
-                    {t.timeline}
-                  </TabsTrigger>
-                  <TabsTrigger value="roles" className="text-xs">
-                    <BotIcon data-icon="inline-start" />
-                    {t.roles}
-                  </TabsTrigger>
-                  <TabsTrigger value="final" className="text-xs">
-                    <FileTextIcon data-icon="inline-start" />
-                    {t.final}
-                  </TabsTrigger>
-                </TabsList>
+              </div>
+              <ReportAnalysisDashboard model={analysisModel} t={t} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="actors-stage" className="min-h-0 overflow-hidden">
+            <section className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)_520px]">
+              <ActorCardRail t={t} selectedActorId={selectedActorId} onActorSelect={selectActorFromRail} />
+
+              <div className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60">
+                <Tabs defaultValue="timeline" className="min-h-0 flex-1 gap-0">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+                    <div>
+                      <h2 className="font-heading text-sm font-semibold">{t.simulationEvents}</h2>
+                      <p className="mt-1 text-xs text-muted-foreground">{t.simulationEventsDescription}</p>
+                    </div>
+                    <TabsList className="grid grid-cols-3">
+                      <TabsTrigger value="timeline" className="text-xs">
+                        <ActivityIcon data-icon="inline-start" />
+                        {t.timeline}
+                      </TabsTrigger>
+                      <TabsTrigger value="roles" className="text-xs">
+                        <BotIcon data-icon="inline-start" />
+                        {t.roles}
+                      </TabsTrigger>
+                      <TabsTrigger value="final" className="text-xs">
+                        <FileTextIcon data-icon="inline-start" />
+                        {t.final}
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
+
+                  <TabsContent value="timeline" className="min-h-0 overflow-hidden">
+                    <TimelinePanel
+                      actorFilter={actorFilter}
+                      actorOptions={actorOptions}
+                      rounds={timelineRounds}
+                      t={t}
+                      onActorFilterChange={setActorFilter}
+                      onActorSelect={selectActorFromTimeline}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="roles" className="min-h-0 overflow-hidden">
+                    <RoleDiagnosticsPanel
+                      summaries={roleDiagnostics.summaries}
+                      selectedRole={systemRoleFilter}
+                      selectedSummary={selectedRoleSummary}
+                      events={selectedRoleEvents}
+                      t={t}
+                      onRoleChange={setSystemRoleFilter}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="final" className="min-h-0 overflow-hidden">
+                    <ScrollArea className="h-[calc(100svh-250px)] min-h-[520px] p-4">
+                      <MarkdownContent content={finalReport} fallback={t.finalReportFallback} />
+                    </ScrollArea>
+                  </TabsContent>
+                </Tabs>
               </div>
 
-              <TabsContent value="timeline" className="min-h-0 overflow-hidden">
-                <TimelinePanel
-                  actorFilter={actorFilter}
-                  actorOptions={actorOptions}
-                  rounds={timelineRounds}
+              <aside className="flex min-h-0 flex-col gap-3 xl:col-span-2 2xl:col-span-1">
+                <SimulationStage
+                  className="min-h-[460px]"
+                  graphClassName="min-h-[300px]"
                   t={t}
-                  onActorFilterChange={setActorFilter}
-                  onActorSelect={selectActorFromTimeline}
+                  selectedActorId={selectedActorId}
+                  onActorSelect={selectActorFromGraph}
+                  onActorExpand={expandActor}
+                  selectedEdgeId={selectedEdgeId}
+                  onEdgeSelect={selectEdge}
+                  showActorPopover
+                  actions={
+                    <Button aria-label={t.maximizeReplay} variant="ghost" size="icon" onClick={() => setReplayOpen(true)}>
+                      <Maximize2Icon />
+                    </Button>
+                  }
                 />
-              </TabsContent>
-
-              <TabsContent value="roles" className="min-h-0 overflow-hidden">
-                <RoleDiagnosticsPanel
-                  summaries={roleDiagnostics.summaries}
-                  selectedRole={systemRoleFilter}
-                  selectedSummary={selectedRoleSummary}
-                  events={selectedRoleEvents}
-                  t={t}
-                  onRoleChange={setSystemRoleFilter}
-                />
-              </TabsContent>
-
-              <TabsContent value="final" className="min-h-0 overflow-hidden">
-                <ScrollArea className="h-[calc(100svh-206px)] min-h-[520px] p-4">
-                  <MarkdownContent content={finalReport} fallback={t.finalReportFallback} />
-                </ScrollArea>
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          <aside className="flex min-h-0 flex-col gap-3 xl:col-span-2 2xl:col-span-1">
-            <SimulationStage
-              className="min-h-[460px]"
-              graphClassName="min-h-[300px]"
-              t={t}
-              selectedActorId={selectedActorId}
-              onActorSelect={selectActorFromGraph}
-              onActorExpand={expandActor}
-              selectedEdgeId={selectedEdgeId}
-              onEdgeSelect={selectEdge}
-              showActorPopover
-              actions={
-                <Button aria-label={t.maximizeReplay} variant="ghost" size="icon" onClick={() => setReplayOpen(true)}>
-                  <Maximize2Icon />
-                </Button>
-              }
-            />
-            <ReplayDock t={t} />
-          </aside>
-        </section>
+                <ReplayDock t={t} />
+              </aside>
+            </section>
+          </TabsContent>
+        </Tabs>
       </div>
 
       <Dialog open={replayOpen} onOpenChange={setReplayOpen}>

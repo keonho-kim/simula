@@ -1,5 +1,5 @@
-import type { ActionVisibility, Interaction, PlannedEvent, SimulationState } from "@simula/shared"
-import { calculateNetworkDynamics, type NetworkRelationshipMetric } from "./network-dynamics"
+import type { ActionVisibility, Interaction, NetworkRelationshipMetric, PlannedEvent, SimulationState } from "@simula/shared"
+import { calculateNetworkDynamics } from "@simula/shared"
 import { plannerDigestSummary } from "./plan"
 
 export function renderReport(state: SimulationState): string {

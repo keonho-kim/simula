@@ -7,6 +7,7 @@ import { GraphView } from "@/widgets/graph-view"
 import { buildSimulationEventNotice } from "@/widgets/simulation-event-notice"
 import { SimulationEventNoticeCard } from "@/widgets/simulation-event-notice-card"
 import { buildSimulationInterlude, type InterludeStageStatus, type SimulationInterludeState } from "@/widgets/simulation-stage-interlude"
+import { buildSimulationStageStatus } from "@/widgets/simulation-stage-status"
 import type { UiTexts } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
 import { MarkdownContent } from "@/shared/ui/markdown-content"
@@ -45,6 +46,7 @@ export function SimulationStage({
   const liveEvents = useRunStore((state) => state.liveEvents)
   const runState = useRunStore((state) => state.runState)
   const frame = timeline[replayIndex] ?? timeline.at(-1)
+  const status = buildSimulationStageStatus(liveEvents, runState, timeline)
   const completedNodes = liveEvents.filter((event) => event.type === "node.completed").length
   const progress = Math.min(100, completedNodes * 25)
   const interlude = buildSimulationInterlude(liveEvents, t)
@@ -65,6 +67,16 @@ export function SimulationStage({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {status ? (
+            <Badge variant="outline" className="rounded-md">
+              {t.roundStatus} {status.currentRound}{status.maxRound ? `/${status.maxRound}` : ""}
+            </Badge>
+          ) : null}
+          {status ? (
+            <Badge variant="outline" className="rounded-md">
+              {t.actorResponseStatus} {status.respondedActors}/{status.totalActors} · {t.actorWaitingStatus} {status.waitingActors}
+            </Badge>
+          ) : null}
           <Badge variant="outline" className="rounded-md">
             {t.simulationFrame} {timeline.length ? replayIndex + 1 : 0}/{timeline.length}
           </Badge>

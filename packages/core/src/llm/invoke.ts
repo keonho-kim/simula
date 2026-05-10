@@ -85,10 +85,11 @@ export async function invokeExactChoiceWithMetrics(
 
 export function buildExactChoiceSettings(settings: LLMSettings, role: ModelRole): ResolvedRoleSettings {
   const config = resolveRoleSettings(settings, role)
-  const { reasoningEffort: _reasoningEffort, extraBody, ...rest } = config
-  const exactExtraBody = buildExactChoiceExtraBody(config.provider, extraBody)
+  const exactConfig = { ...config }
+  delete exactConfig.reasoningEffort
+  const exactExtraBody = buildExactChoiceExtraBody(config.provider, config.extraBody)
   return {
-    ...rest,
+    ...exactConfig,
     temperature: 0,
     maxTokens: 64,
     extraBody: exactExtraBody,
@@ -182,7 +183,8 @@ function buildExactChoiceExtraBody(
   provider: ResolvedRoleSettings["provider"],
   extraBody: Record<string, unknown> | undefined
 ): Record<string, unknown> | undefined {
-  const { reasoning_effort: _reasoningEffort, ...rest } = extraBody ?? {}
+  const rest = { ...(extraBody ?? {}) }
+  delete rest.reasoning_effort
   if (provider === "lmstudio") {
     return { ...rest, reasoning_effort: "none" }
   }

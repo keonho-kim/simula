@@ -1,3 +1,5 @@
+export type * from "./analysis"
+export { calculateNetworkDynamics, calculateRunAnalysis } from "./analysis"
 export type * from "./api"
 export type * from "./graph"
 export type * from "./model"

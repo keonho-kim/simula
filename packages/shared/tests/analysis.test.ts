@@ -1,16 +1,26 @@
 import { describe, expect, test } from "bun:test"
-import type { ActorState, Interaction, SimulationState } from "@simula/shared"
-import { calculateNetworkDynamics } from "../src/simulation/network-dynamics"
+import type { ActorState, Interaction, SimulationState } from "../src"
+import { calculateNetworkDynamics, calculateRunAnalysis } from "../src"
 
-describe("network dynamics", () => {
-  test("computes directed actor and relationship metrics", () => {
+describe("run analysis", () => {
+  test("computes directed network metrics and standard graph structure metrics", () => {
     const dynamics = calculateNetworkDynamics(createState([
-      interaction("i1", 1, "ceo", ["cto"], "private"),
-      interaction("i2", 1, "ceo", ["cfo"], "public"),
-      interaction("i3", 2, "cto", ["ceo"], "private"),
+      interaction("i1", 1, "ceo", ["cto"], "private", "action", "briefing"),
+      interaction("i2", 1, "ceo", ["cfo"], "public", "action", "briefing"),
+      interaction("i3", 2, "cto", ["ceo"], "private", "action", "escalation"),
     ]))
 
     expect(dynamics.summary.validActionCount).toBe(3)
+    expect(dynamics.summary.directedDensity).toBeCloseTo(0.5)
+    expect(dynamics.summary.undirectedDensity).toBeCloseTo(2 / 3)
+    expect(dynamics.summary.reciprocity).toBeCloseTo(0.5)
+    expect(dynamics.summary.clusteringCoefficient).toBe(0)
+    expect(dynamics.summary.connectedComponentCount).toBe(1)
+    expect(dynamics.summary.largestComponentSize).toBe(3)
+    expect(dynamics.summary.isolateCount).toBe(0)
+    expect(dynamics.summary.degreeCentralization).toBe(1)
+    expect(dynamics.summary.tieStrengthGini).toBeCloseTo(1 / 6)
+    expect(dynamics.summary.tieStrengthHhi).toBeCloseTo(5 / 9)
     expect(dynamics.actorMetrics.find((metric) => metric.actorId === "ceo")).toMatchObject({
       sentCount: 2,
       receivedCount: 1,
@@ -35,18 +45,17 @@ describe("network dynamics", () => {
     })
   })
 
-  test("detects reciprocal pairs only when both directions exist", () => {
+  test("computes clustering for a closed undirected triad", () => {
     const dynamics = calculateNetworkDynamics(createState([
       interaction("i1", 1, "ceo", ["cto"], "private"),
-      interaction("i2", 2, "cto", ["ceo"], "private"),
-      interaction("i3", 2, "cfo", ["ceo"], "public"),
+      interaction("i2", 1, "cto", ["cfo"], "private"),
+      interaction("i3", 1, "cfo", ["ceo"], "private"),
     ]))
 
-    expect(dynamics.summary.reciprocalPairCount).toBe(1)
-    expect(dynamics.summary.highestReciprocityPairs.map((pair) => `${pair.sourceActorId}-${pair.targetActorId}`)).toEqual([
-      "ceo-cto",
-    ])
-    expect(dynamics.relationshipMetrics.find((relationship) => relationship.sourceActorId === "ceo" && relationship.targetActorId === "cfo")?.reciprocal).toBe(false)
+    expect(dynamics.summary.undirectedDensity).toBe(1)
+    expect(dynamics.summary.clusteringCoefficient).toBe(1)
+    expect(dynamics.summary.degreeCentralization).toBe(0)
+    expect(dynamics.summary.reciprocity).toBe(0)
   })
 
   test("ignores no-action, self-target, targetless, and unknown-target interactions", () => {
@@ -102,6 +111,37 @@ describe("network dynamics", () => {
       },
     ])
   })
+
+  test("computes actor behavior diversity and coordinator event alignment", () => {
+    const analysis = calculateRunAnalysis(createState([
+      interaction("i1", 1, "ceo", ["cto"], "private", "action", "briefing", "event-1"),
+      interaction("i2", 2, "ceo", ["cfo"], "private", "action", "briefing", "event-1"),
+      interaction("i3", 3, "ceo", ["cto"], "public", "action", "vote", "event-1"),
+      interaction("i4", 3, "cfo", ["ceo"], "public", "action", "warning", "event-2"),
+    ]))
+
+    const ceo = analysis.behavior.find((metric) => metric.actorId === "ceo")
+    expect(ceo).toMatchObject({
+      actionCount: 3,
+      uniqueActionTypes: 2,
+      uniqueVisibilities: 2,
+      uniqueCounterparties: 2,
+      targetSpread: 1,
+      consecutiveRepeatRate: 0.5,
+    })
+    expect(ceo?.actionTypeEntropy).toBeCloseTo(0.918, 3)
+    expect(ceo?.normalizedActionTypeEntropy).toBeCloseTo(0.918, 3)
+    expect(analysis.coordinator.find((metric) => metric.eventId === "event-1")).toMatchObject({
+      plannedParticipantCount: 2,
+      actualParticipantCount: 3,
+      overlapCount: 2,
+      interactionCount: 3,
+      injectedRounds: [1],
+    })
+    expect(analysis.coordinator.find((metric) => metric.eventId === "event-1")?.jaccardAlignment).toBeCloseTo(2 / 3)
+    expect(analysis.summary.completedEventCount).toBe(1)
+    expect(analysis.summary.totalEventCount).toBe(2)
+  })
 })
 
 function createState(interactions: Interaction[]): SimulationState {
@@ -118,13 +158,38 @@ function createState(interactions: Interaction[]): SimulationState {
         fastMode: true,
       },
     },
+    plan: {
+      interpretation: "Interpretation",
+      backgroundStory: "Background",
+      actionCatalog: [],
+      majorEvents: [
+        {
+          id: "event-1",
+          title: "Board vote",
+          summary: "The board vote must be resolved.",
+          status: "completed",
+          participantIds: ["ceo", "cto"],
+        },
+        {
+          id: "event-2",
+          title: "Finance warning",
+          summary: "Finance pressure may alter the decision.",
+          status: "partial",
+          participantIds: ["cfo"],
+        },
+      ],
+    },
     actors: [
       actor("ceo", "CEO"),
       actor("cto", "CTO"),
       actor("cfo", "CFO"),
     ],
     interactions,
-    roundDigests: [],
+    roundDigests: [{
+      roundIndex: 1,
+      injectedEventId: "event-1",
+      preRound: { elapsedTime: "1 hour", content: "Pressure rises." },
+    }],
     roundReports: [],
     roleTraces: [],
     worldSummary: "Summary",
@@ -158,16 +223,18 @@ function interaction(
   sourceActorId: string,
   targetActorIds: string[],
   visibility: Interaction["visibility"],
-  decisionType: Interaction["decisionType"] = "action"
+  decisionType: Interaction["decisionType"] = "action",
+  actionType = decisionType,
+  eventId = "event-1"
 ): Interaction {
   return {
     id,
     roundIndex,
     sourceActorId,
     targetActorIds,
-    actionType: decisionType,
+    actionType,
     content: `${sourceActorId} to ${targetActorIds.join(", ")}`,
-    eventId: "event-1",
+    eventId,
     visibility,
     decisionType,
     intent: "Act.",
