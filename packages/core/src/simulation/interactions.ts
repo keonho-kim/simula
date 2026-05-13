@@ -37,7 +37,7 @@ export function buildInteraction(
     roundIndex,
     sourceActorId: actor.id,
     targetActorIds: decision.targetActorIds,
-    actionType: decision.actionId ?? decision.decisionType,
+    actionType: actionLabel(actor, decision.actionId) ?? decision.decisionType,
     content: sanitizeActorVisibleText(interactionContent(actor, actors, event, decision), actors),
     eventId: event.id,
     visibility: decision.visibility,
@@ -45,6 +45,13 @@ export function buildInteraction(
     intent: sanitizeActorVisibleText(decision.intent, actors),
     expectation: sanitizeActorVisibleText(decision.expectation, actors),
   }
+}
+
+function actionLabel(actor: ActorState, actionId: string | undefined): string | undefined {
+  if (!actionId) {
+    return undefined
+  }
+  return actor.actions.find((action) => action.id === actionId)?.label ?? actionId
 }
 
 function interactionContent(

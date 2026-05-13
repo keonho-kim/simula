@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { RunEvent, SimulationState } from "@simula/shared"
+import type { ActorState, RunEvent, SimulationState } from "@simula/shared"
 import { buildActorOptions, buildReportTimeline, buildRoleDiagnostics } from "./report-view-model"
 
 describe("report view model", () => {
@@ -11,6 +11,7 @@ describe("report view model", () => {
 
     expect(ceoRounds).toHaveLength(1)
     expect(ceoRounds[0]?.interactions.map((item) => item.id)).toEqual(["i1", "i2"])
+    expect(ceoRounds[0]?.interactions[0]?.actionType).toBe("Private call")
     expect(ctoRounds).toHaveLength(1)
     expect(ctoRounds[0]?.interactions.map((item) => item.id)).toEqual(["i1"])
   })
@@ -155,7 +156,7 @@ function createState(): SimulationState {
   }
 }
 
-function createActor(id: string, name: string) {
+function createActor(id: string, name: string): ActorState {
   return {
     id,
     name,
@@ -165,7 +166,11 @@ function createActor(id: string, name: string) {
     preference: "",
     privateGoal: "",
     intent: "",
-    actions: [],
+    actions: id === "ceo"
+      ? [{ id: "private_call", visibility: "private", label: "Private call", intentHint: "", expectedOutcome: "" }]
+      : id === "cfo"
+        ? [{ id: "board_warning", visibility: "semi-public", label: "Board warning", intentHint: "", expectedOutcome: "" }]
+        : [],
     context: { visible: [] },
     contextSummary: "",
     memory: [],

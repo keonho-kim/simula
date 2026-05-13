@@ -6,10 +6,10 @@ const runId = "run-edge-history"
 const timestamp = "2026-04-29T00:00:00.000Z"
 
 describe("edge interaction history", () => {
-  test("matches interactions by source, target, and visibility", () => {
+  test("matches interactions by directed actor pair", () => {
     const selectedEdge = edge("a", "b", "public")
     expect(interactionMatchesEdge(interaction("i1", "a", ["b"], "public"), selectedEdge)).toBe(true)
-    expect(interactionMatchesEdge(interaction("i2", "a", ["b"], "private"), selectedEdge)).toBe(false)
+    expect(interactionMatchesEdge(interaction("i2", "a", ["b"], "private"), selectedEdge)).toBe(true)
     expect(interactionMatchesEdge(interaction("i3", "b", ["a"], "public"), selectedEdge)).toBe(false)
   })
 

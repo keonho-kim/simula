@@ -25,7 +25,10 @@ export interface GraphEdgeAttributes {
   size: number
   alpha: number
   visibility: GraphEdgeView["visibility"]
+  visibilityMix?: GraphEdgeView["visibilityMix"]
+  actionTypes?: GraphEdgeView["actionTypes"]
   latestContent: string
+  latestActionType?: string
   weight: number
   curvature?: number
   parallelIndex?: number | null

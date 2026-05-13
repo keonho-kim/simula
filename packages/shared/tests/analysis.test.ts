@@ -58,6 +58,16 @@ describe("run analysis", () => {
     expect(dynamics.summary.reciprocity).toBe(0)
   })
 
+  test("computes directed density from unique directed ties", () => {
+    const dynamics = calculateNetworkDynamics(createState([
+      interaction("i1", 1, "ceo", ["cto"], "private"),
+      interaction("i2", 2, "ceo", ["cto"], "public"),
+    ]))
+
+    expect(dynamics.summary.validActionCount).toBe(2)
+    expect(dynamics.summary.directedDensity).toBeCloseTo(1 / 6)
+  })
+
   test("ignores no-action, self-target, targetless, and unknown-target interactions", () => {
     const dynamics = calculateNetworkDynamics(createState([
       interaction("i1", 1, "ceo", ["cto"], "private"),
@@ -141,6 +151,25 @@ describe("run analysis", () => {
     expect(analysis.coordinator.find((metric) => metric.eventId === "event-1")?.jaccardAlignment).toBeCloseTo(2 / 3)
     expect(analysis.summary.completedEventCount).toBe(1)
     expect(analysis.summary.totalEventCount).toBe(2)
+  })
+
+  test("does not force coordinator alignment to zero when planner participants are absent", () => {
+    const state = createState([
+      interaction("i1", 1, "ceo", ["cto"], "private", "action", "briefing", "event-1"),
+    ])
+    state.plan = state.plan ? {
+      ...state.plan,
+      majorEvents: state.plan.majorEvents.map((event) => ({ ...event, participantIds: [] })),
+    } : undefined
+
+    const analysis = calculateRunAnalysis(state)
+
+    expect(analysis.coordinator.find((metric) => metric.eventId === "event-1")).toMatchObject({
+      plannedParticipantCount: 2,
+      actualParticipantCount: 2,
+      overlapCount: 2,
+      jaccardAlignment: 1,
+    })
   })
 })
 

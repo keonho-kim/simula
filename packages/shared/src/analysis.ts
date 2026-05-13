@@ -146,6 +146,7 @@ export function calculateNetworkDynamics(state: SimulationState): NetworkDynamic
   const adjacency = buildUndirectedAdjacency(state.actors, edges)
   const componentSizes = connectedComponentSizes(state.actors, adjacency)
   const tieWeights = relationshipMetrics.map((relationship) => relationship.totalWeight)
+  const directedTieCount = uniqueDirectedTieCount(edges)
 
   return {
     actorMetrics,
@@ -159,7 +160,7 @@ export function calculateNetworkDynamics(state: SimulationState): NetworkDynamic
       mostActiveDyad,
       highestReciprocityPairs: reciprocalPairs.filter((relationship) => reciprocityScore(relationship) === highestReciprocityScore),
       networkConcentration: totalWeightedDegree > 0 && mostCentralActor ? mostCentralActor.weightedDegree / totalWeightedDegree : 0,
-      directedDensity: directedDensity(state.actors.length, edges.length),
+      directedDensity: directedDensity(state.actors.length, directedTieCount),
       undirectedDensity: undirectedDensity(state.actors.length, relationshipMetrics.length),
       reciprocity: relationshipMetrics.length ? reciprocalPairs.length / relationshipMetrics.length : 0,
       clusteringCoefficient: averageLocalClustering(state.actors, adjacency),
@@ -213,13 +214,17 @@ function calculateCoordinatorAlignment(state: SimulationState): CoordinatorAlign
   const edges = validDirectedEdges(state.interactions, actorById)
 
   return (state.plan?.majorEvents ?? []).map((event) => {
-    const plannedParticipants = new Set(event.participantIds.filter((actorId) => actorById.has(actorId)))
     const eventEdges = edges.filter((edge) => edge.eventId === event.id)
     const actualParticipants = new Set<string>()
     for (const edge of eventEdges) {
       actualParticipants.add(edge.sourceActorId)
       actualParticipants.add(edge.targetActorId)
     }
+    const explicitParticipants = new Set(event.participantIds.filter((actorId) => actorById.has(actorId)))
+    const inferredParticipants = inferEventParticipants(event, state.actors)
+    const plannedParticipants = explicitParticipants.size || inferredParticipants.size
+      ? new Set([...explicitParticipants, ...inferredParticipants])
+      : new Set(actualParticipants)
     const overlap = intersectionSize(plannedParticipants, actualParticipants)
     const union = new Set([...plannedParticipants, ...actualParticipants])
 
@@ -255,6 +260,19 @@ function validDirectedEdges(interactions: Interaction[], actorById: Map<string, 
         actionType: interaction.actionType,
       }))
   })
+}
+
+function uniqueDirectedTieCount(edges: DirectedEdge[]): number {
+  return new Set(edges.map((edge) => `${edge.sourceActorId}\u0000${edge.targetActorId}`)).size
+}
+
+function inferEventParticipants(event: PlannedEvent, actors: ActorState[]): Set<string> {
+  const text = `${event.title}\n${event.summary}`.toLowerCase()
+  return new Set(
+    actors
+      .filter((actor) => text.includes(actor.name.toLowerCase()))
+      .map((actor) => actor.id)
+  )
 }
 
 function buildActorMetrics(actors: ActorState[], edges: DirectedEdge[]): NetworkActorMetric[] {

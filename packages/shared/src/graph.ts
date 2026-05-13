@@ -21,9 +21,12 @@ export interface GraphEdgeView {
   source: string
   target: string
   visibility: ActionVisibility
+  visibilityMix?: Partial<Record<ActionVisibility, number>>
+  actionTypes?: Record<string, number>
   weight: number
   roundIndex: number
   latestContent: string
+  latestActionType?: string
 }
 
 export interface GraphTimelineFrame {

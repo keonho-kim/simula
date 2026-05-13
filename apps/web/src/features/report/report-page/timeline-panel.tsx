@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { UiTexts } from "@/lib/i18n"
+import { MarkdownContent } from "@/shared/ui/markdown-content"
 import {
   buildActorOptions,
   type ActorFilter,
@@ -96,13 +97,6 @@ function TimelineRoundCard({
       </div>
 
       <div className="flex flex-col gap-3 p-4">
-        {round.preRound || round.roundSummary ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            {round.preRound ? <RoundNote label={t.preRound} value={round.preRound} /> : null}
-            {round.roundSummary ? <RoundNote label={t.roundSummary} value={round.roundSummary} /> : null}
-          </div>
-        ) : null}
-
         {round.interactions.length ? (
           <div className="flex flex-col gap-2">
             {round.interactions.map((interaction) => (
@@ -149,21 +143,12 @@ function InteractionCard({
           <Badge variant="outline" className="rounded-sm">{interaction.actionType}</Badge>
         </div>
       </div>
-      <p className="mt-3 text-sm leading-6">{interaction.content}</p>
+      <p className="mt-3 line-clamp-3 text-sm leading-6">{interaction.content}</p>
       <div className="mt-3 grid gap-2 md:grid-cols-2">
         <MiniField label={t.intent} value={interaction.intent} />
         <MiniField label={t.expectation} value={interaction.expectation} />
       </div>
     </article>
-  )
-}
-
-function RoundNote({ label, value }: { label: string; value: string }) {
-  return (
-    <section className="rounded-md bg-muted/25 p-3">
-      <h4 className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</h4>
-      <p className="mt-1 text-xs leading-5">{value}</p>
-    </section>
   )
 }
 
@@ -191,7 +176,7 @@ function MiniField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md bg-background/70 p-2">
       <div className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</div>
-      <p className="mt-1 text-xs leading-5">{value || "-"}</p>
+      <MarkdownContent compact className="mt-1 line-clamp-2 text-xs leading-5" content={value} fallback="-" />
     </div>
   )
 }

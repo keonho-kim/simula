@@ -12,10 +12,13 @@ import {
   roleLabels,
   roles,
   safetySettingsExample,
+  supportsModelDiscovery,
   supportsReasoningEffort,
+  supportsTemperature,
 } from "./constants"
 import { JsonTextarea, NumberField, OptionalNumberField } from "./form-fields"
 import { updateRoleJsonDraft } from "./json-draft"
+import { providerModelsCacheKey, readProviderModelsCache, writeProviderModelsCache } from "./model-cache"
 import { ModelField } from "./model-field"
 import { ProviderSelect } from "./provider-select"
 import { applyProviderDefaults, patchRole, updateRole } from "./state"
@@ -63,12 +66,20 @@ function RoleSection({ role, settings, t, setDraft, jsonDraft, setJsonDraft }: {
 }) {
   const active = settings.roles[role]
   const connection = settings.providers[active.provider]
-  const shouldLoadModels = isOpenAICompatible(active.provider)
+  const shouldLoadModels = supportsModelDiscovery(active.provider)
+  const modelCacheKey = providerModelsCacheKey(active.provider, connection)
   const modelsQuery = useQuery({
-    queryKey: ["provider-models", role, active.provider, connection.baseUrl, connection.apiKey, connection.extraHeaders],
-    queryFn: () => fetchProviderModels(active.provider, connection),
+    queryKey: ["provider-models", modelCacheKey],
+    queryFn: async () => {
+      const models = await fetchProviderModels(active.provider, connection)
+      writeProviderModelsCache(modelCacheKey, models)
+      return models
+    },
     enabled: shouldLoadModels,
+    initialData: () => readProviderModelsCache(modelCacheKey),
     retry: false,
+    staleTime: Infinity,
+    gcTime: 1000 * 60 * 30,
   })
 
   const models = useMemo(() => {
@@ -92,7 +103,7 @@ function RoleSection({ role, settings, t, setDraft, jsonDraft, setJsonDraft }: {
             role={role}
             active={active}
             models={models}
-            loading={shouldLoadModels && modelsQuery.isFetching}
+            loading={shouldLoadModels && modelsQuery.isLoading}
             error={shouldLoadModels && modelsQuery.isError}
             t={t}
             setDraft={setDraft}
@@ -103,7 +114,9 @@ function RoleSection({ role, settings, t, setDraft, jsonDraft, setJsonDraft }: {
       <FieldSet className="rounded-lg bg-background/70 p-4 ring-1 ring-border/60">
         <FieldLegend>{t.settingsGeneration}</FieldLegend>
         <div className="grid gap-3 pt-3">
-          <NumberField label={t.settingsTemperature} value={active.temperature} step="0.1" onChange={(value) => patchRole(role, { temperature: value }, setDraft)} />
+          {supportsTemperature(active.provider) ? (
+            <NumberField label={t.settingsTemperature} value={active.temperature} step="0.1" onChange={(value) => patchRole(role, { temperature: value }, setDraft)} />
+          ) : null}
           <NumberField label={t.settingsMaxTokens} value={active.maxTokens} onChange={(value) => patchRole(role, { maxTokens: value }, setDraft)} />
           <NumberField label={t.settingsTimeoutSeconds} value={active.timeoutSeconds} onChange={(value) => patchRole(role, { timeoutSeconds: value }, setDraft)} />
           <OptionalNumberField label={t.settingsTopP} value={active.topP} step="0.05" onChange={(value) => patchRole(role, { topP: value }, setDraft)} />

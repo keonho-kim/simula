@@ -63,8 +63,7 @@ export function buildEdgeInteractionHistory(
 export function interactionMatchesEdge(interaction: Interaction, edge: GraphEdgeView): boolean {
   return (
     interaction.sourceActorId === edge.source &&
-    interaction.targetActorIds.includes(edge.target) &&
-    interaction.visibility === edge.visibility
+    interaction.targetActorIds.includes(edge.target)
   )
 }
 

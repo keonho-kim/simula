@@ -25,6 +25,8 @@ export const ROLE_DEFAULTS: Record<ModelRole, RoleSettings> = Object.fromEntries
 ) as Record<ModelRole, RoleSettings>
 
 export const ROLE_PROVIDER_DEFAULTS: Partial<Record<ModelProvider, Partial<RoleSettings>>> = {
+  openai: { model: "gpt-5.4-mini" },
+  anthropic: { model: "claude-sonnet-4-20250514" },
   gemini: { model: "gemini-2.5-pro" },
   ollama: { model: "llama3.1" },
   lmstudio: { model: "local-model" },

@@ -10,7 +10,6 @@ export function createChatModel(config: ResolvedRoleSettings): StreamingChatMode
     return new ChatAnthropic({
       apiKey: config.apiKey,
       model: config.model,
-      temperature: config.temperature,
       maxTokens: config.maxTokens,
       streamUsage: config.streamUsage ?? true,
     })
@@ -19,7 +18,6 @@ export function createChatModel(config: ResolvedRoleSettings): StreamingChatMode
     return new ChatGoogleGenerativeAI({
       apiKey: config.apiKey,
       model: config.model,
-      temperature: config.temperature,
       maxOutputTokens: config.maxTokens,
       topP: config.topP,
       topK: config.topK,
@@ -33,7 +31,7 @@ export function createChatModel(config: ResolvedRoleSettings): StreamingChatMode
   return new ChatOpenAI({
     apiKey: apiKeyForOpenAICompatibleProvider(config.provider, config.apiKey),
     model: config.model,
-    temperature: config.temperature,
+    temperature: isOpenAICompatibleProvider(config.provider) ? config.temperature : undefined,
     maxTokens: config.maxTokens,
     timeout: config.timeoutSeconds * 1000,
     streamUsage: config.streamUsage ?? true,
@@ -65,4 +63,3 @@ function buildOpenAIModelKwargs(config: ResolvedRoleSettings): Record<string, un
   }
   return kwargs
 }
-

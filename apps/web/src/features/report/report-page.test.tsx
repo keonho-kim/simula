@@ -10,7 +10,7 @@ mock.module("@/widgets/simulation-stage", () => ({
 const { ReportPage } = await import("./report-page")
 
 describe("ReportPage", () => {
-  test("renders top-level analysis and actors-stage tabs", () => {
+  test("renders top-level report tabs", () => {
     const html = renderToStaticMarkup(
       <QueryClientProvider client={new QueryClient()}>
         <ReportPage
@@ -22,6 +22,7 @@ describe("ReportPage", () => {
     )
 
     expect(html).toContain("Analysis Dashboard")
+    expect(html).toContain("Simulation Dynamics")
     expect(html).toContain("Actors + Stage")
   })
 

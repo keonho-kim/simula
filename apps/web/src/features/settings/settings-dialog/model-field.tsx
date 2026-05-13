@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import type { UiTexts } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
-import { isOpenAICompatible } from "./constants"
+import { supportsModelDiscovery } from "./constants"
 import { patchRole } from "./state"
 
 export function ModelField({ role, active, models, loading, error, t, setDraft }: {
@@ -19,7 +19,7 @@ export function ModelField({ role, active, models, loading, error, t, setDraft }
   t: UiTexts
   setDraft: Dispatch<SetStateAction<LLMSettings | undefined>>
 }) {
-  if (!isOpenAICompatible(active.provider)) {
+  if (!supportsModelDiscovery(active.provider)) {
     return (
       <Field>
         <FieldLabel>{t.settingsModel}</FieldLabel>
@@ -65,4 +65,3 @@ export function ModelField({ role, active, models, loading, error, t, setDraft }
     </Field>
   )
 }
-

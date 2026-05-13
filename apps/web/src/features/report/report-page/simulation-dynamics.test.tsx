@@ -1,32 +1,29 @@
 import { describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import type { ActorState, Interaction, SimulationState } from "@simula/shared"
 import { dictionary } from "@/lib/i18n/dictionary"
 import { buildReportAnalysisViewModel } from "../report-analysis-view-model"
-import { ReportAnalysisDashboard } from "./analysis-dashboard"
+import { ReportSimulationDynamics } from "./simulation-dynamics"
 
-describe("ReportAnalysisDashboard", () => {
-  test("renders LLM analytics without simulation dynamics panels", () => {
+describe("ReportSimulationDynamics", () => {
+  test("renders behavior and coordinator quality signals", () => {
     const model = buildReportAnalysisViewModel(createState([
       interaction("i1", 1, "ceo", ["cto"], "private", "briefing"),
-      interaction("i2", 2, "cto", ["ceo"], "private", "reply"),
+      interaction("i2", 2, "cto", ["ceo"], "semi-public", "reply"),
     ]))
 
-    const html = renderToStaticMarkup(<ReportAnalysisDashboard events={[]} model={model} t={dictionary.en} />)
+    const html = renderToStaticMarkup(
+      <TooltipProvider>
+        <ReportSimulationDynamics model={model} t={dictionary.en} />
+      </TooltipProvider>
+    )
 
-    expect(html).toContain("Avg TTFT")
-    expect(html).toContain("Avg Duration")
-    expect(html).toContain("Avg Token/sec")
-    expect(html).not.toContain("Relationship Structure")
-    expect(html).not.toContain("Behavior Diversity")
-    expect(html).not.toContain("Coordinator alignment")
-  })
-
-  test("renders an empty state without a run", () => {
-    const html = renderToStaticMarkup(<ReportAnalysisDashboard events={[]} model={undefined} t={dictionary.en} />)
-
-    expect(html).toContain("No run selected")
-    expect(html).toContain("Select or complete a run")
+    expect(html).toContain("Behavior Diversity")
+    expect(html).toContain("Coordinator alignment")
+    expect(html).toContain("Directed density")
+    expect(html).toContain("Avg target spread")
+    expect(html).toContain("Event completion")
   })
 })
 

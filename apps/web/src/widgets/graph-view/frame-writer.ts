@@ -112,7 +112,10 @@ export function writeGraphFrame(
       graph.mergeEdgeAttributes(edge.id, {
         type: EDGE_TYPE,
         visibility: edge.visibility,
+        visibilityMix: edge.visibilityMix,
+        actionTypes: edge.actionTypes,
         latestContent: edge.latestContent,
+        latestActionType: edge.latestActionType,
         weight: edge.weight,
       })
       if (current.weight !== edge.weight || current.visibility !== edge.visibility) {
@@ -133,7 +136,10 @@ export function writeGraphFrame(
       size: 0.2,
       alpha: 0.08,
       visibility: edge.visibility,
+      visibilityMix: edge.visibilityMix,
+      actionTypes: edge.actionTypes,
       latestContent: edge.latestContent,
+      latestActionType: edge.latestActionType,
       weight: edge.weight,
     }
     graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target, attributes)

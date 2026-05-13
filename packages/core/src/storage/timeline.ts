@@ -12,10 +12,5 @@ export function cloneTimeline(timeline: GraphTimelineFrame[]): GraphTimelineFram
 }
 
 export function createsTimelineFrame(event: RunEvent): boolean {
-  return (
-    event.type === "actors.ready" ||
-    event.type === "interaction.recorded" ||
-    event.type === "round.completed"
-  )
+  return event.type === "round.completed"
 }
-

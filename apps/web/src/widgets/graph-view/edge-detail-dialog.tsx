@@ -1,5 +1,6 @@
 import { useMemo } from "react"
 import { ArrowRightIcon } from "lucide-react"
+import type { ActorState } from "@simula/shared"
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
@@ -12,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import type { UiTexts } from "@/lib/i18n"
 import { MarkdownContent } from "@/shared/ui/markdown-content"
 import { useRunStore } from "@/store/run-store"
+import { sanitizeActorVisibleText } from "../actor-visible-text"
 import { buildEdgeActorNames, buildEdgeInteractionHistory, type EdgeInteractionHistoryItem } from "./edge-history"
 
 export function EdgeDetailDialog({
@@ -62,15 +64,19 @@ export function EdgeDetailDialog({
                 <EdgeStat label={t.graphEdgeLatestRound} value={edge.roundIndex} prefix="R" />
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <Badge variant="outline" className="rounded-sm bg-background">{edge.visibility}</Badge>
-                <Badge variant="secondary" className="rounded-sm">{edge.id}</Badge>
+                {countBadges(edge.actionTypes, names, runState?.actors ?? []).map((item) => (
+                  <Badge key={item} variant="secondary" className="rounded-sm">{item}</Badge>
+                ))}
+                {countBadges(edge.visibilityMix).map((item) => (
+                  <Badge key={item} variant="outline" className="rounded-sm bg-background">{item}</Badge>
+                ))}
               </div>
             </div>
 
             <ScrollArea className="min-h-0 flex-1 pr-3">
               <div className="flex flex-col gap-2 pr-3 pt-3">
                 {history.length ? history.map((item) => (
-                  <EdgeHistoryCard key={item.id} item={item} t={t} />
+                  <EdgeHistoryCard key={item.id} item={item} t={t} actorNames={names} actors={runState?.actors ?? []} />
                 )) : (
                   <div className="rounded-md border border-dashed border-border/80 bg-background/60 p-4 text-sm">
                     <p className="font-medium">{t.graphEdgeNoHistory}</p>
@@ -97,16 +103,27 @@ function EdgeStat({ label, value, prefix = "" }: { label: string; value: number;
   )
 }
 
-function EdgeHistoryCard({ item, t }: { item: EdgeInteractionHistoryItem; t: UiTexts }) {
+function EdgeHistoryCard({
+  item,
+  t,
+  actorNames,
+  actors,
+}: {
+  item: EdgeInteractionHistoryItem
+  t: UiTexts
+  actorNames: Map<string, string>
+  actors: ActorState[]
+}) {
+  const actionType = sanitizeActorVisibleText(item.actionType, actorNames, actors)
   return (
     <article className="rounded-md bg-background/80 p-3">
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-xs font-semibold">R{item.roundIndex}</span>
         <Badge variant="outline" className="h-4 rounded-sm bg-background px-1.5 text-[10px]">{item.visibility}</Badge>
         <Badge variant="outline" className="h-4 rounded-sm bg-background px-1.5 text-[10px]">{item.decisionType}</Badge>
-        <Badge variant="outline" className="h-4 rounded-sm bg-background px-1.5 text-[10px]">{item.actionType}</Badge>
+        <Badge variant="outline" className="h-4 rounded-sm bg-background px-1.5 text-[10px]">{actionType || item.actionType}</Badge>
       </div>
-      <MarkdownContent compact className="mt-2" content={item.content} fallback="-" />
+      <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">{item.content || "-"}</p>
       <div className="mt-3 grid gap-2 md:grid-cols-2">
         <MiniField label={t.intent} value={item.intent} />
         <MiniField label={t.expectation} value={item.expectation} />
@@ -120,9 +137,33 @@ function MiniField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-sm bg-muted/40 px-2 py-1.5">
       <div className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</div>
-      <MarkdownContent compact className="mt-1" content={value} fallback="-" />
+      <MarkdownContent compact className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground" content={value} fallback="-" />
     </div>
   )
+}
+
+function countBadges(
+  counts: Record<string, number> | undefined,
+  actorNames?: Map<string, string>,
+  actors: ActorState[] = []
+): string[] {
+  return Object.entries(normalizeCountLabels(counts, actorNames, actors))
+    .toSorted((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 4)
+    .map(([label, count]) => `${label} ${count}`)
+}
+
+function normalizeCountLabels(
+  counts: Record<string, number> | undefined,
+  actorNames?: Map<string, string>,
+  actors: ActorState[] = []
+): Record<string, number> {
+  const normalized: Record<string, number> = {}
+  for (const [label, count] of Object.entries(counts ?? {})) {
+    const visibleLabel = actorNames ? sanitizeActorVisibleText(label, actorNames, actors) : label
+    normalized[visibleLabel] = (normalized[visibleLabel] ?? 0) + count
+  }
+  return normalized
 }
 
 function timeLabel(timestamp: string): string {

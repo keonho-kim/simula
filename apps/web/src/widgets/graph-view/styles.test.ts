@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import Graph from "graphology"
 import type { GraphEdgeView } from "@simula/shared"
+import type { GraphEdgeAttributes, GraphNodeAttributes } from "./types"
 
 const webGlRenderingContext = {
   BOOL: 0,
@@ -25,7 +27,7 @@ Object.defineProperty(globalThis, "WebGL2RenderingContext", {
   value: webGlRenderingContext,
 })
 
-const { edgeAlpha, edgeColor, edgeSize, forceAtlasOptions, graphIntensityColor, nodeSize } = await import("./styles")
+const { collectNodeDepths, edgeAlpha, edgeColor, edgeSize, forceAtlasOptions, graphIntensityColor, nodeSize } = await import("./styles")
 
 describe("graph visual styles", () => {
   test("scales nodes by interaction count and degree", () => {
@@ -91,6 +93,22 @@ describe("graph visual styles", () => {
     expect(graphIntensityColor(8)).not.toBe(graphIntensityColor(12))
     expect(edgeColor(1)).not.toBe(edgeColor(12))
     expect(edgeColor(1)).toContain("37, 99, 235")
+  })
+
+  test("collects selected graph neighborhood through depth two", () => {
+    const graph = new Graph<GraphNodeAttributes, GraphEdgeAttributes>({ type: "directed" })
+    for (const node of ["a", "b", "c", "d"]) {
+      graph.addNode(node)
+    }
+    graph.addDirectedEdgeWithKey("ab", "a", "b")
+    graph.addDirectedEdgeWithKey("bc", "b", "c")
+    graph.addDirectedEdgeWithKey("cd", "c", "d")
+
+    expect([...collectNodeDepths(graph, "a", 2).entries()]).toEqual([
+      ["a", 0],
+      ["b", 1],
+      ["c", 2],
+    ])
   })
 })
 

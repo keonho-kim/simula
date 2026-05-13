@@ -101,7 +101,7 @@ export function buildReportTimeline(
       sourceName: actorNames.get(interaction.sourceActorId) ?? interaction.sourceActorId,
       targetActorIds: interaction.targetActorIds,
       targetNames: interaction.targetActorIds.map((actorId) => actorNames.get(actorId) ?? actorId),
-      actionType: interaction.actionType,
+      actionType: visibleActionLabel(interaction.actionType, state.actors),
       visibility: interaction.visibility,
       decisionType: interaction.decisionType,
       content: interaction.content,
@@ -122,6 +122,16 @@ export function buildReportTimeline(
   return [...rounds.values()]
     .filter((round) => actorFilter === "all" || round.interactions.length > 0)
     .sort((a, b) => a.roundIndex - b.roundIndex)
+}
+
+function visibleActionLabel(actionType: string, actors: ActorState[]): string {
+  for (const actor of actors) {
+    const action = actor.actions.find((item) => item.id === actionType)
+    if (action) {
+      return action.label
+    }
+  }
+  return actionType
 }
 
 export function buildRoleDiagnostics(events: RunEvent[], t?: UiTexts): {

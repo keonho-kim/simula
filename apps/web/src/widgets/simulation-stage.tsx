@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useEffect, useState, type ReactNode } from "react"
 import type { RunEvent } from "@simula/shared"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -6,7 +6,12 @@ import { useRunStore } from "@/store/run-store"
 import { GraphView } from "@/widgets/graph-view"
 import { buildSimulationEventNotice } from "@/widgets/simulation-event-notice"
 import { SimulationEventNoticeCard } from "@/widgets/simulation-event-notice-card"
-import { buildSimulationInterlude, type InterludeStageStatus, type SimulationInterludeState } from "@/widgets/simulation-stage-interlude"
+import {
+  buildSimulationInterlude,
+  type InterludeStageId,
+  type InterludeStageStatus,
+  type SimulationInterludeState,
+} from "@/widgets/simulation-stage-interlude"
 import { buildSimulationStageStatus } from "@/widgets/simulation-stage-status"
 import type { UiTexts } from "@/lib/i18n"
 import { cn } from "@/lib/utils"
@@ -123,7 +128,14 @@ function SimulationInterludeOverlay({
   terminal: boolean
   t: UiTexts
 }) {
-  const details = interlude?.details.filter((item) => item.stageId === interlude.activeStageId).slice(0, 4) ?? []
+  const [selectedStageId, setSelectedStageId] = useState<InterludeStageId | undefined>(interlude?.activeStageId)
+  useEffect(() => {
+    setSelectedStageId(interlude?.activeStageId)
+  }, [interlude?.activeStageId])
+
+  const visibleStageId = selectedStageId ?? interlude?.activeStageId
+  const visibleStage = interlude?.stages.find((stage) => stage.id === visibleStageId)
+  const details = interlude?.details.filter((item) => item.stageId === visibleStageId).slice(0, 4) ?? []
   const activeRound = terminal ? undefined : details.find((message) => message.roundIndex)?.roundIndex
   if (!interlude || terminal) {
     return null
@@ -135,16 +147,19 @@ function SimulationInterludeOverlay({
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <aside className="shrink-0 border-b border-border/70 bg-background/80 p-4 md:w-56 md:border-b-0 md:border-r">
             <p className="text-xs font-semibold uppercase text-muted-foreground">{t.interlude}</p>
-            <div className="mt-4 space-y-1.5">
+            <div className="mt-4 flex flex-col gap-1.5">
               {interlude.stages.map((stage) => (
-                <div
+                <button
                   key={stage.id}
+                  type="button"
                   className={cn(
-                    "flex h-10 items-center justify-between gap-2 rounded-md px-2.5 text-sm transition-colors",
+                    "flex h-10 items-center justify-between gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
+                    stage.id === visibleStageId && stage.status !== "active" && "bg-muted text-foreground ring-1 ring-border/70",
                     stage.status === "active" && "bg-emerald-50 text-emerald-950 ring-1 ring-emerald-100",
-                    stage.status === "done" && "text-muted-foreground",
+                    stage.status === "done" && stage.id !== visibleStageId && "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
                     stage.status === "waiting" && "text-muted-foreground/70"
                   )}
+                  onClick={() => setSelectedStageId(stage.id)}
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <span className={cn("size-2 shrink-0 rounded-full", stageDotClass(stage.status))} />
@@ -155,7 +170,7 @@ function SimulationInterludeOverlay({
                       {t.interludeStageDone}
                     </span>
                   ) : null}
-                </div>
+                </button>
               ))}
             </div>
           </aside>
@@ -174,7 +189,7 @@ function SimulationInterludeOverlay({
             </div>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <InterludeMetric label={interlude.roleLabel} value={interlude.stepLabel} />
+              <InterludeMetric label={visibleStage?.label ?? interlude.roleLabel} value={selectedStageLabel(interlude, visibleStageId)} />
               <InterludeMetric label={t.actorCards} value={interlude.actorCardProgress ?? "0"} />
             </div>
 
@@ -222,6 +237,14 @@ function InterludeMetric({ label, value }: { label: string; value: string }) {
       <p className="mt-1 truncate text-sm font-semibold text-foreground">{value}</p>
     </div>
   )
+}
+
+function selectedStageLabel(interlude: SimulationInterludeState, stageId: InterludeStageId | undefined): string {
+  if (!stageId || stageId === interlude.activeStageId) {
+    return interlude.stepLabel
+  }
+  const latestDetail = interlude.details.find((detail) => detail.stageId === stageId)
+  return latestDetail?.stepLabel ?? interlude.stages.find((stage) => stage.id === stageId)?.status ?? "-"
 }
 
 function hasTerminalEvent(events: RunEvent[]): boolean {

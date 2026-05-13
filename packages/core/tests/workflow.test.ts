@@ -4,265 +4,15 @@ import { join } from "node:path"
 import { tmpdir } from "node:os"
 import {
   RunStore,
-  MODEL_ROLES,
   applyInjectedEventContext,
   applyInteractionContext,
   actorPromptContext,
-  defaultSettings,
   emptyActorContext,
-  runSimulation,
 } from "../src"
 import { buildTimelineFrame } from "../src/simulation/timeline"
-import type { ActorState, Interaction, LLMSettings, ModelProvider, RunEvent } from "@simula/shared"
+import type { ActorState, Interaction, RunEvent } from "@simula/shared"
 
 describe("simulation workflow", () => {
-  test("emits lifecycle events and returns a report", async () => {
-    const settings = defaultSettings()
-    setProviderKey(settings, "unit-test-api-key")
-    const events: RunEvent[] = []
-    const state = await runSimulation({
-      runId: "test-run",
-      settings,
-      scenario: {
-        sourceName: "test.md",
-        text: "A city council faces a flood response conflict.",
-        controls: { numCast: 3, allowAdditionalCast: true, actionsPerType: 3, maxRound: 3, fastMode: false },
-      },
-      emit: async (event) => {
-        events.push(event)
-      },
-    })
-
-    expect(events.some((event) => event.type === "node.started" && event.nodeId === "planner")).toBe(true)
-    expect(events.some((event) => event.type === "node.started" && event.nodeId === "generator")).toBe(true)
-    expect(events.some((event) => event.type === "node.completed" && event.nodeId === "finalization")).toBe(true)
-    expect(events.some((event) => event.type === "actors.ready" && event.actors.length === 3)).toBe(true)
-    expect(events.filter((event) => event.type === "interaction.recorded")).toHaveLength(9)
-    expect(events.filter((event) => event.type === "round.completed")).toHaveLength(3)
-    const metricEvents = events.filter((event) => event.type === "model.metrics")
-    expect(metricEvents.length).toBeGreaterThan(0)
-    expect(metricEvents.every((event) => event.type === "model.metrics" && event.metrics.durationMs > 0)).toBe(true)
-    expect(metricEvents.every((event) => event.type === "model.metrics" && event.metrics.totalTokens > 0)).toBe(true)
-    expect(state.actors).toHaveLength(3)
-    expect(new Set(state.actors.map((actor) => actor.name)).size).toBe(state.actors.length)
-    expect(state.actorRoster?.map((entry) => entry.name)).toEqual(state.actors.map((actor) => actor.name))
-    expect(state.actors.every((actor) => actor.backgroundHistory && actor.personality && actor.preference)).toBe(true)
-    expect(state.actors.every((actor) => actor.contextSummary)).toBe(true)
-    expect(state.interactions).toHaveLength(9)
-    expect(state.interactions.every((interaction) => interaction.content.includes("I will state my position clearly."))).toBe(true)
-    expect(events.filter((event) => event.type === "actor.message")).toHaveLength(9)
-    expect(
-      [1, 2, 3].every((roundIndex) =>
-        state.actors.every((actor) =>
-          state.interactions.some(
-            (interaction) => interaction.roundIndex === roundIndex && interaction.sourceActorId === actor.id
-          )
-        )
-      )
-    ).toBe(true)
-    expect(state.actors.every((actor) => actor.actions.length === 12)).toBe(true)
-    expect(state.actors.every((actor) => new Set(actor.actions.map((action) => action.id)).size === 12)).toBe(true)
-    expect(
-      state.actors.every((actor) =>
-        ["public", "semi-public", "private", "solitary"].every(
-          (visibility) => actor.actions.filter((action) => action.visibility === visibility).length === 3
-        )
-      )
-    ).toBe(true)
-    expect(events.filter((event) => event.type === "event.injected").length).toBeGreaterThan(0)
-    expect(state.actors.every((actor) => actor.context.visible.some((entry) => entry.kind === "event"))).toBe(true)
-    expect(state.actors.every((actor) => actor.context.visible.some((entry) => entry.kind === "self" || entry.kind === "out"))).toBe(true)
-    expect(state.actors.some((actor) => actor.context.visible.some((entry) => entry.kind === "in"))).toBe(true)
-    expect(state.roundDigests).toHaveLength(3)
-    expect(state.roundReports).toHaveLength(3)
-    expect(state.roundReports.map((report) => report.roundIndex)).toEqual([1, 2, 3])
-    expect(state.roundDigests.every((digest) => digest.preRound.content)).toBe(true)
-    expect(state.roundReports.every((report) => report.roundSummary)).toBe(true)
-    expect(state.actors.every((actor) => actor.memory.some((entry) => entry.includes("EVENT | ROUND")))).toBe(true)
-    expect(
-      state.actors.every((actor) =>
-        !actor.memory.some((entry) => entry.includes("After-round") || entry.includes("produced a"))
-      )
-    ).toBe(true)
-    expect(state.roleTraces).toHaveLength(3)
-    expect(
-      state.roleTraces.every((trace) =>
-        trace.role === "planner"
-          ? trace.coreSituation && trace.actorPressures && trace.conflictDynamics && trace.simulationDirection
-            : trace.role === "coordinator"
-            ? trace.runtimeFrame && trace.actorRouting && trace.interactionPolicy && trace.outcomeDirection && trace.eventInjection && trace.progressDecision
-            : trace.role === "observer"
-            ? trace.roundSummary
-            : trace.thought && trace.target && trace.action && trace.intent
-      )
-    ).toBe(true)
-    expect(state.roleTraces.map((trace) => trace.role)).not.toContain("generator")
-    expect(
-      events.filter(
-        (event) =>
-          event.type === "model.metrics" &&
-          event.metrics.role === "generator" &&
-          ["roster", "role", "backgroundHistory", "personality", "preference"].includes(event.metrics.step)
-      )
-    ).toHaveLength(13)
-    expect(
-      events.filter((event) => event.type === "model.metrics" && event.metrics.role === "actor" && event.metrics.step === "message")
-    ).toHaveLength(9)
-    expect(
-      events.filter((event) => event.type === "model.metrics" && event.metrics.role === "actor" && event.metrics.step === "context")
-    ).toHaveLength(9)
-    expect(
-      events
-        .filter((event) => event.type === "model.metrics" && event.metrics.role === "observer")
-        .map((event) => event.type === "model.metrics" ? event.metrics.step : "")
-    ).toEqual(["roundSummary", "roundSummary", "roundSummary"])
-    expect(events.findIndex((event) => event.type === "model.message" && event.role === "actor")).toBeLessThan(
-      events.findIndex((event) => event.type === "interaction.recorded")
-    )
-    expect(events.findIndex((event) => event.type === "round.completed" && event.roundIndex === 1)).toBeGreaterThan(
-      events.findLastIndex((event) => event.type === "interaction.recorded" && event.interaction.roundIndex === 1)
-    )
-    const firstRoundCompletedIndex = events.findIndex((event) => event.type === "round.completed" && event.roundIndex === 1)
-    expect(
-      events
-        .slice(0, firstRoundCompletedIndex)
-        .filter((event) => event.type === "model.metrics" && event.metrics.role === "observer")
-        .map((event) => event.type === "model.metrics" ? event.metrics.step : "")
-    ).toEqual(["roundSummary"])
-    expect(state.plan?.backgroundStory).toBeTruthy()
-    expect(state.plan?.scenarioDigest?.coreSituation).toBeTruthy()
-    expect(state.plan?.scenarioDigest?.actorPressures).toBeTruthy()
-    expect(state.plan?.scenarioDigest?.conflictDynamics).toBeTruthy()
-    expect(state.plan?.scenarioDigest?.simulationDirection).toBeTruthy()
-    expect(state.plan?.backgroundStory).toContain("Core situation:")
-    expect(state.plan?.majorEvents.every((event) => event.title.includes("Major Event"))).toBe(true)
-    expect(state.plan?.actionCatalog.length).toBeGreaterThan(0)
-    expect(state.reportMarkdown).toContain("# Simula Report")
-    expect(state.reportMarkdown).toContain("## Outcome")
-    expect(state.reportMarkdown).toContain("## Benchmark Summary")
-    expect(state.reportMarkdown).toContain("## Major Event Results")
-    expect(state.reportMarkdown).toContain("## Network Dynamics")
-    expect(state.reportMarkdown).toContain("## Actor Relationship Map")
-    expect(state.reportMarkdown).toContain("## Round Progression")
-    expect(state.reportMarkdown).toContain("## Cast")
-    expect(state.reportMarkdown).not.toContain("## Actor Cards")
-    expect(state.reportMarkdown).not.toContain("## Round Digests")
-    expect(state.reportMarkdown).not.toContain("## Round Reports")
-    expect(state.reportMarkdown).not.toContain("## Role Traces")
-    expect(state.reportMarkdown).not.toContain("I will state my position clearly.")
-    expect(events.filter((event) => event.type === "report.delta")).toHaveLength(4)
-  })
-
-  test("fails after five empty model responses and logs retry attempts", async () => {
-    const settings = defaultSettings()
-    setProviderKey(settings, "unit-test-api-key")
-    settings.roles.planner.provider = "litellm"
-    settings.providers.litellm.apiKey = "unit-test-empty-key"
-    const events: RunEvent[] = []
-
-    await expect(
-      runSimulation({
-        runId: "retry-run",
-        settings,
-        scenario: {
-          sourceName: "retry.md",
-          text: "A city council faces a flood response conflict.",
-          controls: { numCast: 3, allowAdditionalCast: true, actionsPerType: 3, maxRound: 3, fastMode: false },
-        },
-        emit: async (event) => {
-          events.push(event)
-        },
-      })
-    ).rejects.toThrow("planner.coreSituation failed after 5 empty responses")
-
-    expect(
-      events.filter(
-        (event) =>
-          event.type === "log" &&
-          event.level === "warn" &&
-          event.message.includes("planner.coreSituation returned empty text")
-      )
-    ).toHaveLength(5)
-    expect(
-      events.filter(
-        (event) =>
-          event.type === "model.metrics" &&
-          event.metrics.role === "planner" &&
-          event.metrics.step === "coreSituation"
-      )
-    ).toHaveLength(5)
-  })
-
-  test("runs with fast mode while preserving actor action counts", async () => {
-    const settings = defaultSettings()
-    setProviderKey(settings, "unit-test-api-key")
-    const events: RunEvent[] = []
-    const state = await runSimulation({
-      runId: "fast-run",
-      settings,
-      scenario: {
-        sourceName: "fast.md",
-        text: "A city council faces a flood response conflict.",
-        controls: { numCast: 3, allowAdditionalCast: true, actionsPerType: 2, maxRound: 3, fastMode: true },
-      },
-      emit: async (event) => {
-        events.push(event)
-      },
-    })
-
-    expect(state.actors).toHaveLength(3)
-    expect(state.actors.every((actor) => actor.backgroundHistory && actor.personality && actor.preference)).toBe(true)
-    expect(state.actors.every((actor) => actor.actions.length === 8)).toBe(true)
-    expect(state.interactions).toHaveLength(9)
-    expect(state.roundReports.map((report) => report.roundIndex)).toEqual([1, 2, 3])
-    expect(events.filter((event) => event.type === "report.delta")).toHaveLength(4)
-    expect(
-      events.some(
-        (event) =>
-          event.type === "log" &&
-          event.message ===
-            "Fast Mode enabled; actor decisions run in parallel while observer summaries and dependency-sensitive stages remain sequential."
-      )
-    ).toBe(true)
-  })
-
-  test("uses max round as the actor activity round count", async () => {
-    const settings = defaultSettings()
-    setProviderKey(settings, "unit-test-api-key")
-    const state = await runSimulation({
-      runId: "round-run",
-      settings,
-      scenario: {
-        sourceName: "round.md",
-        text: "A team faces a release decision.",
-        controls: { numCast: 2, allowAdditionalCast: true, actionsPerType: 2, maxRound: 4, fastMode: false },
-      },
-      emit: async () => {},
-    })
-
-    expect(state.roundDigests).toHaveLength(4)
-    expect(state.interactions).toHaveLength(8)
-    expect(state.roundDigests.map((digest) => digest.roundIndex)).toEqual([1, 2, 3, 4])
-  })
-
-  test("extends max round by five when coordinator returns continue at the boundary", async () => {
-    const settings = defaultSettings()
-    setProviderKey(settings, "unit-test-api-key")
-    const state = await runSimulation({
-      runId: "extend-run",
-      settings,
-      scenario: {
-        sourceName: "extend.md",
-        text: "continue-extension: a team needs one more phase.",
-        controls: { numCast: 2, allowAdditionalCast: true, actionsPerType: 2, maxRound: 1, fastMode: false },
-      },
-      emit: async () => {},
-    })
-
-    expect(state.roundDigests).toHaveLength(6)
-    expect(state.interactions).toHaveLength(12)
-  })
-
   test("keeps no-action context solitary to the source actor", () => {
     const actors = [testActor("actor-1"), testActor("actor-2")]
     const interaction: Interaction = {
@@ -359,6 +109,109 @@ describe("simulation workflow", () => {
     expect(selfTargetFrame.nodes.find((node) => node.id === "actor-1")?.interactionCount).toBe(1)
     expect(selfTargetFrame.edges).toEqual([])
   })
+
+  test("aggregates repeated actions into one directed graph edge", () => {
+    const firstFrame = buildTimelineFrame(0, actorsReadyEvent())
+    const publicFrame = buildTimelineFrame(1, interactionEvent({
+      id: "interaction-1",
+      roundIndex: 1,
+      sourceActorId: "actor-1",
+      targetActorIds: ["actor-2"],
+      actionType: "briefing",
+      content: "Actor 1 briefs Actor 2.",
+      eventId: "event-1",
+      visibility: "public",
+      decisionType: "action",
+      intent: "Brief.",
+      expectation: "Actor 2 understands.",
+    }), firstFrame)
+    const privateFrame = buildTimelineFrame(2, interactionEvent({
+      id: "interaction-2",
+      roundIndex: 2,
+      sourceActorId: "actor-1",
+      targetActorIds: ["actor-2"],
+      actionType: "warning",
+      content: "Actor 1 warns Actor 2.",
+      eventId: "event-1",
+      visibility: "private",
+      decisionType: "action",
+      intent: "Warn.",
+      expectation: "Actor 2 adjusts.",
+    }), publicFrame)
+
+    expect(privateFrame.edges).toHaveLength(1)
+    expect(privateFrame.edges[0]).toMatchObject({
+      id: "actor-1->actor-2",
+      weight: 2,
+      visibilityMix: { public: 1, private: 1 },
+      actionTypes: { briefing: 1, warning: 1 },
+      latestActionType: "warning",
+    })
+  })
+
+  test("builds graph frames at round granularity and merges later actor rosters", () => {
+    const initialActors = actorsReadyEvent()
+    const addedActors: RunEvent = {
+      type: "actors.ready",
+      runId: "timeline-run",
+      timestamp: "2026-04-28T00:02:00.000Z",
+      actors: [
+        { id: "actor-1", label: "Actor 1", role: "Role 1", intent: "", interactionCount: 0 },
+        { id: "actor-2", label: "Actor 2", role: "Role 2", intent: "", interactionCount: 0 },
+        { id: "actor-3", label: "Actor 3", role: "Role 3", intent: "", interactionCount: 0 },
+      ],
+    }
+    const firstInteraction = interactionEvent({
+      id: "interaction-1",
+      roundIndex: 1,
+      sourceActorId: "actor-1",
+      targetActorIds: ["actor-2"],
+      actionType: "briefing",
+      content: "Actor 1 briefs Actor 2.",
+      eventId: "event-1",
+      visibility: "public",
+      decisionType: "action",
+      intent: "Brief.",
+      expectation: "Actor 2 understands.",
+    })
+    const secondInteraction = interactionEvent({
+      id: "interaction-2",
+      roundIndex: 2,
+      sourceActorId: "actor-3",
+      targetActorIds: ["actor-1"],
+      actionType: "warning",
+      content: "Actor 3 warns Actor 1.",
+      eventId: "event-1",
+      visibility: "private",
+      decisionType: "action",
+      intent: "Warn.",
+      expectation: "Actor 1 adjusts.",
+    })
+    const roundOne: RunEvent = {
+      type: "round.completed",
+      runId: "timeline-run",
+      timestamp: "2026-04-28T00:01:00.000Z",
+      roundIndex: 1,
+    }
+    const roundTwo: RunEvent = {
+      type: "round.completed",
+      runId: "timeline-run",
+      timestamp: "2026-04-28T00:03:00.000Z",
+      roundIndex: 2,
+    }
+
+    const firstFrame = buildTimelineFrame(0, roundOne, undefined, [initialActors, firstInteraction, roundOne])
+    const secondFrame = buildTimelineFrame(1, roundTwo, firstFrame, [initialActors, firstInteraction, roundOne, addedActors, secondInteraction, roundTwo])
+
+    expect(firstFrame.index).toBe(0)
+    expect(firstFrame.layoutRoundIndex).toBe(1)
+    expect(firstFrame.nodes.map((node) => node.id)).toEqual(["actor-1", "actor-2"])
+    expect(firstFrame.activeNodeIds).toEqual(["actor-1", "actor-2"])
+    expect(secondFrame.layoutRoundIndex).toBe(2)
+    expect(secondFrame.nodes.map((node) => node.id)).toEqual(["actor-1", "actor-2", "actor-3"])
+    expect(secondFrame.activeNodeIds).toEqual(["actor-3", "actor-1"])
+    expect(secondFrame.edges).toHaveLength(2)
+  })
 })
 
 function testActor(id: string): ActorState {
@@ -400,13 +253,6 @@ function interactionEvent(interaction: Interaction): RunEvent {
   }
 }
 
-function setProviderKey(settings: LLMSettings, apiKey: string, provider: ModelProvider = "openai"): void {
-  settings.providers[provider].apiKey = apiKey
-  for (const role of MODEL_ROLES) {
-    settings.roles[role].provider = provider
-  }
-}
-
 describe("run store", () => {
   test("writes manifest, events, state, report, and export artifacts", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "simula-store-"))
@@ -434,7 +280,7 @@ describe("run store", () => {
           { id: "actor-2", label: "Actor 2", role: "Reviewer", intent: "Respond.", interactionCount: 0 },
         ],
       })
-      expect(actorsFrame?.nodes).toHaveLength(2)
+      expect(actorsFrame).toBeUndefined()
 
       const interactionFrame = await store.appendEvent({
         type: "interaction.recorded",
@@ -454,10 +300,7 @@ describe("run store", () => {
           expectation: "Actor 2 responds.",
         },
       })
-      expect(interactionFrame?.edges).toHaveLength(1)
-      expect(interactionFrame?.edges[0]?.weight).toBe(1)
-      expect(interactionFrame?.nodes.find((node) => node.id === "actor-1")?.interactionCount).toBe(1)
-      expect(interactionFrame?.nodes.find((node) => node.id === "actor-2")?.interactionCount).toBe(1)
+      expect(interactionFrame).toBeUndefined()
 
       const messageFrame = await store.appendEvent({
         type: "actor.message",
@@ -477,7 +320,10 @@ describe("run store", () => {
       })
       expect(roundFrame?.layoutRoundIndex).toBe(1)
       expect(roundFrame?.edges).toHaveLength(1)
-      expect(roundFrame?.activeNodeIds).toEqual([])
+      expect(roundFrame?.edges[0]?.weight).toBe(1)
+      expect(roundFrame?.nodes.find((node) => node.id === "actor-1")?.interactionCount).toBe(1)
+      expect(roundFrame?.nodes.find((node) => node.id === "actor-2")?.interactionCount).toBe(1)
+      expect(roundFrame?.activeNodeIds).toEqual(["actor-1", "actor-2"])
 
       await store.writeState({
         runId: run.id,

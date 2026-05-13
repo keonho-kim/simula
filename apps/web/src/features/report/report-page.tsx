@@ -3,8 +3,8 @@ import { useQuery } from "@tanstack/react-query"
 import {
   ActivityIcon,
   BarChart3Icon,
+  BrainCircuitIcon,
   BotIcon,
-  FileTextIcon,
   HomeIcon,
   Maximize2Icon,
   UsersRoundIcon,
@@ -17,11 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { fetchRun } from "@/lib/api"
 import type { UiTexts } from "@/lib/i18n"
-import { MarkdownContent } from "@/shared/ui/markdown-content"
 import { useRunStore } from "@/store/run-store"
 import { ActorCardRail, ActorDetailDialog } from "@/widgets/actor-panel"
 import { EdgeDetailDialog } from "@/widgets/graph-view/edge-detail-dialog"
@@ -37,6 +35,7 @@ import {
 import { buildReportAnalysisViewModel } from "./report-analysis-view-model"
 import { ReportAnalysisDashboard } from "./report-page/analysis-dashboard"
 import { RoleDiagnosticsPanel } from "./report-page/role-diagnostics-panel"
+import { ReportSimulationDynamics } from "./report-page/simulation-dynamics"
 import { TimelinePanel } from "./report-page/timeline-panel"
 import { ExportButton } from "./report-page/ui"
 
@@ -72,8 +71,6 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
   const roleDiagnostics = useMemo(() => buildRoleDiagnostics(events, t), [events, t])
   const selectedRoleSummary = roleDiagnostics.summaries.find((summary) => summary.role === systemRoleFilter)
   const selectedRoleEvents = roleDiagnostics.events.filter((event) => event.role === systemRoleFilter)
-  const finalReport = runState?.reportMarkdown
-    ?? [...events].reverse().find((event) => event.type === "report.delta")?.content
 
   const selectActorFromTimeline = (actorId: string) => {
     setSelectedEdgeId(undefined)
@@ -133,10 +130,14 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
         </header>
 
         <Tabs defaultValue="analysis-dashboard" className="min-h-0 flex-1 gap-3">
-          <TabsList className="grid w-full max-w-[520px] grid-cols-2">
+          <TabsList className="grid w-full max-w-[760px] grid-cols-3">
             <TabsTrigger value="analysis-dashboard" className="text-xs">
               <BarChart3Icon data-icon="inline-start" />
               {t.analysisDashboardTab}
+            </TabsTrigger>
+            <TabsTrigger value="simulation-dynamics" className="text-xs">
+              <BrainCircuitIcon data-icon="inline-start" />
+              {t.simulationDynamicsTab}
             </TabsTrigger>
             <TabsTrigger value="actors-stage" className="text-xs">
               <UsersRoundIcon data-icon="inline-start" />
@@ -149,10 +150,21 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
                 <div>
                   <h2 className="font-heading text-sm font-semibold">{t.reportAnalysis}</h2>
-                  <p className="mt-1 text-xs text-muted-foreground">{t.reportAnalysisDescription}</p>
                 </div>
               </div>
-              <ReportAnalysisDashboard model={analysisModel} t={t} />
+              <ReportAnalysisDashboard events={events} model={analysisModel} t={t} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="simulation-dynamics" className="min-h-0 overflow-hidden">
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+                <div>
+                  <h2 className="font-heading text-sm font-semibold">{t.reportSimulationDynamics}</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">{t.simulationDynamicsDescription}</p>
+                </div>
+              </div>
+              <ReportSimulationDynamics model={analysisModel} t={t} />
             </div>
           </TabsContent>
 
@@ -167,7 +179,7 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
                       <h2 className="font-heading text-sm font-semibold">{t.simulationEvents}</h2>
                       <p className="mt-1 text-xs text-muted-foreground">{t.simulationEventsDescription}</p>
                     </div>
-                    <TabsList className="grid grid-cols-3">
+                    <TabsList className="grid grid-cols-2">
                       <TabsTrigger value="timeline" className="text-xs">
                         <ActivityIcon data-icon="inline-start" />
                         {t.timeline}
@@ -175,10 +187,6 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
                       <TabsTrigger value="roles" className="text-xs">
                         <BotIcon data-icon="inline-start" />
                         {t.roles}
-                      </TabsTrigger>
-                      <TabsTrigger value="final" className="text-xs">
-                        <FileTextIcon data-icon="inline-start" />
-                        {t.final}
                       </TabsTrigger>
                     </TabsList>
                   </div>
@@ -203,12 +211,6 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
                       t={t}
                       onRoleChange={setSystemRoleFilter}
                     />
-                  </TabsContent>
-
-                  <TabsContent value="final" className="min-h-0 overflow-hidden">
-                    <ScrollArea className="h-[calc(100svh-250px)] min-h-[520px] p-4">
-                      <MarkdownContent content={finalReport} fallback={t.finalReportFallback} />
-                    </ScrollArea>
                   </TabsContent>
                 </Tabs>
               </div>

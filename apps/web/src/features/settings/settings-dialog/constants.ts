@@ -24,6 +24,8 @@ export const roleLabels: Record<ModelRole, string> = {
   repair: "Repair",
 }
 export const roleProviderDefaults: Partial<Record<ModelProvider, Partial<RoleSettings>>> = {
+  openai: { model: "gpt-5.4-mini" },
+  anthropic: { model: "claude-sonnet-4-20250514" },
   gemini: { model: "gemini-2.5-pro" },
   ollama: { model: "llama3.1" },
   lmstudio: { model: "local-model" },
@@ -45,6 +47,14 @@ export const safetySettingsExample = '[\n  { "category": "HARM_CATEGORY_DANGEROU
 
 export function isOpenAICompatible(provider: ModelProvider): boolean {
   return compatibleProviders.includes(provider)
+}
+
+export function supportsModelDiscovery(provider: ModelProvider): boolean {
+  return providers.some((item) => item.value === provider)
+}
+
+export function supportsTemperature(provider: ModelProvider): boolean {
+  return isOpenAICompatible(provider)
 }
 
 export function supportsReasoningEffort(provider: ModelProvider): boolean {

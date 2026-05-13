@@ -107,12 +107,11 @@ export class RunStore {
     }
 
     const previousTimeline = await this.loadTimeline(event.runId)
-    const frame = buildTimelineFrame(previousTimeline.length, event, previousTimeline.at(-1))
+    const events = await this.readEvents(event.runId)
+    const frame = buildTimelineFrame(previousTimeline.length, event, previousTimeline.at(-1), events)
     const nextTimeline = [...previousTimeline, frame]
     this.timelineCache.set(event.runId, nextTimeline)
-    if (event.type === "actors.ready" || event.type === "round.completed") {
-      await this.flushTimeline(event.runId)
-    }
+    await this.flushTimeline(event.runId)
     return frame
   }
 
