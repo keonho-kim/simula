@@ -1,9 +1,10 @@
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { ActivityIcon, CircleHelpIcon, GitBranchIcon, NetworkIcon, RepeatIcon, TargetIcon, WaypointsIcon, ZapIcon } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { UiTexts } from "@/lib/i18n"
+import { cn } from "@/lib/utils"
 import type { ReportAnalysisViewModel } from "../report-analysis-view-model"
 import { EmptyPanel } from "./ui"
 
@@ -26,6 +27,7 @@ export function ReportSimulationDynamics({
     <ScrollArea className="h-[calc(100svh-214px)] min-h-[560px] p-3">
       <div className="flex flex-col gap-3 pr-3">
         <DynamicsKpis model={model} t={t} />
+        <DynamicsSignalMap model={model} t={t} />
         <NetworkStructure model={model} t={t} />
         <RelationshipHeatmap model={model} t={t} />
         <RoundEvolution model={model} t={t} />
@@ -33,6 +35,220 @@ export function ReportSimulationDynamics({
         <CoordinatorAlignment model={model} t={t} />
       </div>
     </ScrollArea>
+  )
+}
+
+interface RadarMetric {
+  id: string
+  label: string
+  value: number
+  help: string
+  color: string
+}
+
+function DynamicsSignalMap({ model, t }: { model: ReportAnalysisViewModel; t: UiTexts }) {
+  const summary = model.analysis.summary
+  const network = model.analysis.network.summary
+  const completionRate = summary.totalEventCount ? summary.completedEventCount / summary.totalEventCount : 0
+  const metrics: RadarMetric[] = [
+    {
+      id: "density",
+      label: t.directedDensity,
+      value: network.directedDensity,
+      help: t.directedDensityHelp,
+      color: "var(--chart-1)",
+    },
+    {
+      id: "reciprocity",
+      label: t.reciprocity,
+      value: network.reciprocity,
+      help: t.reciprocityHelp,
+      color: "var(--chart-2)",
+    },
+    {
+      id: "action-diversity",
+      label: t.actionDiversity,
+      value: summary.averageActionEntropy,
+      help: t.actionDiversityHelp,
+      color: "var(--chart-3)",
+    },
+    {
+      id: "visibility-diversity",
+      label: t.visibilityDiversity,
+      value: summary.averageVisibilityEntropy,
+      help: t.visibilityDiversityHelp,
+      color: "var(--chart-4)",
+    },
+    {
+      id: "target-spread",
+      label: t.targetSpread,
+      value: average(model.behaviorRanking.map((actor) => actor.targetSpread)) ?? 0,
+      help: t.targetSpreadHelp,
+      color: "var(--chart-5)",
+    },
+    {
+      id: "coordinator-alignment",
+      label: t.coordinatorAlignment,
+      value: summary.averageEventAlignment,
+      help: t.coordinatorAlignmentHelp,
+      color: "var(--chart-1)",
+    },
+    {
+      id: "event-completion",
+      label: t.eventCompletionRate,
+      value: completionRate,
+      help: t.eventCompletionRateHelp,
+      color: "var(--chart-2)",
+    },
+  ]
+  const [activeMetricId, setActiveMetricId] = useState(metrics[0]?.id ?? "")
+  const activeMetric = metrics.find((metric) => metric.id === activeMetricId) ?? metrics[0]
+
+  return (
+    <section className="rounded-md border border-border/70 bg-background/80 p-3">
+      <SectionTitle title={t.dynamicsSignalMap} help={t.dynamicsSignalMapDescription} icon={<TargetIcon data-icon="inline-start" />} />
+      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(220px,0.85fr)_minmax(0,1.15fr)]">
+        <div className="relative mx-auto aspect-square w-full max-w-[300px] rounded-md border border-border/60 bg-card/80 p-3">
+          <RadarChart metrics={metrics} activeMetricId={activeMetric?.id} onSelect={setActiveMetricId} />
+        </div>
+        <div className="grid content-start gap-2 sm:grid-cols-2">
+          {metrics.map((metric) => {
+            const active = metric.id === activeMetric?.id
+            return (
+              <Tooltip key={metric.id}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "rounded-md border border-border/60 bg-muted/20 p-3 text-left transition-[background-color,border-color,transform] hover:border-ring/50 hover:bg-muted/40",
+                      active && "border-ring/60 bg-accent/70 ring-2 ring-ring/20"
+                    )}
+                    onClick={() => setActiveMetricId(metric.id)}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-xs font-semibold">{metric.label}</span>
+                      <span className="font-mono text-xs tabular-nums" style={{ color: metric.color }}>{formatPercent(metric.value)}</span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-sm bg-muted">
+                      <div
+                        className="h-full rounded-sm transition-[width] duration-300"
+                        style={{ width: `${Math.round(clamp01(metric.value) * 100)}%`, backgroundColor: metric.color }}
+                      />
+                    </div>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[280px]">
+                  {metric.help}
+                </TooltipContent>
+              </Tooltip>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function RadarChart({
+  metrics,
+  activeMetricId,
+  onSelect,
+}: {
+  metrics: RadarMetric[]
+  activeMetricId: string | undefined
+  onSelect: (metricId: string) => void
+}) {
+  const size = 120
+  const center = 60
+  const radius = 46
+  const outerPoints = metrics.map((_, index) => radarPoint(index, metrics.length, radius, center, 1))
+  const valuePoints = metrics.map((metric, index) => radarPoint(index, metrics.length, radius, center, clamp01(metric.value)))
+  const activeIndex = metrics.findIndex((metric) => metric.id === activeMetricId)
+  const activePoint = activeIndex >= 0 ? valuePoints[activeIndex] : undefined
+
+  return (
+    <>
+      <svg className="h-full w-full" viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Dynamics signal star chart">
+        <polygon points={outerPoints.map(pointString).join(" ")} fill="none" stroke="var(--border)" strokeWidth="0.45" />
+        {[0.33, 0.66].map((ratio) => (
+          <polygon
+            key={ratio}
+            points={metrics.map((_, index) => pointString(radarPoint(index, metrics.length, radius, center, ratio))).join(" ")}
+            fill="none"
+            stroke="var(--border)"
+            strokeWidth="0.25"
+          />
+        ))}
+        {outerPoints.map((point, index) => (
+          <path key={metrics[index]?.id} d={`M ${center} ${center} L ${pointString(point)}`} stroke="var(--border)" strokeWidth="0.25" />
+        ))}
+        <polygon
+          points={valuePoints.map(pointString).join(" ")}
+          fill="color-mix(in srgb, var(--chart-1) 13%, transparent)"
+          stroke="var(--chart-1)"
+          strokeWidth="0.8"
+          strokeLinejoin="round"
+        />
+        {valuePoints.map((point, index) => {
+          const metric = metrics[index]
+          const active = metric?.id === activeMetricId
+          return (
+            <circle
+              key={metric?.id}
+              cx={point.x}
+              cy={point.y}
+              r={active ? 2.5 : 1.8}
+              fill={metric?.color}
+              className={active ? "animate-pulse" : undefined}
+            />
+          )
+        })}
+        {activePoint ? (
+          <circle
+            cx={activePoint.x}
+            cy={activePoint.y}
+            r="5.2"
+            fill="none"
+            stroke="var(--ring)"
+            strokeWidth="0.6"
+            className="animate-ping"
+          />
+        ) : null}
+      </svg>
+      {metrics.map((metric, index) => {
+        const point = radarPoint(index, metrics.length, radius, center, clamp01(metric.value))
+        const active = metric.id === activeMetricId
+        return (
+          <Tooltip key={metric.id}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label={`${metric.label}: ${formatPercent(metric.value)}`}
+                className={cn(
+                  "absolute size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-background/80 transition-[box-shadow,transform] hover:scale-110",
+                  active && "scale-110 ring-2 ring-ring/50"
+                )}
+                style={{
+                  left: `${(point.x / size) * 100}%`,
+                  top: `${(point.y / size) * 100}%`,
+                  backgroundColor: metric.color,
+                }}
+                onClick={() => onSelect(metric.id)}
+              />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[280px]">
+              <div className="grid gap-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold">{metric.label}</span>
+                  <span className="font-mono">{formatPercent(metric.value)}</span>
+                </div>
+                <span>{metric.help}</span>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        )
+      })}
+    </>
   )
 }
 
@@ -227,9 +443,9 @@ function RoundEvolution({ model, t }: { model: ReportAnalysisViewModel; t: UiTex
       <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
         <Sparkline
           series={[
-            { label: t.actions, values: rounds.map((round) => round.actionCount), className: "stroke-primary" },
-            { label: t.activeActors, values: rounds.map((round) => round.activeActorCount), className: "stroke-muted-foreground" },
-            { label: t.newTies, values: rounds.map((round) => round.newTies), className: "stroke-ring" },
+            { label: t.actions, values: rounds.map((round) => round.actionCount), color: "var(--chart-1)" },
+            { label: t.activeActors, values: rounds.map((round) => round.activeActorCount), color: "var(--chart-2)" },
+            { label: t.newTies, values: rounds.map((round) => round.newTies), color: "var(--chart-3)" },
           ]}
         />
         <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
@@ -371,7 +587,7 @@ function MetricBar({
         </div>
         <span className="font-mono tabular-nums text-foreground">{percent ? formatPercent(value) : value.toLocaleString()}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-sm bg-muted">
+      <div className="h-1.5 overflow-hidden rounded-sm bg-muted">
         <div className="h-full rounded-sm bg-primary" style={{ width: `${Math.round(ratio * 100)}%` }} />
       </div>
       {detail ? <div className="mt-1 truncate text-[10px] text-muted-foreground">{detail}</div> : null}
@@ -388,20 +604,23 @@ function MiniMetric({ label, value }: { label: string; value: string }) {
   )
 }
 
-function Sparkline({ series }: { series: Array<{ label: string; values: number[]; className: string }> }) {
+function Sparkline({ series }: { series: Array<{ label: string; values: number[]; color: string }> }) {
   const width = 100
   const height = 34
   const max = Math.max(1, ...series.flatMap((item) => item.values))
   return (
     <div className="rounded-md border border-border/70 bg-card p-3">
       <svg className="h-[104px] w-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-        <path d="M 0 33.5 H 100" className="stroke-border" strokeWidth="0.4" />
+        <path d="M 0 33.5 H 100" className="stroke-border" strokeWidth="0.3" />
+        <path d="M 0 22.5 H 100" stroke="var(--border)" strokeOpacity="0.7" strokeWidth="0.2" />
+        <path d="M 0 11.5 H 100" stroke="var(--border)" strokeOpacity="0.7" strokeWidth="0.2" />
         {series.map((item) => (
           <path
             key={item.label}
             d={sparklinePath(item.values, max, width, height)}
-            className={`fill-none ${item.className}`}
-            strokeWidth="1.4"
+            className="fill-none"
+            stroke={item.color}
+            strokeWidth="0.85"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -427,6 +646,26 @@ function sparklinePath(values: number[], max: number, width: number, height: num
       return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`
     })
     .join(" ")
+}
+
+function radarPoint(index: number, total: number, radius: number, center: number, ratio: number): { x: number; y: number } {
+  const angle = -Math.PI / 2 + (index / total) * Math.PI * 2
+  const distance = radius * ratio
+  return {
+    x: center + Math.cos(angle) * distance,
+    y: center + Math.sin(angle) * distance,
+  }
+}
+
+function pointString(point: { x: number; y: number }): string {
+  return `${point.x.toFixed(2)},${point.y.toFixed(2)}`
+}
+
+function clamp01(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return 0
+  }
+  return Math.min(1, Math.max(0, value))
 }
 
 function formatPercent(value: number | undefined): string {

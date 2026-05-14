@@ -45,6 +45,10 @@ export function buildReportMetrics(events: RunEvent[]): ReportMetricsViewModel {
       }
     })
 
+  return buildReportMetricsFromSamples(samples)
+}
+
+export function buildReportMetricsFromSamples(samples: ReportMetricSample[]): ReportMetricsViewModel {
   return {
     samples,
     averages: {

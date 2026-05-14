@@ -20,6 +20,8 @@ describe("ReportSimulationDynamics", () => {
     )
 
     expect(html).toContain("Behavior Diversity")
+    expect(html).toContain("Dynamics signal map")
+    expect(html).toContain("Dynamics signal star chart")
     expect(html).toContain("Coordinator alignment")
     expect(html).toContain("Directed density")
     expect(html).toContain("Avg target spread")

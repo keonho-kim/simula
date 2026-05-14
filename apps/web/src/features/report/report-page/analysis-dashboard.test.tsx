@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
-import type { ActorState, Interaction, SimulationState } from "@simula/shared"
+import type { ActorState, Interaction, RunEvent, SimulationState } from "@simula/shared"
 import { dictionary } from "@/lib/i18n/dictionary"
 import { buildReportAnalysisViewModel } from "../report-analysis-view-model"
 import { ReportAnalysisDashboard } from "./analysis-dashboard"
@@ -12,8 +12,15 @@ describe("ReportAnalysisDashboard", () => {
       interaction("i2", 2, "cto", ["ceo"], "private", "reply"),
     ]))
 
-    const html = renderToStaticMarkup(<ReportAnalysisDashboard events={[]} model={model} t={dictionary.en} />)
+    const html = renderToStaticMarkup(<ReportAnalysisDashboard events={[
+      metricEvent("2026-01-01T00:00:00.000Z", 120, 1000, 300, 100, 200),
+      metricEvent("2026-01-01T00:00:01.000Z", 180, 1500, 600, 500, 700),
+    ]} model={model} t={dictionary.en} />)
 
+    expect(html).toContain("Token range")
+    expect(html).toContain("2 / 2 samples")
+    expect(html).toContain("value=\"100\"")
+    expect(html).toContain("value=\"700\"")
     expect(html).toContain("Avg TTFT")
     expect(html).toContain("Avg Duration")
     expect(html).toContain("Avg Token/sec")
@@ -68,6 +75,33 @@ function createState(interactions: Interaction[]): SimulationState {
     reportMarkdown: "",
     stopReason: "simulation_done",
     errors: [],
+  }
+}
+
+function metricEvent(
+  timestamp: string,
+  ttftMs: number,
+  durationMs: number,
+  totalTokens: number,
+  inputTokens: number,
+  outputTokens: number
+): Extract<RunEvent, { type: "model.metrics" }> {
+  return {
+    type: "model.metrics",
+    runId: "run-1",
+    timestamp,
+    metrics: {
+      role: "planner",
+      step: "coreSituation",
+      attempt: 1,
+      ttftMs,
+      durationMs,
+      inputTokens,
+      reasoningTokens: 0,
+      outputTokens,
+      totalTokens,
+      tokenSource: "provider",
+    },
   }
 }
 

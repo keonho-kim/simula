@@ -115,7 +115,7 @@ function SlotNumber({ value, formatter }: { value: number; formatter: (value: nu
   }, [value])
 
   return (
-    <div className="overflow-hidden font-mono text-4xl font-semibold leading-none tabular-nums text-[#0284a8]">
+    <div className="overflow-hidden font-mono text-4xl font-semibold leading-none tabular-nums text-[var(--chart-1)]">
       <span className="inline-block animate-in slide-in-from-bottom-1 duration-300">{formatter(displayValue)}</span>
     </div>
   )
@@ -128,7 +128,7 @@ function ChartsPanel({ metrics, t }: { metrics: ReportMetricsViewModel; t: UiTex
         <article key={kind} className="rounded-md border border-border/70 bg-background p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="truncate text-xs font-medium text-muted-foreground">{metricLabel(kind, t)}</h3>
-            <span className="font-mono text-xs text-[#0284a8]">{formatMaybeMetric(kind, metrics.series[kind].at(-1)?.value)}</span>
+            <span className="font-mono text-xs" style={{ color: chartColor(kind) }}>{formatMaybeMetric(kind, metrics.series[kind].at(-1)?.value)}</span>
           </div>
           <LineChart id={`report-${kind}`} points={metrics.series[kind]} emptyLabel={t.noMetricSamples} />
         </article>
@@ -148,23 +148,35 @@ function LineChart({ id, points, emptyLabel }: { id: string; points: ReportMetri
       <svg className="h-full w-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none">
         <defs>
           <pattern id={`report-grid-${safeId}`} width="10" height="8" patternUnits="userSpaceOnUse">
-            <path d="M 10 0 L 0 0 0 8" fill="none" stroke="#d8e0e4" strokeWidth="0.35" />
+            <path d="M 10 0 L 0 0 0 8" fill="none" stroke="var(--border)" strokeWidth="0.24" />
           </pattern>
           <linearGradient id={`report-fill-${safeId}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#2dbbd3" stopOpacity="0.36" />
-            <stop offset="100%" stopColor="#2dbbd3" stopOpacity="0.06" />
+            <stop offset="0%" stopColor={chartColorFromId(id)} stopOpacity="0.16" />
+            <stop offset="100%" stopColor={chartColorFromId(id)} stopOpacity="0.03" />
           </linearGradient>
         </defs>
         <rect width={chartWidth} height={chartHeight} fill={`url(#report-grid-${safeId})`} />
         {areaPath ? <path d={areaPath} fill={`url(#report-fill-${safeId})`} /> : null}
-        {path ? <path d={path} fill="none" stroke="#0891b2" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" /> : null}
-        {latest ? <circle cx={lastX(points.length)} cy={valueY(points, latest.value)} r="1.7" fill="#06b6d4" /> : null}
+        {path ? <path d={path} fill="none" stroke={chartColorFromId(id)} strokeWidth="0.85" strokeLinejoin="round" strokeLinecap="round" /> : null}
+        {latest ? <circle cx={lastX(points.length)} cy={valueY(points, latest.value)} r="1.35" fill={chartColorFromId(id)} /> : null}
       </svg>
       {!points.length ? (
         <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">{emptyLabel}</div>
       ) : null}
     </div>
   )
+}
+
+function chartColor(kind: ReportMetricKind): string {
+  if (kind === "ttft") return "var(--chart-1)"
+  if (kind === "duration") return "var(--chart-2)"
+  return "var(--chart-3)"
+}
+
+function chartColorFromId(id: string): string {
+  if (id.includes("ttft")) return "var(--chart-1)"
+  if (id.includes("duration")) return "var(--chart-2)"
+  return "var(--chart-3)"
 }
 
 function UsageMatrixPanel({ metrics, t }: { metrics: ReportMetricsViewModel; t: UiTexts }) {
