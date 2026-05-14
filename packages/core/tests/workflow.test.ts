@@ -149,7 +149,7 @@ describe("simulation workflow", () => {
     })
   })
 
-  test("builds graph frames at round granularity and merges later actor rosters", () => {
+  test("builds the actor roster before the first round frame and merges later rosters", () => {
     const initialActors = actorsReadyEvent()
     const addedActors: RunEvent = {
       type: "actors.ready",
@@ -280,7 +280,10 @@ describe("run store", () => {
           { id: "actor-2", label: "Actor 2", role: "Reviewer", intent: "Respond.", interactionCount: 0 },
         ],
       })
-      expect(actorsFrame).toBeUndefined()
+      expect(actorsFrame?.layoutRoundIndex).toBeUndefined()
+      expect(actorsFrame?.nodes.map((node) => node.id)).toEqual(["actor-1", "actor-2"])
+      expect(actorsFrame?.edges).toEqual([])
+      expect(actorsFrame?.activeNodeIds).toEqual(["actor-1", "actor-2"])
 
       const interactionFrame = await store.appendEvent({
         type: "interaction.recorded",
@@ -300,7 +303,11 @@ describe("run store", () => {
           expectation: "Actor 2 responds.",
         },
       })
-      expect(interactionFrame).toBeUndefined()
+      expect(interactionFrame?.layoutRoundIndex).toBeUndefined()
+      expect(interactionFrame?.index).toBe(1)
+      expect(interactionFrame?.edges).toHaveLength(1)
+      expect(interactionFrame?.edges[0]?.weight).toBe(1)
+      expect(interactionFrame?.activeNodeIds).toEqual(["actor-1", "actor-2"])
 
       const messageFrame = await store.appendEvent({
         type: "actor.message",
@@ -319,6 +326,7 @@ describe("run store", () => {
         roundIndex: 1,
       })
       expect(roundFrame?.layoutRoundIndex).toBe(1)
+      expect(roundFrame?.index).toBe(2)
       expect(roundFrame?.edges).toHaveLength(1)
       expect(roundFrame?.edges[0]?.weight).toBe(1)
       expect(roundFrame?.nodes.find((node) => node.id === "actor-1")?.interactionCount).toBe(1)

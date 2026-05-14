@@ -1,5 +1,11 @@
 import type { GraphTimelineFrame, RunEvent } from "@simula/shared"
 
+const TIMELINE_FRAME_EVENT_TYPES = new Set<RunEvent["type"]>([
+  "actors.ready",
+  "interaction.recorded",
+  "round.completed",
+])
+
 export function cloneTimeline(timeline: GraphTimelineFrame[]): GraphTimelineFrame[] {
   return timeline.map((frame) => ({
     ...frame,
@@ -12,5 +18,5 @@ export function cloneTimeline(timeline: GraphTimelineFrame[]): GraphTimelineFram
 }
 
 export function createsTimelineFrame(event: RunEvent): boolean {
-  return event.type === "round.completed"
+  return TIMELINE_FRAME_EVENT_TYPES.has(event.type)
 }
