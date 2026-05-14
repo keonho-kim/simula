@@ -146,7 +146,7 @@ export function buildRoleDiagnostics(events: RunEvent[], t?: UiTexts): {
     const running = roleEvents.some((event) => event.title.toLowerCase().includes("started"))
     return {
       role,
-      label: roleLabel(role),
+      label: roleLabel(role, t),
       status: failed ? "failed" : running ? "active" : roleEvents.length ? "done" : "idle",
       messageCount: roleEvents.filter((event) => event.kind === "message").length,
       metricCount: roleEvents.filter((event) => event.kind === "metric").length,
@@ -158,13 +158,13 @@ export function buildRoleDiagnostics(events: RunEvent[], t?: UiTexts): {
   return { summaries, events: diagnosticEvents }
 }
 
-export function roleLabel(role: ReportSystemRole): string {
-  if (role === "planner") return "Planner"
-  if (role === "generator") return "Generator"
-  if (role === "coordinator") return "Coordinator"
-  if (role === "actor") return "Actor"
-  if (role === "observer") return "Observer"
-  return "Repair"
+export function roleLabel(role: ReportSystemRole, t?: UiTexts): string {
+  if (role === "planner") return t?.rolePlanner ?? "Planner"
+  if (role === "generator") return t?.roleGenerator ?? "Generator"
+  if (role === "coordinator") return t?.roleCoordinator ?? "Coordinator"
+  if (role === "actor") return t?.roleActor ?? "Actor"
+  if (role === "observer") return t?.roleObserver ?? "Observer"
+  return t?.roleRepair ?? "Repair"
 }
 
 function ensureRound(

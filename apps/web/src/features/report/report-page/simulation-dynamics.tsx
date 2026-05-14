@@ -26,8 +26,6 @@ export function ReportSimulationDynamics({
   return (
     <ScrollArea className="h-[calc(100svh-214px)] min-h-[560px] p-3">
       <div className="flex flex-col gap-3 pr-3">
-        <DynamicsKpis model={model} t={t} />
-        <DynamicsSignalMap model={model} t={t} />
         <NetworkStructure model={model} t={t} />
         <RelationshipHeatmap model={model} t={t} />
         <RoundEvolution model={model} t={t} />
@@ -46,7 +44,7 @@ interface RadarMetric {
   color: string
 }
 
-function DynamicsSignalMap({ model, t }: { model: ReportAnalysisViewModel; t: UiTexts }) {
+export function DynamicsSignalMap({ model, t }: { model: ReportAnalysisViewModel; t: UiTexts }) {
   const summary = model.analysis.summary
   const network = model.analysis.network.summary
   const completionRate = summary.totalEventCount ? summary.completedEventCount / summary.totalEventCount : 0
@@ -109,7 +107,7 @@ function DynamicsSignalMap({ model, t }: { model: ReportAnalysisViewModel; t: Ui
       <SectionTitle title={t.dynamicsSignalMap} help={t.dynamicsSignalMapDescription} icon={<TargetIcon data-icon="inline-start" />} />
       <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(220px,0.85fr)_minmax(0,1.15fr)]">
         <div className="relative mx-auto aspect-square w-full max-w-[300px] rounded-md border border-border/60 bg-card/80 p-3">
-          <RadarChart metrics={metrics} activeMetricId={activeMetric?.id} onSelect={setActiveMetricId} />
+          <RadarChart metrics={metrics} activeMetricId={activeMetric?.id} label={t.dynamicsSignalMap} onSelect={setActiveMetricId} />
         </div>
         <div className="grid content-start gap-2 sm:grid-cols-2">
           {metrics.map((metric) => {
@@ -152,10 +150,12 @@ function DynamicsSignalMap({ model, t }: { model: ReportAnalysisViewModel; t: Ui
 function RadarChart({
   metrics,
   activeMetricId,
+  label,
   onSelect,
 }: {
   metrics: RadarMetric[]
   activeMetricId: string | undefined
+  label: string
   onSelect: (metricId: string) => void
 }) {
   const size = 120
@@ -163,12 +163,9 @@ function RadarChart({
   const radius = 46
   const outerPoints = metrics.map((_, index) => radarPoint(index, metrics.length, radius, center, 1))
   const valuePoints = metrics.map((metric, index) => radarPoint(index, metrics.length, radius, center, clamp01(metric.value)))
-  const activeIndex = metrics.findIndex((metric) => metric.id === activeMetricId)
-  const activePoint = activeIndex >= 0 ? valuePoints[activeIndex] : undefined
-
   return (
     <>
-      <svg className="h-full w-full" viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Dynamics signal star chart">
+      <svg className="h-full w-full" viewBox={`0 0 ${size} ${size}`} role="img" aria-label={label}>
         <polygon points={outerPoints.map(pointString).join(" ")} fill="none" stroke="var(--border)" strokeWidth="0.45" />
         {[0.33, 0.66].map((ratio) => (
           <polygon
@@ -203,17 +200,6 @@ function RadarChart({
             />
           )
         })}
-        {activePoint ? (
-          <circle
-            cx={activePoint.x}
-            cy={activePoint.y}
-            r="5.2"
-            fill="none"
-            stroke="var(--ring)"
-            strokeWidth="0.6"
-            className="animate-ping"
-          />
-        ) : null}
       </svg>
       {metrics.map((metric, index) => {
         const point = radarPoint(index, metrics.length, radius, center, clamp01(metric.value))
@@ -252,7 +238,7 @@ function RadarChart({
   )
 }
 
-function DynamicsKpis({
+export function DynamicsKpis({
   model,
   t,
 }: {
@@ -302,7 +288,7 @@ function DynamicsKpis({
     {
       icon: RepeatIcon,
       label: t.repeatRate,
-      value: formatPercent(model.analysis.summary.averageRepeatRate),
+      value: formatPercent(nonRepeatDiversity(model.analysis.summary.averageRepeatRate)),
       help: t.repeatRateHelp,
     },
     {
@@ -320,7 +306,7 @@ function DynamicsKpis({
   ]
 
   return (
-    <section className="grid gap-3 md:grid-cols-3 2xl:grid-cols-8" aria-label={t.simulationDynamicsKpis}>
+    <section className="grid gap-3 md:grid-cols-3 2xl:grid-cols-9" aria-label={t.simulationDynamicsKpis}>
       {cards.map((card) => {
         const Icon = card.icon
         return (
@@ -474,7 +460,7 @@ function BehaviorRanking({ model, t }: { model: ReportAnalysisViewModel; t: UiTe
                   </p>
                 </div>
                 <Badge variant="outline" className="rounded-sm">
-                  {formatPercent(actor.consecutiveRepeatRate)} {t.repeatRate}
+                  {formatPercent(nonRepeatDiversity(actor.consecutiveRepeatRate))} {t.repeatRate}
                 </Badge>
               </div>
               <div className="mt-3 grid gap-2">
@@ -666,6 +652,13 @@ function clamp01(value: number | undefined): number {
     return 0
   }
   return Math.min(1, Math.max(0, value))
+}
+
+function nonRepeatDiversity(repeatRate: number | undefined): number | undefined {
+  if (repeatRate === undefined || !Number.isFinite(repeatRate)) {
+    return undefined
+  }
+  return 1 - clamp01(repeatRate)
 }
 
 function formatPercent(value: number | undefined): string {

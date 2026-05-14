@@ -7,7 +7,7 @@ import { buildReportAnalysisViewModel } from "../report-analysis-view-model"
 import { ReportSimulationDynamics } from "./simulation-dynamics"
 
 describe("ReportSimulationDynamics", () => {
-  test("renders behavior and coordinator quality signals", () => {
+  test("renders detailed dynamics without compact summary signals", () => {
     const model = buildReportAnalysisViewModel(createState([
       interaction("i1", 1, "ceo", ["cto"], "private", "briefing"),
       interaction("i2", 2, "cto", ["ceo"], "semi-public", "reply"),
@@ -19,13 +19,36 @@ describe("ReportSimulationDynamics", () => {
       </TooltipProvider>
     )
 
+    expect(html).toContain("Relationship Structure")
+    expect(html).toContain("Relationship heatmap")
     expect(html).toContain("Behavior Diversity")
-    expect(html).toContain("Dynamics signal map")
-    expect(html).toContain("Dynamics signal star chart")
     expect(html).toContain("Coordinator alignment")
-    expect(html).toContain("Directed density")
-    expect(html).toContain("Avg target spread")
-    expect(html).toContain("Event completion")
+    expect(html).not.toContain("Dynamics signal map")
+    expect(html).not.toContain("Avg target spread")
+    expect(html).not.toContain("Event completion")
+  })
+
+  test("renders Korean report labels without exposed actor or dyad wording", () => {
+    const model = buildReportAnalysisViewModel(createState([
+      interaction("i1", 1, "ceo", ["cto"], "private", "briefing"),
+      interaction("i2", 2, "ceo", ["cfo"], "private", "briefing"),
+      interaction("i3", 3, "ceo", ["cto"], "public", "vote"),
+    ]))
+
+    const html = renderToStaticMarkup(
+      <TooltipProvider>
+        <ReportSimulationDynamics model={model} t={dictionary.ko} />
+      </TooltipProvider>
+    )
+
+    expect(html).toContain("활성 관계쌍")
+    expect(html).toContain("인물")
+    expect(html).toContain("50% 행동 변화 다양성")
+    expect(html).not.toContain("흐름 신호 지도")
+    expect(html).not.toContain("actor")
+    expect(html).not.toContain("dyad")
+    expect(html).not.toContain("반복률")
+    expect(html).not.toContain("animate-ping")
   })
 })
 
@@ -58,6 +81,7 @@ function createState(interactions: Interaction[]): SimulationState {
     actors: [
       actor("ceo", "CEO"),
       actor("cto", "CTO"),
+      actor("cfo", "CFO"),
     ],
     interactions,
     roundDigests: [],

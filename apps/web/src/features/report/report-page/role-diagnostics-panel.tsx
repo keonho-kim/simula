@@ -49,7 +49,7 @@ export function RoleDiagnosticsPanel({
             <SelectGroup>
               {REPORT_SYSTEM_ROLES.map((role) => (
                 <SelectItem key={role} value={role}>
-                  {roleLabel(role)}
+                  {roleLabel(role, t)}
                 </SelectItem>
               ))}
             </SelectGroup>

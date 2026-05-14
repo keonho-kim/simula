@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { ActorState, RunEvent, SimulationState } from "@simula/shared"
-import { buildActorOptions, buildReportTimeline, buildRoleDiagnostics } from "./report-view-model"
+import { dictionary } from "@/lib/i18n/dictionary"
+import { buildActorOptions, buildReportTimeline, buildRoleDiagnostics, roleLabel } from "./report-view-model"
 
 describe("report view model", () => {
   test("filters timeline interactions by source and target actor", () => {
@@ -89,6 +90,11 @@ describe("report view model", () => {
     expect(diagnostics.summaries.find((summary) => summary.role === "observer")?.logCount).toBe(1)
     expect(bodies).not.toContain("secret planner chain")
     expect(bodies).not.toContain("{\"raw\"")
+  })
+
+  test("localizes report role labels", () => {
+    expect(roleLabel("actor", dictionary.ko)).toBe("인물")
+    expect(roleLabel("coordinator", dictionary.ko)).toBe("진행")
   })
 })
 

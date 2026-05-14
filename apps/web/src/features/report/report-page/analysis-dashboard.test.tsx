@@ -1,22 +1,35 @@
 import { describe, expect, test } from "bun:test"
 import { renderToStaticMarkup } from "react-dom/server"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import type { ActorState, Interaction, RunEvent, SimulationState } from "@simula/shared"
 import { dictionary } from "@/lib/i18n/dictionary"
 import { buildReportAnalysisViewModel } from "../report-analysis-view-model"
 import { ReportAnalysisDashboard } from "./analysis-dashboard"
 
 describe("ReportAnalysisDashboard", () => {
-  test("renders LLM analytics without simulation dynamics panels", () => {
+  test("renders compact simulation summary before LLM analytics", () => {
     const model = buildReportAnalysisViewModel(createState([
       interaction("i1", 1, "ceo", ["cto"], "private", "briefing"),
       interaction("i2", 2, "cto", ["ceo"], "private", "reply"),
     ]))
 
-    const html = renderToStaticMarkup(<ReportAnalysisDashboard events={[
-      metricEvent("2026-01-01T00:00:00.000Z", 120, 1000, 300, 100, 200),
-      metricEvent("2026-01-01T00:00:01.000Z", 180, 1500, 600, 500, 700),
-    ]} model={model} t={dictionary.en} />)
+    const html = renderToStaticMarkup(
+      <TooltipProvider>
+        <ReportAnalysisDashboard events={[
+          metricEvent("2026-01-01T00:00:00.000Z", 120, 1000, 300, 100, 200),
+          metricEvent("2026-01-01T00:00:01.000Z", 180, 1500, 600, 500, 700),
+        ]} model={model} t={dictionary.en} />
+      </TooltipProvider>
+    )
 
+    expect(html).toContain("Report briefing")
+    expect(html).toContain("Simulation delivered")
+    expect(html).toContain("Model intelligence measured")
+    expect(html).toContain("2 / 2")
+    expect(html).toContain("Dynamics signal map")
+    expect(html).toContain("Directed density")
+    expect(html).toContain("Avg target spread")
+    expect(html).toContain("Event completion")
     expect(html).toContain("Token range")
     expect(html).toContain("2 / 2 samples")
     expect(html).toContain("value=\"100\"")
@@ -25,8 +38,9 @@ describe("ReportAnalysisDashboard", () => {
     expect(html).toContain("Avg Duration")
     expect(html).toContain("Avg Token/sec")
     expect(html).not.toContain("Relationship Structure")
-    expect(html).not.toContain("Behavior Diversity")
-    expect(html).not.toContain("Coordinator alignment")
+    expect(html).not.toContain("Relationship heatmap")
+    expect(html).not.toContain("Round Evolution")
+    expect(html).not.toContain("Participant alignment")
   })
 
   test("renders an empty state without a run", () => {

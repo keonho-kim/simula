@@ -11,6 +11,7 @@ import {
   type ReportMetricsViewModel,
 } from "../report-metrics-view-model"
 import type { ReportAnalysisViewModel } from "../report-analysis-view-model"
+import { DynamicsKpis, DynamicsSignalMap } from "./simulation-dynamics"
 import { EmptyPanel } from "./ui"
 
 interface TokenRange {
@@ -51,6 +52,9 @@ export function ReportAnalysisDashboard({
   return (
     <ScrollArea className="h-[calc(100svh-214px)] min-h-[560px] p-3">
       <div className="flex flex-col gap-3 pr-3">
+        <ReportBriefing model={model} metrics={metrics} t={t} />
+        <DynamicsSignalMap model={model} t={t} />
+        <DynamicsKpis model={model} t={t} />
         <TokenRangeControls
           bounds={bounds}
           range={range}
@@ -63,6 +67,98 @@ export function ReportAnalysisDashboard({
         <LlmMetricCharts metrics={filteredMetrics} t={t} />
       </div>
     </ScrollArea>
+  )
+}
+
+function ReportBriefing({
+  model,
+  metrics,
+  t,
+}: {
+  model: ReportAnalysisViewModel
+  metrics: ReportMetricsViewModel
+  t: UiTexts
+}) {
+  const summary = model.analysis.summary
+  const network = model.analysis.network.summary
+  const activeActorCount = model.analysis.network.actorMetrics.filter((actor) => actor.weightedDegree > 0).length
+  const totalActorCount = model.analysis.network.actorMetrics.length
+  const deliveryStats = [
+    {
+      label: t.reportBriefingInteractions,
+      value: network.validActionCount.toLocaleString(),
+      detail: t.reportBriefingInteractionsHelp,
+    },
+    {
+      label: t.reportBriefingActiveActors,
+      value: `${activeActorCount.toLocaleString()} / ${totalActorCount.toLocaleString()}`,
+      detail: t.reportBriefingActiveActorsHelp,
+    },
+    {
+      label: t.reportBriefingCompletedEvents,
+      value: summary.totalEventCount ? `${summary.completedEventCount.toLocaleString()} / ${summary.totalEventCount.toLocaleString()}` : "-",
+      detail: t.reportBriefingCompletedEventsHelp,
+    },
+  ]
+  const intelligenceStats = [
+    {
+      label: t.actionDiversity,
+      value: formatPercent(summary.averageActionEntropy),
+      detail: t.actionDiversityHelp,
+    },
+    {
+      label: t.coordinatorAlignment,
+      value: formatPercent(summary.averageEventAlignment),
+      detail: t.coordinatorAlignmentHelp,
+    },
+    {
+      label: t.responseThroughput,
+      value: formatMaybeNumber(metrics.averages.tokensPerSecond),
+      detail: t.responseThroughputHelp,
+    },
+  ]
+
+  return (
+    <section className="grid gap-3 lg:grid-cols-2" aria-label={t.reportBriefing}>
+      <BriefingPanel
+        title={t.reportBriefingSimulation}
+        description={t.reportBriefingSimulationDescription}
+        stats={deliveryStats}
+      />
+      <BriefingPanel
+        title={t.reportBriefingIntelligence}
+        description={t.reportBriefingIntelligenceDescription}
+        stats={intelligenceStats}
+      />
+    </section>
+  )
+}
+
+function BriefingPanel({
+  title,
+  description,
+  stats,
+}: {
+  title: string
+  description: string
+  stats: Array<{ label: string; value: string; detail: string }>
+}) {
+  return (
+    <article className="rounded-md border border-border/70 bg-background p-3">
+      <div>
+        <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        {stats.map((stat) => (
+          <div key={stat.label} className="rounded-md bg-muted/25 p-2">
+            <div className="text-[10px] font-semibold uppercase text-muted-foreground">{stat.label}</div>
+            <div className="mt-1 font-mono text-lg font-semibold tabular-nums">{stat.value}</div>
+            <div className="mt-1 line-clamp-2 text-[10px] leading-4 text-muted-foreground">{stat.detail}</div>
+          </div>
+        ))}
+      </div>
+    </article>
   )
 }
 
@@ -324,6 +420,13 @@ function formatMaybeMetric(kind: ReportMetricKind, value: number | undefined): s
     return value.toLocaleString("en-US", { maximumFractionDigits: 1 })
   }
   return Math.round(value).toLocaleString("en-US")
+}
+
+function formatPercent(value: number | undefined): string {
+  if (value === undefined || !Number.isFinite(value)) {
+    return "-"
+  }
+  return `${Math.round(value * 100)}%`
 }
 
 function average(values: number[]): number | undefined {
