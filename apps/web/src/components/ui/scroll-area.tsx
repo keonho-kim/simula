@@ -13,6 +13,8 @@ function ScrollArea({
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
+      type="scroll"
+      scrollHideDelay={650}
       className={cn("relative", className)}
       {...props}
     >

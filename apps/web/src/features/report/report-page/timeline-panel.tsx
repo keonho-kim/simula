@@ -35,14 +35,14 @@ export function TimelinePanel({
   onActorSelect: (actorId: string) => void
 }) {
   return (
-    <div className="flex min-h-0 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <FilterIcon className="size-4" />
           <span>{rounds.length} {t.rounds}</span>
         </div>
         <Select value={actorFilter} onValueChange={onActorFilterChange}>
-          <SelectTrigger size="sm" className="w-[240px]">
+          <SelectTrigger size="sm" className="w-full sm:w-[240px]">
             <SelectValue placeholder={t.filterByActor} />
           </SelectTrigger>
           <SelectContent>
@@ -57,9 +57,9 @@ export function TimelinePanel({
           </SelectContent>
         </Select>
       </div>
-      <ScrollArea className="h-[calc(100svh-260px)] min-h-[520px] p-4">
+      <ScrollArea className="h-[calc(100svh-260px)] min-h-[520px] min-w-0 p-4">
         {rounds.length ? (
-          <div className="flex flex-col gap-4 pr-3">
+          <div className="flex min-w-0 flex-col gap-4 pr-3">
             {rounds.map((round) => (
               <TimelineRoundCard key={round.roundIndex} round={round} t={t} onActorSelect={onActorSelect} />
             ))}
@@ -82,7 +82,7 @@ function TimelineRoundCard({
   onActorSelect: (actorId: string) => void
 }) {
   return (
-    <article className="rounded-md border border-border/70 bg-background/80">
+    <article className="min-w-0 rounded-md border border-border/70 bg-background/80">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 px-4 py-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -121,7 +121,7 @@ function InteractionCard({
   onActorSelect: (actorId: string) => void
 }) {
   return (
-    <article className="rounded-md bg-muted/25 p-3">
+    <article className="min-w-0 rounded-md bg-muted/25 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <ActorButton actorId={interaction.sourceActorId} label={interaction.sourceName} onActorSelect={onActorSelect} />

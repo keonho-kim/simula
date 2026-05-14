@@ -333,12 +333,12 @@ function NetworkStructure({ model, t }: { model: ReportAnalysisViewModel; t: UiT
       <SectionTitle title={t.relationshipStructure} help={t.relationshipStructureDescription} icon={<NetworkIcon data-icon="inline-start" />} />
       <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          <MiniMetric label={t.validActions} value={summary.validActionCount.toLocaleString()} />
-          <MiniMetric label={t.activeDyads} value={model.analysis.network.relationshipMetrics.length.toLocaleString()} />
-          <MiniMetric label={t.components} value={summary.connectedComponentCount.toLocaleString()} />
-          <MiniMetric label={t.isolates} value={summary.isolateCount.toLocaleString()} />
-          <MiniMetric label={t.centralization} value={formatPercent(summary.degreeCentralization)} />
-          <MiniMetric label={t.tieInequality} value={formatDecimal(summary.tieStrengthGini)} />
+          <MiniMetric label={t.validActions} value={summary.validActionCount.toLocaleString()} help={t.validActionsHelp} />
+          <MiniMetric label={t.activeDyads} value={model.analysis.network.relationshipMetrics.length.toLocaleString()} help={t.activeDyadsHelp} />
+          <MiniMetric label={t.components} value={summary.connectedComponentCount.toLocaleString()} help={t.componentsHelp} />
+          <MiniMetric label={t.isolates} value={summary.isolateCount.toLocaleString()} help={t.isolatesHelp} />
+          <MiniMetric label={t.centralization} value={formatPercent(summary.degreeCentralization)} help={t.centralizationHelp} />
+          <MiniMetric label={t.tieInequality} value={formatDecimal(summary.tieStrengthGini)} help={t.tieInequalityHelp} />
         </div>
         <div>
           <h3 className="text-xs font-semibold">{t.centralityRanking}</h3>
@@ -581,10 +581,13 @@ function MetricBar({
   )
 }
 
-function MiniMetric({ label, value }: { label: string; value: string }) {
+function MiniMetric({ label, value, help }: { label: string; value: string; help?: string }) {
   return (
     <div className="rounded-md bg-background/70 px-3 py-2">
-      <div className="text-[10px] uppercase text-muted-foreground">{label}</div>
+      <div className="flex items-center justify-between gap-2 text-[10px] uppercase text-muted-foreground">
+        <span className="truncate">{label}</span>
+        {help ? <InfoTip label={label} body={help} /> : null}
+      </div>
       <div className="mt-1 font-mono text-xs font-semibold tabular-nums">{value}</div>
     </div>
   )

@@ -22,6 +22,7 @@ describe("ReportAnalysisDashboard", () => {
       </TooltipProvider>
     )
 
+    expect(html.indexOf("Token range")).toBeLessThan(html.indexOf("Report briefing"))
     expect(html).toContain("Report briefing")
     expect(html).toContain("Simulation delivered")
     expect(html).toContain("Model intelligence measured")
@@ -29,11 +30,11 @@ describe("ReportAnalysisDashboard", () => {
     expect(html).toContain("Dynamics signal map")
     expect(html).toContain("Directed density")
     expect(html).toContain("Avg target spread")
-    expect(html).toContain("Event completion")
+    expect(html).toContain("Planned-event completion")
     expect(html).toContain("Token range")
     expect(html).toContain("2 / 2 samples")
-    expect(html).toContain("value=\"100\"")
-    expect(html).toContain("value=\"700\"")
+    expect(html).toContain("100 - 500")
+    expect(html).toContain("200 - 700")
     expect(html).toContain("Avg TTFT")
     expect(html).toContain("Avg Duration")
     expect(html).toContain("Avg Token/sec")

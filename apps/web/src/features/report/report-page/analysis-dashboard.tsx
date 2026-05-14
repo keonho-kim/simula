@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import type { RunEvent } from "@simula/shared"
-import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Slider } from "@/components/ui/slider"
 import type { UiTexts } from "@/lib/i18n"
 import {
   buildReportMetrics,
@@ -52,9 +52,6 @@ export function ReportAnalysisDashboard({
   return (
     <ScrollArea className="h-[calc(100svh-214px)] min-h-[560px] p-3">
       <div className="flex flex-col gap-3 pr-3">
-        <ReportBriefing model={model} metrics={metrics} t={t} />
-        <DynamicsSignalMap model={model} t={t} />
-        <DynamicsKpis model={model} t={t} />
         <TokenRangeControls
           bounds={bounds}
           range={range}
@@ -65,6 +62,9 @@ export function ReportAnalysisDashboard({
         />
         <KpiStrip metrics={filteredMetrics} t={t} />
         <LlmMetricCharts metrics={filteredMetrics} t={t} />
+        <ReportBriefing model={model} metrics={metrics} t={t} />
+        <DynamicsSignalMap model={model} t={t} />
+        <DynamicsKpis model={model} t={t} />
       </div>
     </ScrollArea>
   )
@@ -188,65 +188,70 @@ function TokenRangeControls({
           {activeCount.toLocaleString("en-US")} / {totalCount.toLocaleString("en-US")} {t.samples}
         </div>
       </div>
-      <div className="mt-3 grid gap-2 md:grid-cols-4">
-        <TokenInput
-          label={`${t.inputTokens} ${t.minToken}`}
-          value={range.inputMin}
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <TokenRangeSlider
+          label={t.inputTokens}
+          minLabel={t.minToken}
+          maxLabel={t.maxToken}
           min={bounds.inputMin}
           max={bounds.inputMax}
-          onChange={(value) => onChange(normalizeRange({ ...range, inputMin: value }, bounds))}
+          value={[range.inputMin, range.inputMax]}
+          onChange={([inputMin, inputMax]) => onChange(normalizeRange({ ...range, inputMin, inputMax }, bounds))}
         />
-        <TokenInput
-          label={`${t.inputTokens} ${t.maxToken}`}
-          value={range.inputMax}
-          min={bounds.inputMin}
-          max={bounds.inputMax}
-          onChange={(value) => onChange(normalizeRange({ ...range, inputMax: value }, bounds))}
-        />
-        <TokenInput
-          label={`${t.outputTokens} ${t.minToken}`}
-          value={range.outputMin}
+        <TokenRangeSlider
+          label={t.outputTokens}
+          minLabel={t.minToken}
+          maxLabel={t.maxToken}
           min={bounds.outputMin}
           max={bounds.outputMax}
-          onChange={(value) => onChange(normalizeRange({ ...range, outputMin: value }, bounds))}
-        />
-        <TokenInput
-          label={`${t.outputTokens} ${t.maxToken}`}
-          value={range.outputMax}
-          min={bounds.outputMin}
-          max={bounds.outputMax}
-          onChange={(value) => onChange(normalizeRange({ ...range, outputMax: value }, bounds))}
+          value={[range.outputMin, range.outputMax]}
+          onChange={([outputMin, outputMax]) => onChange(normalizeRange({ ...range, outputMin, outputMax }, bounds))}
         />
       </div>
     </section>
   )
 }
 
-function TokenInput({
+function TokenRangeSlider({
   label,
+  minLabel,
+  maxLabel,
   value,
   min,
   max,
   onChange,
 }: {
   label: string
-  value: number
+  minLabel: string
+  maxLabel: string
+  value: [number, number]
   min: number
   max: number
-  onChange: (value: number) => void
+  onChange: (value: [number, number]) => void
 }) {
+  const disabled = min === max
   return (
-    <label className="grid gap-1 text-[10px] font-medium uppercase text-muted-foreground">
-      <span>{label}</span>
-      <Input
-        type="number"
+    <div className="grid gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</span>
+        <span className="font-mono text-xs tabular-nums text-foreground">
+          {value[0].toLocaleString("en-US")} - {value[1].toLocaleString("en-US")}
+        </span>
+      </div>
+      <Slider
+        minStepsBetweenThumbs={1}
         min={min}
         max={max}
+        step={1}
         value={value}
-        className="h-8 rounded-md border-border/70 bg-background font-mono text-xs tabular-nums"
-        onChange={(event) => onChange(Number(event.currentTarget.value))}
+        disabled={disabled}
+        onValueChange={(nextValue) => onChange([nextValue[0] ?? min, nextValue[1] ?? max])}
       />
-    </label>
+      <div className="flex items-center justify-between gap-3 text-[10px] text-muted-foreground">
+        <span>{minLabel}: {min.toLocaleString("en-US")}</span>
+        <span>{maxLabel}: {max.toLocaleString("en-US")}</span>
+      </div>
+    </div>
   )
 }
 

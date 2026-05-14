@@ -102,7 +102,7 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
 
   return (
     <main className="min-h-svh bg-background text-foreground">
-      <div className="mx-auto flex min-h-svh w-full max-w-[1720px] flex-col gap-4 px-4 py-3 lg:px-6">
+      <div className="mx-auto flex min-h-svh w-[95vw] max-w-none flex-col gap-4 py-3">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <Button aria-label={t.home} variant="ghost" size="icon" className="rounded-md" onClick={onHome}>
@@ -130,7 +130,7 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
         </header>
 
         <Tabs defaultValue="analysis-dashboard" className="min-h-0 flex-1 gap-3">
-          <TabsList className="grid w-full max-w-[760px] grid-cols-3">
+          <TabsList className="grid w-full max-w-none grid-cols-3">
             <TabsTrigger value="analysis-dashboard" className="text-xs">
               <BarChart3Icon data-icon="inline-start" />
               {t.analysisDashboardTab}
@@ -169,10 +169,10 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
           </TabsContent>
 
           <TabsContent value="actors-stage" className="min-h-0 overflow-hidden">
-            <section className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)_520px]">
+            <section className="grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(360px,520px)]">
               <ActorCardRail t={t} selectedActorId={selectedActorId} onActorSelect={selectActorFromRail} />
 
-              <div className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60">
+              <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60">
                 <Tabs defaultValue="timeline" className="min-h-0 flex-1 gap-0">
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
                     <div>
@@ -215,7 +215,7 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
                 </Tabs>
               </div>
 
-              <aside className="flex min-h-0 flex-col gap-3 xl:col-span-2 2xl:col-span-1">
+              <aside className="flex min-h-0 min-w-0 flex-col gap-3 xl:col-span-2 2xl:col-span-1">
                 <SimulationStage
                   className="min-h-[460px]"
                   graphClassName="min-h-[300px]"
