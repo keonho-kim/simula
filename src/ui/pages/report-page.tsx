@@ -1,0 +1,272 @@
+import { useMemo, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import {
+  ActivityIcon,
+  BarChart3Icon,
+  BrainCircuitIcon,
+  BotIcon,
+  HomeIcon,
+  Maximize2Icon,
+  UsersRoundIcon,
+} from "lucide-react"
+import { Badge } from "@/ui/components/ui/badge"
+import { Button } from "@/ui/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/ui/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/components/ui/tabs"
+import { fetchRun } from "@/ui/api/client"
+import type { UiTexts } from "@/ui/types/i18n"
+import { useRunStore } from "@/ui/stores/run-store"
+import { ActorCardRail, ActorDetailDialog } from "@/ui/components/actors/actor-panel"
+import { EdgeDetailDialog } from "@/ui/components/graph/edge-detail-dialog"
+import { ReplayDock } from "@/ui/components/replay/replay-dock"
+import { SimulationStage } from "@/ui/components/simulation/simulation-stage"
+import {
+  buildActorOptions,
+  buildReportTimeline,
+  buildRoleDiagnostics,
+  type ActorFilter,
+  type ReportSystemRole,
+} from "@/ui/models/report/report-view-model"
+import { buildReportAnalysisViewModel } from "@/ui/models/report/report-analysis-view-model"
+import { ReportAnalysisDashboard } from "@/ui/components/report/analysis-dashboard"
+import { RoleDiagnosticsPanel } from "@/ui/components/report/role-diagnostics-panel"
+import { ReportSimulationDynamics } from "@/ui/components/report/simulation-dynamics"
+import { TimelinePanel } from "@/ui/components/report/timeline-panel"
+import { ExportButton } from "@/ui/components/report/presentation"
+
+interface ReportPageProps {
+  selectedRunId?: string
+  selectedRunStatus?: string
+  t: UiTexts
+  onHome: () => void
+  onExport: (kind: "json" | "jsonl" | "md") => void
+}
+
+export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExport }: ReportPageProps) {
+  const [replayOpen, setReplayOpen] = useState(false)
+  const [selectedActorId, setSelectedActorId] = useState<string>()
+  const [actorDetailOpen, setActorDetailOpen] = useState(false)
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string>()
+  const [actorFilter, setActorFilter] = useState<ActorFilter>("all")
+  const [systemRoleFilter, setSystemRoleFilter] = useState<ReportSystemRole>("planner")
+  const liveEvents = useRunStore((state) => state.liveEvents)
+  const storedRunState = useRunStore((state) => state.runState)
+  const runQuery = useQuery({
+    queryKey: ["runs", selectedRunId],
+    queryFn: () => fetchRun(selectedRunId ?? ""),
+    enabled: Boolean(selectedRunId),
+    retry: 30,
+    retryDelay: 500,
+  })
+  const runState = runQuery.data?.state ?? storedRunState
+  const events = runQuery.data?.events ?? liveEvents
+  const actorOptions = useMemo(() => buildActorOptions(runState), [runState])
+  const analysisModel = useMemo(() => buildReportAnalysisViewModel(runState), [runState])
+  const timelineRounds = useMemo(() => buildReportTimeline(runState, actorFilter, t), [actorFilter, runState, t])
+  const roleDiagnostics = useMemo(() => buildRoleDiagnostics(events, t), [events, t])
+  const selectedRoleSummary = roleDiagnostics.summaries.find((summary) => summary.role === systemRoleFilter)
+  const selectedRoleEvents = roleDiagnostics.events.filter((event) => event.role === systemRoleFilter)
+
+  const selectActorFromTimeline = (actorId: string) => {
+    setSelectedEdgeId(undefined)
+    setSelectedActorId(actorId)
+    setActorDetailOpen(true)
+  }
+  const selectActorFromRail = (actorId: string) => {
+    setSelectedEdgeId(undefined)
+    setSelectedActorId(actorId)
+    setActorDetailOpen(true)
+  }
+  const selectActorFromGraph = (actorId: string | undefined) => {
+    setSelectedEdgeId(undefined)
+    setSelectedActorId(actorId)
+    if (!actorId) {
+      setActorDetailOpen(false)
+    }
+  }
+  const expandActor = (actorId: string) => {
+    setSelectedEdgeId(undefined)
+    setSelectedActorId(actorId)
+    setActorDetailOpen(true)
+  }
+  const selectEdge = (edgeId: string | undefined) => {
+    setActorDetailOpen(false)
+    setSelectedActorId(undefined)
+    setSelectedEdgeId(edgeId)
+  }
+
+  return (
+    <main className="min-h-svh bg-background text-foreground">
+      <div className="mx-auto flex min-h-svh w-[95vw] max-w-none flex-col gap-4 py-3">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button aria-label={t.home} variant="ghost" size="icon" className="rounded-md" onClick={onHome}>
+              <HomeIcon />
+              <span className="sr-only">{t.home}</span>
+            </Button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate font-heading text-lg font-semibold tracking-normal">{t.report}</h1>
+                {selectedRunStatus ? (
+                  <Badge variant="secondary" className="rounded-md px-2 py-0.5 text-[11px] uppercase tracking-normal">
+                    {selectedRunStatus}
+                  </Badge>
+                ) : null}
+              </div>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{selectedRunId ?? t.noRunSelected}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <ExportButton label={t.exportJson} disabled={!selectedRunId} onClick={() => onExport("json")} />
+            <ExportButton label={t.exportJsonl} disabled={!selectedRunId} onClick={() => onExport("jsonl")} />
+            <ExportButton label={t.exportMarkdown} disabled={!selectedRunId} onClick={() => onExport("md")} />
+          </div>
+        </header>
+
+        <Tabs defaultValue="analysis-dashboard" className="min-h-0 flex-1 gap-3">
+          <TabsList className="grid w-full max-w-none grid-cols-3">
+            <TabsTrigger value="analysis-dashboard" className="text-xs">
+              <BarChart3Icon data-icon="inline-start" />
+              {t.analysisDashboardTab}
+            </TabsTrigger>
+            <TabsTrigger value="simulation-dynamics" className="text-xs">
+              <BrainCircuitIcon data-icon="inline-start" />
+              {t.simulationDynamicsTab}
+            </TabsTrigger>
+            <TabsTrigger value="actors-stage" className="text-xs">
+              <UsersRoundIcon data-icon="inline-start" />
+              {t.actorsStageTab}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="analysis-dashboard" className="min-h-0 overflow-hidden">
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+                <div>
+                  <h2 className="font-heading text-sm font-semibold">{t.reportAnalysis}</h2>
+                </div>
+              </div>
+              <ReportAnalysisDashboard events={events} model={analysisModel} t={t} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="simulation-dynamics" className="min-h-0 overflow-hidden">
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+                <div>
+                  <h2 className="font-heading text-sm font-semibold">{t.reportSimulationDynamics}</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">{t.simulationDynamicsDescription}</p>
+                </div>
+              </div>
+              <ReportSimulationDynamics model={analysisModel} t={t} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="actors-stage" className="min-h-0 overflow-hidden">
+            <section className="grid min-h-0 flex-1 gap-4 overflow-hidden xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,280px)_minmax(0,1fr)_minmax(360px,520px)]">
+              <ActorCardRail t={t} selectedActorId={selectedActorId} onActorSelect={selectActorFromRail} />
+
+              <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60">
+                <Tabs defaultValue="timeline" className="min-h-0 flex-1 gap-0">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+                    <div>
+                      <h2 className="font-heading text-sm font-semibold">{t.simulationEvents}</h2>
+                      <p className="mt-1 text-xs text-muted-foreground">{t.simulationEventsDescription}</p>
+                    </div>
+                    <TabsList className="grid grid-cols-2">
+                      <TabsTrigger value="timeline" className="text-xs">
+                        <ActivityIcon data-icon="inline-start" />
+                        {t.timeline}
+                      </TabsTrigger>
+                      <TabsTrigger value="roles" className="text-xs">
+                        <BotIcon data-icon="inline-start" />
+                        {t.roles}
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
+
+                  <TabsContent value="timeline" className="min-h-0 overflow-hidden">
+                    <TimelinePanel
+                      actorFilter={actorFilter}
+                      actorOptions={actorOptions}
+                      rounds={timelineRounds}
+                      t={t}
+                      onActorFilterChange={setActorFilter}
+                      onActorSelect={selectActorFromTimeline}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="roles" className="min-h-0 overflow-hidden">
+                    <RoleDiagnosticsPanel
+                      summaries={roleDiagnostics.summaries}
+                      selectedRole={systemRoleFilter}
+                      selectedSummary={selectedRoleSummary}
+                      events={selectedRoleEvents}
+                      t={t}
+                      onRoleChange={setSystemRoleFilter}
+                    />
+                  </TabsContent>
+                </Tabs>
+              </div>
+
+              <aside className="flex min-h-0 min-w-0 flex-col gap-3 xl:col-span-2 2xl:col-span-1">
+                <SimulationStage
+                  className="min-h-[460px]"
+                  graphClassName="min-h-[300px]"
+                  t={t}
+                  selectedActorId={selectedActorId}
+                  onActorSelect={selectActorFromGraph}
+                  onActorExpand={expandActor}
+                  selectedEdgeId={selectedEdgeId}
+                  onEdgeSelect={selectEdge}
+                  showActorPopover
+                  actions={
+                    <Button aria-label={t.maximizeReplay} variant="ghost" size="icon" onClick={() => setReplayOpen(true)}>
+                      <Maximize2Icon />
+                    </Button>
+                  }
+                />
+                <ReplayDock t={t} />
+              </aside>
+            </section>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <Dialog open={replayOpen} onOpenChange={setReplayOpen}>
+        <DialogContent className="max-h-[92svh] overflow-hidden sm:max-w-[1400px]">
+          <DialogHeader>
+            <DialogTitle>{t.simulationReplay}</DialogTitle>
+          </DialogHeader>
+          <div className="flex min-h-0 flex-col gap-3">
+            <SimulationStage
+              className="min-h-[70svh]"
+              graphClassName="min-h-[58svh]"
+              t={t}
+              selectedActorId={selectedActorId}
+              onActorSelect={selectActorFromGraph}
+              onActorExpand={expandActor}
+              selectedEdgeId={selectedEdgeId}
+              onEdgeSelect={selectEdge}
+              showActorPopover
+            />
+            <ReplayDock t={t} />
+          </div>
+        </DialogContent>
+      </Dialog>
+      {actorDetailOpen ? <ActorDetailDialog
+        t={t}
+        actorId={selectedActorId}
+        open={actorDetailOpen}
+        onOpenChange={(open) => setActorDetailOpen(open)}
+      /> : null}
+      {selectedEdgeId ? <EdgeDetailDialog t={t} edgeId={selectedEdgeId} onOpenChange={(open) => !open && setSelectedEdgeId(undefined)} /> : null}
+    </main>
+  )
+}

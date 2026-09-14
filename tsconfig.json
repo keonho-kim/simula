@@ -1,9 +1,26 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./packages/shared" },
-    { "path": "./packages/core" },
-    { "path": "./apps/server" },
-    { "path": "./apps/web" }
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "types": ["bun", "node", "vite/client"]
+  },
+  "include": [
+    "src",
+    "apps/server/tests",
+    "apps/web/e2e",
+    "packages/core/tests",
+    "playwright.config.ts"
   ]
 }

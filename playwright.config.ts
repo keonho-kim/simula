@@ -11,7 +11,7 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "PORT=4011 SIMULA_DATA_DIR=.e2e-runs SIMULA_SETTINGS_PATH=.e2e-settings.json bun --filter @simula/server start",
+        "SIMULA_TEST_MODEL=1 SIMULA_ENV_TOML_PATH=.e2e-env.toml PORT=4011 SIMULA_DATA_DIR=.e2e-runs SIMULA_SETTINGS_PATH=.e2e-settings.json bun --filter @simula/server start",
       port: 4011,
       reuseExistingServer: false,
     },

@@ -6,7 +6,7 @@
 
 Settings resolve in this order:
 
-1. built-in defaults from `packages/core/src/settings`
+1. built-in defaults from `src/backend/core/settings`
 2. `env.toml`, or the file pointed to by `SIMULA_ENV_TOML_PATH`
 3. `settings.json`, or the file pointed to by `SIMULA_SETTINGS_PATH`
 4. values saved through `PUT /api/settings`

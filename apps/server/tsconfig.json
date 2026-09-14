@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "composite": true,
     "target": "ES2023",
     "lib": ["ES2023", "DOM"],
     "module": "ESNext",
@@ -9,11 +8,12 @@
     "skipLibCheck": true,
     "noEmit": true,
     "verbatimModuleSyntax": true,
-    "types": ["bun"]
+    "types": ["bun"],
+    "ignoreDeprecations": "6.0",
+    "baseUrl": "../..",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
-  "references": [
-    { "path": "../../packages/shared" },
-    { "path": "../../packages/core" }
-  ],
-  "include": ["src", "tests"]
+  "include": ["../../src/backend","../../src/shared","tests"]
 }

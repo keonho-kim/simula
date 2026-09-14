@@ -1,0 +1,84 @@
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual"
+import type { ActorRound } from "@/ui/models/actors/actor-conversation"
+import type { UiTexts } from "@/ui/types/i18n"
+import { ScrollArea } from "@/ui/components/ui/scroll-area"
+import { Separator } from "@/ui/components/ui/separator"
+import { ActorMessageCard } from "./message-card"
+
+export function VirtualActorHistory({ rounds, t, onActorSelect }: {
+  rounds: ActorRound[]; t: UiTexts; onActorSelect: (id: string) => void
+}) {
+  "use no memo"
+  const [focusedIndex, setFocusedIndex] = useState<number>()
+  const root = useRef<HTMLDivElement>(null)
+  const rows = useMemo(() => rounds.flatMap((round) => [
+    { key: `round:${round.roundIndex}`, roundIndex: round.roundIndex, message: undefined },
+    ...round.messages.map((message) => ({ key: `message:${message.id}`, roundIndex: round.roundIndex, message })),
+  ]), [rounds])
+  const getScrollElement = useCallback(() => root.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]') ?? null, [])
+  // This non-compiled component keeps the mutable virtualizer local; it is never passed to memoized children.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    rangeExtractor: (range) => {
+      const visible = defaultRangeExtractor(range)
+      return focusedIndex !== undefined && focusedIndex < rows.length && !visible.includes(focusedIndex)
+        ? [...visible, focusedIndex].sort((a, b) => a - b) : visible
+    },
+    getScrollElement,
+    getItemKey: useCallback((index: number) => rows[index]!.key, [rows]),
+    estimateSize: (index) => rows[index]?.message ? 220 : 30,
+    overscan: 8,
+    gap: 16,
+    paddingStart: 20,
+    paddingEnd: 20,
+    anchorTo: "end",
+    followOnAppend: true,
+    scrollEndThreshold: 1,
+    useAnimationFrameWithResizeObserver: true,
+  })
+  useLayoutEffect(() => { virtualizer.scrollToEnd() }, [virtualizer])
+  useLayoutEffect(() => {
+    const element = getScrollElement()
+    if (!element) return
+    let width = element.clientWidth
+    const observer = new ResizeObserver(() => {
+      if (element.clientWidth !== width) {
+        width = element.clientWidth
+        virtualizer.measure()
+      }
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [getScrollElement, virtualizer])
+
+  return <div ref={root} className="relative min-h-[560px] flex-1"
+    onFocusCapture={(event) => {
+      const index = (event.target as HTMLElement).closest<HTMLElement>("[data-index]")?.dataset.index
+      setFocusedIndex(index === undefined ? undefined : Number(index))
+    }}
+    onBlurCapture={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusedIndex(undefined)
+    }}>
+    <div className="absolute inset-0">
+      <ScrollArea className="size-full">
+        {rows.length === 0 ? <p role="status" className="px-5 py-12 text-center text-sm text-muted-foreground">{t.actorRailEmpty}</p> : null}
+        <div data-history-items={rows.length} className="relative w-full" style={{ height: virtualizer.getTotalSize(), overflowAnchor: "none" }}>
+          {virtualizer.getVirtualItems().map((item) => {
+            const row = rows[item.index]!
+            return <div key={item.key} data-index={item.index} ref={virtualizer.measureElement}
+              className="absolute left-4 right-4 top-0 sm:left-5 sm:right-5" style={{ transform: `translateY(${item.start}px)` }}>
+              {row.message ? <ActorMessageCard {...row.message} targets={row.message.targets.join(", ")} t={t} onActorSelect={onActorSelect} /> :
+                <div className="flex items-center gap-3 py-2">
+                  <Separator className="flex-1" />
+                  <h3 id={`actor-round-${row.roundIndex}`} className="shrink-0 text-[11px] font-medium tracking-[0.16em] text-muted-foreground">ROUND {row.roundIndex}</h3>
+                  <Separator className="flex-1" />
+                </div>}
+            </div>
+          })}
+        </div>
+      </ScrollArea>
+    </div>
+  </div>
+}

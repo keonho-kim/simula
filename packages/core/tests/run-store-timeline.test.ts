@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { RunStore } from "../src/storage/run-store"
-import type { Interaction } from "@simula/shared"
+import { RunStore } from "@/backend/storage/runs/run-store"
+import type { Interaction } from "@/shared"
 
 describe("run store graph timeline", () => {
   test("creates live graph frames for actors and each recorded interaction", async () => {

@@ -120,3 +120,18 @@ bun run test:e2e
 - Keep `output.samples/` as committed reference data only.
 - Update workflow docs when stage order or run event behavior changes.
 - Update `packages/shared` types and this documentation together when public event or API shapes change.
+
+## Dependency Update Constraints
+
+Direct dependencies were checked against npm stable releases on 2026-09-15. Root and web
+workspace declarations use matching versions, with `bun.lock` recording resolved packages.
+
+Two dependencies intentionally remain on the newest compatible release line:
+
+- TypeScript 6.0.3: typescript-eslint 8.70.0 supports `>=4.8.4 <6.1.0`, so TypeScript 7.0.2
+  is outside its supported range. See the [supported dependency versions](https://typescript-eslint.io/users/dependency-versions/).
+- KaTeX 0.16.47: rehype-katex 7.0.1 depends on `katex ^0.16.0`. Keep the directly imported
+  stylesheet on the renderer's version line rather than mixing it with KaTeX 0.18 assets.
+
+Recheck these constraints before a future upgrade. `bun outdated --recursive` lists both
+packages as newer upstream releases; this does not mean their current integration supports them.

@@ -19,14 +19,18 @@ run artifacts.
 identity, state, intent, memory, relationships, and available actions. The system advances the
 world through focused rounds instead of producing one opaque narrative in a single pass.
 
-The current implementation is a Bun monorepo with:
+Production source is organized by runtime and responsibility:
 
-| Package | Responsibility |
+| Source | Responsibility |
 | --- | --- |
-| `apps/server` | Bun API server, run storage, settings persistence, sample loading, SSE streaming |
-| `apps/web` | Vite React app for scenario creation, settings, live simulation, replay, and report export |
-| `packages/core` | scenario parsing, settings validation, LangGraph workflow, reporting, and file storage |
-| `packages/shared` | shared API, event, scenario, run, graph, and simulation types |
+| `src/backend/api`, `runtime` | Bun HTTP API, SSE transport, run lifecycle and event publication |
+| `src/backend/integrations`, `storage` | Model providers, settings files, run artifacts and sample loading |
+| `src/backend/core/simulation`, `scenario`, `settings`, `story-builder`, `prompts` | Simulation workflows, domain parsing, configuration rules and prompt construction |
+| `src/ui` | Pages, components, hooks, stores, presentation models, browser API and storage |
+| `src/shared` | Shared API, event, scenario, run, graph and simulation types |
+
+Bun workspace commands and tests remain in `apps/*` and `packages/*`.
+See [architecture](./docs/architecture.md) for placement and dependency rules.
 
 ## Core Concepts
 

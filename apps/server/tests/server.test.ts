@@ -2,31 +2,55 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { MODEL_ROLES, defaultSettings } from "@simula/core"
-import type { LLMSettings, ModelProvider } from "@simula/shared"
+import { MODEL_ROLES } from "@/backend/core/settings/constants"
+import { defaultSettings } from "@/backend/core/settings/defaults"
+import type { LLMSettings, ModelProvider } from "@/shared"
 
 const port = 3917
 const baseUrl = `http://localhost:${port}`
+const repoRoot = join(import.meta.dir, "../../..")
+const serverEntry = join(repoRoot, "src/backend/index.ts")
 let dataDir = ""
 let settingsPath = ""
 let processRef: ReturnType<typeof Bun.spawn>
+let serverStdout = ""
+let serverStderr = ""
 
 beforeAll(async () => {
   dataDir = await mkdtemp(join(tmpdir(), "simula-server-runs-"))
   settingsPath = join(dataDir, "settings.json")
-  processRef = Bun.spawn(["bun", "apps/server/src/index.ts"], {
-    cwd: process.cwd(),
+  processRef = Bun.spawn(["bun", serverEntry], {
+    cwd: repoRoot,
     env: {
       ...process.env,
       PORT: String(port),
       SIMULA_DATA_DIR: dataDir,
       SIMULA_SETTINGS_PATH: settingsPath,
+      SIMULA_TEST_MODEL: "1",
     },
     stdout: "pipe",
     stderr: "pipe",
   })
+  if (processRef.stdout instanceof ReadableStream) {
+    collectStream(processRef.stdout, (chunk) => {
+      serverStdout += chunk
+    })
+  }
+  if (processRef.stderr instanceof ReadableStream) {
+    collectStream(processRef.stderr, (chunk) => {
+      serverStderr += chunk
+    })
+  }
   await waitForServer()
-})
+  try {
+    await fetch(`${baseUrl}/api/settings`)
+  } catch (error) {
+    throw new Error(
+      `Server started but settings endpoint was unreachable: ${String(error)}\nstdout:\n${serverStdout}\nstderr:\n${serverStderr}`,
+      { cause: error }
+    )
+  }
+}, 15_000)
 
 afterAll(async () => {
   processRef.kill()
@@ -57,12 +81,20 @@ describe("server API", () => {
     })
     const { run } = (await createResponse.json()) as { run: { id: string } }
 
-    const eventsResponse = await fetch(`${baseUrl}/api/runs/${run.id}/events`)
+    const eventsController = new AbortController()
+    const eventsResponse = await fetch(`${baseUrl}/api/runs/${run.id}/events`, { signal: eventsController.signal })
     expect(eventsResponse.ok).toBe(true)
-    await fetch(`${baseUrl}/api/runs/${run.id}/start`, { method: "POST" })
+    const eventPump = continueRoundsFromEventStream(run.id, eventsResponse)
 
-    const completed = await pollRun(run.id, "completed")
-    expect(completed.status).toBe("completed")
+    try {
+      await fetch(`${baseUrl}/api/runs/${run.id}/start`, { method: "POST" })
+
+      const completed = await pollRun(run.id, "completed")
+      expect(completed.status).toBe("completed")
+    } finally {
+      eventsController.abort()
+      await eventPump.catch(() => undefined)
+    }
 
     const report = await fetch(`${baseUrl}/api/runs/${run.id}/report`).then((response) => response.text())
     expect(report).toContain("# Simula Report")
@@ -71,6 +103,11 @@ describe("server API", () => {
       response.text()
     )
     expect(exported).toContain("graph.delta")
+    const interactions = exported.trim().split("\n")
+      .map(line => JSON.parse(line) as { type: string; interaction?: { thought?: string } })
+      .filter(event => event.type === "interaction.recorded")
+    expect(interactions.length).toBeGreaterThan(0)
+    expect(interactions.every(event => Boolean(event.interaction?.thought))).toBe(true)
   })
 
   test("fails explicitly when provider keys are missing", async () => {
@@ -263,6 +300,9 @@ describe("server API", () => {
 
 async function waitForServer(): Promise<void> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (processRef.exitCode !== null) {
+      throw new Error(`Server exited before startup.\nstdout:\n${serverStdout}\nstderr:\n${serverStderr}`)
+    }
     try {
       const response = await fetch(`${baseUrl}/api/runs`)
       if (response.ok) {
@@ -272,7 +312,64 @@ async function waitForServer(): Promise<void> {
       await Bun.sleep(100)
     }
   }
-  throw new Error("Server did not start.")
+  throw new Error(`Server did not start.\nstdout:\n${serverStdout}\nstderr:\n${serverStderr}`)
+}
+
+function collectStream(stream: ReadableStream<Uint8Array>, onChunk: (chunk: string) => void): void {
+  void (async () => {
+    const reader = stream.getReader()
+    const decoder = new TextDecoder()
+    while (true) {
+      const result = await reader.read()
+      if (result.done) {
+        break
+      }
+      onChunk(decoder.decode(result.value, { stream: true }))
+    }
+  })()
+}
+
+async function continueRoundsFromEventStream(runId: string, response: Response): Promise<void> {
+  const reader = response.body?.getReader()
+  if (!reader) {
+    return
+  }
+  const decoder = new TextDecoder()
+  let buffer = ""
+  while (true) {
+    const result = await reader.read()
+    if (result.done) {
+      return
+    }
+    buffer += decoder.decode(result.value, { stream: true })
+    let frameEnd = buffer.indexOf("\n\n")
+    while (frameEnd >= 0) {
+      const frame = buffer.slice(0, frameEnd)
+      buffer = buffer.slice(frameEnd + 2)
+      await continueAfterCompletedRound(runId, frame)
+      frameEnd = buffer.indexOf("\n\n")
+    }
+  }
+}
+
+async function continueAfterCompletedRound(runId: string, frame: string): Promise<void> {
+  const eventType = frame.split("\n").find((line) => line.startsWith("event: "))?.slice("event: ".length)
+  if (eventType !== "round.completed") {
+    return
+  }
+  const dataLine = frame.split("\n").find((line) => line.startsWith("data: "))
+  if (!dataLine) {
+    return
+  }
+  const event = JSON.parse(dataLine.slice("data: ".length)) as { roundIndex?: number }
+  if (!Number.isInteger(event.roundIndex)) {
+    return
+  }
+  await fetch(`${baseUrl}/api/runs/${runId}/continue`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roundIndex: event.roundIndex }),
+  })
 }
 
 async function pollRun(runId: string, status: "completed" | "failed") {

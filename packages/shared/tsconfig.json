@@ -1,16 +1,18 @@
 {
   "compilerOptions": {
-    "composite": true,
     "target": "ES2023",
     "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
     "skipLibCheck": true,
-    "declaration": true,
-    "emitDeclarationOnly": true,
-    "outDir": "dist",
-    "verbatimModuleSyntax": true
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+    "ignoreDeprecations": "6.0",
+    "baseUrl": "../..",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["../../src/shared"]
 }

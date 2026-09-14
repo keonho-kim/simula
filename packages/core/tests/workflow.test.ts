@@ -2,15 +2,10 @@ import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import {
-  RunStore,
-  applyInjectedEventContext,
-  applyInteractionContext,
-  actorPromptContext,
-  emptyActorContext,
-} from "../src"
-import { buildTimelineFrame } from "../src/simulation/timeline"
-import type { ActorState, Interaction, RunEvent } from "@simula/shared"
+import { RunStore } from "@/backend/storage/runs/run-store"
+import { applyInjectedEventContext, applyInteractionContext, actorPromptContext, emptyActorContext } from "@/backend/core/simulation/actors/memory"
+import { buildTimelineFrame } from "@/backend/core/simulation/outputs/timeline"
+import type { ActorState, Interaction, RunEvent } from "@/shared"
 
 describe("simulation workflow", () => {
   test("keeps no-action context solitary to the source actor", () => {

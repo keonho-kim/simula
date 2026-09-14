@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import type { ActorState, Interaction, SimulationState } from "@simula/shared"
-import { renderReport } from "../src/simulation/reporting"
+import type { ActorState, Interaction, SimulationState } from "@/shared"
+import { renderReport } from "@/backend/core/simulation/outputs/report"
 
 describe("report rendering", () => {
   test("renders a concise benchmark report without raw actor utterances or diagnostics", () => {

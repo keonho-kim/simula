@@ -123,3 +123,10 @@ The system prefers explicit failure over silent fallback:
 - architecture: [`architecture.md`](./architecture.md)
 - configuration: [`configuration.md`](./configuration.md)
 - workflow stages: [`workflows/README.md`](./workflows/README.md)
+
+## Actor History
+
+Actor decisions and interactions can include `thought`, the actor graph's explicit thought-step
+output. New interactions carry it alongside the existing action and content fields, so live SSE,
+JSONL history, and final state share one message source. This is not provider reasoning telemetry.
+Previously stored interactions may omit thought; the UI does not infer it from intent or model logs.

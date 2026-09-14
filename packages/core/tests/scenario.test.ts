@@ -1,40 +1,30 @@
 import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
-import {
-  parseScenarioDocument,
-  validateSettings,
-  defaultSettings,
-  normalizeSettings,
-  plannerDigestSummary,
-  compactLines,
-  compactText,
-  renderPromptLanguageGuide,
-  renderPromptReasoningGuide,
-  renderOutputLengthGuide,
-  renderStoryBuilderChangeSummaryPrompt,
-  renderStoryBuilderPrompt,
-  resolveRoleSettings,
-  scalePromptLimit,
-  listScenarioSamples,
-  streamDraftScenario,
-  storyBuilderFallbackDraft,
-  withRolePromptGuide,
-} from "../src"
-import { buildExactChoiceSettings, exactChoiceMessages, reasoningOnlyWarning } from "../src/llm"
-import { readUsage } from "../src/llm/usage"
-import { actorMemorySentenceLimit, renderActorMemoryLengthGuide } from "../src/simulation/actor-memory"
-import { emitModelTelemetry } from "../src/simulation/events"
-import { actorPrompts } from "../src/simulation/roles/actor/prompts"
-import { buildActorDecision, isValidActorAction, isValidActorTarget } from "../src/simulation/roles/actor/state"
-import { actorCardPrompts } from "../src/simulation/roles/generator/card-prompts"
-import { coordinatorPrompts } from "../src/simulation/roles/coordinator/prompts"
-import { eventInjectionAllowedOutputs } from "../src/simulation/event-injection"
-import { buildRepairChoicePrompt } from "../src/simulation/roles/repair"
-import type { ActorGraphState } from "../src/simulation/roles/actor"
-import { initialActorCardState } from "../src/simulation/roles/generator/card-state"
-import { parseActorRoster, renderRosterPrompt } from "../src/simulation/roles/generator/roster"
-import type { WorkflowState } from "../src/simulation/state"
-import type { PlannedEvent, SimulationState } from "@simula/shared"
+import { parseScenarioDocument } from "@/backend/core/scenario"
+import { validateSettings } from "@/backend/core/settings/validate"
+import { defaultSettings } from "@/backend/core/settings/defaults"
+import { normalizeSettings } from "@/backend/core/settings/normalize"
+import { plannerDigestSummary } from "@/backend/core/simulation/planning/digest"
+import { compactLines, compactText, renderOutputLengthGuide, scalePromptLimit } from "@/backend/core/prompts/prompt"
+import { renderPromptLanguageGuide, renderPromptReasoningGuide, withRolePromptGuide } from "@/backend/core/prompts/language"
+import { renderStoryBuilderChangeSummaryPrompt, renderStoryBuilderPrompt, streamDraftScenario, storyBuilderFallbackDraft } from "@/backend/core/story-builder"
+import { resolveRoleSettings } from "@/backend/core/settings/resolve"
+import { listScenarioSamples } from "@/backend/storage/samples"
+import { buildExactChoiceSettings, exactChoiceMessages, reasoningOnlyWarning } from "@/backend/integrations/llm"
+import { readUsage } from "@/backend/integrations/llm/usage"
+import { actorMemorySentenceLimit, renderActorMemoryLengthGuide } from "@/backend/core/simulation/actors/memory"
+import { emitModelTelemetry } from "@/backend/core/simulation/events/telemetry"
+import { actorPrompts } from "@/backend/core/simulation/roles/actor/prompts"
+import { buildActorDecision, isValidActorAction, isValidActorTarget } from "@/backend/core/simulation/roles/actor/state"
+import { actorCardPrompts } from "@/backend/core/simulation/roles/generator/cards/prompts"
+import { coordinatorPrompts } from "@/backend/core/simulation/roles/coordinator/prompts"
+import { eventInjectionAllowedOutputs } from "@/backend/core/simulation/events/injection"
+import { buildRepairChoicePrompt } from "@/backend/core/simulation/roles/repair"
+import type { ActorGraphState } from "@/backend/core/simulation/roles/actor"
+import { initialActorCardState } from "@/backend/core/simulation/roles/generator/cards/state"
+import { parseActorRoster, renderRosterPrompt } from "@/backend/core/simulation/roles/generator/roster"
+import type { WorkflowState } from "@/backend/core/simulation/workflow/state"
+import type { PlannedEvent, SimulationState } from "@/shared"
 
 describe("scenario parsing", () => {
   test("parses frontmatter controls and body", () => {
@@ -387,6 +377,7 @@ describe("scenario parsing", () => {
         ...state.trace,
         action: "no_action",
         target: "actor-2",
+        thought: "Wait until the evidence is clearer.",
         intent: "Hold position.",
         message: "We need to talk.",
       },
@@ -395,6 +386,7 @@ describe("scenario parsing", () => {
     expect(noAction.decisionType).toBe("no_action")
     expect(noAction.targetActorIds).toEqual([])
     expect(noAction.message).toBeUndefined()
+    expect(noAction.thought).toBe("Wait until the evidence is clearer.")
 
     const action = buildActorDecision({
       ...state,

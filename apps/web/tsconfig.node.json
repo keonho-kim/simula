@@ -10,10 +10,9 @@
     /* Bundler mode */
     "moduleResolution": "bundler",
     "ignoreDeprecations": "6.0",
-    "baseUrl": ".",
+    "baseUrl": "../..",
     "paths": {
-      "@/*": ["./src/*"],
-      "@simula/shared": ["../../packages/shared/src/index.ts"]
+      "@/*": ["src/*"]
     },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,

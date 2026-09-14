@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import type { ActorState, Interaction, SimulationState } from "../src"
-import { calculateNetworkDynamics, calculateRunAnalysis } from "../src"
+import type { ActorState, Interaction, SimulationState } from "@/shared"
+import { calculateNetworkDynamics, calculateRunAnalysis } from "@/shared"
 
 describe("run analysis", () => {
   test("computes directed network metrics and standard graph structure metrics", () => {

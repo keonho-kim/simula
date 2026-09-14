@@ -1,6 +1,6 @@
 # Simulation Root Workflow
 
-The server starts a run by calling `runSimulation` from `packages/core`.
+The server starts a run by calling `runSimulation` from `src/backend/core/simulation/workflow/graph.ts`.
 
 ## Input
 

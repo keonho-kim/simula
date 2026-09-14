@@ -1,0 +1,78 @@
+import type { ActorCardStep, RunEvent } from "@/shared"
+import { invokeRoleTextWithMetrics } from "@/backend/integrations/llm"
+import { withRolePromptGuide } from "@/backend/core/prompts/language"
+import { emitModelTelemetry } from "@/backend/core/simulation/events/telemetry"
+import type { ActorCardPromptBuilder } from "@/backend/core/simulation/roles/generator/cards/prompts"
+import type { ActorCardGraphState } from "@/backend/core/simulation/roles/generator/cards/state"
+
+const MAX_ATTEMPTS = 5
+
+export function createActorCardStepNode(
+  step: ActorCardStep,
+  promptBuilder: ActorCardPromptBuilder
+): (state: ActorCardGraphState) => Promise<Partial<ActorCardGraphState>> {
+  return async (state) => {
+    const result = await runActorCardTextNode(state, step, promptBuilder)
+    return {
+      card: {
+        ...state.card,
+        [step]: result.text,
+      },
+      retryCounts: {
+        ...state.retryCounts,
+        [step]: result.retries,
+      },
+    }
+  }
+}
+
+async function runActorCardTextNode(
+  state: ActorCardGraphState,
+  step: ActorCardStep,
+  promptBuilder: ActorCardPromptBuilder
+): Promise<{ text: string; retries: number }> {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    const prompt = withRolePromptGuide(promptBuilder(state), {
+      language: state.scenario.language,
+      settings: state.settings,
+      role: "generator",
+    })
+    const result = await invokeRoleTextWithMetrics(state.settings, "generator", step, attempt, prompt)
+    await emitModelTelemetry(state.runId, result, state.emit)
+    const response = normalizePlainText(result.text)
+    if (response) {
+      await state.emit({
+        type: "model.message",
+        runId: state.runId,
+        timestamp: timestamp(),
+        role: "generator",
+        content: `actor-${state.actorIndex} ${step}: ${response}`,
+      })
+      return { text: response, retries: attempt - 1 }
+    }
+
+    await emitEmptyAttempt(state, step, attempt)
+  }
+
+  throw new Error(`generator.actor-${state.actorIndex}.${step} failed after ${MAX_ATTEMPTS} empty responses.`)
+}
+
+async function emitEmptyAttempt(state: ActorCardGraphState, step: ActorCardStep, attempt: number): Promise<void> {
+  const event: RunEvent = {
+    type: "log",
+    runId: state.runId,
+    timestamp: timestamp(),
+    level: "warn",
+    message: `generator.actor-${state.actorIndex}.${step} returned empty text on attempt ${attempt}/${MAX_ATTEMPTS}.`,
+  }
+  await state.emit(event)
+}
+
+function normalizePlainText(value: string): string {
+  const trimmed = value.replace(/```[\s\S]*?```/g, "").replace(/\s+/g, " ").trim()
+  return trimmed.length > 1200 ? trimmed.slice(0, 1200).trim() : trimmed
+}
+
+function timestamp(): string {
+  return new Date().toISOString()
+}
