@@ -67,11 +67,19 @@ Current event families include:
 - run lifecycle: `run.started`, `run.completed`, `run.failed`
 - node lifecycle: `node.started`, `node.completed`, `node.failed`
 - model output and metrics: `model.message`, `model.metrics`
+- accepted scenario artifacts: `board.updated`
 - actor and interaction activity: `actors.ready`, `actor.message`, `interaction.recorded`
 - round and graph updates: `round.completed`, `graph.delta`
 - report and log updates: `report.delta`, `log`
 
 Every event includes `runId` and `timestamp`.
+
+`board.updated` carries typed configuration, digest sections, validated planned events,
+action batches, the accepted roster, and individual completed actor cards. It is emitted
+from existing generation results without additional model calls. The browser retains these
+artifacts outside its rolling telemetry window and uses them for clickable Scenario Board
+items. Progress counts completed work units, not elapsed time: four digest sections, the
+event batch, roster, configured actions and actors, and the first round handoff.
 
 ## State Contract
 

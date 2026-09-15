@@ -15,6 +15,9 @@ export function createPlannerStepNode(
   emit: (event: RunEvent) => Promise<void>
 ): (state: WorkflowState) => Promise<Partial<WorkflowState>> {
   return async (state) => {
+    if (step === "coreSituation") await emit({ type: "board.updated", runId: state.runId, timestamp: timestamp(), update: {
+      kind: "config", actorCount: state.scenario.controls.numCast, actionCount: state.scenario.controls.actionsPerType * 4,
+    } })
     const currentTrace = getPlannerTrace(state.simulation)
     const partial = plannerTracePartial(currentTrace)
     const result = await runPlannerTextNode(state, step, promptBuilder, partial, emit)
@@ -27,6 +30,8 @@ export function createPlannerStepNode(
       },
     }
 
+    if (step !== "majorEvents") await emit({ type: "board.updated", runId: state.runId, timestamp: timestamp(),
+      update: { kind: "digest", key: step, content: result.text } })
     return {
       simulation: upsertRoleTrace(state.simulation, nextTrace),
     }

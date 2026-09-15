@@ -1,3 +1,4 @@
+import type { ScenarioBoardUpdate } from "./scenario-board"
 import type { ActorReadyView, GraphTimelineFrame } from "@/shared/graph"
 import type {
   ActorCardStep,
@@ -54,6 +55,7 @@ export interface ModelMetrics {
 }
 
 export type RunEvent =
+  | { type: "board.updated"; runId: string; timestamp: string; update: ScenarioBoardUpdate }
   | { type: "run.started"; runId: string; timestamp: string }
   | { type: "node.started"; runId: string; timestamp: string; nodeId: string; label: string }
   | { type: "node.completed"; runId: string; timestamp: string; nodeId: string; label: string }

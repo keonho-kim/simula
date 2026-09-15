@@ -11,6 +11,8 @@ export function createGeneratorRosterNode(
   return async (state) => {
     const plannerDigest = plannerDigestSummary(state.simulation.plan, state.scenario.text)
     const actorRoster = await createActorRoster(state, plannerDigest, emit)
+    await emit({ type: "board.updated", runId: state.runId, timestamp: new Date().toISOString(),
+      update: { kind: "roster", actors: actorRoster } })
 
     return {
       simulation: {
@@ -61,14 +63,14 @@ async function runActorCardsSequentially(
   return cards
 }
 
-function runActorCardGraphForEntry(
+async function runActorCardGraphForEntry(
   state: WorkflowState,
   entry: ActorRosterEntry,
   fullRoster: ActorRosterEntry[],
   plannerDigest: string,
   emit: (event: RunEvent) => Promise<void>
 ) {
-  return runActorCardGraph({
+  const card = await runActorCardGraph({
     runId: state.runId,
     scenario: state.scenario,
     settings: state.settings,
@@ -79,4 +81,7 @@ function runActorCardGraphForEntry(
     plannerDigest,
     emit,
   })
+  await emit({ type: "board.updated", runId: state.runId, timestamp: new Date().toISOString(),
+    update: { kind: "actor", id: "actor-" + entry.index, card } })
+  return card
 }

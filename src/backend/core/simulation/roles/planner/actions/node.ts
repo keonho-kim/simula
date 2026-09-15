@@ -40,6 +40,8 @@ export function createPlannerActionsNode(emit: (event: RunEvent) => Promise<void
           for (const action of actions) catalog[action.id] = action
           await emit({ type: "model.message", runId: state.runId, timestamp: new Date().toISOString(), role: "planner",
             content: `actionCatalog ${visibility}: ${actions.map((action) => `${action.id} = ${action.label}`).join("; ")}` })
+          await emit({ type: "board.updated", runId: state.runId, timestamp: new Date().toISOString(),
+            update: { kind: "actions", actions } })
           accepted = true
           break
         }

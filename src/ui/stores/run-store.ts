@@ -1,3 +1,4 @@
+import { emptyScenarioBoard, updateScenarioBoard, type ScenarioBoardState } from "@/ui/models/simulation/scenario-board"
 import { emptyMetricData, appendMetricData, type MetricData } from "@/ui/models/metrics/metric-data"
 import { emptyConversationData, updateConversationData, type ConversationData } from "@/ui/models/actors/conversation-data"
 import { eventsWithTimelineFrames, mergeTimeline } from "@/ui/stores/run/timeline"
@@ -6,6 +7,7 @@ import { appendRetainedEvents, actorEvents, conversationEvents, mergeLiveEvents,
 import type { GraphTimelineFrame, RunEvent, RunManifest, SimulationState } from "@/shared"
 
 interface RunUiState {
+  scenarioBoard: ScenarioBoardState
   selectedRunId?: string
   liveEvents: RunEvent[]
   metricData: MetricData
@@ -30,6 +32,7 @@ export const useRunStore = create<RunUiState>((set) => {
   const actorIds = new Set<string>()
   const conversationIds = new Set<string>()
   return {
+    scenarioBoard: emptyScenarioBoard(),
     metricData: emptyMetricData(),
     conversationData: emptyConversationData(),
     selectedRunId: undefined,
@@ -46,7 +49,7 @@ export const useRunStore = create<RunUiState>((set) => {
       metricIds.clear()
       actorIds.clear()
       conversationIds.clear()
-      set({ metricData: emptyMetricData(), conversationData: emptyConversationData(), liveEvents: [], metricEvents: [], actorEvents: [], conversationEvents: [], stageEvents: [], timeline: [], runState: undefined, replayIndex: 0 })
+      set({ scenarioBoard: emptyScenarioBoard(), metricData: emptyMetricData(), conversationData: emptyConversationData(), liveEvents: [], metricEvents: [], actorEvents: [], conversationEvents: [], stageEvents: [], timeline: [], runState: undefined, replayIndex: 0 })
     },
     pushEvent: (event) =>
       set((state) => applyEvents(state, [event], metricIds, actorIds, conversationIds)),
@@ -78,6 +81,7 @@ function applyEvents(state: RunUiState, events: RunEvent[], metricIds: Set<strin
   const retainedMetrics = appendRetainedEvents(state.metricEvents, nextMetricEvents, metricIds)
   const retainedConversation = appendRetainedEvents(state.conversationEvents, conversationEvents(events), conversationIds)
   return {
+    scenarioBoard: updateScenarioBoard(state.scenarioBoard, events),
     liveEvents: mergeLiveEvents(state.liveEvents, eventsWithTimelineFrames(events, nextTimeline)),
     stageEvents: mergeLiveEvents(state.stageEvents, stageEvents(events)),
     metricEvents: retainedMetrics,

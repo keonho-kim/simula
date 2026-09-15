@@ -30,6 +30,8 @@ import { useRunEventStream } from "@/ui/hooks/use-run-event-stream"
 
 type ViewMode = "home" | "simulation" | "report"
 
+const ScenarioBoard = lazy(() => import("@/ui/components/simulation/scenario-board").then(module => ({ default: module.ScenarioBoard })))
+
 const ActorRail = lazy(() =>
   import("@/ui/components/actors/actor-rail").then((module) => ({ default: module.ActorRail }))
 )
@@ -393,6 +395,7 @@ function App() {
         </div>
 
         <Suspense fallback={null}>
+          <ScenarioBoard key={selectedRunId} t={t} />
           {actorDetailOpen ? (
             <ActorDetailDialog
               t={t}

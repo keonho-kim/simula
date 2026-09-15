@@ -15,7 +15,12 @@ export function createPlannerGraph(emit: (event: RunEvent) => Promise<void>) {
       createPlannerStepNode("simulationDirection", plannerPrompts.simulationDirection, emit)
     )
     .addNode("planner.majorEvents", createPlannerStepNode("majorEvents", plannerPrompts.majorEvents, emit))
-    .addNode("planner.apply", plannerNode)
+    .addNode("planner.apply", async (state) => {
+      const result = await plannerNode(state)
+      await emit({ type: "board.updated", runId: state.runId, timestamp: new Date().toISOString(),
+        update: { kind: "events", events: result.simulation!.plan!.majorEvents } })
+      return result
+    })
     .addNode("planner.actionCatalog", createPlannerActionsNode(emit))
     .addEdge(START, "planner.coreSituation")
     .addEdge("planner.coreSituation", "planner.actorPressures")

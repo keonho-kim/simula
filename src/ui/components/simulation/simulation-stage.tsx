@@ -1,18 +1,13 @@
 import { memo, useMemo, useState, type ReactNode } from "react"
-import type { RunEvent } from "@/shared"
 import { Badge } from "@/ui/components/ui/badge"
 import { Progress } from "@/ui/components/ui/progress"
 import { useRunStore } from "@/ui/stores/run-store"
 import { GraphView } from "@/ui/components/graph/graph-view"
 import { buildSimulationEventNotice } from "@/ui/models/simulation/simulation-event-notice"
 import { SimulationEventNoticeCard } from "@/ui/components/simulation/simulation-event-notice-card"
-import {
-  buildSimulationInterlude,
-} from "@/ui/models/simulation/simulation-stage-interlude"
 import { buildSimulationStageStatus } from "@/ui/models/simulation/simulation-stage-status"
 import type { UiTexts } from "@/ui/types/i18n"
 import { cn } from "@/ui/lib/class-names"
-import { SimulationInterludeOverlay } from "@/ui/components/simulation/interlude/overlay"
 
 const noopActorSelect = () => undefined
 const noopEdgeSelect = () => undefined
@@ -51,10 +46,8 @@ export const SimulationStage = memo(function SimulationStage({
   const status = useMemo(() => buildSimulationStageStatus(liveEvents, runState, timeline), [liveEvents, runState, timeline])
   const completedNodes = liveEvents.filter((event) => event.type === "node.completed").length
   const progress = Math.min(100, completedNodes * 25)
-  const interlude = useMemo(() => buildSimulationInterlude(liveEvents, t), [liveEvents, t])
   const eventNotice = useMemo(() => buildSimulationEventNotice(liveEvents), [liveEvents])
   const visibleEventNotice = eventNotice && !dismissedEventNoticeKeys.has(eventNotice.dismissalKey) ? eventNotice : undefined
-  const terminal = hasTerminalEvent(liveEvents)
   const dismissEventNotice = (dismissalKey: string) => {
     setDismissedEventNoticeKeys((current) => new Set(current).add(dismissalKey))
   }
@@ -104,29 +97,9 @@ export const SimulationStage = memo(function SimulationStage({
               actors={runState?.actors}
             />
           </div>
-          <SimulationInterludeOverlay
-            interlude={interlude}
-            terminal={terminal}
-            t={t}
-          />
           <SimulationEventNoticeCard notice={visibleEventNotice} t={t} onDismiss={dismissEventNotice} />
         </div>
       </div>
     </section>
   )
 })
-
-function hasTerminalEvent(events: RunEvent[]): boolean {
-  const runStartedIndex = lastIndexOf(events, (event) => event.type === "run.started")
-  const scopedEvents = runStartedIndex < 0 ? events : events.slice(runStartedIndex)
-  return scopedEvents.some((event) => event.type === "run.completed" || event.type === "run.failed" || event.type === "run.canceled")
-}
-
-function lastIndexOf<T>(items: T[], predicate: (item: T) => boolean): number {
-  for (let index = items.length - 1; index >= 0; index -= 1) {
-    if (predicate(items[index] as T)) {
-      return index
-    }
-  }
-  return -1
-}

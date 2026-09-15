@@ -17,7 +17,7 @@ and replay behavior. This change targets repeated computation and unrelated subs
 | `src/ui/components/graph/overlays/` | Node/pointer positioning and edge preview presentation. |
 | `src/ui/models/actors/actor-details.ts` | Actor detail, history, and reasoning projections without React rendering. |
 | `src/ui/components/actors/history/` | Memoized message cards, detail subscriptions, and measured virtual scrolling. |
-| `src/ui/components/simulation/interlude/` | Stage-progress overlay presentation. |
+| `src/ui/components/simulation/scenario-board.tsx` | Scenario artifact board and on-demand detail rendering. |
 
 Graph, actor rail, stage, and metric panel boundaries are memoized. Message cards receive stable
 primitive props, so an appended interaction does not re-render unchanged cards. Graph camera
@@ -230,3 +230,5 @@ then verifies that the simulation resumes and only two continuation requests adv
 Production builds use Vite's dependency-aware chunking. The prior forced vendor partition caused
 an initialization-order error in the built browser app; removing that override was verified in a
 source-free deployment using the built API server and browser workflows.
+
+The Scenario Board uses an incremental artifact projection in `models/simulation/scenario-board.ts`. Telemetry-only batches preserve its reference. Only the selected artifact mounts Markdown detail content; the four board columns display titles and status markers. The dialog spans 92% of viewport width, scrolls horizontally on narrow screens, and uses a discrete text progress bar without continuous animation. Reading an artifact delays automatic closure after the first event until the reader closes details or selects View simulation; terminal events always close the board.
