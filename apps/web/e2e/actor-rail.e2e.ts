@@ -96,3 +96,33 @@ test("pauses following when scrolled up and resumes only at the bottom", async (
   await expect(rail.getByRole("heading", { name: "ROUND 3", exact: true })).toHaveCount(1)
   await expect.poll(bottomGap).toBeLessThanOrEqual(1)
 })
+
+test("Planner action codes resolve to Korean badges to the left of speech", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("simula.language", "ko"))
+  const { settings } = await (await page.request.get("/api/settings")).json()
+  settings.providers.openai.apiKey = "unit-test-api-key"
+  await page.request.put("/api/settings", { data: { settings } })
+  await page.goto("/")
+  const chooser = page.waitForEvent("filechooser")
+  await page.getByRole("button", { name: /시나리오 업로드/ }).click()
+  await (await chooser).setFiles({ name: "action-catalog.md", mimeType: "text/markdown", buffer: Buffer.from("민수와 지수가 안전한 출시를 논의합니다.") })
+  await page.getByLabel("등장 인원").fill("3")
+  await page.getByLabel("최대 라운드").fill("1")
+  await page.getByRole("button", { name: "시작하기", exact: true }).click()
+  await page.getByRole("button", { name: "계속 보기", exact: true }).click()
+  const card = page.getByRole("complementary").getByRole("article").first()
+  const badge = card.locator('[data-slot="badge"]')
+  await expect(badge).toHaveText("근거 요청")
+  const positions = await card.evaluate((element) => {
+    const badge = element.querySelector('[data-slot="badge"]')!.getBoundingClientRect()
+    const speech = element.querySelector('[aria-label="발화"]')!.getBoundingClientRect()
+    return { badgeRight: badge.right, speechLeft: speech.left }
+  })
+  expect(positions.badgeRight).toBeLessThanOrEqual(positions.speechLeft)
+  await expect(card).not.toContainText("Public move")
+  const { runId } = await page.evaluate(() => JSON.parse(sessionStorage.getItem("simula.run-session")!))
+  const detail = await (await page.request.get(`/api/runs/${runId}`)).json()
+  expect(Object.keys(detail.state.plan.actionCatalog)).toHaveLength(12)
+  const interaction = detail.state.interactions.find((item: { decisionType: string }) => item.decisionType === "action")
+  expect(detail.state.plan.actionCatalog[interaction.actionCode].label).toBe(interaction.actionType)
+})

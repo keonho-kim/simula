@@ -1,3 +1,4 @@
+import { Badge } from "@/ui/components/ui/badge"
 import { memo } from "react"
 import { Button } from "@/ui/components/ui/button"
 import type { ActorMessage } from "@/ui/models/actors/actor-conversation"
@@ -13,8 +14,12 @@ export const ActorMessageCard = memo(function ActorMessageCard({ t, onActorSelec
       </header>
       <div className="flex flex-col gap-3 whitespace-pre-wrap break-words text-sm leading-6 [overflow-wrap:anywhere]">
         {message.thought ? <p aria-label={t.actorRailThought} className="text-muted-foreground">{message.thought}</p> : null}
-        <p aria-label={t.actorRailAction} className="font-medium text-black">{message.decisionType === "no_action" ? t.actorRailNoAction : message.action}</p>
-        {message.decisionType !== "no_action" && message.content ? <p aria-label={t.actorRailSpeech} className="text-black">{message.content}</p> : null}
+        <div className="flex items-start gap-2">
+          <Badge variant="secondary" aria-label={t.actorRailAction} className="h-auto max-w-[45%] whitespace-normal break-words rounded-full px-2.5 py-0.5 text-xs leading-5">
+            {message.decisionType === "no_action" ? t.actorRailNoAction : message.action}
+          </Badge>
+          {message.decisionType !== "no_action" && message.content ? <p aria-label={t.actorRailSpeech} className="min-w-0 flex-1 text-black">{message.content}</p> : null}
+        </div>
       </div>
     </article>
   )

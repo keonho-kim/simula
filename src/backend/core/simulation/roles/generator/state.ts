@@ -1,7 +1,5 @@
-import type { ActionVisibility, ActorAction, ActorState } from "@/shared"
+import type { ActionCatalog, ActorState } from "@/shared"
 import { emptyActorContext } from "@/backend/core/simulation/actors/memory"
-
-const VISIBILITIES: ActionVisibility[] = ["public", "semi-public", "private", "solitary"]
 
 export interface ActorCard {
   role: string
@@ -11,7 +9,7 @@ export interface ActorCard {
   preference: string
 }
 
-export function buildActor(index: number, card: ActorCard, plannerDigest: string, actionsPerType: number): ActorState {
+export function buildActor(index: number, card: ActorCard, plannerDigest: string, actionCatalog: ActionCatalog): ActorState {
   const preference = card.preference || `Shape the outcome of ${firstSentence(plannerDigest).toLowerCase()}.`
   const personality = card.personality || "Pragmatic under pressure."
   return {
@@ -23,57 +21,12 @@ export function buildActor(index: number, card: ActorCard, plannerDigest: string
     preference,
     privateGoal: preference,
     intent: `${personality} Preference: ${preference}`,
-    actions: buildActorActions(index, card, actionsPerType),
+    actions: Object.values(actionCatalog),
     context: emptyActorContext(),
     contextSummary: "",
     memory: [],
     relationships: {},
   }
-}
-
-export function buildActionCatalog(actors: ActorState): string[]
-export function buildActionCatalog(actors: ActorState[]): string[]
-export function buildActionCatalog(actors: ActorState | ActorState[]): string[] {
-  const actorList = Array.isArray(actors) ? actors : [actors]
-  return actorList.flatMap((actor) => actor.actions.map((action) => `${actor.name}: ${action.label}`))
-}
-
-function buildActorActions(
-  actorIndex: number,
-  card: ActorCard,
-  actionsPerType: number
-): ActorAction[] {
-  return VISIBILITIES.flatMap((visibility) =>
-    Array.from({ length: actionsPerType }, (_, index) => buildAction(actorIndex, visibility, index + 1, card))
-  )
-}
-
-function buildAction(
-  actorIndex: number,
-  visibility: ActionVisibility,
-  actionIndex: number,
-  card: ActorCard
-): ActorAction {
-  return {
-    id: `actor-${actorIndex}-${visibility}-${actionIndex}`,
-    visibility,
-    label: `${visibilityLabel(visibility)} ${actionIndex} about ${card.preference}`,
-    intentHint: card.preference,
-    expectedOutcome: `${card.name} creates a ${visibility} consequence shaped by ${card.personality}.`,
-  }
-}
-
-function visibilityLabel(visibility: ActionVisibility): string {
-  if (visibility === "public") {
-    return "Public move"
-  }
-  if (visibility === "semi-public") {
-    return "Semi-public exchange"
-  }
-  if (visibility === "private") {
-    return "Private encounter"
-  }
-  return "Solitary reflection"
 }
 
 function firstSentence(value: string): string {

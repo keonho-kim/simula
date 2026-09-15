@@ -106,6 +106,22 @@ function unitTestResponse(input: ChatInput): string {
   if (prompt.includes("Generator roster.")) {
     return unitTestRoster(prompt)
   }
+  if (prompt.includes("Planner actionCatalog.")) {
+    const scope = prompt.match(/Scope: ([^\n]+)/)?.[1] ?? "public"
+    const count = Number(prompt.match(/Batch size: (\d+)/)?.[1] ?? 3)
+    const korean = prompt.includes("Language: Korean.")
+    const names: Record<string, [string[], string[]]> = {
+      public: [["근거 요청", "대안 제안", "공개 이의 제기"], ["Request evidence", "Propose an alternative", "Challenge an assumption"]],
+      "semi-public": [["실무 의견 수렴", "공동 계획 조정", "그룹 중재 요청"], ["Gather team feedback", "Coordinate a joint plan", "Request group mediation"]],
+      private: [["비공개 협상", "우려 확인", "개별 지원 요청"], ["Negotiate privately", "Clarify concerns", "Request individual support"]],
+      solitary: [["자료 검토", "입장 재평가", "대응안 준비"], ["Review evidence", "Reconsider a position", "Prepare a response"]],
+    }
+    const options = names[scope]![korean ? 0 : 1]
+    const used = prompt.split("Already defined labels (do not duplicate):")[1] ?? ""
+    return options.filter((name) => !used.includes(`- ${name}`)).slice(0, count).map((name) => korean
+      ? `${name} | 판단에 필요한 정보나 협력이 부족할 때 | 관련 정보를 얻거나 다음 행동을 준비한다`
+      : `${name} | Use when information or cooperation is needed | Seek evidence or prepare the next step`).join("\n")
+  }
   if (prompt.includes("Planner majorEvents")) {
     return [
       "Release Risk Review - The team must decide whether the release can proceed under visible uncertainty.",

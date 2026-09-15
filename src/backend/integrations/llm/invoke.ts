@@ -33,6 +33,7 @@ export type RoleTextStep =
   | ObserverTraceStep
   | GeneratorRosterStep
   | ActorCardStep
+  | "actionCatalog"
   | "draft"
 
 export async function invokeRoleText(

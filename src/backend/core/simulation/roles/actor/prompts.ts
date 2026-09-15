@@ -49,6 +49,7 @@ ${targetPromptContext(state, partial.action)}`,
     `Actor action.
 Return exactly one allowed output.
 Use an action id when this actor should act this round.
+Compare the listed usage conditions with your current goal; choose a concrete mechanism rather than repeating the first option.
 Use no_action only when holding position is the best choice.
 Stay within channels this actor can realistically use from their role, relationships, workplace, public position, or current event context.
 Do not jump to private or semi-public contact with distant executives, officials, or field actors unless the scenario context makes that access plausible.
@@ -110,7 +111,7 @@ function actionPromptOutputs(state: ActorGraphState): string {
     targetActors(state).length === 0
       ? state.actor.actions.filter((action) => action.visibility === "solitary")
       : state.actor.actions
-  return actions.map((action) => `- ${action.id} (${action.label}). ${action.expectedOutcome}`).join("\n")
+  return actions.map((action) => `- ${action.id} (${action.label}). Use when: ${action.intentHint} Effect: ${action.expectedOutcome}`).join("\n")
 }
 
 function targetPromptOutputs(state: ActorGraphState, actionId: string | undefined): string {

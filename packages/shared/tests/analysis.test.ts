@@ -190,7 +190,7 @@ function createState(interactions: Interaction[]): SimulationState {
     plan: {
       interpretation: "Interpretation",
       backgroundStory: "Background",
-      actionCatalog: [],
+      actionCatalog: {},
       majorEvents: [
         {
           id: "event-1",

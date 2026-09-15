@@ -689,7 +689,7 @@ function buildDigestSimulation(): SimulationState {
         conflictDynamics: "Public and private pressure collide.",
         simulationDirection: "Resolve responsibility.",
       },
-      actionCatalog: [],
+      actionCatalog: {},
       majorEvents: [
         {
           id: "event-1",

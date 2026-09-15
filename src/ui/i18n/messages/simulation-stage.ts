@@ -1,5 +1,6 @@
 export const simulationStageTexts = {
   en: {
+    plannerActionCatalog: "Action catalog",
     simulationStageTitle: "Simulation Stage",
     simulationStageDescription: "Actor relationships and interaction strength as a live network.",
     simulationFrame: "Frame",
@@ -76,6 +77,7 @@ export const simulationStageTexts = {
     metricAttempt: "Attempt",
   },
   ko: {
+    plannerActionCatalog: "행동 목록 정의",
     simulationStageTitle: "시뮬레이션 무대",
     simulationStageDescription: "인물 관계와 상호작용 강도를 실시간 관계망으로 보여줍니다.",
     simulationFrame: "프레임",

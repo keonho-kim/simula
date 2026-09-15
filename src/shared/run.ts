@@ -41,6 +41,7 @@ export interface ModelMetrics {
     | ObserverTraceStep
     | GeneratorRosterStep
     | ActorCardStep
+    | "actionCatalog"
     | "draft"
   attempt: number
   ttftMs: number

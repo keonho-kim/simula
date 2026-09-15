@@ -50,7 +50,7 @@ export function applyPlannerTrace(state: SimulationState, scenario: ScenarioInpu
       interpretation: scenarioDigest.coreSituation,
       backgroundStory: renderScenarioDigest(scenarioDigest),
       scenarioDigest,
-      actionCatalog: [],
+      actionCatalog: {},
       majorEvents,
     },
   }

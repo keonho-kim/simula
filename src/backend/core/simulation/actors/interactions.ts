@@ -38,6 +38,7 @@ export function buildInteraction(
     thought: sanitizeActorVisibleText(decision.thought, actors),
     sourceActorId: actor.id,
     targetActorIds: decision.targetActorIds,
+    actionCode: decision.actionId,
     actionType: actionLabel(actor, decision.actionId) ?? decision.decisionType,
     content: sanitizeActorVisibleText(interactionContent(actor, actors, event, decision), actors),
     eventId: event.id,

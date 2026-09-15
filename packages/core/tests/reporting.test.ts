@@ -47,7 +47,7 @@ function createState(): SimulationState {
         conflictDynamics: "Private pressure drives the action chain.",
         simulationDirection: "Resolve the leadership path.",
       },
-      actionCatalog: [],
+      actionCatalog: {},
       majorEvents: [{
         id: "event-1",
         title: "Board decision",

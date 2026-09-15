@@ -165,3 +165,16 @@ Frontend naming and helper placement are documented in [the web guide](../apps/w
 - contracts: [`contracts.md`](./contracts.md)
 - configuration: [`configuration.md`](./configuration.md)
 - workflow stages: [`workflows/README.md`](./workflows/README.md)
+
+
+## Planner-owned action catalog
+
+`roles/planner/actions` owns a separate `planner.actionCatalog` stage after the planner digest and
+major events have been applied. `prompts.ts` requests short action definitions, `catalog.ts` parses
+and validates them and assigns codes, and `node.ts` coordinates model calls, retries, and telemetry.
+This is one workflow stage with focused functions, not an additional nested graph.
+
+The plan is the owner of the code-to-definition map. Generator actor assembly references its
+values rather than synthesizing per-actor template names. Actor decisions use the existing exact
+choice and repair path. Scope and expected effect are resolved by code; the Actor still generates
+its own context-dependent thought, intent, target, and message.

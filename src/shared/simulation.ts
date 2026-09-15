@@ -27,6 +27,8 @@ export interface ActorRosterEntry {
   roleSeed: string
 }
 
+export type ActionCatalog = Record<string, ActorAction>
+
 export interface ActorAction {
   id: string
   visibility: ActionVisibility
@@ -96,6 +98,7 @@ export interface Interaction {
   sourceActorId: string
   targetActorIds: string[]
   actionType: string
+  actionCode?: string
   content: string
   eventId: string
   visibility: ActionVisibility
@@ -166,7 +169,7 @@ export interface SimulationState {
     interpretation: string
     backgroundStory: string
     scenarioDigest?: ScenarioDigest
-    actionCatalog: string[]
+    actionCatalog: ActionCatalog
     majorEvents: PlannedEvent[]
   }
   actors: ActorState[]

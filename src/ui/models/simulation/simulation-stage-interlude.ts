@@ -130,7 +130,7 @@ function latestInterludeSignal(events: RunEvent[], startIndex: number, t?: UiTex
       const parsed = parseModelMessageStep(event.content)
       return {
         role: event.role,
-        stepLabel: parsed.step ? traceStepLabel(parsed.step) : t?.interludeThinking ?? "Thinking",
+        stepLabel: parsed.step ? traceStepLabel(parsed.step, t) : t?.interludeThinking ?? "Thinking",
         message: parsed.content || event.content,
       }
     }
@@ -194,7 +194,7 @@ function interludeDetailFromEvent(event: RunEvent, index: number, t?: UiTexts): 
       id: `model-${index}`,
       stageId,
       title: stageId === "actorCards" ? t?.actorCards ?? "Actor Cards" : roleLabel(event.role, t),
-      stepLabel: parsed.step ? traceStepLabel(parsed.step) : t?.interludeThinking ?? "Thinking",
+      stepLabel: parsed.step ? traceStepLabel(parsed.step, t) : t?.interludeThinking ?? "Thinking",
       message: parsed.content || event.content,
     }
   }
@@ -302,7 +302,8 @@ function roleLabel(role: ModelRole, t?: UiTexts): string {
   return t?.simulationStageTitle ?? "Simulation"
 }
 
-function traceStepLabel(step: string): string {
+function traceStepLabel(step: string, t?: UiTexts): string {
+  if (step.split(" ")[0] === "actionCatalog") return t?.plannerActionCatalog ?? "Action catalog"
   return step
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/[-_]+/g, " ")

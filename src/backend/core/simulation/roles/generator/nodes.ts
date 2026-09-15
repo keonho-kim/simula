@@ -1,7 +1,7 @@
 import type { ActorRosterEntry, RunEvent } from "@/shared"
 import type { WorkflowState } from "@/backend/core/simulation/workflow/state"
 import { plannerDigestSummary } from "@/backend/core/simulation/planning/digest"
-import { buildActionCatalog, buildActor, type ActorCard } from "@/backend/core/simulation/roles/generator/state"
+import { buildActor, type ActorCard } from "@/backend/core/simulation/roles/generator/state"
 import { runActorCardGraph } from "@/backend/core/simulation/roles/generator/cards/graph"
 import { createActorRoster } from "@/backend/core/simulation/roles/generator/roster"
 
@@ -30,22 +30,18 @@ export function createGeneratorCardsNode(
     if (!actorRoster?.length) {
       throw new Error("generator.cards requires generator.roster to complete first.")
     }
+    const catalog = state.simulation.plan?.actionCatalog
+    if (!catalog || !Object.keys(catalog).length) throw new Error("generator.cards requires planner.actionCatalog first.")
     const cards = state.scenario.controls.fastMode
       ? await Promise.all(actorRoster.map((entry) => runActorCardGraphForEntry(state, entry, actorRoster, plannerDigest, emit)))
       : await runActorCardsSequentially(state, actorRoster, plannerDigest, emit)
     const actors = cards.map((card, index) =>
-      buildActor(actorRoster[index]?.index ?? index + 1, card, plannerDigest, state.scenario.controls.actionsPerType)
+      buildActor(actorRoster[index]?.index ?? index + 1, card, plannerDigest, catalog)
     )
 
     return {
       simulation: {
         ...state.simulation,
-        plan: state.simulation.plan
-          ? {
-              ...state.simulation.plan,
-              actionCatalog: buildActionCatalog(actors),
-            }
-          : state.simulation.plan,
         actors,
       },
     }
