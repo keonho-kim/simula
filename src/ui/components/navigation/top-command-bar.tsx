@@ -1,3 +1,4 @@
+import { Switch } from "@/ui/components/ui/switch"
 import {
   ArrowRightIcon,
   HomeIcon,
@@ -7,6 +8,9 @@ import { Button } from "@/ui/components/ui/button"
 import type { UiTexts } from "@/ui/types/i18n"
 
 interface TopCommandBarProps {
+  autoContinue?: boolean
+  onAutoContinueChange?: (enabled: boolean) => void
+  autoContinueDisabled?: boolean
   selectedRunStatus?: string
   showReportShortcut?: boolean
   t: UiTexts
@@ -15,6 +19,9 @@ interface TopCommandBarProps {
 }
 
 export function TopCommandBar({
+  autoContinue,
+  onAutoContinueChange,
+  autoContinueDisabled,
   selectedRunStatus,
   showReportShortcut = false,
   t,
@@ -44,12 +51,20 @@ export function TopCommandBar({
             </p>
           </div>
         </div>
+        <div className="flex items-center gap-3">
+        {onAutoContinueChange && !showReportShortcut ? (
+          <label className="flex items-center gap-2 text-xs">
+            <Switch checked={autoContinue} disabled={autoContinueDisabled} onCheckedChange={onAutoContinueChange} />
+            {t.autoContinue}
+          </label>
+        ) : null}
         {showReportShortcut && onReport ? (
           <Button className="rounded-md uppercase tracking-normal" onClick={onReport}>
             {t.report}
             <ArrowRightIcon data-icon="inline-end" />
           </Button>
         ) : null}
+        </div>
       </div>
     </header>
   )

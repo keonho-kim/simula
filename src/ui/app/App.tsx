@@ -85,7 +85,7 @@ function App() {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>()
   const [reportConfirmRunId, setReportConfirmRunId] = useState<string>()
   const [scenarioPreviewOpen, setScenarioPreviewOpen] = useState(false)
-  const { autoContinue, setAutoContinue, roundPromptIndex, roundAction, continueRound, cancelCurrentRun,
+  const { autoContinue, setAutoContinue, skipRoundDelay, roundPromptIndex, roundAction, continueRound, cancelCurrentRun,
     resetRoundProgression, completed } = useRoundProgression(selectedRunId, t)
   const uploadInputRef = useRef<HTMLInputElement>(null)
   const [scenarioDraft, setScenarioDraft] = useState<ScenarioDraft>({
@@ -355,6 +355,9 @@ function App() {
       <div className="mx-auto flex min-h-svh w-full max-w-[1720px] flex-col px-4 py-3 lg:px-6">
         <TopCommandBar
           selectedRunStatus={selectedRunStatus}
+          autoContinue={autoContinue}
+          onAutoContinueChange={setAutoContinue}
+          autoContinueDisabled={Boolean(roundAction)}
           showReportShortcut={selectedRunCompleted}
           t={t}
           onHome={() => {
@@ -431,7 +434,7 @@ function App() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        {roundPromptIndex !== undefined ? (
+        {roundPromptIndex !== undefined && !skipRoundDelay ? (
           <RoundContinuationDialog
             key={`${selectedRunId}:${roundPromptIndex}`}
             autoContinue={autoContinue}

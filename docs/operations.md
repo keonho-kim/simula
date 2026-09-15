@@ -155,3 +155,13 @@ Two dependencies intentionally remain on the newest compatible release line:
 
 Recheck these constraints before a future upgrade. `bun outdated --recursive` lists both
 packages as newer upstream releases; this does not mean their current integration supports them.
+
+
+## Automatic round progression
+
+The first three consecutive successful automatic round approvals each show the five-second
+countdown. Subsequent rounds in that streak continue immediately without opening the round
+modal. The simulation header retains an auto-continue switch so this mode can be stopped.
+Turning auto-continue off, a failed continuation, or selecting/creating another run resets the
+streak. The tab session retains the confirmed streak across reloads, together with acknowledged
+rounds. Manual approvals do not advance the automatic streak.

@@ -100,3 +100,61 @@ test("reload keeps the active simulation and automatic round progression", async
   await expect(page.getByRole("dialog", { name: "Move to the Report page?" })).toBeVisible({ timeout: 20000 })
   expect(continuations).toBe(2)
 })
+
+test("three automatic approvals remove later waits and disabling resets the streak", async ({ page }) => {
+  test.setTimeout(45000)
+  await page.addInitScript(() => localStorage.setItem("simula.language", "en"))
+  const { settings } = await (await page.request.get("/api/settings")).json()
+  settings.providers.openai.apiKey = "unit-test-api-key"
+  await page.request.put("/api/settings", { data: { settings } })
+  const approvals: number[] = []
+  let fourth: import("@playwright/test").Route | undefined
+  // The test model completes its scenario after three rounds. Feed later boundary events
+  // explicitly to verify the frontend's longer continuation policy.
+  const nextBoundary = (round: number) => page.evaluate(async (round) => {
+    const path = "/src/ui/stores/run-store.ts"
+    const { useRunStore } = await import(path)
+    const store = useRunStore.getState()
+    store.pushEvent(round === 5
+      ? { type: "run.completed", runId: store.selectedRunId, timestamp: new Date().toISOString(), stopReason: "simulation_done" }
+      : { type: "round.completed", runId: store.selectedRunId, timestamp: new Date().toISOString(), roundIndex: round + 1 })
+  }, round)
+  await page.route("**/api/runs/*/continue", async route => {
+    const round = route.request().postDataJSON().roundIndex
+    approvals.push(round)
+    if (round === 4) fourth = route
+    else {
+      await route.fulfill({ json: { ok: true } })
+      await nextBoundary(round)
+    }
+  })
+  await page.goto("/")
+  const chooser = page.waitForEvent("filechooser")
+  await page.getByRole("button", { name: /Upload My Scenario/ }).click()
+  await (await chooser).setFiles({ name: "automatic-streak.md", mimeType: "text/markdown", buffer: Buffer.from("A team discusses a release.") })
+  await page.getByLabel("Cast size").fill("3")
+  await page.getByLabel("Max round").fill("6")
+  await page.getByRole("switch", { name: "Auto continue" }).check()
+  await page.getByRole("button", { name: "Start", exact: true }).click()
+  const prompt = page.getByRole("dialog", { name: "Round complete" })
+  for (const round of [1, 2, 3]) {
+    await expect(prompt).toBeVisible()
+    await expect(prompt.getByRole("status")).toHaveText("Next round in 5s")
+    expect(approvals).toHaveLength(round - 1)
+    await expect.poll(() => approvals.includes(round), { timeout: 8000 }).toBe(true)
+  }
+  // Round four must send its approval before another five-second delay could elapse.
+  await expect.poll(() => approvals, { timeout: 3000 }).toEqual([1, 2, 3, 4])
+  await expect(prompt).toHaveCount(0)
+  await fourth!.fulfill({ json: { ok: true } })
+  const headerToggle = page.locator("header").getByRole("switch", { name: "Auto continue" })
+  await expect(headerToggle).toBeEnabled()
+  await headerToggle.uncheck()
+  await nextBoundary(4)
+  await expect(prompt).toBeVisible()
+  await expect(prompt.getByRole("button", { name: "Continue", exact: true })).toBeEnabled()
+  await prompt.getByRole("switch", { name: "Auto continue" }).check()
+  await expect(prompt.getByRole("status")).toHaveText("Next round in 5s")
+  await expect.poll(() => approvals.includes(5), { timeout: 8000 }).toBe(true)
+  await expect(prompt).toHaveCount(0)
+})

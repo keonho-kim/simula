@@ -3,6 +3,7 @@ export interface RunSession {
   viewMode?: "home" | "simulation" | "report"
   autoContinue?: boolean
   handledRounds?: number[]
+  automaticStreak?: number
 }
 const key = "simula.run-session"
 export function readRunSession(): RunSession {
