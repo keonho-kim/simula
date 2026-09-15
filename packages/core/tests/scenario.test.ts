@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { parseScenarioDocument } from "@/backend/core/scenario"
 import { validateSettings } from "@/backend/core/settings/validate"
 import { defaultSettings } from "@/backend/core/settings/defaults"
@@ -105,7 +105,7 @@ describe("scenario parsing", () => {
   })
 
   test("loads all scenario samples with load levels", async () => {
-    const samples = await listScenarioSamples(join(process.cwd(), "senario.samples"))
+    const samples = await listScenarioSamples(fileURLToPath(new URL("../../../senario.samples", import.meta.url)))
     const sampleNames = new Set(samples.map((sample) => sample.name))
 
     expect(samples.every((sample) => ["low", "middle", "high"].includes(sample.controls.loadLevel ?? ""))).toBe(true)

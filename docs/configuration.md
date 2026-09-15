@@ -19,10 +19,25 @@ Saved settings are normalized before writing. When the client sends a masked API
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `PORT` | `3001` | Bun API server port |
-| `SIMULA_DATA_DIR` | `runs` under the server working directory | live run artifact root |
-| `SIMULA_SETTINGS_PATH` | `settings.json` under the server working directory | saved settings file |
-| `SIMULA_ENV_TOML_PATH` | `env.toml` under the server working directory | local TOML settings file |
+| `SIMULA_DATA_DIR` | `runs` under the repository root | live run artifact root |
+| `SIMULA_SETTINGS_PATH` | `settings.json` under the repository root | saved settings file |
+| `SIMULA_ENV_TOML_PATH` | `env.toml` under the repository root | local TOML settings file |
 | `SIMULA_SAMPLE_DIR` | repository `senario.samples` directory | scenario sample root |
+
+Runtime paths are resolved from the backend module's location in the checkout, independent of the
+launch working directory. Relative path overrides are also relative to the repository root;
+explicit absolute overrides are preserved. No developer home directory is embedded in the source.
+
+The `runs/` directory name is also used by backend source modules. Git ignore rules must target
+`/runs/` and `/apps/*/runs/` explicitly; an unanchored `runs/` rule excludes required source files
+and makes fresh checkouts fail with a module-not-found error.
+
+Earlier versions resolved defaults and relative overrides from the launch directory, commonly
+`apps/server` when started through workspace scripts. Existing files are not moved automatically.
+To keep that data location, explicitly set `SIMULA_DATA_DIR=apps/server/runs`,
+`SIMULA_SETTINGS_PATH=apps/server/settings.json`, and/or `SIMULA_ENV_TOML_PATH=apps/server/env.toml`.
+Otherwise place the desired files in the repository root. Check custom `SIMULA_*` values inherited
+from the shell if an error still names an unexpected absolute path.
 
 For web development, `SIMULA_API_ORIGIN` controls the Vite proxy target for `/api`.
 

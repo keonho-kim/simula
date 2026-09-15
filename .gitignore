@@ -34,7 +34,8 @@ apps/*/.e2e-settings.json
 apps/*/.e2e-runs/
 test-results/
 playwright-report/
-runs/
+/runs/
+/apps/*/runs/
 runtime.sqlite
 runtime.db
 data/db/*.sqlite

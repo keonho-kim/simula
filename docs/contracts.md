@@ -130,3 +130,11 @@ Actor decisions and interactions can include `thought`, the actor graph's explic
 output. New interactions carry it alongside the existing action and content fields, so live SSE,
 JSONL history, and final state share one message source. This is not provider reasoning telemetry.
 Previously stored interactions may omit thought; the UI does not infer it from intent or model logs.
+
+
+### Portable artifact paths
+
+Manifest `artifactPaths` are relative to the configured run data root (for example,
+`<run_id>/report.md`), not to a hardcoded `runs/` directory or a developer's home. The store derives
+these paths when reading a manifest, so copied run directories do not retain stale path metadata.
+Actual file reads and writes always use the configured data root.

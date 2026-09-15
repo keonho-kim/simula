@@ -88,3 +88,21 @@ function interaction(
     expectation: "Targets respond.",
   }
 }
+
+test("artifact paths remain relative to the configured data root after relocating a manifest", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "simula-portable-store-"))
+  try {
+    const store = new RunStore({ rootDir })
+    const { mkdir, writeFile } = await import("node:fs/promises")
+    await mkdir(store.runDir("copied-run"), { recursive: true })
+    await writeFile(store.path("copied-run", "manifest.json"), JSON.stringify({
+      id: "copied-run", status: "created", createdAt: "2026-01-01T00:00:00Z", scenarioName: "sample.md",
+      artifactPaths: { report: "runs/copied-run/report.md" },
+    }))
+    const manifest = await store.readManifest("copied-run")
+    expect(manifest.artifactPaths.report).toBe("copied-run/report.md")
+    expect(join(store.rootDir, manifest.artifactPaths.report)).toBe(store.path("copied-run", "report.md"))
+  } finally {
+    await rm(rootDir, { recursive: true, force: true })
+  }
+})
