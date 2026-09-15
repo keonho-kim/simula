@@ -9,13 +9,14 @@ import { scenarioBoardColumns } from "@/ui/models/simulation/scenario-board-item
 import type { UiTexts } from "@/ui/types/i18n"
 import { cn } from "@/ui/lib/class-names"
 
+const PROGRESS_DOTS = [0, 1, 2, 3, 4]
+
 export const ScenarioBoard = memo(function ScenarioBoard({ t }: { t: UiTexts }) {
   const board = useRunStore(state => state.scenarioBoard)
   const [selectedId, setSelectedId] = useState<string>()
   const columns = useMemo(() => scenarioBoardColumns(board, t), [board, t])
   const selected = columns.flatMap(column => column.items).find(item => item.id === selectedId)
   const progress = boardProgress(board)
-  const filled = Math.floor((progress ?? 0) / 5)
   const activeColumn = columns.findIndex(column => column.items.some(item => !item.fields))
   const activeIds = new Set(board.ready || board.terminal ? [] : board.activeActorIds.length ? board.activeActorIds : [columns[activeColumn]?.items.find(item => !item.fields)?.id])
   const selectedDraft = selected ? board.drafts[selected.id] : undefined
@@ -32,8 +33,15 @@ export const ScenarioBoard = memo(function ScenarioBoard({ t }: { t: UiTexts }) 
         <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
           <DialogTitle>{t.scenarioBoardTitle}</DialogTitle>
           <div role="progressbar" aria-label={t.boardProgress} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress}
+            data-running={!board.ready && !board.terminal}
             className="font-mono text-xs tabular-nums text-muted-foreground">
-            <span aria-hidden="true">[ {">".repeat(filled)}{"·".repeat(20 - filled)}{progress !== undefined ? ` ${progress}%` : ""} ]</span>
+            <span aria-hidden="true" className="inline-flex items-center gap-2">
+              <span>[</span>
+              <span>{PROGRESS_DOTS.map(index => <span key={index} className="scenario-progress-dot" style={{ animationDelay: `${index * -90}ms` }}>·</span>)}</span>
+              <span className="inline-block w-[4ch] text-center">{progress === undefined ? "—" : `${progress}%`}</span>
+              <span>{PROGRESS_DOTS.map(index => <span key={index} className="scenario-progress-dot" style={{ animationDelay: `${(index + 5) * -90}ms` }}>·</span>)}</span>
+              <span>]</span>
+            </span>
           </div>
         </header>
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">

@@ -326,6 +326,20 @@ select {
   50% { opacity: 0.8; }
 }
 
+.scenario-progress-dot {
+  display: inline-block;
+}
+
+[data-running="true"] .scenario-progress-dot {
+  animation: scenario-progress-wave 1.4s ease-in-out infinite;
+}
+
+@keyframes scenario-progress-wave {
+  0%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-2px); }
+  75% { transform: translateY(2px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
