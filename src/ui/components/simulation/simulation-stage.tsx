@@ -91,7 +91,7 @@ export const SimulationStage = memo(function SimulationStage({
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
         <Progress value={progress} className="h-1.5" />
         <div className={cn("relative min-h-[560px] flex-1", graphClassName)}>
-          <div className={cn("h-full min-h-[560px] transition duration-300", interlude && "grayscale opacity-55")}>
+          <div className="h-full min-h-[560px]">
             <GraphView
               frame={frame}
               t={t}
