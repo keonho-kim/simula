@@ -14,7 +14,10 @@
     "test:e2e": "playwright test",
     "typecheck": "tsc -b",
     "lint": "eslint .",
-    "build": "bun --filter @simula/web build"
+    "build": "bun run --parallel build:server build:web",
+    "start": "bun --filter @simula/server start",
+    "build:server": "bun --filter @simula/server build",
+    "build:web": "bun --filter @simula/web build"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

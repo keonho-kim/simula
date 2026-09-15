@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "bun --watch ../../src/backend/index.ts",
-    "start": "bun ../../src/backend/index.ts",
-    "typecheck": "tsc -b"
+    "start": "NODE_ENV=production bun ../../dist/backend/index.js",
+    "typecheck": "tsc -b",
+    "build": "tsc -b && bun ../../scripts/build-server.ts"
   }
 }

@@ -23,6 +23,26 @@ bun run dev
 
 The server defaults to `http://localhost:3001`. The web app proxies `/api` to that server.
 
+## Built Application
+
+From the repository root:
+
+```bash
+bun run build
+bun run start
+```
+
+The root build runs `build:server` and `build:web` in parallel and fails if either build fails.
+Backend output is `dist/backend/index.js` (Bun target, external packages); frontend output is
+`apps/web/dist`, including the separate graph layout Worker. Keep the checkout's package files,
+installed dependencies, sample directory, and build outputs together when running the application.
+
+`start` sets production mode and serves both the API and built web app through the Bun server.
+The default URL is `http://localhost:3001`; `PORT` applies to both. No Vite process or development
+proxy is needed. Settings and run data use the same repository-root resolution as development.
+Hashed assets are cached as immutable; HTML is revalidated. Unknown assets return 404. Missing web
+build output is an explicit startup error. Rebuild after changing application source.
+
 ## Scenario Input
 
 A scenario file must start with frontmatter followed by a non-empty body.

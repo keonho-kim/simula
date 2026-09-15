@@ -77,6 +77,18 @@ You can also run both dev servers with:
 bun run dev
 ```
 
+## Build and Start
+
+```bash
+bun run build
+bun run start
+```
+
+`build` builds the backend and frontend concurrently. `start` runs the compiled Bun backend and
+serves the built frontend on the same origin, `http://localhost:3001` by default. Set `PORT` to
+change the port. Production startup requires both build outputs and installed dependencies.
+Run `build:server` or `build:web` to build an individual app. Development commands remain unchanged.
+
 ## Settings
 
 Model settings resolve from:

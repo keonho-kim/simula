@@ -1,6 +1,8 @@
+import { join } from "node:path"
+import { serveWebAsset } from "@/backend/api/web-assets"
 import { RunStore } from "@/backend/storage/runs/run-store"
 import type { RunEvent } from "@/shared"
-import { DATA_ROOT, PORT } from "@/backend/config"
+import { DATA_ROOT, PORT, SERVE_WEB, WEB_ROOT } from "@/backend/config"
 import { corsHeaders, json } from "@/backend/api/responses"
 import { RoundContinuationStore } from "@/backend/runtime/round-continuation"
 import { route } from "@/backend/api/routes"
@@ -11,6 +13,9 @@ const runningRuns = new Set<string>()
 const roundContinuations = new RoundContinuationStore()
 const streamCancelTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
+if (SERVE_WEB && !await Bun.file(join(WEB_ROOT, "index.html")).exists()) {
+  throw new Error("Web build is missing. Run bun run build before bun run start.")
+}
 await store.ensureRoot()
 
 const server = Bun.serve({
@@ -22,6 +27,9 @@ const server = Bun.serve({
         return new Response(null, { headers: corsHeaders() })
       }
       const url = new URL(request.url)
+      if (SERVE_WEB && url.pathname !== "/api" && !url.pathname.startsWith("/api/")) {
+        return serveWebAsset(request, WEB_ROOT)
+      }
       const response = await route({
         store,
         subscriptions,

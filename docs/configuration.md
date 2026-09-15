@@ -40,6 +40,8 @@ Otherwise place the desired files in the repository root. Check custom `SIMULA_*
 from the shell if an error still names an unexpected absolute path.
 
 For web development, `SIMULA_API_ORIGIN` controls the Vite proxy target for `/api`.
+`bun run start` sets `NODE_ENV=production` and serves the built frontend and API from the same
+server, so the production command does not use the Vite proxy.
 
 ## Model Roles
 

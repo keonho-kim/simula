@@ -9,3 +9,6 @@ export const DATA_ROOT = resolve(repositoryRoot, process.env.SIMULA_DATA_DIR ?? 
 export const SETTINGS_PATH = resolve(repositoryRoot, process.env.SIMULA_SETTINGS_PATH ?? "settings.json")
 export const ENV_TOML_PATH = resolve(repositoryRoot, process.env.SIMULA_ENV_TOML_PATH ?? "env.toml")
 export const SAMPLE_ROOT = resolve(repositoryRoot, process.env.SIMULA_SAMPLE_DIR ?? "senario.samples")
+
+export const SERVE_WEB = process.env.NODE_ENV === "production"
+export const WEB_ROOT = resolve(repositoryRoot, "apps/web/dist")

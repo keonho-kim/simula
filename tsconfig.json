@@ -21,6 +21,7 @@
     "apps/server/tests",
     "apps/web/e2e",
     "packages/core/tests",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "scripts"
   ]
 }
