@@ -150,7 +150,7 @@ function StartTile({
   return (
     <Button
       variant="outline"
-      className="group h-auto justify-start rounded-2xl bg-card/95 p-4 text-left shadow-sm ring-1 ring-border/60 transition-transform hover:-translate-y-0.5 hover:bg-card hover:shadow-md sm:p-5"
+      className="group h-auto justify-start rounded-2xl bg-card/95 p-4 text-left shadow-sm ring-1 ring-border/60 transition-transform  hover:bg-card hover:shadow-md sm:p-5"
       onClick={onClick}
     >
       <span

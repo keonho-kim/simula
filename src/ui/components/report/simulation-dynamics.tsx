@@ -118,7 +118,7 @@ export function DynamicsSignalMap({ model, t }: { model: ReportAnalysisViewModel
                   <button
                     type="button"
                     className={cn(
-                      "rounded-md border border-border/60 bg-muted/20 p-3 text-left transition-[background-color,border-color,transform] hover:border-ring/50 hover:bg-muted/40",
+                      "rounded-md border border-border/60 bg-muted/20 p-3 text-left transition-colors duration-100 hover:border-ring/50 hover:bg-muted/40",
                       active && "border-ring/60 bg-accent/70 ring-2 ring-ring/20"
                     )}
                     onClick={() => setActiveMetricId(metric.id)}
@@ -129,7 +129,7 @@ export function DynamicsSignalMap({ model, t }: { model: ReportAnalysisViewModel
                     </div>
                     <div className="mt-2 h-1.5 overflow-hidden rounded-sm bg-muted">
                       <div
-                        className="h-full rounded-sm transition-[width] duration-300"
+                        className="h-full rounded-sm "
                         style={{ width: `${Math.round(clamp01(metric.value) * 100)}%`, backgroundColor: metric.color }}
                       />
                     </div>
@@ -196,7 +196,6 @@ function RadarChart({
               cy={point.y}
               r={active ? 2.5 : 1.8}
               fill={metric?.color}
-              className={active ? "animate-pulse" : undefined}
             />
           )
         })}
@@ -211,7 +210,7 @@ function RadarChart({
                 type="button"
                 aria-label={`${metric.label}: ${formatPercent(metric.value)}`}
                 className={cn(
-                  "absolute size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-background/80 transition-[box-shadow,transform] hover:scale-110",
+                  "absolute size-5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-background/80 transition-colors duration-100 ",
                   active && "scale-110 ring-2 ring-ring/50"
                 )}
                 style={{

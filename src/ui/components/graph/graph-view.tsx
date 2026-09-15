@@ -53,7 +53,7 @@ export const GraphView = memo(function GraphView(props: GraphViewProps) {
 
       {showActorPopover && selectedActor && selectedPopoverStyle ? (
         <div
-          className="absolute z-20 rounded-md border border-border/80 bg-white/95 p-3 text-left shadow-[0_12px_32px_rgba(23,32,51,0.14)] backdrop-blur"
+          className="absolute z-20 rounded-md border border-border/80 bg-white/95 p-3 text-left shadow-[0_12px_32px_rgba(23,32,51,0.14)] "
           style={selectedPopoverStyle}
         >
           <div className="flex items-start justify-between gap-3">
@@ -88,7 +88,7 @@ export const GraphView = memo(function GraphView(props: GraphViewProps) {
 
       {previewEdge ? (
         <div
-          className="pointer-events-none absolute z-20 w-[min(340px,calc(100%-24px))] rounded-md border border-border/80 bg-white/95 p-3 text-left shadow-[0_12px_32px_rgba(23,32,51,0.12)] backdrop-blur"
+          className="pointer-events-none absolute z-20 w-[min(340px,calc(100%-24px))] rounded-md border border-border/80 bg-white/95 p-3 text-left shadow-[0_12px_32px_rgba(23,32,51,0.12)] "
           style={edgePreviewStyle ?? { right: 12, top: 12 }}
         >
           <EdgePreview edge={previewEdge} t={t} actorNames={actorNames} actors={actors} />

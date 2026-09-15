@@ -41,21 +41,6 @@ export interface LayoutAnimationState {
   frameId?: number
 }
 
-export interface EdgeAnimation {
-  startedAt: number
-  duration: number
-  fromSize: number
-  toSize: number
-  fromAlpha: number
-  toAlpha: number
-  weight: number
-}
-
-export interface EdgeAnimationState {
-  frameId?: number
-  items: Map<string, EdgeAnimation>
-}
-
 export interface NodeOverlayPosition {
   x: number
   y: number

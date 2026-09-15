@@ -22,7 +22,7 @@ export function TopCommandBar({
   onReport,
 }: TopCommandBarProps) {
   return (
-    <header className="sticky top-0 z-30 -mx-4 border-b border-border/60 bg-background/92 px-4 py-3 backdrop-blur lg:-mx-6 lg:px-6">
+    <header className="sticky top-0 z-30 -mx-4 border-b border-border/60 bg-background/92 px-4 py-3  lg:-mx-6 lg:px-6">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <Button aria-label={t.home} variant="ghost" size="icon" className="rounded-md" onClick={onHome}>

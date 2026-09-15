@@ -1,11 +1,8 @@
 import { sameGraphValue } from "@/ui/models/graph/timeline-sharing"
 import type { MutableRefObject } from "react"
 import type { GraphTimelineFrame } from "@/shared"
-import { EDGE_ANIMATION_MS } from "@/ui/components/graph/constants"
 import {
   cancelAnimation,
-  cancelEdgeAnimation,
-  queueEdgeAnimation,
 } from "@/ui/components/graph/animation"
 import { buildNodeDegree } from "@/ui/components/graph/node-degree"
 import {
@@ -17,7 +14,7 @@ import {
   initialPosition,
   nodeSize,
 } from "@/ui/components/graph/styles"
-import { EDGE_TYPE, type ActorGraph, type EdgeAnimationState, type GraphEdgeAttributes, type GraphNodeAttributes, type LayoutAnimationState, type Position } from "@/ui/components/graph/types"
+import { EDGE_TYPE, type ActorGraph, type GraphEdgeAttributes, type GraphNodeAttributes, type LayoutAnimationState, type Position } from "@/ui/components/graph/types"
 
 export function writeGraphFrame(
   graph: ActorGraph,
@@ -26,11 +23,9 @@ export function writeGraphFrame(
   frameIndexRef: MutableRefObject<number | undefined>,
   layoutRoundRef: MutableRefObject<number | undefined>,
   layoutAnimation: LayoutAnimationState,
-  edgeAnimation: EdgeAnimationState,
 ): boolean {
   if (!frame) {
     cancelAnimation(layoutAnimation)
-    cancelEdgeAnimation(edgeAnimation)
     graph.clear()
     nodePositions.clear()
     frameIndexRef.current = undefined
@@ -40,7 +35,6 @@ export function writeGraphFrame(
   let topologyChanged = false
   if (frame.index === 0 || (frameIndexRef.current !== undefined && frame.index < frameIndexRef.current)) {
     cancelAnimation(layoutAnimation)
-    cancelEdgeAnimation(edgeAnimation)
     graph.clear()
     topologyChanged = true
     nodePositions.clear()
@@ -98,7 +92,6 @@ export function writeGraphFrame(
     if (!nextEdgeIds.has(edgeId)) {
       topologyChanged = true
       graph.dropEdge(edgeId)
-      edgeAnimation.items.delete(edgeId)
     }
   }
   for (const edge of frame?.edges ?? []) {
@@ -120,22 +113,15 @@ export function writeGraphFrame(
       }
       if (Object.entries(next).some(([key, value]) => !sameGraphValue(current[key as keyof typeof current], value))) graph.mergeEdgeAttributes(edge.id, next)
       if (current.weight !== edge.weight || current.visibility !== edge.visibility) {
-        queueEdgeAnimation(graph, edgeAnimation, edge.id, {
-          weight: edge.weight,
-          fromSize: current.size,
-          toSize: targetSize,
-          fromAlpha: current.alpha,
-          toAlpha: targetAlpha,
-          duration: EDGE_ANIMATION_MS,
-        })
+        graph.mergeEdgeAttributes(edge.id, { size: targetSize, alpha: targetAlpha, color: edgeColor(edge.weight, targetAlpha) })
       }
       continue
     }
     const attributes: GraphEdgeAttributes = {
       type: EDGE_TYPE,
-      color: edgeColor(edge.weight, 0.08),
-      size: 0.2,
-      alpha: 0.08,
+      color: edgeColor(edge.weight, targetAlpha),
+      size: targetSize,
+      alpha: targetAlpha,
       visibility: edge.visibility,
       visibilityMix: edge.visibilityMix,
       actionTypes: edge.actionTypes,
@@ -145,14 +131,7 @@ export function writeGraphFrame(
     }
     topologyChanged = true
     graph.addDirectedEdgeWithKey(edge.id, edge.source, edge.target, attributes)
-    queueEdgeAnimation(graph, edgeAnimation, edge.id, {
-      weight: edge.weight,
-      fromSize: attributes.size,
-      toSize: targetSize,
-      fromAlpha: attributes.alpha,
-      toAlpha: targetAlpha,
-      duration: EDGE_ANIMATION_MS,
-    })
+
   }
   if (topologyChanged) applyEdgeCurves(graph)
   return topologyChanged

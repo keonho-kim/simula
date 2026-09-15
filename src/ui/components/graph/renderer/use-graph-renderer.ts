@@ -7,7 +7,7 @@ import Graph from "graphology"
 import Sigma from "sigma"
 import type { EdgeProgramType } from "sigma/rendering"
 import type { ActorState } from "@/shared"
-import { animateNodePositions, cancelAnimation, cancelEdgeAnimation } from "@/ui/components/graph/animation"
+import { animateNodePositions, cancelAnimation } from "@/ui/components/graph/animation"
 import { updateActiveNodes } from "@/ui/components/graph/active-nodes"
 import { LAYOUT_ANIMATION_MS, MUTED_EDGE_COLOR, MUTED_NODE_COLOR } from "@/ui/components/graph/constants"
 import { writeGraphFrame } from "@/ui/components/graph/frame-writer"
@@ -17,7 +17,6 @@ import { sanitizeActorVisibleText } from "@/ui/models/actors/actor-visible-text"
 import {
   EDGE_TYPE,
   type ActorGraph,
-  type EdgeAnimationState,
   type GraphEdgeAttributes,
   type GraphNodeAttributes,
   type LayoutAnimationState,
@@ -44,7 +43,6 @@ export function useGraphRenderer({
   const layoutRoundRef = useRef<number | undefined>(undefined)
   const frameIndexRef = useRef<number | undefined>(undefined)
   const layoutAnimationRef = useRef<LayoutAnimationState>({})
-  const edgeAnimationRef = useRef<EdgeAnimationState>({ items: new Map() })
   const activeUntilRef = useRef<Map<string, number>>(new Map())
   const activeRefreshRef = useRef<number | undefined>(undefined)
   const hoveredNodeRef = useRef<string | undefined>(undefined)
@@ -111,7 +109,7 @@ export function useGraphRenderer({
     const current = camera.getState()
     void camera.animate(
       { x: display.x, y: display.y, angle: 0, ratio: Math.min(current.ratio, 0.9) },
-      { duration: 320 }
+      { duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 120 }
     )
   }, [])
 
@@ -153,7 +151,6 @@ export function useGraphRenderer({
     }
 
     const layoutAnimation = layoutAnimationRef.current
-    const edgeAnimation = edgeAnimationRef.current
     const activeUntil = activeUntilRef.current
     const graph: ActorGraph = new Graph({ type: "directed", multi: true })
     graphRef.current = graph
@@ -193,7 +190,7 @@ export function useGraphRenderer({
     rendererRef.current = renderer
     const layoutWorker = createLayoutWorker((positions) => {
       cancelAnimation(layoutAnimation)
-      animateNodePositions(graph, nodePositionsRef.current, layoutAnimation, new Map(positions), LAYOUT_ANIMATION_MS)
+      animateNodePositions(graph, nodePositionsRef.current, layoutAnimation, new Map(positions), window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : LAYOUT_ANIMATION_MS)
     }, setLayoutError)
     layoutWorkerRef.current = layoutWorker
     const updateOverlays = () => requestOverlayRefresh()
@@ -232,7 +229,6 @@ export function useGraphRenderer({
       layoutWorker.cancel()
       layoutWorkerRef.current = null
       cancelAnimation(layoutAnimation)
-      cancelEdgeAnimation(edgeAnimation)
       if (activeRefreshRef.current !== undefined) {
         window.clearTimeout(activeRefreshRef.current)
         activeRefreshRef.current = undefined
@@ -261,8 +257,7 @@ export function useGraphRenderer({
       nodePositionsRef.current,
       frameIndexRef,
       layoutRoundRef,
-      layoutAnimationRef.current,
-      edgeAnimationRef.current
+      layoutAnimationRef.current
     )
     if (frame?.layoutRoundIndex !== undefined && layoutRoundRef.current !== frame.layoutRoundIndex && graphRef.current.order > 1) {
       cancelAnimation(layoutAnimationRef.current)
@@ -276,7 +271,7 @@ export function useGraphRenderer({
   }, [frame, requestOverlayRefresh, updateSelectedDepths])
 
   const resetCamera = () => {
-    rendererRef.current?.getCamera().animate({ x: 0, y: 0, angle: 0, ratio: 1 }, { duration: 260 })
+    rendererRef.current?.getCamera().animate({ x: 0, y: 0, angle: 0, ratio: 1 }, { duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 120 })
   }
 
   if (layoutError) throw layoutError

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo } from "react"
 import type { RunEvent } from "@/shared"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/components/ui/tabs"
 import type { UiTexts } from "@/ui/types/i18n"
@@ -85,7 +85,7 @@ function AverageCard({
         <div className="font-mono text-2xl text-muted-foreground">{emptyLabel}</div>
       ) : (
         <div className="flex items-end justify-between gap-3">
-          <SlotNumber value={value} formatter={formatter} />
+          <MetricNumber value={value} formatter={formatter} />
           <span className="pb-1 text-xs uppercase text-muted-foreground">{unit}</span>
         </div>
       )}
@@ -93,30 +93,11 @@ function AverageCard({
   )
 }
 
-function SlotNumber({ value, formatter }: { value: number; formatter: (value: number) => string }) {
-  const [displayValue, setDisplayValue] = useState(0)
-
-  useEffect(() => {
-    const startedAt = performance.now()
-    const duration = 720
-    let frame = 0
-
-    const tick = (now: number) => {
-      const progress = Math.min(1, (now - startedAt) / duration)
-      const eased = 1 - (1 - progress) ** 3
-      setDisplayValue(value * eased)
-      if (progress < 1) {
-        frame = window.requestAnimationFrame(tick)
-      }
-    }
-
-    frame = window.requestAnimationFrame(tick)
-    return () => window.cancelAnimationFrame(frame)
-  }, [value])
+function MetricNumber({ value, formatter }: { value: number; formatter: (value: number) => string }) {
 
   return (
     <div className="overflow-hidden font-mono text-4xl font-semibold leading-none tabular-nums text-[var(--chart-1)]">
-      <span className="inline-block animate-in slide-in-from-bottom-1 duration-300">{formatter(displayValue)}</span>
+      <span>{formatter(value)}</span>
     </div>
   )
 }
@@ -139,7 +120,8 @@ function ChartsPanel({ metrics, t }: { metrics: ReportMetricsViewModel; t: UiTex
 
 function LineChart({ id, points, emptyLabel }: { id: string; points: ReportMetricPoint[]; emptyLabel: string }) {
   const safeId = id.toLowerCase().replace(/[^a-z0-9]+/g, "-")
-  const path = buildLinePath(points)
+  const max = points.reduce((maximum, point) => Number.isFinite(point.value) ? Math.max(maximum, point.value) : maximum, 0)
+  const path = buildLinePath(points, max)
   const areaPath = path ? `${path} L ${lastX(points.length)} ${baselineY} L ${firstX(points.length)} ${baselineY} Z` : ""
   const latest = points.at(-1)
 
@@ -168,7 +150,7 @@ function LineChart({ id, points, emptyLabel }: { id: string; points: ReportMetri
             vectorEffect="non-scaling-stroke"
           />
         ) : null}
-        {latest ? <circle cx={lastX(points.length)} cy={valueY(points, latest.value)} r="1.35" fill={chartColorFromId(id)} /> : null}
+        {latest ? <circle cx={lastX(points.length)} cy={valueY(max, latest.value)} r="1.35" fill={chartColorFromId(id)} /> : null}
       </svg>
       {!points.length ? (
         <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">{emptyLabel}</div>
@@ -278,20 +260,18 @@ function formatMetricValue(kind: ReportMetricKind, value: number): string {
   return Math.round(value).toLocaleString("en-US")
 }
 
-function buildLinePath(points: ReportMetricPoint[]): string {
+function buildLinePath(points: ReportMetricPoint[], max: number): string {
   if (!points.length) {
     return ""
   }
   const coordinates = points.map((point, index) => ({
     x: xForIndex(index, points.length),
-    y: valueY(points, point.value),
+    y: valueY(max, point.value),
   }))
   return smoothPath(coordinates)
 }
 
-function valueY(points: ReportMetricPoint[], value: number): number {
-  const values = points.map((point) => point.value).filter(Number.isFinite)
-  const max = Math.max(...values, 0)
+function valueY(max: number, value: number): number {
   if (max <= 0) {
     return baselineY
   }

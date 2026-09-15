@@ -155,9 +155,8 @@ history DOM costs in place. The following bounded-rendering pass addresses those
 
 ## Five bounded-rendering improvements
 
-All existing graph interpolation durations, easing functions, camera animations, and message-card
-presentation are preserved. These changes reduce work and allocation; they do not lower animation
-frame rates or disable effects.
+The five-item pass originally preserved animation timings. The subsequent VDI pass below changes
+the motion policy explicitly to favor immediate feedback on constrained clients.
 
 1. **SVG budget.** `models/metrics/sample-history.ts` selects at most 258 display points across the
    entire history. Each bucket retains its minimum and maximum and the first/latest samples remain
@@ -206,3 +205,28 @@ All 181 logic tests and six focused browser workflows pass. Checks cover chunk s
 sample retention, endpoint/extrema preservation, bounded path size, timeline equality, canonical
 stream references, zero writes for unchanged frames, unchanged intermediate easing positions,
 and virtual scrolling. The earlier legacy smoke mismatches are not changed by this pass.
+
+
+## VDI motion and reload recovery
+
+The default interface now favors short, functional transitions. Graph layouts and camera moves use
+120 ms transitions; reduced-motion preference makes those updates immediate. Layout interpolation
+emits one bulk Graphology position update per animation frame. Edge width/color changes apply
+immediately, eliminating their separate decoration loop. Numeric metrics show their final value
+without count-up animation. Repeating pulses/spinners, hover lifts, zoom/slide entrances, and
+backdrop filters are removed; dialogs retain a short opacity fade. The report chart also computes
+its vertical scale once per series instead of rescanning every sample for every point.
+
+`storage/run-session.ts` keeps only the active run id, view, auto-continue preference, and handled
+round numbers in tab-scoped session storage. Reloading reconnects to server events and restores the
+simulation/report view. A continuation is not persisted as handled while its HTTP request is still
+pending. This restores a browser view, not a stopped server process. The original external trigger
+for a user's unexpected reload cannot be established from client source alone; defaulting every
+remount to the home page was independently reproduced and corrected.
+
+A browser workflow reloads during automatic progression with 6x CPU throttling and reduced motion,
+then verifies that the simulation resumes and only two continuation requests advance three rounds.
+
+Production builds use Vite's dependency-aware chunking. The prior forced vendor partition caused
+an initialization-order error in the built browser app; removing that override was verified in a
+source-free deployment using the built API server and browser workflows.

@@ -362,7 +362,7 @@ function StoryBuilderRefine({
               role="status"
               className="flex min-h-[260px] flex-col items-center justify-center gap-3 text-sm text-muted-foreground"
             >
-              <LoaderCircleIcon className="size-5 animate-spin" />
+              <LoaderCircleIcon className="size-5 " />
               <span>{t.storyBuilderGenerating}</span>
             </div>
           ) : (
@@ -444,7 +444,7 @@ function StoryBuilderChatBubble({
         {message.role === "progress" ? (
           <p className="mt-1 whitespace-pre-wrap text-sm leading-6">
             {message.pending ? (
-              <LoaderCircleIcon data-icon="inline-start" className="animate-spin" />
+              <LoaderCircleIcon data-icon="inline-start" className="" />
             ) : null}
             {message.content}
           </p>

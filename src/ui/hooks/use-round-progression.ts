@@ -1,3 +1,4 @@
+import { readRunSession, updateRunSession } from "@/ui/storage/run-session"
 import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { cancelRun, continueRun } from "@/ui/api/client"
@@ -8,10 +9,14 @@ import type { UiTexts } from "@/ui/types/i18n"
 export function useRoundProgression(selectedRunId: string | undefined, t: UiTexts) {
   const completedRound = useRunStore(selectCompletedRound)
   const terminalEvent = useRunStore(selectTerminalEvent)
-  const [autoContinue, setAutoContinue] = useState(false)
+  const [autoContinue, setAutoContinue] = useState(() => readRunSession().autoContinue ?? false)
   const [roundPromptIndex, setRoundPromptIndex] = useState<number>()
   const [roundAction, setRoundAction] = useState<"continue" | "cancel">()
-  const [handledRounds, setHandledRounds] = useState(() => new Set<number>())
+  const [handledRounds, setHandledRounds] = useState(() => new Set<number>(readRunSession().handledRounds ?? []))
+
+  useEffect(() => {
+    if (selectedRunId) updateRunSession({ runId: selectedRunId, autoContinue, ...(!roundAction ? { handledRounds: [...handledRounds] } : {}) })
+  }, [selectedRunId, autoContinue, handledRounds, roundAction])
 
   const resetRoundProgression = useCallback(() => {
     setRoundPromptIndex(undefined)

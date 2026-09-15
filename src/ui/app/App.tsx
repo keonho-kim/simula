@@ -1,3 +1,4 @@
+import { readRunSession, updateRunSession } from "@/ui/storage/run-session"
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -72,8 +73,9 @@ function App() {
   const pushEvents = useRunStore((state) => state.pushEvents)
   const syncRunDetail = useRunStore((state) => state.syncRunDetail)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>("home")
-  const viewModeRef = useRef<ViewMode>("home")
+  const [initialSession] = useState(readRunSession)
+  const [viewMode, setViewMode] = useState<ViewMode>(initialSession.viewMode ?? "home")
+  const viewModeRef = useRef<ViewMode>(initialSession.viewMode ?? "home")
   const selectedRunIdRef = useRef<string | undefined>(undefined)
   const [storyBuilderOpen, setStoryBuilderOpen] = useState(false)
   const [samplePickerOpen, setSamplePickerOpen] = useState(false)
@@ -91,6 +93,13 @@ function App() {
     text: "",
     controls: { numCast: 6, allowAdditionalCast: true, actionsPerType: 3, maxRound: 8, fastMode: false, outputLength: "short" },
   })
+
+  useEffect(() => {
+    if (initialSession.runId) setSelectedRunId(initialSession.runId)
+  }, [initialSession, setSelectedRunId])
+  useEffect(() => {
+    if (selectedRunId) updateRunSession({ runId: selectedRunId, viewMode })
+  }, [selectedRunId, viewMode])
 
   const runsQuery = useQuery({ queryKey: ["runs"], queryFn: fetchRuns })
   const selectedRunQuery = useQuery({

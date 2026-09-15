@@ -27,7 +27,7 @@ export const SimulationInterludeOverlay = memo(function SimulationInterludeOverl
   }
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-muted/70 p-3 backdrop-grayscale sm:p-4">
+    <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-muted/70 p-3  sm:p-4">
       <div className="flex h-[86%] max-h-[86%] min-h-[420px] w-[calc(100%-24px)] flex-col overflow-hidden rounded-lg border border-border/80 bg-card text-left shadow-sm md:w-[86%] lg:w-[82%]">
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <aside className="shrink-0 border-b border-border/70 bg-background/80 p-4 md:w-56 md:border-b-0 md:border-r">
