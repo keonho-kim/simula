@@ -35,7 +35,7 @@ function SidebarButton({ active, title, subtitle, onClick }: {
     <button
       type="button"
       className={cn(
-        "rounded-md px-2.5 py-2 text-left text-sm transition-colors",
+        "rounded-md px-2.5 py-2 text-left text-sm transition-colors duration-100",
         active
           ? "bg-background text-foreground shadow-sm ring-1 ring-border/70"
           : "text-muted-foreground hover:bg-background/70 hover:text-foreground"

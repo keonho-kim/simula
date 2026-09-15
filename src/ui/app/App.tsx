@@ -1,3 +1,4 @@
+import { usePageVisibility } from "@/ui/hooks/use-page-visibility"
 import { readRunSession, updateRunSession } from "@/ui/storage/run-session"
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -67,6 +68,7 @@ const StoryBuilderDialog = lazy(() =>
 )
 
 function App() {
+  usePageVisibility()
   const { t, promptLanguage, languagePreference, setLanguagePreference } = useLocaleText()
   const queryClient = useQueryClient()
   const selectedRunId = useRunStore((state) => state.selectedRunId)

@@ -38,7 +38,7 @@ export function ActorCardRail({
             <button
               key={actor.id}
               type="button"
-              className={`rounded-md p-3 text-left transition-colors ring-1 ${
+              className={`rounded-md p-3 text-left transition-colors duration-100 ring-1 ${
                 actor.id === selectedActorId
                   ? "bg-background text-foreground ring-foreground/20"
                   : "bg-background/70 text-foreground ring-border/60 hover:bg-background"

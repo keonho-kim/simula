@@ -70,6 +70,10 @@ test("edges update immediately while short layout transitions reach their target
     animateNodePositions(graph, positions, layout, new Map([["a", { x: 0, y: 0 }]]), 0)
     expect(positions.get("a")).toEqual({ x: 0, y: 0 })
     expect(callbacks.size).toBe(0)
+    const writesBefore = bulkUpdates
+    animateNodePositions(graph, positions, layout, new Map([["a", { x: 0, y: 0 }]]), 120)
+    expect(callbacks.size).toBe(0)
+    expect(bulkUpdates).toBe(writesBefore)
   } finally {
     clock.mockRestore()
     if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow)

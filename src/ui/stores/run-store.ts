@@ -28,6 +28,7 @@ interface RunUiState {
 }
 
 export const useRunStore = create<RunUiState>((set) => {
+  const boardIds = new Set<string>()
   const metricIds = new Set<string>()
   const actorIds = new Set<string>()
   const conversationIds = new Set<string>()
@@ -46,24 +47,25 @@ export const useRunStore = create<RunUiState>((set) => {
     replayIndex: 0,
     setSelectedRunId: (runId) => set({ selectedRunId: runId }),
     resetLiveState: () => {
+      boardIds.clear()
       metricIds.clear()
       actorIds.clear()
       conversationIds.clear()
       set({ scenarioBoard: emptyScenarioBoard(), metricData: emptyMetricData(), conversationData: emptyConversationData(), liveEvents: [], metricEvents: [], actorEvents: [], conversationEvents: [], stageEvents: [], timeline: [], runState: undefined, replayIndex: 0 })
     },
     pushEvent: (event) =>
-      set((state) => applyEvents(state, [event], metricIds, actorIds, conversationIds)),
+      set((state) => applyEvents(state, [event], metricIds, actorIds, conversationIds, boardIds)),
     pushEvents: (events) =>
       set((state) => {
         if (!events.length) {
           return state
         }
-        return applyEvents(state, events, metricIds, actorIds, conversationIds)
+        return applyEvents(state, events, metricIds, actorIds, conversationIds, boardIds)
       }),
     setReplayIndex: (index) => set({ replayIndex: index }),
     syncRunDetail: (run, timeline, runState, events) =>
       set((state) => {
-        const next = applyEvents(state, events, metricIds, actorIds, conversationIds, runState)
+        const next = applyEvents(state, events, metricIds, actorIds, conversationIds, boardIds, runState)
         const nextTimeline = mergeTimeline(next.timeline ?? state.timeline, timeline)
         return { ...next, selectedRunId: state.selectedRunId ?? run.id, timeline: nextTimeline, runState,
           replayIndex: nextTimeline.length ? nextTimeline.length - 1 : 0 }
@@ -71,7 +73,7 @@ export const useRunStore = create<RunUiState>((set) => {
   }
 })
 
-function applyEvents(state: RunUiState, events: RunEvent[], metricIds: Set<string>, actorIds: Set<string>, conversationIds: Set<string>, runState = state.runState): Partial<RunUiState> {
+function applyEvents(state: RunUiState, events: RunEvent[], metricIds: Set<string>, actorIds: Set<string>, conversationIds: Set<string>, boardIds: Set<string>, runState = state.runState): Partial<RunUiState> {
   const frames = events
     .filter((event): event is Extract<RunEvent, { type: "graph.delta" }> => event.type === "graph.delta")
     .map((event) => event.frame)
@@ -81,7 +83,10 @@ function applyEvents(state: RunUiState, events: RunEvent[], metricIds: Set<strin
   const retainedMetrics = appendRetainedEvents(state.metricEvents, nextMetricEvents, metricIds)
   const retainedConversation = appendRetainedEvents(state.conversationEvents, conversationEvents(events), conversationIds)
   return {
-    scenarioBoard: updateScenarioBoard(state.scenarioBoard, events),
+    scenarioBoard: updateScenarioBoard(state.scenarioBoard, appendRetainedEvents([], events.filter(event =>
+      event.type === "board.updated" || event.type === "run.started" || event.type === "event.injected" ||
+      event.type === "run.completed" || event.type === "run.failed" || event.type === "run.canceled"
+    ), boardIds)),
     liveEvents: mergeLiveEvents(state.liveEvents, eventsWithTimelineFrames(events, nextTimeline)),
     stageEvents: mergeLiveEvents(state.stageEvents, stageEvents(events)),
     metricEvents: retainedMetrics,

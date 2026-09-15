@@ -58,3 +58,17 @@ test("streamed drafts append once and retries replace rejected output", () => {
   expect(retry.drafts.coreSituation?.coreSituation).toBe("revised")
   expect(updateScenarioBoard(retry, [digest]).digest.coreSituation).toBe("A concrete situation.")
 })
+
+test("a late initial snapshot cannot reopen a board already completed by live events", () => {
+  const store = useRunStore.getState()
+  store.resetLiveState()
+  store.pushEvents([start, digest, { ...base, type: "event.injected", event: {
+    id: "e", sourceEventId: "e", title: "Event", summary: "", roundIndex: 1,
+  } }])
+  store.syncRunDetail({ id: base.runId, status: "running", createdAt: base.timestamp,
+    artifactPaths: { manifest: "manifest.json", events: "events.jsonl", state: "state.json", report: "report.md", timeline: "timeline.json" },
+  }, [], undefined, [start, digest])
+  expect(useRunStore.getState().scenarioBoard.ready).toBe(true)
+  expect(useRunStore.getState().scenarioBoard.digest.coreSituation).toBe("A concrete situation.")
+  store.resetLiveState()
+})

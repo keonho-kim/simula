@@ -10,6 +10,14 @@ export function animateNodePositions(
 ): void {
   const startedAt = performance.now()
   const startPositions = readNodePositions(graph)
+  let moving = false
+  for (const [nodeId, target] of targetPositions) {
+    const start = startPositions.get(nodeId)
+    if (start && (start.x !== target.x || start.y !== target.y)) moving = true
+    if (start) nodePositions.set(nodeId, start)
+  }
+  if (!moving) return
+  if (globalThis.document?.hidden) duration = 0
   const tick = (now: number) => {
     const progress = duration <= 0 ? 1 : easeOutCubic(Math.min(1, (now - startedAt) / duration))
     graph.updateEachNodeAttributes((nodeId, attributes) => {
