@@ -352,7 +352,7 @@ function App() {
 
   return (
     <main className="min-h-svh bg-background text-foreground">
-      <div className="mx-auto flex min-h-svh w-full max-w-[1720px] flex-col px-4 py-3 lg:px-6">
+      <div className="mx-auto flex min-h-svh w-full flex-col px-4 py-3 lg:w-4/5 lg:px-0">
         <TopCommandBar
           selectedRunStatus={selectedRunStatus}
           autoContinue={autoContinue}
@@ -376,7 +376,7 @@ function App() {
           <Suspense fallback={null}>
             <LlmMetricsPanel t={t} />
           </Suspense>
-          <section className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <section className="grid min-h-0 gap-4 xl:min-h-[720px] xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
             <Suspense fallback={null}>
               <SimulationStage
                 t={t}

@@ -34,6 +34,21 @@ test("groups actor history by round with thoughts and speech in one card", async
     return graph.width / (graph.width + element.getBoundingClientRect().width)
   })
   expect(ratio).toBeCloseTo(0.6, 2)
+  await page.setViewportSize({ width: 2393, height: 1267 })
+  await expect(page.getByRole("heading", { name: "Simulation", exact: true })).toBeVisible()
+  await expect.poll(() => rail.evaluate(element => {
+    const stage = element.previousElementSibling!.getBoundingClientRect()
+    const history = element.getBoundingClientRect()
+    return Math.max(Math.abs(stage.top - history.top), Math.abs(stage.bottom - history.bottom))
+  })).toBeLessThanOrEqual(1)
+  const margins = await rail.evaluate(element => ({
+    left: element.previousElementSibling!.getBoundingClientRect().left / innerWidth,
+    right: (innerWidth - element.getBoundingClientRect().right) / innerWidth,
+  }))
+  expect(margins.left).toBeCloseTo(0.1, 2)
+  expect(margins.right).toBeCloseTo(0.1, 2)
+  await page.screenshot({ path: testInfo.outputPath("simulation-wide.png"), fullPage: true })
+  await page.setViewportSize({ width: 1440, height: 1100 })
   const viewport = rail.locator('[data-slot="scroll-area-viewport"]')
   expect(await viewport.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true)
   await viewport.evaluate(element => { element.scrollTop = 0 })

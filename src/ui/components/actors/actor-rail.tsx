@@ -12,7 +12,7 @@ export const ActorRail = memo(function ActorRail({ t, onActorSelect }: { t: UiTe
   const rounds = useMemo(() => roundsThrough(allRounds, cutoff), [allRounds, cutoff])
 
   return (
-    <aside aria-labelledby="actor-rail-title" className="flex h-[720px] min-h-0 min-w-0 flex-col overflow-hidden xl:h-[max(720px,calc(100svh-340px))] rounded-lg bg-card ring-1 ring-border/60">
+    <aside aria-labelledby="actor-rail-title" className="flex h-[720px] min-h-0 min-w-0 flex-col overflow-hidden xl:h-auto rounded-lg bg-card ring-1 ring-border/60">
       <header className="border-b border-border/60 px-5 py-4">
         <h2 id="actor-rail-title" className="text-sm font-semibold">{t.actorRailTitle}</h2>
         <p className="mt-1 text-xs text-muted-foreground">{t.actorRailDescription}</p>
