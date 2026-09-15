@@ -117,7 +117,7 @@ export async function cancelRun(runId: string): Promise<void> {
 }
 
 export async function fetchSettings(): Promise<LLMSettings> {
-  const data = await request<SettingsResponse>("/api/settings")
+  const data = await request<SettingsResponse>("/api/settings", { signal: AbortSignal.timeout(10_000) })
   return data.settings
 }
 

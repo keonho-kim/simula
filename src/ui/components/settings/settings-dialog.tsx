@@ -1,3 +1,4 @@
+import { Alert, AlertDescription, AlertTitle } from "@/ui/components/ui/alert"
 import { useEffect, useState } from "react"
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { SaveIcon } from "lucide-react"
@@ -37,7 +38,7 @@ export function SettingsDialog({ open, t, onOpenChange }: SettingsDialogProps) {
   const [page, setPage] = useState<SettingsPage>("providers")
   const [roleJsonDraft, setRoleJsonDraft] = useState<RoleJsonDraft>(() => emptyRoleJsonDraft())
   const [providerJsonDraft, setProviderJsonDraft] = useState<ProviderJsonDraft>(() => emptyProviderJsonDraft())
-  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings })
+  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: fetchSettings, enabled: open, retry: false })
   const saveMutation = useMutation({
     mutationFn: saveSettings,
     onSuccess: (settings) => {
@@ -102,8 +103,17 @@ export function SettingsDialog({ open, t, onOpenChange }: SettingsDialogProps) {
               )}
             </ScrollArea>
           </div>
+        ) : settingsQuery.isError ? (
+          <Alert variant="destructive">
+            <AlertTitle>{t.settingsLoadFailed}</AlertTitle>
+            <AlertDescription>
+              <p>{t.settingsLoadHint}</p>
+              <p className="break-words">{settingsQuery.error.message}</p>
+              <Button variant="outline" disabled={settingsQuery.isFetching} onClick={() => void settingsQuery.refetch()}>{t.settingsRetry}</Button>
+            </AlertDescription>
+          </Alert>
         ) : (
-          <div className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">{t.settingsLoading}</div>
+          <div role="status" className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">{t.settingsLoading}</div>
         )}
 
         <div className="flex justify-end border-t border-border/60 pt-3">

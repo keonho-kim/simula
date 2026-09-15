@@ -88,6 +88,20 @@ output_length: short
 `num_cast` is required. `output_length` accepts `short`, `medium`, or `long` and also controls
 actor memory compression length: 3, 5, or 10 sentences respectively. Unsupported keys fail explicitly.
 
+## Settings loading failures
+
+The settings dialog reads `GET /api/settings`; it does not need provider API keys or local model
+servers to open. Missing local configuration files use the built-in defaults. Invalid existing
+configuration files fail explicitly.
+
+If settings cannot load, check the API server's startup output and open
+`http://localhost:3001/api/settings` directly (adjust the port if configured). If the direct request
+works but the web app fails, check the Vite `/api` proxy and `SIMULA_API_ORIGIN`. A running Vite page
+does not prove that the backend process launched by `bun run dev` started successfully.
+
+Settings reads time out after ten seconds. Failed reads show an error and an explicit Retry action
+instead of leaving the dialog in its loading state.
+
 ## Related Docs
 
 - server and artifact operations: [`operations.md`](./operations.md)
