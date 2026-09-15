@@ -40,7 +40,7 @@ async function runActorCardTextNode(
     })
     const stream = await createBoardStream(state.runId, state.emit, "actor-" + state.actorIndex, step)
     const result = await invokeRoleTextWithMetrics(state.settings, "generator", step, attempt, prompt, stream.onDelta)
-    await stream.flush()
+
     await emitModelTelemetry(state.runId, result, state.emit)
     const response = normalizePlainText(result.text)
     if (response) {

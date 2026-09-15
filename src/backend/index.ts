@@ -1,14 +1,14 @@
 import { join } from "node:path"
 import { serveWebAsset } from "@/backend/api/web-assets"
 import { RunStore } from "@/backend/storage/runs/run-store"
-import type { RunEvent } from "@/shared"
+import { Subscriptions } from "@/backend/runtime/events"
 import { DATA_ROOT, PORT, SERVE_WEB, WEB_ROOT } from "@/backend/config"
 import { corsHeaders, json } from "@/backend/api/responses"
 import { RoundContinuationStore } from "@/backend/runtime/round-continuation"
 import { route } from "@/backend/api/routes"
 
 const store = new RunStore({ rootDir: DATA_ROOT })
-const subscriptions = new Map<string, Set<(event: RunEvent) => void>>()
+const subscriptions = new Subscriptions()
 const runningRuns = new Set<string>()
 const roundContinuations = new RoundContinuationStore()
 const streamCancelTimers = new Map<string, ReturnType<typeof setTimeout>>()

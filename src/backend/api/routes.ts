@@ -11,7 +11,7 @@ import type {
   StoryBuilderStreamEvent,
 } from "@/shared"
 import { SAMPLE_ROOT } from "@/backend/config"
-import { streamEvents } from "@/backend/api/event-stream"
+import { streamEvents, streamBoardPreview } from "@/backend/api/event-stream"
 import type { Subscriptions } from "@/backend/runtime/events"
 import { listProviderModels } from "@/backend/api/model-controller"
 import { json, text } from "@/backend/api/responses"
@@ -179,6 +179,12 @@ async function routeRunDetail(
   }
   if (parts[3] === "cancel" && request.method === "POST") {
     return cancelRun(context.runningRuns, context.roundContinuations, runId)
+  }
+  if (parts[3] === "board-preview" && request.method === "GET") {
+    const itemId = url.searchParams.get("item")
+    if (!itemId) return json({ error: "item is required." }, { status: 400 })
+    await context.store.readManifest(runId)
+    return streamBoardPreview(context.subscriptions, runId, itemId)
   }
   if (parts[3] === "events" && request.method === "GET") {
     return streamEvents(context.store, context.subscriptions, runId, {

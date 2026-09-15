@@ -43,18 +43,22 @@ test("scenario board fills ordered columns and opens structured details", async 
   await expect(columns.first()).toHaveAttribute("aria-busy", "true")
   const active = dialog.getByRole("button", { name: /배경 상황/ })
   await expect(active).toHaveAttribute("aria-busy", "true")
-  await active.click()
-  await expect(dialog.getByRole("complementary")).toContainText("첫 응답을 기다리고 있습니다")
-  await page.evaluate(async () => {
-    const path = "/src/ui/stores/run-store.ts"
-    const { useRunStore } = await import(path)
-    const store = useRunStore.getState()
-    const base = { type: "board.updated", runId: store.selectedRunId, timestamp: new Date().toISOString() }
-    store.pushEvents([
-      { ...base, update: { kind: "preview", id: "coreSituation", field: "coreSituation", streamId: "test", sequence: 0, content: "" } },
-      { ...base, update: { kind: "preview", id: "coreSituation", field: "coreSituation", streamId: "test", sequence: 1, content: "새로운 상황을 작성하고 있습니다." } },
-    ])
+  let previewRequests = 0
+  await page.route("**/board-preview?item=*", async route => {
+    previewRequests++
+    const event = { type: "board.updated", runId: "test", timestamp: new Date().toISOString(), update: {
+      kind: "preview", id: "coreSituation", field: "coreSituation", streamId: "test", sequence: 3, snapshot: true, content: "새로운 상황을 작성하고 있습니다.",
+    } }
+    await route.fulfill({ contentType: "text/event-stream", body: "event: board.updated\ndata: " + JSON.stringify(event) + "\n\n" })
   })
+  expect(previewRequests).toBe(0)
+  await active.click()
+  await expect(columns).toHaveCount(1)
+  expect(await dialog.getByRole("complementary").evaluate(element => {
+    const detail = element.getBoundingClientRect()
+    const list = element.previousElementSibling!.getBoundingClientRect()
+    return list.width / (list.width + detail.width)
+  })).toBeCloseTo(0.4, 2)
   await expect(dialog.getByRole("complementary")).toContainText("새로운 상황을 작성하고 있습니다.")
   await expect(dialog.getByRole("complementary")).toContainText("검증 전")
   await dialog.getByRole("button", { name: "상세 닫기", exact: true }).click()
@@ -75,9 +79,11 @@ test("scenario board fills ordered columns and opens structured details", async 
   await dialog.getByRole("button", { name: /사과 방식 확인/ }).click()
   await expect(dialog.getByRole("complementary")).toContainText("개인 대화")
   await expect(dialog.getByRole("complementary")).toContainText("오해를 줄입니다.")
+  await dialog.getByRole("button", { name: /전체 보드/ }).click()
   await dialog.getByRole("button", { name: /입장권 오류/ }).click()
   await expect(dialog.getByRole("complementary")).toContainText("예약된 티켓이 한 사람의 이름으로 발급되었습니다.")
-  await dialog.getByRole("button", { name: /인물별 압력/ }).click()
+  await dialog.getByRole("button", { name: /전체 보드/ }).click()
+  await dialog.getByRole("button", { name: /인물별 이해관계/ }).click()
   const overlay = page.locator('[data-slot="dialog-overlay"]')
   expect(await overlay.evaluate(element => {
     const box = element.getBoundingClientRect()
@@ -89,8 +95,8 @@ test("scenario board fills ordered columns and opens structured details", async 
   await page.keyboard.press("Escape")
   await expect(dialog).toBeVisible()
   await expect(dialog.getByRole("complementary")).toHaveCount(0)
-  await dialog.getByRole("button", { name: /인물별 압력/ }).click()
-  await page.screenshot({ path: testInfo.outputPath("preparation-desktop.png") })
+  await dialog.getByRole("button", { name: /인물별 이해관계/ }).click()
+  await page.screenshot({ animations: "disabled", path: testInfo.outputPath("preparation-desktop.png") })
   await page.setViewportSize({ width: 390, height: 600 })
   await expect.poll(async () => (await dialog.boundingBox())!.height).toBeLessThanOrEqual(568)
   const mobile = (await dialog.boundingBox())!
@@ -126,4 +132,7 @@ test("scenario board fills ordered columns and opens structured details", async 
   expect(counts.actions).toBe(12)
   expect(counts.cards).toBe(3)
   expect(counts.events).toBeGreaterThan(0)
+  const runId = await page.evaluate(() => JSON.parse(sessionStorage.getItem("simula.run-session")!).runId)
+  const detail = await (await page.request.get("/api/runs/" + runId)).json()
+  expect(detail.events.some((event: { type: string; update?: { kind: string } }) => event.type === "board.updated" && event.update?.kind === "preview")).toBe(false)
 })

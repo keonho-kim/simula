@@ -21,7 +21,7 @@ export async function createActorRoster(
     })
     const stream = await createBoardStream(state.runId, emit, "roster-pending", "roster")
     const result = await invokeRoleTextWithMetrics(state.settings, "generator", "roster", attempt, prompt, stream.onDelta)
-    await stream.flush()
+
     await emitModelTelemetry(state.runId, result, emit)
 
     try {

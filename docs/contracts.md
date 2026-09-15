@@ -75,7 +75,7 @@ Current event families include:
 Every event includes `runId` and `timestamp`.
 
 `board.updated` carries typed configuration, digest sections, validated planned events,
-action batches, the accepted roster, individual actor start/completion, and streamed output previews. Previews carry a stream ID and increasing sequence number; sequence zero resets a field for a new call or retry. They are unvalidated drafts, separate from accepted artifacts. It is emitted
+action batches, the accepted roster, individual actor start/completion, and actor lifecycle notifications. Unvalidated output previews use the same typed envelope through `GET /api/runs/:id/board-preview?item=:itemId`, but are excluded from persisted events and the general run SSE. Previews carry a stream ID and increasing sequence number; sequence zero resets a field for a new call or retry. New subscriptions receive the current field snapshots, followed by immediate live deltas for that item only. It is emitted
 from existing generation results without additional model calls. The browser retains these
 artifacts outside its rolling telemetry window and uses them for clickable Scenario Board
 items. Progress counts completed work units, not elapsed time: four digest sections, the

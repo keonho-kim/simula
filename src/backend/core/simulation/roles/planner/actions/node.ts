@@ -29,7 +29,7 @@ export function createPlannerActionsNode(emit: (event: RunEvent) => Promise<void
           })
           const stream = await createBoardStream(state.runId, emit, "actions-pending", visibility)
           const result = await invokeRoleTextWithMetrics(state.settings, "planner", "actionCatalog", attempt, prompt, stream.onDelta)
-          await stream.flush()
+
           await emitModelTelemetry(state.runId, result, emit)
           let actions: ActorAction[]
           try {

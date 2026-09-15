@@ -1,3 +1,4 @@
+import { useBoardPreview } from "@/ui/hooks/use-board-preview"
 import { memo, useMemo, useState } from "react"
 import { X } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/ui/components/ui/dialog"
@@ -12,6 +13,7 @@ import { cn } from "@/ui/lib/class-names"
 const PROGRESS_DOTS = [0, 1, 2, 3, 4]
 
 export const ScenarioBoard = memo(function ScenarioBoard({ t }: { t: UiTexts }) {
+  const runId = useRunStore(state => state.selectedRunId)
   const board = useRunStore(state => state.scenarioBoard)
   const [selectedId, setSelectedId] = useState<string>()
   const columns = useMemo(() => scenarioBoardColumns(board, t), [board, t])
@@ -19,7 +21,10 @@ export const ScenarioBoard = memo(function ScenarioBoard({ t }: { t: UiTexts }) 
   const progress = boardProgress(board)
   const activeColumn = columns.findIndex(column => column.items.some(item => !item.fields))
   const activeIds = new Set(board.ready || board.terminal ? [] : board.activeActorIds.length ? board.activeActorIds : [columns[activeColumn]?.items.find(item => !item.fields)?.id])
-  const selectedDraft = selected ? board.drafts[selected.id] : undefined
+  const preview = useBoardPreview(runId, selected && !selected.fields && !board.ready && !board.terminal ? selected.id : undefined)
+  const selectedDraft = preview.fields
+  const selectedColumn = selected ? columns.find(column => column.items.some(item => item.id === selected.id)) : undefined
+  const visibleColumns = selectedColumn ? [selectedColumn] : columns
   const fieldLabels: Record<string, string> = { role: t.boardRole, backgroundHistory: t.boardBackground, personality: t.boardPersonality, preference: t.boardPreference,
     roster: t.actorCards, public: t.boardPublic, "semi-public": t.boardGroup, private: t.boardPrivate, solitary: t.boardSolitary,
     coreSituation: t.boardCore, actorPressures: t.boardPressures, conflictDynamics: t.boardConflict, simulationDirection: t.boardDirection, majorEvents: t.boardEvents }
@@ -44,10 +49,11 @@ export const ScenarioBoard = memo(function ScenarioBoard({ t }: { t: UiTexts }) 
             </span>
           </div>
         </header>
-        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <div aria-label={t.scenarioBoardTitle} className="min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden p-5">
-            <div className="grid h-full min-h-0 min-w-[880px] grid-cols-4 gap-5">
-              {columns.map((column) => (
+        {selected ? <div className="shrink-0 border-b px-5 py-2"><Button variant="ghost" size="sm" onClick={() => setSelectedId(undefined)}>← {t.boardBack}</Button></div> : null}
+        <div key={selectedColumn?.title ?? "board"} className="scenario-board-transition flex min-h-0 flex-1 flex-col md:flex-row">
+          <div aria-label={t.scenarioBoardTitle} className={cn("min-h-0 min-w-0 overflow-x-auto overflow-y-hidden p-5", selected ? "flex-1 md:w-2/5 md:flex-none" : "flex-1")}>
+            <div className={cn("grid h-full min-h-0 gap-5", selected ? "grid-cols-1" : "min-w-[880px] grid-cols-4")}>
+              {visibleColumns.map((column) => (
                 <section key={column.title} aria-label={column.title} aria-busy={column.items.some(item => activeIds.has(item.id))} className="flex min-h-0 min-w-0 flex-col">
                   <h3 className="mb-3 flex shrink-0 items-center justify-between bg-muted/60 px-2 py-1.5 text-sm font-medium">
                     <span className="flex items-center gap-2"><span aria-label={column.items.every(item => item.fields) ? t.boardDone : column.items.some(item => activeIds.has(item.id)) ? t.boardWorking : t.boardPending} className={cn("size-2 shrink-0 rounded-full", column.items.every(item => item.fields) ? "bg-blue-500" : column.items.some(item => activeIds.has(item.id)) ? "bg-emerald-500" : "bg-slate-300")} />{column.title}</span><span className="font-mono text-xs text-muted-foreground">{column.items.filter(item => item.fields).length}</span>
@@ -69,7 +75,7 @@ export const ScenarioBoard = memo(function ScenarioBoard({ t }: { t: UiTexts }) 
             </div>
           </div>
           {selected ? (
-            <aside aria-label={selected.title} className="flex min-h-0 basis-1/2 flex-col border-t bg-muted/20 md:w-[36%] md:min-w-80 md:basis-auto md:border-l md:border-t-0">
+            <aside aria-label={selected.title} className="flex min-h-0 basis-1/2 flex-col border-t bg-muted/20 min-w-0 md:w-3/5 md:basis-auto md:border-l md:border-t-0">
               <header className="flex shrink-0 items-center justify-between gap-2 border-b px-5 py-3">
                 <h3 className="text-sm font-semibold">{selected.title}</h3>
                 <Button variant="ghost" size="icon-sm" aria-label={t.boardClose} onClick={() => setSelectedId(undefined)}><X /></Button>
@@ -81,7 +87,7 @@ export const ScenarioBoard = memo(function ScenarioBoard({ t }: { t: UiTexts }) 
                     <section key={field}><h4 className="mb-2 text-xs font-medium text-muted-foreground">{fieldLabels[field] ?? t.boardWorking}</h4>
                       <p className="whitespace-pre-wrap break-words text-sm leading-6">{content}</p>
                     </section>
-                  )) : <p role="status" className="text-sm text-muted-foreground">{t.boardAwaiting}</p>}
+                  )) : <p role="status" className="text-sm text-muted-foreground">{preview.disconnected ? t.boardReconnecting : t.boardAwaiting}</p>}
                 </> : null}
                 {selected.fields?.map((field, index) => (
                   <section key={index}>

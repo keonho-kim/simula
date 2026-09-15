@@ -61,7 +61,7 @@ async function runPlannerTextNode(
     })
     const stream = await createBoardStream(state.runId, emit, step === "majorEvents" ? "events-pending" : step, step)
     const result = await invokeRoleTextWithMetrics(state.settings, "planner", step, attempt, prompt, stream.onDelta)
-    await stream.flush()
+
     await emitModelTelemetry(state.runId, result, emit)
     const response = step === "majorEvents" ? normalizePlannerMajorEvents(result.text) : normalizePlannerDigest(result.text)
     if (response) {

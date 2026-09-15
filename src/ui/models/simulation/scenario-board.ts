@@ -37,10 +37,10 @@ export function updateScenarioBoard(current: ScenarioBoardState, events: RunEven
         const key = value.id + ":" + value.field
         const previous = board.streams[key]
         if (previous?.id === value.streamId && previous.sequence >= value.sequence) break
-        if (previous?.id !== value.streamId && value.sequence !== 0) break
+        if (previous?.id !== value.streamId && value.sequence !== 0 && !value.snapshot) break
         board = { ...board, streams: { ...board.streams, [key]: { id: value.streamId, sequence: value.sequence } },
           drafts: { ...board.drafts, [value.id]: { ...board.drafts[value.id],
-            [value.field]: value.sequence === 0 ? "" : (board.drafts[value.id]?.[value.field] ?? "") + value.content,
+            [value.field]: value.snapshot ? value.content : value.sequence === 0 ? "" : (board.drafts[value.id]?.[value.field] ?? "") + value.content,
           } } }
         break
       }

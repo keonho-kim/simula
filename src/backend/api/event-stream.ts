@@ -53,3 +53,15 @@ export function streamEvents(
 function formatSse(event: RunEvent): string {
   return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`
 }
+
+export function streamBoardPreview(subscriptions: Subscriptions, runId: string, itemId: string): Response {
+  const encoder = new TextEncoder()
+  let unsubscribe: (() => void) | undefined
+  return new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      unsubscribe = subscriptions.previews.subscribe(runId, itemId, event => controller.enqueue(encoder.encode(formatSse(event))))
+      controller.enqueue(encoder.encode(": connected\n\n"))
+    },
+    cancel() { unsubscribe?.() },
+  }), { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } })
+}

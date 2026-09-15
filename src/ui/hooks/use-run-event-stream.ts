@@ -4,6 +4,7 @@ import type { RunEvent } from "@/shared"
 
 const eventTypes: RunEvent["type"][] = [
   "run.started",
+  "board.updated",
   "node.started",
   "node.completed",
   "node.failed",

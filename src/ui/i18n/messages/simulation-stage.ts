@@ -1,8 +1,9 @@
 export const simulationStageTexts = {
   en: {
+    boardBack: "All columns", boardReconnecting: "Reconnecting to live output…",
     boardDraft: "Live draft · awaiting validation", boardAwaiting: "Waiting for the first output…",
     boardWorld: "Background & conflict", boardEvents: "Expected events", boardActions: "Actions",
-    boardCore: "Background", boardPressures: "Actor pressures", boardConflict: "Conflict structure", boardDirection: "Story direction",
+    boardCore: "Background", boardPressures: "Actor stakes", boardConflict: "Conflict structure", boardDirection: "Story direction",
     boardProgress: "Completed work", boardClose: "Close details", boardEnter: "View simulation",
     boardPending: "Waiting", boardWorking: "In progress", boardDone: "Complete", boardActor: "Actor {number}",
     boardScope: "Visibility", boardIntent: "Usage condition", boardOutcome: "Expected effect",
@@ -66,9 +67,10 @@ export const simulationStageTexts = {
     metricAttempt: "Attempt",
   },
   ko: {
+    boardBack: "전체 보드", boardReconnecting: "실시간 연결을 다시 시도하고 있습니다…",
     boardDraft: "생성 중인 초안 · 검증 전", boardAwaiting: "첫 응답을 기다리고 있습니다…",
     boardWorld: "배경·갈등", boardEvents: "예상 이벤트", boardActions: "행동",
-    boardCore: "배경 상황", boardPressures: "인물별 압력", boardConflict: "갈등 구조", boardDirection: "전개 방향",
+    boardCore: "배경 상황", boardPressures: "인물별 이해관계", boardConflict: "갈등 구조", boardDirection: "전개 방향",
     boardProgress: "작업 완료율", boardClose: "상세 닫기", boardEnter: "시뮬레이션 보기",
     boardPending: "대기", boardWorking: "진행 중", boardDone: "완료", boardActor: "인물 {number}",
     boardScope: "공개 범위", boardIntent: "사용 조건", boardOutcome: "예상 효과",

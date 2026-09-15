@@ -1,7 +1,7 @@
 import type { ActorAction, ActorRosterEntry, ActorState, PlannedEvent, ScenarioDigest } from "./simulation"
 
 export type ScenarioBoardUpdate =
-  | { kind: "preview"; id: string; field: string; content: string; streamId: string; sequence: number }
+  | { kind: "preview"; id: string; field: string; content: string; streamId: string; sequence: number; snapshot?: boolean }
   | { kind: "actor.started"; id: string }
   | { kind: "config"; actorCount: number; actionCount: number }
   | { kind: "digest"; key: keyof ScenarioDigest; content: string }
