@@ -26,7 +26,7 @@ test("scenario board fills ordered columns and opens structured details", async 
       { ...base, type: "run.started" },
       { ...base, type: "board.updated", update: { kind: "config", actorCount: 3, actionCount: 12 } },
       { ...base, type: "board.updated", update: { kind: "digest", key: "actorPressures", content: "인물들은 서로 다른 입장을 가지고 있습니다.\n\n".repeat(100) } },
-      { ...base, type: "board.updated", update: { kind: "events", events: [{ id: "event-1", title: "입장권 오류", summary: "예약된 티켓이 한 사람의 이름으로 발급되었습니다.", status: "pending", participantIds: [] }] } },
+      { ...base, type: "board.updated", update: { kind: "events", events: [{ id: "event-1", title: "입장권 오류", summary: "예약된 티켓이 한 사람의 이름으로 발급되었습니다.", status: "pending", participantIds: [] }, ...Array.from({ length: 60 }, (_, index) => ({ id: "extra-" + index, title: "추가 사건 " + index, summary: "설명", status: "pending", participantIds: [] }))] } },
       { ...base, type: "board.updated", update: { kind: "actions", actions: [{ id: "PRV01", label: "사과 방식 확인", visibility: "private", intentHint: "상대의 의도를 확인합니다.", expectedOutcome: "오해를 줄입니다." }] } },
     ])
   })
@@ -34,6 +34,35 @@ test("scenario board fills ordered columns and opens structured details", async 
   await expect(dialog).toBeVisible()
   const columns = dialog.locator('section[aria-label]')
   expect(await columns.evaluateAll(elements => elements.map(element => element.getAttribute("aria-label")))).toEqual(["배경·갈등", "예상 이벤트", "행동", "인물 카드"])
+  await expect(columns.first()).toHaveAttribute("aria-busy", "true")
+  const active = dialog.getByRole("button", { name: /배경 상황/ })
+  await expect(active).toHaveAttribute("aria-busy", "true")
+  await active.click()
+  await expect(dialog.getByRole("complementary")).toContainText("첫 응답을 기다리고 있습니다")
+  await page.evaluate(async () => {
+    const path = "/src/ui/stores/run-store.ts"
+    const { useRunStore } = await import(path)
+    const store = useRunStore.getState()
+    const base = { type: "board.updated", runId: store.selectedRunId, timestamp: new Date().toISOString() }
+    store.pushEvents([
+      { ...base, update: { kind: "preview", id: "coreSituation", field: "coreSituation", streamId: "test", sequence: 0, content: "" } },
+      { ...base, update: { kind: "preview", id: "coreSituation", field: "coreSituation", streamId: "test", sequence: 1, content: "새로운 상황을 작성하고 있습니다." } },
+    ])
+  })
+  await expect(dialog.getByRole("complementary")).toContainText("새로운 상황을 작성하고 있습니다.")
+  await expect(dialog.getByRole("complementary")).toContainText("검증 전")
+  await dialog.getByRole("button", { name: "상세 닫기", exact: true }).click()
+  expect(await active.evaluate(element => getComputedStyle(element, "::before").animationName)).toBe("scenario-board-breathe")
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  expect(await active.evaluate(element => getComputedStyle(element, "::before").animationName)).toBe("none")
+  await page.emulateMedia({ reducedMotion: "no-preference" })
+  const eventList = dialog.getByRole("group", { name: "예상 이벤트", exact: true })
+  const headingY = (await columns.nth(1).getByRole("heading").boundingBox())!.y
+  await eventList.evaluate(element => { element.scrollTop = element.scrollHeight })
+  expect(await eventList.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+  expect((await columns.nth(1).getByRole("heading").boundingBox())!.y).toBe(headingY)
+  expect(await dialog.getByRole("group", { name: "배경·갈등", exact: true }).evaluate(element => element.scrollTop)).toBe(0)
+  await eventList.evaluate(element => { element.scrollTop = 0 })
   await expect(dialog).not.toContainText("PRV01")
   await expect(dialog.getByText("오해를 줄입니다.")).toHaveCount(0)
   await dialog.getByRole("button", { name: /사과 방식 확인/ }).click()

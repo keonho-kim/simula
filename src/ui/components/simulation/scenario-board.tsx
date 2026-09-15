@@ -13,11 +13,15 @@ export const ScenarioBoard = memo(function ScenarioBoard({ t }: { t: UiTexts }) 
   const board = useRunStore(state => state.scenarioBoard)
   const [selectedId, setSelectedId] = useState<string>()
   const columns = useMemo(() => scenarioBoardColumns(board, t), [board, t])
-  const selected = columns.flatMap(column => column.items).find(item => item.id === selectedId && item.fields)
+  const selected = columns.flatMap(column => column.items).find(item => item.id === selectedId)
   const progress = boardProgress(board)
   const filled = Math.floor((progress ?? 0) / 5)
   const activeColumn = columns.findIndex(column => column.items.some(item => !item.fields))
-  const activeItemId = columns[activeColumn]?.items.find(item => !item.fields)?.id
+  const activeIds = new Set(board.ready || board.terminal ? [] : board.activeActorIds.length ? board.activeActorIds : [columns[activeColumn]?.items.find(item => !item.fields)?.id])
+  const selectedDraft = selected ? board.drafts[selected.id] : undefined
+  const fieldLabels: Record<string, string> = { role: t.boardRole, backgroundHistory: t.boardBackground, personality: t.boardPersonality, preference: t.boardPreference,
+    roster: t.actorCards, public: t.boardPublic, "semi-public": t.boardGroup, private: t.boardPrivate, solitary: t.boardSolitary,
+    coreSituation: t.boardCore, actorPressures: t.boardPressures, conflictDynamics: t.boardConflict, simulationDirection: t.boardDirection, majorEvents: t.boardEvents }
   const visible = board.started && !board.terminal && (!board.ready || Boolean(selected))
   return (
     <Dialog open={visible}>
@@ -33,20 +37,20 @@ export const ScenarioBoard = memo(function ScenarioBoard({ t }: { t: UiTexts }) 
           </div>
         </header>
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <div aria-label={t.scenarioBoardTitle} className="min-h-0 min-w-0 flex-1 overflow-auto p-5">
-            <div className="grid min-w-[880px] grid-cols-4 items-start gap-5">
+          <div aria-label={t.scenarioBoardTitle} className="min-h-0 min-w-0 flex-1 overflow-x-auto overflow-y-hidden p-5">
+            <div className="grid h-full min-h-0 min-w-[880px] grid-cols-4 gap-5">
               {columns.map((column) => (
-                <section key={column.title} aria-label={column.title} className="min-w-0">
-                  <h3 className="mb-3 flex items-center justify-between bg-muted/60 px-2 py-1.5 text-sm font-medium">
-                    {column.title}<span className="font-mono text-xs text-muted-foreground">{column.items.filter(item => item.fields).length}</span>
+                <section key={column.title} aria-label={column.title} aria-busy={column.items.some(item => activeIds.has(item.id))} className="flex min-h-0 min-w-0 flex-col">
+                  <h3 className="mb-3 flex shrink-0 items-center justify-between bg-muted/60 px-2 py-1.5 text-sm font-medium">
+                    <span className="flex items-center gap-2"><span aria-label={column.items.every(item => item.fields) ? t.boardDone : column.items.some(item => activeIds.has(item.id)) ? t.boardWorking : t.boardPending} className={cn("size-2 shrink-0 rounded-full", column.items.every(item => item.fields) ? "bg-blue-500" : column.items.some(item => activeIds.has(item.id)) ? "bg-emerald-500" : "bg-slate-300")} />{column.title}</span><span className="font-mono text-xs text-muted-foreground">{column.items.filter(item => item.fields).length}</span>
                   </h3>
-                  <div className="flex flex-col gap-1">
+                  <div data-slot="board-column-list" tabIndex={0} role="group" aria-label={column.title} className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-y-contain">
                     {column.items.map(item => (
-                      <button key={item.id} type="button" disabled={!item.fields}
-                        aria-pressed={selectedId === item.id} onClick={() => setSelectedId(item.id)}
-                        className={cn("flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left text-sm outline-none enabled:hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring disabled:text-muted-foreground/60", selectedId === item.id && "bg-muted") }>
-                        <span className="shrink-0 font-mono text-muted-foreground" aria-label={item.fields ? t.boardDone : item.id === activeItemId ? t.boardWorking : t.boardPending}>
-                          {item.fields ? "✓" : item.id === activeItemId ? "▸" : "·"}
+                      <button key={item.id} type="button" disabled={!item.fields && !activeIds.has(item.id) && !board.drafts[item.id]}
+                        aria-busy={activeIds.has(item.id)} aria-pressed={selectedId === item.id} onClick={() => setSelectedId(item.id)}
+                        className={cn("relative isolate flex w-full shrink-0 items-start gap-2 rounded-sm px-2 py-2 text-left text-sm outline-none enabled:hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring disabled:text-muted-foreground/60", selectedId === item.id && "bg-muted", activeIds.has(item.id) && "scenario-board-active text-foreground") }>
+                        <span className={cn("shrink-0 font-mono", item.fields ? "text-blue-600" : activeIds.has(item.id) ? "text-emerald-600" : "text-muted-foreground")} aria-label={item.fields ? t.boardDone : activeIds.has(item.id) ? t.boardWorking : t.boardPending}>
+                          {item.fields ? "✓" : activeIds.has(item.id) ? "▸" : "·"}
                         </span>
                         <span className="min-w-0 break-words">{item.title}</span>
                       </button>
@@ -63,6 +67,14 @@ export const ScenarioBoard = memo(function ScenarioBoard({ t }: { t: UiTexts }) 
                 <Button variant="ghost" size="icon-sm" aria-label={t.boardClose} onClick={() => setSelectedId(undefined)}><X /></Button>
               </header>
               <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto p-5">
+                {!selected.fields ? <>
+                  <p className="text-xs text-muted-foreground">{t.boardDraft}</p>
+                  {selectedDraft && Object.values(selectedDraft).some(Boolean) ? Object.entries(selectedDraft).map(([field, content]) => (
+                    <section key={field}><h4 className="mb-2 text-xs font-medium text-muted-foreground">{fieldLabels[field] ?? t.boardWorking}</h4>
+                      <p className="whitespace-pre-wrap break-words text-sm leading-6">{content}</p>
+                    </section>
+                  )) : <p role="status" className="text-sm text-muted-foreground">{t.boardAwaiting}</p>}
+                </> : null}
                 {selected.fields?.map((field, index) => (
                   <section key={index}>
                     {field.label ? <h4 className="mb-2 text-xs font-medium text-muted-foreground">{field.label}</h4> : null}

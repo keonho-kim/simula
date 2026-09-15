@@ -31,8 +31,6 @@ export function scenarioBoardColumns(board: ScenarioBoardState, t: UiTexts): { t
         { label: t.boardRole, content: card.role }, { label: t.boardBackground, content: card.backgroundHistory },
         { label: t.boardPersonality, content: card.personality }, { label: t.boardPreference, content: card.preference },
       ] : undefined }
-    }) : Array.from({ length: board.config?.actorCount ?? 1 }, (_, index) => ({
-      id: `actor-${index + 1}`, title: t.boardActor.replace("{number}", String(index + 1)),
-    })) },
+    }) : [{ id: "roster-pending", title: t.actorCards }] },
   ]
 }

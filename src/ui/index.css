@@ -308,6 +308,24 @@ select {
 }
 
 
+/* Only the active row's background fades; text and layout remain stable. */
+.scenario-board-active::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--color-emerald-100);
+  opacity: 0.65;
+  pointer-events: none;
+  animation: scenario-board-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes scenario-board-breathe {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.8; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;

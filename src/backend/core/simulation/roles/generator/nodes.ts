@@ -70,6 +70,8 @@ async function runActorCardGraphForEntry(
   plannerDigest: string,
   emit: (event: RunEvent) => Promise<void>
 ) {
+  await emit({ type: "board.updated", runId: state.runId, timestamp: new Date().toISOString(),
+    update: { kind: "actor.started", id: "actor-" + entry.index } })
   const card = await runActorCardGraph({
     runId: state.runId,
     scenario: state.scenario,

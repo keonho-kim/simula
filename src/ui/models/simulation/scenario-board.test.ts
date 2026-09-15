@@ -32,3 +32,29 @@ test("board artifacts survive telemetry retention and restore from persisted eve
   expect(updateScenarioBoard(emptyScenarioBoard(), [start, digest])).toEqual(useRunStore.getState().scenarioBoard)
   store.resetLiveState()
 })
+
+test("parallel actor activity ends independently when each card completes", () => {
+  const board = updateScenarioBoard(emptyScenarioBoard(), [start,
+    { ...base, type: "board.updated", update: { kind: "actor.started", id: "actor-1" } },
+    { ...base, type: "board.updated", update: { kind: "actor.started", id: "actor-2" } },
+  ])
+  expect(board.activeActorIds).toEqual(["actor-1", "actor-2"])
+  const completed = updateScenarioBoard(board, [{ ...base, type: "board.updated", update: {
+    kind: "actor", id: "actor-2", card: { name: "B", role: "Role", backgroundHistory: "Background", personality: "Calm", preference: "Agree" },
+  } }])
+  expect(completed.activeActorIds).toEqual(["actor-1"])
+  expect(completed.cards["actor-2"]?.name).toBe("B")
+})
+
+test("streamed drafts append once and retries replace rejected output", () => {
+  const preview = (streamId: string, sequence: number, content: string): RunEvent => ({ ...base, type: "board.updated", update: {
+    kind: "preview", id: "coreSituation", field: "coreSituation", streamId, sequence, content,
+  } })
+  const first = preview("first", 1, "partial")
+  const board = updateScenarioBoard(emptyScenarioBoard(), [start, preview("first", 0, ""), first, first])
+  expect(board.drafts.coreSituation?.coreSituation).toBe("partial")
+  expect(board.digest.coreSituation).toBeUndefined()
+  const retry = updateScenarioBoard(board, [preview("retry", 0, ""), preview("retry", 1, "revised")])
+  expect(retry.drafts.coreSituation?.coreSituation).toBe("revised")
+  expect(updateScenarioBoard(retry, [digest]).digest.coreSituation).toBe("A concrete situation.")
+})

@@ -74,6 +74,6 @@ export function mergeLiveEvents(current: RunEvent[], incoming: RunEvent[]): RunE
 }
 
 export function stageEvents(events: RunEvent[]): RunEvent[] {
-  return events.filter(event => event.type !== "model.metrics" && event.type !== "model.reasoning" &&
+  return events.filter(event => event.type !== "board.updated" && event.type !== "model.metrics" && event.type !== "model.reasoning" &&
     event.type !== "log" && event.type !== "graph.delta" && event.type !== "report.delta")
 }

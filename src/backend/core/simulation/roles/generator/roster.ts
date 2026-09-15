@@ -1,3 +1,4 @@
+import { createBoardStream } from "@/backend/core/simulation/events/board-stream"
 import type { ActorRosterEntry, RunEvent } from "@/shared"
 import { invokeRoleTextWithMetrics } from "@/backend/integrations/llm"
 import { withRolePromptGuide } from "@/backend/core/prompts/language"
@@ -18,7 +19,9 @@ export async function createActorRoster(
       settings: state.settings,
       role: "generator",
     })
-    const result = await invokeRoleTextWithMetrics(state.settings, "generator", "roster", attempt, prompt)
+    const stream = await createBoardStream(state.runId, emit, "roster-pending", "roster")
+    const result = await invokeRoleTextWithMetrics(state.settings, "generator", "roster", attempt, prompt, stream.onDelta)
+    await stream.flush()
     await emitModelTelemetry(state.runId, result, emit)
 
     try {

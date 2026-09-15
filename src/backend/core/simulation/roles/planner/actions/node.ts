@@ -1,3 +1,4 @@
+import { createBoardStream } from "@/backend/core/simulation/events/board-stream"
 import type { ActionCatalog, ActorAction, RunEvent } from "@/shared"
 import { invokeRoleTextWithMetrics } from "@/backend/integrations/llm"
 import { normalizePromptLanguage, withRolePromptGuide } from "@/backend/core/prompts/language"
@@ -26,7 +27,9 @@ export function createPlannerActionsNode(emit: (event: RunEvent) => Promise<void
           const prompt = withRolePromptGuide(actionCatalogPrompt(context, visibility, count, catalog, error), {
             language: state.scenario.language, settings: state.settings, role: "planner",
           })
-          const result = await invokeRoleTextWithMetrics(state.settings, "planner", "actionCatalog", attempt, prompt)
+          const stream = await createBoardStream(state.runId, emit, "actions-pending", visibility)
+          const result = await invokeRoleTextWithMetrics(state.settings, "planner", "actionCatalog", attempt, prompt, stream.onDelta)
+          await stream.flush()
           await emitModelTelemetry(state.runId, result, emit)
           let actions: ActorAction[]
           try {

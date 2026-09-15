@@ -1,3 +1,4 @@
+import { createBoardStream } from "@/backend/core/simulation/events/board-stream"
 import type { PlannerTrace, PlannerTraceStep, RunEvent } from "@/shared"
 import { invokeRoleTextWithMetrics } from "@/backend/integrations/llm"
 import { withRolePromptGuide } from "@/backend/core/prompts/language"
@@ -58,7 +59,9 @@ async function runPlannerTextNode(
       settings: state.settings,
       role: "planner",
     })
-    const result = await invokeRoleTextWithMetrics(state.settings, "planner", step, attempt, prompt)
+    const stream = await createBoardStream(state.runId, emit, step === "majorEvents" ? "events-pending" : step, step)
+    const result = await invokeRoleTextWithMetrics(state.settings, "planner", step, attempt, prompt, stream.onDelta)
+    await stream.flush()
     await emitModelTelemetry(state.runId, result, emit)
     const response = step === "majorEvents" ? normalizePlannerMajorEvents(result.text) : normalizePlannerDigest(result.text)
     if (response) {

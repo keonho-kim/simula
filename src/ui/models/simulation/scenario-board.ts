@@ -5,6 +5,9 @@ export interface ScenarioBoardState {
   started: boolean
   ready: boolean
   terminal: boolean
+  activeActorIds: string[]
+  drafts: Record<string, Record<string, string>>
+  streams: Record<string, { id: string; sequence: number }>
   config?: Extract<ScenarioBoardUpdate, { kind: "config" }>
   digest: Partial<ScenarioDigest>
   events: Extract<ScenarioBoardUpdate, { kind: "events" }>["events"]
@@ -13,7 +16,7 @@ export interface ScenarioBoardState {
   cards: Record<string, Extract<ScenarioBoardUpdate, { kind: "actor" }>["card"]>
 }
 export function emptyScenarioBoard(): ScenarioBoardState {
-  return { started: false, ready: false, terminal: false, digest: {}, events: [], actions: [], roster: [], cards: {} }
+  return { started: false, ready: false, terminal: false, activeActorIds: [], drafts: {}, streams: {}, digest: {}, events: [], actions: [], roster: [], cards: {} }
 }
 
 /** Retain accepted artifacts independently of the rolling telemetry window. */
@@ -30,6 +33,18 @@ export function updateScenarioBoard(current: ScenarioBoardState, events: RunEven
     if (event.type !== "board.updated") continue
     const value = event.update
     switch (value.kind) {
+      case "preview": {
+        const key = value.id + ":" + value.field
+        const previous = board.streams[key]
+        if (previous?.id === value.streamId && previous.sequence >= value.sequence) break
+        if (previous?.id !== value.streamId && value.sequence !== 0) break
+        board = { ...board, streams: { ...board.streams, [key]: { id: value.streamId, sequence: value.sequence } },
+          drafts: { ...board.drafts, [value.id]: { ...board.drafts[value.id],
+            [value.field]: value.sequence === 0 ? "" : (board.drafts[value.id]?.[value.field] ?? "") + value.content,
+          } } }
+        break
+      }
+      case "actor.started": board = { ...board, activeActorIds: [...new Set([...board.activeActorIds, value.id])] }; break
       case "config": board = { ...board, config: value }; break
       case "digest": board = { ...board, digest: { ...board.digest, [value.key]: value.content } }; break
       case "events": board = { ...board, events: value.events }; break
@@ -40,7 +55,15 @@ export function updateScenarioBoard(current: ScenarioBoardState, events: RunEven
         break
       }
       case "roster": board = { ...board, roster: value.actors }; break
-      case "actor": board = { ...board, cards: { ...board.cards, [value.id]: value.card } }; break
+      case "actor": board = { ...board, activeActorIds: board.activeActorIds.filter(id => id !== value.id), cards: { ...board.cards, [value.id]: value.card } }; break
+    }
+    const completedId = value.kind === "digest" ? value.key : value.kind === "actor" ? value.id :
+      value.kind === "events" ? "events-pending" : value.kind === "actions" ? "actions-pending" :
+      value.kind === "roster" ? "roster-pending" : undefined
+    if (completedId && board.drafts[completedId]) {
+      const drafts = { ...board.drafts }
+      delete drafts[completedId]
+      board = { ...board, drafts }
     }
   }
   return board

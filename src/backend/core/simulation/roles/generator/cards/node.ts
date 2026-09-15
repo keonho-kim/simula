@@ -1,3 +1,4 @@
+import { createBoardStream } from "@/backend/core/simulation/events/board-stream"
 import type { ActorCardStep, RunEvent } from "@/shared"
 import { invokeRoleTextWithMetrics } from "@/backend/integrations/llm"
 import { withRolePromptGuide } from "@/backend/core/prompts/language"
@@ -37,7 +38,9 @@ async function runActorCardTextNode(
       settings: state.settings,
       role: "generator",
     })
-    const result = await invokeRoleTextWithMetrics(state.settings, "generator", step, attempt, prompt)
+    const stream = await createBoardStream(state.runId, state.emit, "actor-" + state.actorIndex, step)
+    const result = await invokeRoleTextWithMetrics(state.settings, "generator", step, attempt, prompt, stream.onDelta)
+    await stream.flush()
     await emitModelTelemetry(state.runId, result, state.emit)
     const response = normalizePlainText(result.text)
     if (response) {

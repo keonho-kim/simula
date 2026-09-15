@@ -1,5 +1,6 @@
 export const simulationStageTexts = {
   en: {
+    boardDraft: "Live draft · awaiting validation", boardAwaiting: "Waiting for the first output…",
     boardWorld: "Background & conflict", boardEvents: "Expected events", boardActions: "Actions",
     boardCore: "Background", boardPressures: "Actor pressures", boardConflict: "Conflict structure", boardDirection: "Story direction",
     boardProgress: "Completed work", boardClose: "Close details", boardEnter: "View simulation",
@@ -65,6 +66,7 @@ export const simulationStageTexts = {
     metricAttempt: "Attempt",
   },
   ko: {
+    boardDraft: "생성 중인 초안 · 검증 전", boardAwaiting: "첫 응답을 기다리고 있습니다…",
     boardWorld: "배경·갈등", boardEvents: "예상 이벤트", boardActions: "행동",
     boardCore: "배경 상황", boardPressures: "인물별 압력", boardConflict: "갈등 구조", boardDirection: "전개 방향",
     boardProgress: "작업 완료율", boardClose: "상세 닫기", boardEnter: "시뮬레이션 보기",
