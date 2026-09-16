@@ -109,3 +109,20 @@ selection call or requiring a multi-field response from smaller models.
 Automated verification uses deterministic provider responses and malformed-response fixtures.
 These checks establish protocol behavior, not measured semantic quality or reliability on an
 actual 27B (or smaller) model; that requires evaluation with the intended local model.
+
+## Actor thought, intent, and speech
+
+Actor text prompts distinguish private interpretation (`thought`), the purpose of the chosen
+behavior (`intent`), and recipient-facing dialogue (`message`). Intent receives the preceding
+thought, current event, and pre-round context. Speech receives event context alongside thought,
+intent, action, and target. Korean and English instructions include one connected role example;
+only the current step is requested, and the example's content must not be copied. Honest speech
+is allowed; actors are not required to invent hidden motives or contradict their thoughts.
+
+Speech validation rejects only whole-response copies of thought or intent, after Unicode,
+case, whitespace, and punctuation normalization. It does not reject semantic similarity or
+shared phrases. A rejected response receives localized feedback identifying the copied field
+and asking for recipient-facing speech while retaining the previous decisions. Only speech is
+retried, with at most three total attempts. Exhaustion fails explicitly without inventing a
+replacement line. Existing silence and no-action behavior is preserved; target and action
+exact-choice validation and repair remain unchanged.
