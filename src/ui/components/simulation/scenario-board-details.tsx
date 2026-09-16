@@ -12,7 +12,7 @@ export const ScenarioBoardDetails = memo(function ScenarioBoardDetails({ item, r
 }) {
   const preview = useBoardPreview(runId, !item.fields && live ? item.id : undefined)
   const selectedDraft = preview.fields
-  const fieldLabels: Record<string, string> = { role: t.boardRole, backgroundHistory: t.boardBackground, personality: t.boardPersonality, preference: t.boardPreference,
+  const fieldLabels: Record<string, string> = { label: t.boardActionName, intentHint: t.boardIntent, expectedOutcome: t.boardOutcome, role: t.boardRole, backgroundHistory: t.boardBackground, personality: t.boardPersonality, preference: t.boardPreference,
     roster: t.actorCards, public: t.boardPublic, "semi-public": t.boardGroup, private: t.boardPrivate, solitary: t.boardSolitary,
     coreSituation: t.boardCore, actorPressures: t.boardPressures, conflictDynamics: t.boardConflict, simulationDirection: t.boardDirection, majorEvents: t.boardEvents }
   return <>

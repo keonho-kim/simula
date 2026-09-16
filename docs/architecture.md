@@ -170,8 +170,9 @@ Frontend naming and helper placement are documented in [the web guide](../apps/w
 ## Planner-owned action catalog
 
 `roles/planner/actions` owns a separate `planner.actionCatalog` stage after the planner digest and
-major events have been applied. `prompts.ts` requests short action definitions, `catalog.ts` parses
-and validates them and assigns codes, and `node.ts` coordinates model calls, retries, and telemetry.
+major events have been applied. `prompts.ts` requests one JSON action, `catalog.ts` uses the existing LangChain JSON parser and
+validates the schema before assigning codes, and `node.ts` coordinates sequential per-action calls,
+retries, and telemetry. `stream.ts` uses LangChain partial JSON parsing to publish live named fields.
 This is one workflow stage with focused functions, not an additional nested graph.
 
 The plan is the owner of the code-to-definition map. Generator actor assembly references its

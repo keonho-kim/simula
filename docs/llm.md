@@ -77,22 +77,29 @@ decision contract.
 
 ## Small-model action catalog generation
 
-Planner defines actions in sequential batches of at most three, one visibility at a time. The
-model returns `label | usage condition | expected effect` lines, not a JSON map. Program code
-assigns the ids. Conditions and effects have 200-character limits and labels have a 40-character
-limit. Context budgets preserve both scenario and planner information. Prompts request concrete,
-varied mechanisms and show previously accepted labels.
+Planner generates one action per model call, sequentially within each visibility scope. Each
+response is one JSON object with exactly label, intentHint, and expectedOutcome. The existing
+LangChain parseJsonMarkdown utility with JSON.parse handles the completed response; Zod validates
+field types, bounds, and unknown keys. No custom JSON parser or pipe-delimited compatibility path
+is retained. IDs and visibility remain program-owned.
 
-Validation requires bounded row counts, exact field counts, non-empty bounded fields, distinct normalized
-labels (including rejection of variants distinguished only by numbering), and Korean fields for
-Korean scenarios. Codes, placeholders, and the former generic visibility templates are not valid
-labels. Valid rows are retained even if neighboring rows are malformed or duplicated. Missing
-rows are regenerated one at a time, with at most five calls per original batch. Retry feedback
-accumulates validation failures and identifies the conflicting code, scope, and accepted label;
-all accepted actions are included in the exclusion list. Codes remain contiguous as valid rows
-are accepted. Excess rows are rejected explicitly. Exhaustion reports accepted/missing counts
-and conflicts; no invented fallback actions or partial catalog is installed. Transport/storage failures propagate instead of being treated as
-model formatting errors. Existing reasoning separation and metric/log emission remain in use.
+Korean scenarios receive Korean instructions and examples, with English JSON keys and Korean
+values. Language errors identify the failing fields. Context reserves space for each digest
+section rather than truncating a combined digest. Accepted labels and purposes are included in
+subsequent calls; normalized duplicates and numbering variants remain invalid.
+
+Each action has at most five attempts. A failure retries only that slot; accepted actions and
+codes stay unchanged. Failure logs identify scope, slot, attempt and validation issue. The final
+catalog is installed only when every slot passes. Default three actions per scope now require
+12 initial calls rather than four batches; this trades additional round trips for smaller tasks.
+Generation is deliberately sequential because each action must compare against all accepted
+labels. Provider-specific JSON response-format flags are not forced on servers with unknown
+support; the prompt requests JSON and application validation enforces the contract.
+
+For live previews, LangChain's existing partial JSON parsing extracts named string fields as
+tokens arrive. Only these draft fields are sent through item-specific preview SSE and rendered
+under localized headings. Partial JSON never becomes an accepted action. Retry resets all three
+fields, and final parsing is strict even though preview parsing tolerates incomplete JSON.
 
 Actor selection continues to use the existing short exact-choice responses, allowed-output
 validation, and repair role. The default catalog has twelve codes plus `no_action`, and a solitary

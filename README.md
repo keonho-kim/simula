@@ -55,7 +55,7 @@ flowchart LR
     Finalization --> Artifacts["Run Artifacts"]
 ```
 
-- Planning interprets the scenario, defines major events and runtime direction, then creates a code-to-action catalog in small validated batches.
+- Planning interprets the scenario, defines major events and runtime direction, then creates a code-to-action catalog one validated JSON action at a time.
 - Actor generation turns planned cast slots into actor cards and attaches the Planner-owned action definitions.
 - Runtime advances the world through actor messages, interactions, context updates, and round reports.
 - Finalization renders the completed state into `report.md`.

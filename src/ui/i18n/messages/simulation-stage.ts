@@ -1,5 +1,6 @@
 export const simulationStageTexts = {
   en: {
+    boardActionName: "Action name",
     boardBack: "All columns", boardReconnecting: "Reconnecting to live output…",
     boardDraft: "Live draft · awaiting validation", boardAwaiting: "Waiting for the first output…",
     boardWorld: "Background & conflict", boardEvents: "Expected events", boardActions: "Actions",
@@ -67,6 +68,7 @@ export const simulationStageTexts = {
     metricAttempt: "Attempt",
   },
   ko: {
+    boardActionName: "행동 이름",
     boardBack: "전체 보드", boardReconnecting: "실시간 연결을 다시 시도하고 있습니다…",
     boardDraft: "생성 중인 초안 · 검증 전", boardAwaiting: "첫 응답을 기다리고 있습니다…",
     boardWorld: "배경·갈등", boardEvents: "예상 이벤트", boardActions: "행동",

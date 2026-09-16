@@ -46,10 +46,12 @@ test("scenario board fills ordered columns and opens structured details", async 
   let previewRequests = 0
   await page.route("**/board-preview?item=*", async route => {
     previewRequests++
-    const event = { type: "board.updated", runId: "test", timestamp: new Date().toISOString(), update: {
-      kind: "preview", id: "coreSituation", field: "coreSituation", streamId: "test", sequence: 3, snapshot: true, content: "새로운 상황을 작성하고 있습니다.",
-    } }
-    await route.fulfill({ contentType: "text/event-stream", body: "event: board.updated\ndata: " + JSON.stringify(event) + "\n\n" })
+    const id = new URL(route.request().url()).searchParams.get("item")!
+    const fields = id === "actions-pending" ? { label: "답변 시점 협의", intentHint: "당장 답하기 어려울 때", expectedOutcome: "기다릴 시간을 합의한다" } : { coreSituation: "새로운 상황을 작성하고 있습니다." }
+    const body = Object.entries(fields).map(([field, content]) => "event: board.updated\ndata: " + JSON.stringify({ type: "board.updated", runId: "test", timestamp: new Date().toISOString(), update: {
+      kind: "preview", id, field, streamId: "test", sequence: 3, snapshot: true, content,
+    } }) + "\n\n").join("")
+    await route.fulfill({ contentType: "text/event-stream", body })
   })
   expect(previewRequests).toBe(0)
   await active.click()
@@ -79,6 +81,20 @@ test("scenario board fills ordered columns and opens structured details", async 
   await dialog.getByRole("button", { name: /사과 방식 확인/ }).click()
   await expect(dialog.getByRole("complementary")).toContainText("개인 대화")
   await expect(dialog.getByRole("complementary")).toContainText("오해를 줄입니다.")
+  await page.evaluate(async () => {
+    const path = "/src/ui/stores/run-store.ts"
+    const { useRunStore } = await import(path)
+    const store = useRunStore.getState()
+    store.pushEvents(["coreSituation", "conflictDynamics", "simulationDirection"].map(key => ({ type: "board.updated", runId: store.selectedRunId, timestamp: new Date().toISOString(), update: { kind: "digest", key, content: "완료된 기획 내용" } })))
+  })
+  await dialog.getByRole("button", { name: /진행 중 …/ }).click()
+  const actionDraft = dialog.getByRole("complementary")
+  await expect(actionDraft.getByRole("heading", { name: "행동 이름", exact: true })).toBeVisible()
+  await expect(actionDraft).toContainText("답변 시점 협의")
+  await expect(actionDraft).toContainText("사용 조건")
+  await expect(actionDraft).toContainText("기다릴 시간을 합의한다")
+  await expect(actionDraft).not.toContainText('"label":')
+
   await dialog.getByRole("button", { name: /전체 보드/ }).click()
   await dialog.getByRole("button", { name: /입장권 오류/ }).click()
   await expect(dialog.getByRole("complementary")).toContainText("예약된 티켓이 한 사람의 이름으로 발급되었습니다.")
