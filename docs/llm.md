@@ -83,12 +83,15 @@ assigns the ids. Conditions and effects have 200-character limits and labels hav
 limit. Context budgets preserve both scenario and planner information. Prompts request concrete,
 varied mechanisms and show previously accepted labels.
 
-Validation requires the exact row/field counts, non-empty bounded fields, distinct normalized
+Validation requires bounded row counts, exact field counts, non-empty bounded fields, distinct normalized
 labels (including rejection of variants distinguished only by numbering), and Korean fields for
 Korean scenarios. Codes, placeholders, and the former generic visibility templates are not valid
-labels. Each invalid batch receives its validation error as retry feedback, up to five attempts.
-Only the invalid batch is retried. Exhaustion fails explicitly; no invented fallback actions or
-partial catalog is installed. Transport/storage failures propagate instead of being treated as
+labels. Valid rows are retained even if neighboring rows are malformed or duplicated. Missing
+rows are regenerated one at a time, with at most five calls per original batch. Retry feedback
+accumulates validation failures and identifies the conflicting code, scope, and accepted label;
+all accepted actions are included in the exclusion list. Codes remain contiguous as valid rows
+are accepted. Excess rows are rejected explicitly. Exhaustion reports accepted/missing counts
+and conflicts; no invented fallback actions or partial catalog is installed. Transport/storage failures propagate instead of being treated as
 model formatting errors. Existing reasoning separation and metric/log emission remain in use.
 
 Actor selection continues to use the existing short exact-choice responses, allowed-output

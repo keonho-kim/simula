@@ -21,25 +21,25 @@ function state() {
 }
 
 test("program-assigned codes retain Korean labels and concrete action metadata", () => {
-  const actions = parseActionBatch(rows, "public", 0, 2, {}, "ko")
+  const actions = parseActionBatch(rows, "public", 0, 2, {}, "ko").actions
   expect(actions.map((action) => action.id)).toEqual(["PUB01", "PUB02"])
   expect(actions[0]).toEqual({ id: "PUB01", visibility: "public", label: "근거 요청", intentHint: "정보가 부족할 때", expectedOutcome: "판단 자료를 확보한다" })
-  expect(parseActionBatch("```text\n1. 자료 검토 | 근거가 필요할 때 | 판단을 준비한다\n```", "solitary", 3, 1, {}, "ko")[0]!.id).toBe("SOL04")
+  expect(parseActionBatch("```text\n1. 자료 검토 | 근거가 필요할 때 | 판단을 준비한다\n```", "solitary", 3, 1, {}, "ko").actions[0]!.id).toBe("SOL04")
 })
 
-test("invalid batches are rejected instead of silently changing the action catalog", () => {
-  const existing = { PUB01: parseActionBatch(rows, "public", 0, 2, {}, "ko")[0]! }
-  expect(() => parseActionBatch(rows, "public", 0, 3, {}, "ko")).toThrow("Expected 3")
-  expect(() => parseActionBatch("근거 요청 | 정보가 부족할 때", "public", 0, 1, {}, "ko")).toThrow("exactly")
-  expect(() => parseActionBatch("근거 요청 1 | 정보가 부족할 때 | 근거를 얻는다\n근거 요청 2 | 검토할 때 | 근거를 얻는다", "public", 0, 2, {}, "ko")).toThrow("distinct")
-  expect(() => parseActionBatch(rows, "private", 0, 2, existing, "ko")).toThrow("distinct")
-  expect(() => parseActionBatch("PUB01 | Need evidence | Learn facts", "public", 0, 1, {}, "en")).toThrow("not a code")
-  expect(() => parseActionBatch("Request evidence | Need evidence | Learn facts", "public", 0, 1, {}, "ko")).toThrow("Korean")
-  expect(() => parseActionBatch("Public move 1 about a goal | Need evidence | Learn facts", "public", 0, 1, {}, "en")).toThrow("concrete")
+test("invalid rows report validation issues and never enter the accepted catalog", () => {
+  const existing = { PUB01: parseActionBatch(rows, "public", 0, 2, {}, "ko").actions[0]! }
+  expect(parseActionBatch(rows, "public", 0, 3, {}, "ko").issues.join(" ")).toContain("Expected 3")
+  expect(parseActionBatch("근거 요청 | 정보가 부족할 때", "public", 0, 1, {}, "ko").issues.join(" ")).toContain("exactly")
+  expect(parseActionBatch("근거 요청 1 | 정보가 부족할 때 | 근거를 얻는다\n근거 요청 2 | 검토할 때 | 근거를 얻는다", "public", 0, 2, {}, "ko").issues.join(" ")).toContain("distinct")
+  expect(parseActionBatch(rows, "private", 0, 2, existing, "ko").issues.join(" ")).toContain("distinct")
+  expect(parseActionBatch("PUB01 | Need evidence | Learn facts", "public", 0, 1, {}, "en").issues.join(" ")).toContain("not a code")
+  expect(parseActionBatch("Request evidence | Need evidence | Learn facts", "public", 0, 1, {}, "ko").issues.join(" ")).toContain("Korean")
+  expect(parseActionBatch("Public move 1 about a goal | Need evidence | Learn facts", "public", 0, 1, {}, "en").issues.join(" ")).toContain("concrete")
 })
 
 test("Actor selects a code; labels, scope, effect and interaction metadata come from the catalog", () => {
-  const actions = [...parseActionBatch(rows, "public", 0, 2, {}, "ko"), ...parseActionBatch("자료 검토 | 검토할 때 | 준비한다", "solitary", 0, 1, {}, "ko")]
+  const actions = [...parseActionBatch(rows, "public", 0, 2, {}, "ko").actions, ...parseActionBatch("자료 검토 | 검토할 때 | 준비한다", "solitary", 0, 1, {}, "ko").actions]
   const catalog = Object.fromEntries(actions.map((action) => [action.id, action]))
   const card = { name: "민수", role: "담당자", backgroundHistory: "출시 준비", personality: "신중함", preference: "안전한 출시" }
   const actor = buildActor(1, card, "출시", catalog)
@@ -59,7 +59,7 @@ test("Actor selects a code; labels, scope, effect and interaction metadata come 
   expect(actor.actions[0]).toBe(catalog.PUB01)
 })
 
-test("Planner retries invalid output with feedback and only commits complete batches", async () => {
+test("Planner retries invalid output with feedback and only installs a complete catalog", async () => {
   const prompts: string[] = []
   let calls = 0
   const spy = spyOn(invocation, "invokeRoleTextWithMetrics").mockImplementation(async (_settings, _role, _step, _attempt, prompt) => {
@@ -73,10 +73,9 @@ test("Planner retries invalid output with feedback and only commits complete bat
     const events: RunEvent[] = []
     const result = await createPlannerActionsNode(async (event) => { events.push(event) })(input)
     expect(Object.keys(result.simulation!.plan!.actionCatalog)).toHaveLength(16)
-    expect(prompts).toHaveLength(9)
-    expect(prompts[1]).toContain("Previous response was invalid")
+    expect(prompts).toHaveLength(11)
     expect(Object.keys(input.simulation.plan.actionCatalog)).toHaveLength(0)
-    expect(events.filter((event) => event.type === "model.metrics")).toHaveLength(9)
+    expect(events.filter((event) => event.type === "model.metrics")).toHaveLength(11)
   } finally { spy.mockRestore() }
 })
 
@@ -85,5 +84,40 @@ test("Planner fails after bounded invalid responses without inventing default ac
   try {
     await expect(createPlannerActionsNode(async () => {})(state())).rejects.toThrow("failed after 5 attempts")
     expect(spy).toHaveBeenCalledTimes(5)
+  } finally { spy.mockRestore() }
+})
+
+test("Planner preserves valid rows and regenerates only cross-scope or same-batch duplicates", async () => {
+  const requested: number[] = []
+  let privateCalls = 0
+  const spy = spyOn(invocation, "invokeRoleTextWithMetrics").mockImplementation(async (_settings, _role, _step, attempt, prompt) => {
+    const textPrompt = String(prompt)
+    const scope = textPrompt.match(/Scope: (.+)/)![1]!
+    const count = Number(textPrompt.match(/Batch size: (\d+)/)![1])
+    let labels: string[]
+    if (scope === "private") {
+      privateCalls++
+      requested.push(count)
+      labels = privateCalls === 1 ? ["근거 요청", "사과 방식 확인", "사과 방식 확인"] : privateCalls === 2 ? ["답변 시점 제안"] : ["개인 경계 명시"]
+    } else {
+      labels = scope === "public" ? ["근거 요청", "대안 제시", "공개 약속"] : scope === "semi-public" ? ["공동 일정 조율", "소그룹 의견 수집", "역할 분담"] : ["감정 정리", "기록 검토", "입장 재고"]
+    }
+    return { text: labels.map(label => `${label} | 판단이 필요할 때 | 대화를 준비한다`).join("\n"), metrics: { role: "planner", step: "actionCatalog", attempt, ttftMs: 0, durationMs: 0, inputTokens: 0, reasoningTokens: 0, outputTokens: 0, totalTokens: 0, tokenSource: "unavailable" }, diagnostics: { reasoningContentObserved: false, reasoningContent: "" } }
+  })
+  try {
+    const input = state()
+    input.scenario = { ...input.scenario, controls: { ...input.scenario.controls, actionsPerType: 3 } }
+    const events: RunEvent[] = []
+    const result = await createPlannerActionsNode(async event => { events.push(event) })(input)
+    const catalog = result.simulation!.plan!.actionCatalog
+    expect(requested).toEqual([3, 1, 1])
+    expect(Object.keys(catalog)).toHaveLength(12)
+    expect(catalog.PRV01!.label).toBe("사과 방식 확인")
+    expect(catalog.PRV02!.label).toBe("답변 시점 제안")
+    expect(catalog.PRV03!.label).toBe("개인 경계 명시")
+    expect(new Set(Object.values(catalog).map(action => action.label)).size).toBe(12)
+    const accepted = events.flatMap(event => event.type === "board.updated" && event.update.kind === "actions" ? event.update.actions : [])
+    expect(accepted.filter(action => action.label === "사과 방식 확인")).toHaveLength(1)
+    expect(Object.keys(input.simulation.plan.actionCatalog)).toHaveLength(0)
   } finally { spy.mockRestore() }
 })

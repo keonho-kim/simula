@@ -19,6 +19,6 @@ Scenario and planner context:
 ${context}
 
 Already defined labels (do not duplicate):
-${Object.values(existing).map((action) => `- ${action.label}`).join("\n") || "None"}
-${error ? `\nPrevious response was invalid: ${error}\nGenerate the entire corrected batch again.` : ""}`
+${Object.values(existing).map((action) => `- ${action.id} (${action.visibility}): ${action.label}`).join("\n") || "None"}
+${error ? `\nPrevious response was invalid: ${error}\nValid actions from earlier responses have already been kept in the list above. Return ONLY the requested missing number of NEW actions. Do not repeat or rename retained actions; choose different concrete mechanisms.` : ""}`
 }
