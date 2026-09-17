@@ -9,6 +9,9 @@ import { actionAllowedOutputs, buildActorDecision, createActorGraphState, isVali
 import { emptyCoordinatorTrace } from "@/backend/core/simulation/roles/coordinator/state"
 import { parseAction } from "./catalog"
 import { createPlannerActionsNode } from "./node"
+import { emptyScenarioBoard, updateScenarioBoard } from "@/ui/models/simulation/scenario-board"
+import { scenarioBoardColumns } from "@/ui/models/simulation/scenario-board-items"
+import { dictionary } from "@/ui/i18n/dictionary"
 
 const json = (label: string) => JSON.stringify({ label, intentHint: "정보가 필요할 때", expectedOutcome: "판단을 준비한다" })
 const scenario = { ...parseScenarioDocument("---\nnum_cast: 2\nactions_per_type: 4\n---\n출시를 논의하는 팀"), language: "ko" as const }
@@ -86,5 +89,33 @@ test("repeated malformed JSON fails after a bounded number of attempts", async (
   try {
     await expect(createPlannerActionsNode(async () => {})(state())).rejects.toThrow("failed after 5 attempts")
     expect(spy).toHaveBeenCalledTimes(5)
+  } finally { spy.mockRestore() }
+})
+
+test("persistent cross-scope label collisions recover and repeated same-scope actions reduce the target", async () => {
+  const spy = spyOn(invocation, "invokeRoleTextWithMetrics").mockResolvedValue(result(json("자료 검토")))
+  try {
+    const input = state()
+    const events: RunEvent[] = []
+    const output = await createPlannerActionsNode(async event => { events.push(event) })(input)
+    const actions = Object.values(output.simulation!.plan!.actionCatalog)
+    expect(actions).toHaveLength(4)
+    expect(new Set(actions.map(action => action.label)).size).toBe(4)
+    expect(actions.map(action => action.id)).toEqual(["PUB01", "GRP01", "PRV01", "SOL01"])
+    expect(actions.every(action => action.intentHint === "정보가 필요할 때")).toBe(true)
+    expect(events.some(event => event.type === "log" && event.level === "warn" && event.message.includes("recovered"))).toBe(true)
+    expect(events.findLast(event => event.type === "board.updated" && event.update.kind === "config")).toMatchObject({ update: { actionCount: 4, actorCount: 2 } })
+    const board = updateScenarioBoard(emptyScenarioBoard(), events)
+    expect(board.actions).toHaveLength(4)
+    expect(scenarioBoardColumns(board, dictionary.ko)[2]?.items.some(item => item.id === "actions-pending")).toBe(false)
+    expect(input.simulation.plan.actionCatalog).toEqual({})
+  } finally { spy.mockRestore() }
+})
+
+test("transport failure is not treated as a recoverable catalog validation error", async () => {
+  const spy = spyOn(invocation, "invokeRoleTextWithMetrics").mockRejectedValue(new Error("connection refused"))
+  try {
+    await expect(createPlannerActionsNode(async () => {})(state())).rejects.toThrow("connection refused")
+    expect(spy).toHaveBeenCalledTimes(1)
   } finally { spy.mockRestore() }
 })

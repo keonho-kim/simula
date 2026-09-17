@@ -89,8 +89,18 @@ section rather than truncating a combined digest. Accepted labels and purposes a
 subsequent calls; normalized duplicates and numbering variants remain invalid.
 
 Each action has at most five attempts. A failure retries only that slot; accepted actions and
-codes stay unchanged. Failure logs identify scope, slot, attempt and validation issue. The final
-catalog is installed only when every slot passes. Default three actions per scope now require
+codes stay unchanged. Failure logs identify scope, slot, attempt and validation issue. Solitary
+prompts use an independent-action example and explicitly exclude dialogue or joint agreement.
+After attempts are exhausted, a schema/language-validated candidate whose label conflicts with
+another visibility may receive a localized visibility prefix. The condition and effect remain
+model-authored, and the resulting action is validated again, including global label uniqueness.
+A same-scope collision is never renamed into a fake extra action. If that scope already has an
+accepted action, unresolved remaining slots are omitted and generation continues with the next
+scope. Thus actionsPerType is a target; recovered catalogs may contain fewer actions. Warning
+logs record every recovery and the board config is updated to the actual accepted count.
+Each scope must still contain at least one validated action; no invented fallback is installed
+when an entire scope has no valid output. Transport, cancellation, and event I/O failures propagate
+rather than being mistaken for duplicate-label errors. Default three actions per scope now require
 12 initial calls rather than four batches; this trades additional round trips for smaller tasks.
 Generation is deliberately sequential because each action must compare against all accepted
 labels. Provider-specific JSON response-format flags are not forced on servers with unknown

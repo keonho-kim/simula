@@ -10,6 +10,14 @@ const actionSchema = z.object({
   expectedOutcome: z.string().trim().min(1).max(200),
 }).strict()
 
+/** Carries only schema- and language-validated content into label recovery. */
+export class ActionLabelCollision extends Error {
+  constructor(readonly candidate: ActorAction, readonly existingAction: ActorAction) {
+    super(`label "${candidate.label}" must be distinct; conflicts with ${existingAction.id} (${existingAction.visibility}) "${existingAction.label}". Choose a different mechanism, not spacing, punctuation, or numbering variants.`)
+    this.name = "ActionLabelCollision"
+  }
+}
+
 export function parseAction(text: string, visibility: ActionVisibility, index: number, existing: ActionCatalog, language: "en" | "ko"): ActorAction {
   let decoded: unknown
   try { decoded = parseJsonMarkdown(text, JSON.parse) } catch { throw new Error("Return one valid JSON object with label, intentHint, expectedOutcome; no markdown or surrounding text.") }
@@ -25,10 +33,28 @@ export function parseAction(text: string, visibility: ActionVisibility, index: n
   const normalized = normalizeLabel(fields.label)
   if (!normalized) throw new Error("label: write a meaningful action name.")
   const collision = Object.values(existing).find(action => normalizeLabel(action.label) === normalized)
-  if (collision) throw new Error(`label "${fields.label}" must be distinct; conflicts with ${collision.id} (${collision.visibility}) "${collision.label}". Choose a different mechanism, not spacing, punctuation, or numbering variants.`)
-  return { id: `${prefixes[visibility]}${String(index + 1).padStart(2, "0")}`, visibility, ...fields }
+  const action = { id: `${prefixes[visibility]}${String(index + 1).padStart(2, "0")}`, visibility, ...fields }
+  if (collision) throw new ActionLabelCollision(action, collision)
+  return action
 }
 
 function normalizeLabel(label: string): string {
   return label.normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}\p{N}]/gu, "")
+}
+
+/** Disambiguate visibility, without inventing a new action or changing its condition/effect. */
+export function recoverScopedLabel(collision: ActionLabelCollision, catalog: ActionCatalog, language: "en" | "ko"): ActorAction | undefined {
+  const candidate = collision.candidate
+  if (candidate.visibility === collision.existingAction.visibility) return undefined
+  const names = language === "ko"
+    ? { public: "공개", "semi-public": "그룹", private: "개인", solitary: "혼자" }
+    : { public: "Public", "semi-public": "Group", private: "Private", solitary: "Solo" }
+  const prefix = `${names[candidate.visibility]} · `
+  const label = prefix + candidate.label.slice(0, 40 - prefix.length).trim()
+  try {
+    return parseAction(JSON.stringify({ label, intentHint: candidate.intentHint, expectedOutcome: candidate.expectedOutcome }), candidate.visibility, Number(candidate.id.slice(3)) - 1, catalog, language)
+  } catch (error) {
+    if (error instanceof ActionLabelCollision) return undefined
+    throw error
+  }
 }
