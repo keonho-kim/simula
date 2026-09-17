@@ -23,7 +23,7 @@ export function LlmMetricsPanelView({ data, t }: { data: MetricData; t: UiTexts 
   )
 }
 
-function MetricPanel({ series, t }: { series: MetricSeries; t: UiTexts }) {
+export function MetricPanel({ series, t, summary = false }: { series: MetricSeries; t: UiTexts; summary?: boolean }) {
   const hasSamples = series.sampleCount > 0
   const isTotal = series.display === "total"
   return (
@@ -31,12 +31,12 @@ function MetricPanel({ series, t }: { series: MetricSeries; t: UiTexts }) {
       <div className="flex min-h-[128px] min-w-0 flex-col gap-2 p-3">
         <div className="flex min-w-0 items-start justify-between gap-2">
           <h2 className="truncate text-sm font-medium">{series.title}</h2>
-          <span className="shrink-0 text-[10px] text-muted-foreground">{hasSamples ? t.metricLive : t.metricIdle}</span>
+          <span className="shrink-0 text-[10px] text-muted-foreground">{hasSamples ? summary ? t.samples : t.metricLive : t.metricIdle}</span>
         </div>
         {isTotal ? (
           <TokenTotalPanel series={series} t={t} />
         ) : (
-          series.points ? <LineChart id={series.title} points={series.points} t={t} /> : null
+          !summary && series.points ? <LineChart id={series.title} points={series.points} t={t} /> : null
         )}
         <div className={isTotal ? "hidden" : "border-t border-border/60 pt-2 text-right"}>
           <div className="truncate font-mono text-lg leading-none text-[#0284a8]">{series.latestValue}</div>

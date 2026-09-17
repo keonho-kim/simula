@@ -179,3 +179,20 @@ The plan is the owner of the code-to-definition map. Generator actor assembly re
 values rather than synthesizing per-actor template names. Actor decisions use the existing exact
 choice and repair path. Scope and expected effect are resolved by code; the Actor still generates
 its own context-dependent thought, intent, target, and message.
+
+### Report workspace
+
+The report page composes three panels in order: relationships, conversations, and performance.
+Only the selected panel mounts. Relationship inspection owns its graph selection and uses the
+existing replay cursor; the WebGL renderer is loaded on demand. Heatmap and additional behavior
+charts are revealed separately. Stable graph callbacks preserve the renderer when selection changes.
+
+Conversation projection derives a round board from persisted interactions, summaries, and injected
+events. Carousel browsing does not change the selected round. The shared message card and virtual
+history support archive mode (start-anchored, no automatic following), while simulation retains live
+following. Event badges describe the final recorded event status, not a reconstructed historical status.
+
+Performance projection filters recorded calls and reuses simulation metric panels and line charts.
+Token usage unavailable from a provider remains unavailable, with coverage shown explicitly.
+Error-event counts describe recorded node/log errors across the run, not unique failed requests;
+token-range filtering affects call metrics only. No report view initiates model calls.

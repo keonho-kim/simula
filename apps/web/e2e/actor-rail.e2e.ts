@@ -66,7 +66,7 @@ test("groups actor history by round with thoughts and speech in one card", async
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.setViewportSize({ width: 1440, height: 1100 })
   await page.getByRole("button", { name: "Report", exact: true }).click()
-  await page.getByRole("tab", { name: "Actors + Stage" }).click()
+  await page.getByRole("tab", { name: "Relationships" }).click()
   await expect(page.getByRole("slider", { name: "Replay timeline" }).first()).toBeVisible()
   expect(errors).toEqual([])
 })

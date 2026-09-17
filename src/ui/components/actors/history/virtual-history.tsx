@@ -6,8 +6,8 @@ import { ScrollArea } from "@/ui/components/ui/scroll-area"
 import { Separator } from "@/ui/components/ui/separator"
 import { ActorMessageCard } from "./message-card"
 
-export function VirtualActorHistory({ rounds, t, onActorSelect }: {
-  rounds: ActorRound[]; t: UiTexts; onActorSelect: (id: string) => void
+export function VirtualActorHistory({ rounds, t, onActorSelect, mode = "live", onMessageSelect }: {
+  rounds: ActorRound[]; t: UiTexts; onActorSelect: (id: string) => void; mode?: "live" | "archive"; onMessageSelect?: (id: string) => void
 }) {
   "use no memo"
   const [focusedIndex, setFocusedIndex] = useState<number>()
@@ -33,25 +33,27 @@ export function VirtualActorHistory({ rounds, t, onActorSelect }: {
     gap: 16,
     paddingStart: 20,
     paddingEnd: 20,
-    anchorTo: "end",
-    followOnAppend: true,
+    anchorTo: mode === "live" ? "end" : "start",
+    followOnAppend: mode === "live",
     scrollEndThreshold: 1,
     useAnimationFrameWithResizeObserver: true,
   })
-  useLayoutEffect(() => { virtualizer.scrollToEnd() }, [virtualizer])
+  useLayoutEffect(() => { if (mode === "live") virtualizer.scrollToEnd() }, [mode, virtualizer])
   useLayoutEffect(() => {
     const element = getScrollElement()
     if (!element) return
     let width = element.clientWidth
     const observer = new ResizeObserver(() => {
       if (element.clientWidth !== width) {
+        const following = mode === "live" && virtualizer.isAtEnd()
         width = element.clientWidth
         virtualizer.measure()
+        if (following) virtualizer.scrollToEnd()
       }
     })
     observer.observe(element)
     return () => observer.disconnect()
-  }, [getScrollElement, virtualizer])
+  }, [getScrollElement, mode, virtualizer])
 
   return <div ref={root} className="relative min-h-[560px] flex-1"
     onFocusCapture={(event) => {
@@ -69,7 +71,7 @@ export function VirtualActorHistory({ rounds, t, onActorSelect }: {
             const row = rows[item.index]!
             return <div key={item.key} data-index={item.index} ref={virtualizer.measureElement}
               className="absolute left-4 right-4 top-0 sm:left-5 sm:right-5" style={{ transform: `translateY(${item.start}px)` }}>
-              {row.message ? <ActorMessageCard {...row.message} targets={row.message.targets.join(", ")} t={t} onActorSelect={onActorSelect} /> :
+              {row.message ? <ActorMessageCard {...row.message} targets={row.message.targets.join(", ")} t={t} onActorSelect={onActorSelect} onMessageSelect={onMessageSelect} /> :
                 <div className="flex items-center gap-3 py-2">
                   <Separator className="flex-1" />
                   <h3 id={`actor-round-${row.roundIndex}`} className="shrink-0 text-[11px] font-medium tracking-[0.16em] text-muted-foreground">ROUND {row.roundIndex}</h3>

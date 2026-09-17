@@ -4,7 +4,7 @@ import { Button } from "@/ui/components/ui/button"
 import type { ActorMessage } from "@/ui/models/actors/actor-conversation"
 import type { UiTexts } from "@/ui/types/i18n"
 
-export const ActorMessageCard = memo(function ActorMessageCard({ t, onActorSelect, ...message }: Omit<ActorMessage, "targets"> & { targets: string; t: UiTexts; onActorSelect: (id: string) => void }) {
+export const ActorMessageCard = memo(function ActorMessageCard({ t, onActorSelect, onMessageSelect, ...message }: Omit<ActorMessage, "targets"> & { targets: string; t: UiTexts; onActorSelect: (id: string) => void; onMessageSelect?: (id: string) => void }) {
   return (
     <article aria-label={message.actorName} className="rounded-xl border border-border/70 bg-white px-4 py-3.5">
       <header className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -21,6 +21,7 @@ export const ActorMessageCard = memo(function ActorMessageCard({ t, onActorSelec
           {message.decisionType !== "no_action" && message.content ? <p aria-label={t.actorRailSpeech} className="min-w-0 flex-1 text-black">{message.content}</p> : null}
         </div>
       </div>
+      {onMessageSelect ? <Button variant="ghost" size="sm" className="mt-2" onClick={() => onMessageSelect(message.id)}>{t.reportMessageDetails}</Button> : null}
     </article>
   )
 })

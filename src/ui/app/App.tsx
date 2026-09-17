@@ -214,7 +214,7 @@ function App() {
     resetRoundProgression()
     setSelectedRunId(runId)
     const run = runsQuery.data?.find((item) => item.id === runId)
-    if (run?.status === "completed") {
+    if (run && ["completed", "failed", "canceled"].includes(run.status)) {
       viewModeRef.current = "report"
       setViewMode("report")
     }

@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/ui/components/ui/tooltip"
 import type { ActorState, Interaction, SimulationState } from "@/shared"
 import { dictionary } from "@/ui/i18n/dictionary"
 import { buildReportAnalysisViewModel } from "@/ui/models/report/report-analysis-view-model"
-import { ReportSimulationDynamics } from "@/ui/components/report/simulation-dynamics"
+import { RelationshipHeatmap, BehaviorRanking, RoundEvolution } from "@/ui/components/report/simulation-dynamics"
 
 describe("ReportSimulationDynamics", () => {
   test("renders detailed dynamics without compact summary signals", () => {
@@ -15,14 +15,12 @@ describe("ReportSimulationDynamics", () => {
 
     const html = renderToStaticMarkup(
       <TooltipProvider>
-        <ReportSimulationDynamics model={model} t={dictionary.en} />
+        {model ? <><RelationshipHeatmap model={model} t={dictionary.en} /><BehaviorRanking model={model} t={dictionary.en} /><RoundEvolution model={model} t={dictionary.en} /></> : null}
       </TooltipProvider>
     )
 
-    expect(html).toContain("Relationship Structure")
     expect(html).toContain("Relationship heatmap")
     expect(html).toContain("Behavior Diversity")
-    expect(html).toContain("Coordinator alignment")
     expect(html).not.toContain("Dynamics signal map")
     expect(html).not.toContain("Avg target spread")
     expect(html).not.toContain("Event completion")
@@ -37,11 +35,10 @@ describe("ReportSimulationDynamics", () => {
 
     const html = renderToStaticMarkup(
       <TooltipProvider>
-        <ReportSimulationDynamics model={model} t={dictionary.ko} />
+        {model ? <><RelationshipHeatmap model={model} t={dictionary.ko} /><BehaviorRanking model={model} t={dictionary.ko} /><RoundEvolution model={model} t={dictionary.ko} /></> : null}
       </TooltipProvider>
     )
 
-    expect(html).toContain("활성 관계쌍")
     expect(html).toContain("인물")
     expect(html).toContain("50% 행동 변화 다양성")
     expect(html).not.toContain("흐름 신호 지도")

@@ -21,12 +21,12 @@ describe("ReportPage", () => {
       </QueryClientProvider>
     )
 
-    expect(html).toContain("Analysis Dashboard")
-    expect(html).toContain("Simulation Dynamics")
-    expect(html).toContain("Actors + Stage")
+    expect(html).toContain("Relationships")
+    expect(html).toContain("Conversations")
+    expect(html).toContain("Performance")
   })
 
-  test("keeps the default analysis tab free of actor and stage panels", () => {
+  test("keeps the empty relationship tab free of actor and stage panels", () => {
     const html = renderToStaticMarkup(
       <QueryClientProvider client={new QueryClient()}>
         <ReportPage
