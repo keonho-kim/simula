@@ -46,6 +46,7 @@ export function renderReport(state: SimulationState): string {
   return [
     `# Simula Report`,
     ``,
+    ...renderCommentary(state),
     `## Outcome`,
     state.worldSummary,
     latestRoundReport ? `\nLatest observed outcome: ${latestRoundReport.roundSummary}` : "",
@@ -165,4 +166,15 @@ export function summarizeEvents(events: PlannedEvent[]): string {
   const pending = events.filter((event) => event.status === "pending").length
   const missed = events.filter((event) => event.status === "missed").length
   return `${completed}/${events.length} major events completed; ${partial} partial; ${pending} pending; ${missed} missed.`
+}
+
+function renderCommentary(state: SimulationState): string[] {
+  const commentary = state.reportCommentary
+  if (!commentary) return []
+  const ko = state.scenario.language === "ko"
+  const root = commentary.nodes.find(node => node.id === commentary.rootId)
+  const section = (title: string, nodes: typeof commentary.nodes) => [`## ${title}`, ...nodes.flatMap(node => node.status === "ready"
+    ? [`### ${node.id}`, node.summary ?? "", ...(node.findings ?? []).map(text => `- ${text}`), node.conclusion ?? "", `Evidence: ${node.evidenceIds.join(", ")}`, ""]
+    : [`### ${node.id}`, ko ? "해설을 생성하지 못했습니다. 재시도할 수 있습니다." : "Commentary unavailable; retry is available.", ""])]
+  return [...section(ko ? "종합 결론" : "Overall conclusion", root ? [root] : []), ...section(ko ? "세부 항목" : "Detailed findings", commentary.nodes.filter(node => node.level === 0)), ...section(ko ? "상세 결론" : "Detailed conclusions", commentary.nodes.filter(node => node.level > 0 && node.id !== root?.id))]
 }

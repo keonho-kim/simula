@@ -43,16 +43,21 @@ export function VirtualActorHistory({ rounds, t, onActorSelect, mode = "live", o
     const element = getScrollElement()
     if (!element) return
     let width = element.clientWidth
+    let following = mode === "live"
+    const recordPosition = () => {
+      // Width changes can reflow rows before this observer runs. Preserve the pre-resize intent.
+      if (element.clientWidth === width) following = mode === "live" && virtualizer.isAtEnd()
+    }
+    element.addEventListener("scroll", recordPosition, { passive: true })
     const observer = new ResizeObserver(() => {
       if (element.clientWidth !== width) {
-        const following = mode === "live" && virtualizer.isAtEnd()
         width = element.clientWidth
         virtualizer.measure()
         if (following) virtualizer.scrollToEnd()
       }
     })
     observer.observe(element)
-    return () => observer.disconnect()
+    return () => { observer.disconnect(); element.removeEventListener("scroll", recordPosition) }
   }, [getScrollElement, mode, virtualizer])
 
   return <div ref={root} className="relative min-h-[560px] flex-1"

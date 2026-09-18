@@ -1,3 +1,4 @@
+import type { ReportCommentary } from "./report-commentary"
 import type { RoleTraceStep, SimulationRole, PlannerTraceStep, CoordinatorTraceStep, ObserverTraceStep } from "@/shared/model"
 import type { ScenarioInput } from "@/shared/scenario"
 
@@ -180,6 +181,7 @@ export interface SimulationState {
   roleTraces: RoleTrace[]
   observerRoundIndex?: number
   worldSummary: string
+  reportCommentary?: ReportCommentary
   reportMarkdown: string
   stopReason: StopReason
   errors: string[]

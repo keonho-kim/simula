@@ -23,6 +23,7 @@ export async function executeRun(
       roundDelayMs: 5000,
       waitForNextRound: (roundIndex) => roundContinuations.wait(manifest.id, roundIndex),
       isCanceled: () => roundContinuations.isCanceled(manifest.id),
+      saveReportState: state => store.writeState(state),
       emit: (event) => appendAndPublish(store, subscriptions, event),
     })
     await store.writeState(finalState)

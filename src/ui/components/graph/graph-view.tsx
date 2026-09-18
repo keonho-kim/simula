@@ -1,7 +1,6 @@
 import { memo } from "react"
-import { CrosshairIcon, Maximize2Icon, SearchIcon, XIcon } from "lucide-react"
+import { CrosshairIcon, Maximize2Icon } from "lucide-react"
 import { Button } from "@/ui/components/ui/button"
-import { Input } from "@/ui/components/ui/input"
 import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 import { EdgePreview } from "@/ui/components/graph/overlays/edge-preview"
 import { useGraphRenderer } from "@/ui/components/graph/renderer/use-graph-renderer"
@@ -9,44 +8,12 @@ import type { GraphViewProps } from "@/ui/components/graph/renderer/types"
 
 export const GraphView = memo(function GraphView(props: GraphViewProps) {
   const { t, frame, showActorPopover, onActorExpand } = props
-  const { containerRef, query, setQuery, searchResults, selectedActor, selectedPopoverStyle, selectedActorIntent,
-    previewEdge, edgePreviewStyle, actorNames, actors, selectAndFocusNode, resetCamera } = useGraphRenderer(props)
+  const { containerRef, selectedActor, selectedPopoverStyle, selectedActorIntent,
+    previewEdge, edgePreviewStyle, actorNames, actors, resetCamera } = useGraphRenderer(props)
   return (
     <div className="relative h-full min-h-[520px] overflow-hidden rounded-lg bg-white ring-1 ring-border/60">
-      <div className="absolute left-3 top-3 z-10 flex w-[min(420px,calc(100%-24px))] flex-col gap-2">
-        <div className="flex items-center gap-2 rounded-md border border-border/80 bg-white/95 p-1.5 shadow-[0_4px_16px_rgba(23,32,51,0.06)]">
-          <SearchIcon className="ml-2 size-4 shrink-0 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t.graphFindActor}
-            className="h-8 border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
-          />
-          {query ? (
-            <Button type="button" variant="ghost" size="icon" className="size-8" aria-label={t.graphClearActorSearch} onClick={() => setQuery("")}>
-              <XIcon className="size-4" />
-            </Button>
-          ) : null}
-          <Button type="button" variant="ghost" size="icon" className="size-8" aria-label={t.graphResetView} onClick={resetCamera}>
-            <CrosshairIcon className="size-4" />
-          </Button>
-        </div>
-
-        {searchResults.length ? (
-          <div className="rounded-md border border-border/80 bg-white/95 p-1 shadow-[0_4px_16px_rgba(23,32,51,0.06)]">
-            {searchResults.map((actor) => (
-              <button
-                key={actor.id}
-                type="button"
-                className="flex w-full items-center justify-between gap-3 rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted"
-                onClick={() => selectAndFocusNode(actor.id)}
-              >
-                <span className="truncate font-medium">{actor.label}</span>
-                <span className="shrink-0 text-muted-foreground">{actor.interactionCount}</span>
-              </button>
-            ))}
-          </div>
-        ) : null}
+      <div className="absolute right-3 top-3 z-10">
+        <Button variant="outline" size="icon" aria-label={t.graphResetView} onClick={resetCamera}><CrosshairIcon /></Button>
       </div>
 
       <div ref={containerRef} className="h-full min-h-[520px] bg-[radial-gradient(circle_at_center,#f8fafc_1px,transparent_1px)] [background-size:24px_24px]" />

@@ -1,7 +1,7 @@
 import { createLayoutWorker } from "../layout/worker-client"
 import type { GraphViewProps } from "@/ui/components/graph/renderer/types"
 import { edgePreviewStyleFromEvent } from "@/ui/components/graph/overlays/pointer-position"
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { EdgeCurvedArrowProgram } from "@sigma/edge-curve"
 import Graph from "graphology"
 import Sigma from "sigma"
@@ -55,8 +55,6 @@ export function useGraphRenderer({
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string>()
   const [selectedPopoverStyle, setSelectedPopoverStyle] = useState<CSSProperties>()
   const [edgePreviewStyle, setEdgePreviewStyle] = useState<CSSProperties>()
-  const [query, setQuery] = useState("")
-  const deferredQuery = useDeferredValue(query)
   const requestOverlayRefresh = useCallback(() => {
     const renderer = rendererRef.current
     const nodeId = selectedNodeRef.current
@@ -69,16 +67,6 @@ export function useGraphRenderer({
   const updateSelectedDepths = useCallback(() => {
     highlightedNodeDepthsRef.current = collectNodeDepths(graphRef.current, selectedNodeRef.current, 2)
   }, [])
-
-  const searchResults = useMemo(() => {
-    const normalized = deferredQuery.trim().toLowerCase()
-    if (!normalized) {
-      return []
-    }
-    return (frame?.nodes ?? [])
-      .filter((node) => `${node.label} ${node.role}`.toLowerCase().includes(normalized))
-      .slice(0, 6)
-  }, [deferredQuery, frame])
 
   const selectedActor = useMemo(
     () => frame?.nodes.find((node) => node.id === selectedActorId),
@@ -163,7 +151,7 @@ export function useGraphRenderer({
       edgeProgramClasses: {
         [EDGE_TYPE]: EdgeCurvedArrowProgram as unknown as EdgeProgramType<GraphNodeAttributes, GraphEdgeAttributes>,
       },
-      enableEdgeEvents: true,
+      enableEdgeEvents: Boolean(onEdgeSelect),
       labelColor: { color: "#172033" },
       labelDensity: 0.12,
       labelFont: "Geist Variable, sans-serif",
@@ -276,6 +264,6 @@ export function useGraphRenderer({
 
   if (layoutError) throw layoutError
 
-  return { containerRef, query, setQuery, searchResults, selectedActor, selectedPopoverStyle, selectedActorIntent,
-    previewEdge, edgePreviewStyle, actorNames, actors, selectAndFocusNode, resetCamera }
+  return { containerRef, selectedActor, selectedPopoverStyle, selectedActorIntent,
+    previewEdge, edgePreviewStyle, actorNames, actors, resetCamera }
 }

@@ -238,3 +238,14 @@ test("shared projections apply duplicated stream and HTTP events once and reset 
   expect(useRunStore.getState().metricData.ttft).toHaveLength(0)
   expect(useRunStore.getState().conversationData.rounds).toHaveLength(0)
 })
+
+test("report polling preserves the replay cursor when no frames were added", () => {
+  const store = useRunStore.getState()
+  store.resetLiveState()
+  store.setSelectedRunId(runId)
+  const frames = [0, 1, 2].map(index => ({ index, timestamp, nodes: [], edges: [], activeNodeIds: [], messages: [], logRefs: [] }))
+  store.syncRunDetail(runManifest(), frames, undefined, [])
+  store.setReplayIndex(0)
+  store.syncRunDetail(runManifest(), frames, undefined, [])
+  expect(useRunStore.getState().replayIndex).toBe(0)
+})

@@ -8,3 +8,5 @@ export type * from "@/shared/scenario"
 export type * from "@/shared/settings"
 export type * from "@/shared/simulation"
 export type * from "@/shared/scenario-board"
+
+export type * from "./report-commentary"

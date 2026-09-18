@@ -186,3 +186,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   return response.json() as Promise<T>
 }
+
+export async function generateCommentary(runId: string): Promise<void> {
+  await request(`/api/runs/${runId}/commentary`, { method: "POST" })
+}

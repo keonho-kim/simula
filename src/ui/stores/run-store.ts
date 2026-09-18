@@ -68,7 +68,8 @@ export const useRunStore = create<RunUiState>((set) => {
         const next = applyEvents(state, events, metricIds, actorIds, conversationIds, boardIds, runState)
         const nextTimeline = mergeTimeline(next.timeline ?? state.timeline, timeline)
         return { ...next, selectedRunId: state.selectedRunId ?? run.id, timeline: nextTimeline, runState,
-          replayIndex: nextTimeline.length ? nextTimeline.length - 1 : 0 }
+          replayIndex: state.selectedRunId === run.id && nextTimeline.length === state.timeline.length
+            ? state.replayIndex : Math.max(0, nextTimeline.length - 1) }
       }),
   }
 })

@@ -182,3 +182,19 @@ one validated action in every visibility. Accepted IDs and definitions remain un
 final board config event publishes the actual action count, so reduced catalogs do not leave
 pending placeholders. Recovery warnings distinguish visibility-qualified labels from omitted
 same-scope duplicates. No new interaction fields or actor selection protocol are introduced.
+
+## Report commentary
+
+`SimulationState.reportCommentary` is optional for older runs. It stores generation status,
+validated/failed tree nodes, child/evidence references, and the root ID. The observer model's
+`reportCommentary` step generates JSON with `summary`, `findings`, `conclusion`, and `evidenceIds`.
+Nodes are analyzed bottom-up and shown in reading order: overall, detail items, detail conclusions.
+Markdown exports include this commentary alongside deterministic result tables.
+
+`POST /api/runs/:id/commentary` starts or retries commentary for a terminal run with stored state
+and returns 202. An active run/job returns 409. Valid nodes are reused; failed nodes and affected
+parents are regenerated. The run manifest status remains unchanged. Poll the ordinary run detail
+endpoint for checkpointed status; a stored running flag without an active owner is exposed as
+partial so the user can retry after a server restart. The existing cancel endpoint cancels an
+active commentary job as well. `report.commentary` events carry an `update` containing newly
+processed or invalidated nodes (a delta), status, and root ID rather than repeated whole-tree snapshots.

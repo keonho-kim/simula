@@ -1,6 +1,6 @@
 import { reportStatusLabel } from "@/ui/models/report/status-label"
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { DownloadIcon, HomeIcon } from "lucide-react"
 import { Badge } from "@/ui/components/ui/badge"
 import { Button } from "@/ui/components/ui/button"
@@ -12,7 +12,7 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem
 } from "@/ui/components/ui/dropdown-menu"
-import { fetchRun } from "@/ui/api/client"
+import { generateCommentary, fetchRun } from "@/ui/api/client"
 import type { UiTexts } from "@/ui/types/i18n"
 import { useRunStore } from "@/ui/stores/run-store"
 import { ReportRelationshipPanel } from "@/ui/components/report/relationship-panel"
@@ -28,6 +28,7 @@ interface ReportPageProps {
 }
 
 export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExport }: ReportPageProps) {
+  const queryClient = useQueryClient()
   const [tab, setTab] = useState("relationships")
   const liveEvents = useRunStore((state) => state.liveEvents)
   const storedRunState = useRunStore((state) => state.runState)
@@ -35,10 +36,12 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
     queryKey: ["runs", selectedRunId],
     queryFn: () => fetchRun(selectedRunId ?? ""),
     enabled: Boolean(selectedRunId),
+    refetchInterval: query => query.state.data?.state?.reportCommentary?.status === "running" ? 2000 : false,
     retry: 2
   })
   const state = query.data?.state ?? (storedRunState?.runId === selectedRunId ? storedRunState : undefined)
   const events = query.data?.events ?? (state ? liveEvents : [])
+  const generation = useMutation({ mutationFn: () => generateCommentary(selectedRunId ?? ""), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["runs", selectedRunId] }) })
   const title = query.data?.run.scenarioName || state?.scenario.sourceName || t.report
   const status = query.data?.run.status ?? selectedRunStatus
   return (
@@ -59,6 +62,8 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
               </Badge>
             ) : null}
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" disabled={!state || state.reportCommentary?.status === "running" || generation.isPending} onClick={() => generation.mutate()}>{state?.reportCommentary?.status === "running" ? t.reportCommentaryRunning : t.reportGenerateCommentary}</Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" disabled={!selectedRunId}>
@@ -74,7 +79,9 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </header>
+        {generation.isError ? <p role="alert" className="text-sm text-destructive">{t.reportCommentaryUnavailable}</p> : null}
         {query.isError ? (
           <div role="alert" className="text-sm text-destructive">
             {t.reportLoadError}{" "}

@@ -16,7 +16,7 @@ import type { Subscriptions } from "@/backend/runtime/events"
 import { listProviderModels } from "@/backend/api/model-controller"
 import { json, text } from "@/backend/api/responses"
 import type { RoundContinuationStore } from "@/backend/runtime/round-continuation"
-import { cancelRun, continueRunRound, startRun } from "@/backend/api/run-controller"
+import { cancelRun, continueRunRound, startRun, startReportCommentary } from "@/backend/api/run-controller"
 import { readSettings, writeSettings } from "@/backend/storage/settings-store"
 
 export interface RouteContext {
@@ -160,12 +160,19 @@ async function routeRunDetail(
   runId: string
 ): Promise<Response> {
   if (parts.length === 3 && request.method === "GET") {
+    const stored = await context.store.readState(runId)
+    // A persisted running flag without an in-process owner means generation was interrupted.
+    const state = stored?.reportCommentary?.status === "running" && !context.runningRuns.has(runId)
+      ? { ...stored, reportCommentary: { ...stored.reportCommentary, status: "partial" as const } } : stored
     return json({
       run: await context.store.readManifest(runId),
-      state: await context.store.readState(runId),
+      state,
       timeline: await context.store.readTimeline(runId),
       events: await context.store.readEvents(runId),
     })
+  }
+  if (parts[3] === "commentary" && request.method === "POST") {
+    return startReportCommentary(context.store, context.subscriptions, context.runningRuns, context.roundContinuations, runId)
   }
   if (parts[3] === "start" && request.method === "POST") {
     return startRun(context.store, context.subscriptions, context.runningRuns, context.roundContinuations, runId)

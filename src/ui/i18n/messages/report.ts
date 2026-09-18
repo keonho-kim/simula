@@ -1,4 +1,16 @@
 const en = {
+  reportCommentary: "Simulation commentary",
+  reportCommentaryEmpty: "No commentary is stored. Generate commentary to interpret the scenario and recorded simulation.",
+  reportCommentaryRunning: "Generating commentary",
+  reportCommentaryPartial: "Some commentary is unavailable. Retry preserves successful items.",
+  reportCommentaryWaiting: "The overall conclusion follows detailed analysis.",
+  reportOverallConclusion: "Overall conclusion",
+  reportDetailedItems: "Detailed findings",
+  reportDetailedConclusions: "Detailed conclusions",
+  reportCommentaryUnavailable: "Commentary unavailable. Use Generate to retry.",
+  reportEvidence: "Evidence",
+  reportGenerateCommentary: "Generate / retry commentary",
+
   reportSelectEdge: "Select a connection",
   reportStatusPending: "Pending",
   reportStatusActive: "Active",
@@ -29,7 +41,7 @@ const en = {
   reportRelationshipDetails: "Relationship details",
   reportPersonality: "Personality",
   reportBackground: "Background",
-  reportSelectRelationship: "Select a person or connection in the graph to inspect its details.",
+  reportSelectRelationship: "Select a person in the graph to inspect their details.",
   reportAdditionalAnalysis: "Round evolution and behavior",
 
   reportRelations: "Relationships",
@@ -190,6 +202,18 @@ const en = {
 } as const
 
 const ko = {
+  reportCommentary: "시뮬레이션 해설",
+  reportCommentaryEmpty: "저장된 해설이 없습니다. 해설 생성 버튼으로 시나리오와 기록을 분석할 수 있습니다.",
+  reportCommentaryRunning: "해설 생성 중",
+  reportCommentaryPartial: "일부 해설이 누락되었습니다. 성공한 항목을 유지하며 재시도할 수 있습니다.",
+  reportCommentaryWaiting: "세부 항목을 분석한 뒤 종합 결론을 작성합니다.",
+  reportOverallConclusion: "종합 결론",
+  reportDetailedItems: "세부 항목",
+  reportDetailedConclusions: "상세 결론",
+  reportCommentaryUnavailable: "해설을 생성하지 못했습니다. 생성 버튼으로 다시 시도할 수 있습니다.",
+  reportEvidence: "근거",
+  reportGenerateCommentary: "해설 생성 / 재시도",
+
   reportSelectEdge: "연결선 선택",
   reportStatusPending: "대기",
   reportStatusActive: "진행 중",
@@ -220,7 +244,7 @@ const ko = {
   reportRelationshipDetails: "관계 상세",
   reportPersonality: "인물 성향",
   reportBackground: "배경",
-  reportSelectRelationship: "그래프에서 인물이나 연결선을 선택하면 상세 내용을 볼 수 있습니다.",
+  reportSelectRelationship: "그래프에서 인물을 선택하면 상세 내용을 볼 수 있습니다.",
   reportAdditionalAnalysis: "라운드별 변화 · 행동 분석",
 
   reportRelations: "관계 분석",

@@ -170,10 +170,13 @@ round completion, graph deltas, report deltas, and terminal run events.
 `state.json` is the final structured simulation state. `report.md` is the human-readable report.
 
 The browser report has three tabs: Relationships, Conversations, and Performance. Relationships
-combine graph selection and replay with an optional heatmap. Conversations use a horizontally
+show the heatmap above the network and replay. Conversations use a horizontally
 scrollable round board and the shared message history. Performance reuses the live metric cards
 and charts with role/token filters and call diagnostics. Completed, failed, and canceled runs
-open this report from history; available partial results and failures remain visible. Exports
+open this report from history; available partial results and failures remain visible. New runs
+generate evidence-based commentary using the configured observer model. Existing reports can
+use Generate / retry commentary without replaying the simulation. Successful items are preserved
+and only failed items and affected parent conclusions are regenerated. Exports
 (JSON, JSONL, Markdown) share one menu.
 `graph.timeline.json` powers replay and visual inspection in the web app.
 

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 
-test("runs the engine flow from settings to report", async ({ page }) => {
+test("runs the engine flow from settings to report", async ({ page }, testInfo) => {
   await setUnitTestApiKeys(page)
   await page.goto("/")
 
@@ -33,6 +33,16 @@ test("runs the engine flow from settings to report", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Report", exact: true })).toHaveCount(0)
   await page.getByRole("button", { name: "Open Report" }).click()
   await expect(page.getByRole("tab", { name: "Relationships", exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Overall conclusion", exact: true })).toBeVisible()
+  await expect(page.getByPlaceholder("Find actor")).toHaveCount(0)
+  expect(await page.locator("details").count()).toBe(0)
+  await page.screenshot({ path: testInfo.outputPath("report-commentary.png"), fullPage: true })
+  const commentaryResponse = page.waitForResponse(response => response.url().endsWith("/commentary") && response.request().method() === "POST")
+  await page.getByRole("button", { name: "Generate / retry commentary" }).click()
+  const generated = await commentaryResponse
+  expect(generated.status()).toBe(202)
+  const runUrl = generated.url().replace(/\/commentary$/, "")
+  await expect.poll(async () => (await (await page.request.get(runUrl)).json()).state.reportCommentary.status).toBe("ready")
   await expect(page.getByRole("button", { name: "Home" })).toBeVisible()
   await expect(page.getByRole("tab", { name: "Relationships" })).toBeVisible()
   await page.getByRole("button", { name: "Export", exact: true }).click()

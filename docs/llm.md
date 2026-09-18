@@ -136,3 +136,15 @@ and asking for recipient-facing speech while retaining the previous decisions. O
 retried, with at most three total attempts. Exhaustion fails explicitly without inventing a
 replacement line. Existing silence and no-action behavior is preserved; target and action
 exact-choice validation and repair remain unchanged.
+
+## Report interpretation
+
+Report commentary uses the configured observer model and existing provider invocation path.
+No additional provider or model role is required. Generation adds bounded calls after simulation:
+round evidence packets first, then four-way reduction frontiers with a detailed-conclusion level
+and an overall-conclusion level. Concurrency is capped at two requests and every node has at most
+three attempts. Prompts require scenario-specific interpretation, a distinction between evidence
+and inference, and explicit uncertainty when evidence or child analyses are missing. Provider
+JSON-mode flags are not assumed. No model calls are made merely by viewing an existing report;
+the user can explicitly generate/retry commentary. Deterministic simulation results remain usable
+when generation is unavailable.

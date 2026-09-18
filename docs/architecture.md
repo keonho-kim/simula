@@ -184,8 +184,7 @@ its own context-dependent thought, intent, target, and message.
 
 The report page composes three panels in order: relationships, conversations, and performance.
 Only the selected panel mounts. Relationship inspection owns its graph selection and uses the
-existing replay cursor; the WebGL renderer is loaded on demand. Heatmap and additional behavior
-charts are revealed separately. Stable graph callbacks preserve the renderer when selection changes.
+existing replay cursor; the WebGL renderer is loaded on demand. The heatmap precedes the graph and replay; additional behavior charts stay expanded. Stable graph callbacks preserve the renderer when selection changes.
 
 Conversation projection derives a round board from persisted interactions, summaries, and injected
 events. Carousel browsing does not change the selected round. The shared message card and virtual
@@ -196,3 +195,29 @@ Performance projection filters recorded calls and reuses simulation metric panel
 Token usage unavailable from a provider remains unavailable, with coverage shown explicitly.
 Error-event counts describe recorded node/log errors across the run, not unique failed requests;
 token-range filtering affects call metrics only. No report view initiates model calls.
+
+### Evidence-first report commentary
+
+`outputs/commentary/evidence.ts` prepares bounded packets using the scenario, planner digest,
+network totals, existing observer summaries, and every round's interactions. Long text fields are
+shortened explicitly; interactions are partitioned into groups of eight rather than dropping
+middle history. Global actor/event context is bounded, with omissions disclosed and packet-local
+participants supplied separately.
+
+`outputs/commentary/workflow.ts` reduces a tree bottom-up. A frontier completes before its
+parents begin, with at most two in-flight observer requests. Groups of up to four detailed items
+produce detailed conclusions, followed by an overall conclusion (at least two synthesis levels).
+Completed responses use the installed LangChain JSON parser and a strict Zod schema. Citations
+must reference supplied evidence IDs; Korean responses must contain Korean prose. This validates
+structure and reference membership, not the truth of every interpretation.
+
+Each node gets three attempts with validation feedback. Provider outages stop further fan-out;
+invalid leaves remain marked unavailable and parents acknowledge missing support. Previously
+validated siblings are reused, while retried children invalidate their ancestors. Runtime saves
+checkpoint states during finalization and manual generation. Commentary failure does not erase
+simulation results. Cancellation waits for the current bounded batch to settle before releasing
+ownership. The existing run lock prevents overlapping execution or commentary jobs.
+
+The report shows metrics followed by overall conclusion, detailed items, and detailed conclusions.
+All report disclosures are expanded sections. Heatmap precedes the network and replay; the report
+has no edge selector. Actor search is removed from the shared graph renderer in all views.

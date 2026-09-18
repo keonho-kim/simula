@@ -18,6 +18,7 @@ export interface SimulationRunInput {
   roundDelayMs?: number
   waitForNextRound?: (roundIndex: number) => Promise<void>
   isCanceled?: () => boolean
+  saveReportState?: (state: SimulationState) => Promise<void>
 }
 
 export async function runSimulation(input: SimulationRunInput): Promise<SimulationState> {
@@ -75,7 +76,7 @@ export async function runSimulation(input: SimulationRunInput): Promise<Simulati
         )
       )
     )
-    .addNode("finalization", async (state) => runCancelableNode(() => finalizationNode(state, input.emit)))
+    .addNode("finalization", async (state) => runCancelableNode(() => finalizationNode(state, input.emit, input.isCanceled, input.saveReportState)))
     .addEdge(START, "planner")
     .addEdge("planner", "generator")
     .addEdge("generator", "coordinator")

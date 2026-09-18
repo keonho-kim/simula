@@ -1,3 +1,4 @@
+import type { ReportCommentary } from "./report-commentary"
 import type { ScenarioBoardUpdate } from "./scenario-board"
 import type { ActorReadyView, GraphTimelineFrame } from "@/shared/graph"
 import type {
@@ -43,6 +44,7 @@ export interface ModelMetrics {
     | GeneratorRosterStep
     | ActorCardStep
     | "actionCatalog"
+    | "reportCommentary"
     | "draft"
   attempt: number
   ttftMs: number
@@ -55,6 +57,7 @@ export interface ModelMetrics {
 }
 
 export type RunEvent =
+  | { type: "report.commentary"; runId: string; timestamp: string; update: ReportCommentary }
   | { type: "board.updated"; runId: string; timestamp: string; update: ScenarioBoardUpdate }
   | { type: "run.started"; runId: string; timestamp: string }
   | { type: "node.started"; runId: string; timestamp: string; nodeId: string; label: string }

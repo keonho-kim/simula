@@ -238,21 +238,21 @@ function ActorReasoningStream({ items, t }: { items: ActorReasoningItem[]; t: Ui
     return null
   }
   return (
-    <details className="border-b border-border/70 bg-background/60 px-3 py-2">
-      <summary className="cursor-pointer text-xs font-semibold uppercase text-muted-foreground">
+    <section className="border-b border-border/70 bg-background/60 px-3 py-2">
+      <h3 className="text-xs font-semibold uppercase text-muted-foreground">
         {t.think} ({items.length})
-      </summary>
+      </h3>
       <div className="mt-2 flex flex-col gap-2">
         {items.slice(-6).map((item) => (
-          <details key={item.id} className="rounded-md bg-muted/30 p-3">
-            <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+          <section key={item.id} className="rounded-md bg-muted/30 p-3">
+            <h3 className="text-xs font-medium text-muted-foreground">
               {item.step} · attempt {item.attempt} · {timeLabel(item.timestamp)} · {item.reasoningTokens.toLocaleString()} tokens
-            </summary>
+            </h3>
             <MarkdownContent compact className="mt-2" content={item.content} fallback="-" />
-          </details>
+          </section>
         ))}
       </div>
-    </details>
+    </section>
   )
 }
 

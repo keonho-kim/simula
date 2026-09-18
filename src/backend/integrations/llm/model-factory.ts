@@ -130,6 +130,12 @@ function unitTestResponse(input: ChatInput): string {
   if (prompt.includes("Generator actor card role.")) {
     return "Decision stakeholder"
   }
+  if (prompt.includes("Report commentary.")) {
+    const evidenceIds = JSON.parse(prompt.match(/Evidence IDs: (.+)/)?.[1] ?? "[]") as string[]
+    return JSON.stringify(prompt.includes("Language: Korean.")
+      ? { summary: "기록에서 시나리오의 제약과 인물의 선택을 확인할 수 있습니다.", findings: ["인물은 주어진 상황에서 대응을 선택했습니다."], conclusion: "관측된 결과를 바탕으로 판단하며 이후 전개는 불확실합니다.", evidenceIds: evidenceIds.slice(0, 1) }
+      : { summary: "The recorded scenario constrains the actors' choices.", findings: ["Actors selected responses within the visible situation."], conclusion: "The observed outcomes support a bounded interpretation; later developments remain uncertain.", evidenceIds: evidenceIds.slice(0, 1) })
+  }
   if (prompt.includes("Actor message.")) {
     return "We need a bounded decision with clear ownership."
   }

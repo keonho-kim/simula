@@ -38,8 +38,8 @@ export function ReportPerformancePanel({ events, t }: { events: RunEvent[]; t: U
   const { series, roles: roleRows } = report
   return (
     <div className="flex flex-col gap-6">
-      <details className="rounded-md border p-3">
-        <summary className="cursor-pointer text-sm">{t.reportMetricFilters}</summary>
+      <section className="rounded-md border p-3">
+        <h2 className="text-sm font-medium">{t.reportMetricFilters}</h2>
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <Select value={role} onValueChange={setRole}>
             <SelectTrigger aria-label={t.role} className="w-44">
@@ -79,7 +79,7 @@ export function ReportPerformancePanel({ events, t }: { events: RunEvent[]; t: U
             />
           </Field>
         </div>
-      </details>
+      </section>
       <p className="text-xs text-muted-foreground">
         {t.reportUsageCoverage}: {report.measuredCount} / {report.sampleCount} · {t.reportErrorScope}
       </p>
@@ -150,14 +150,14 @@ export function ReportPerformancePanel({ events, t }: { events: RunEvent[]; t: U
           {report.diagnostics
             .filter((event) => event.role === selectedRole)
             .map((event) => (
-              <details key={event.id} className="border-b py-2">
-                <summary className="cursor-pointer text-xs">
+              <section key={event.id} className="border-b py-2">
+                <h3 className="text-xs font-medium">
                   {event.title} · {event.timestamp}
-                </summary>
+                </h3>
                 <p className="mt-2 whitespace-pre-wrap break-words text-xs leading-5">
                   {event.details || event.body}
                 </p>
-              </details>
+              </section>
             ))}
         </section>
       ) : null}
