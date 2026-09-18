@@ -15,6 +15,7 @@ import {
 import { generateCommentary, fetchRun } from "@/ui/api/client"
 import type { UiTexts } from "@/ui/types/i18n"
 import { useRunStore } from "@/ui/stores/run-store"
+import { ReportCommentaryPanel } from "@/ui/components/report/commentary-panel"
 import { ReportRelationshipPanel } from "@/ui/components/report/relationship-panel"
 import { ReportConversationPanel } from "@/ui/components/report/conversation-panel"
 import { ReportPerformancePanel } from "@/ui/components/report/performance-panel"
@@ -29,7 +30,7 @@ interface ReportPageProps {
 
 export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExport }: ReportPageProps) {
   const queryClient = useQueryClient()
-  const [tab, setTab] = useState("relationships")
+  const [tab, setTab] = useState("overview")
   const liveEvents = useRunStore((state) => state.liveEvents)
   const storedRunState = useRunStore((state) => state.runState)
   const query = useQuery({
@@ -101,11 +102,15 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
           </p>
         ) : null}
         <Tabs value={tab} onValueChange={setTab} className="min-w-0 gap-5">
-          <TabsList className="w-full">
+          <TabsList className="w-full overflow-x-auto justify-start">
+            <TabsTrigger value="overview">{t.reportOverview}</TabsTrigger>
             <TabsTrigger value="relationships">{t.reportRelations}</TabsTrigger>
             <TabsTrigger value="conversations">{t.reportConversations}</TabsTrigger>
             <TabsTrigger value="performance">{t.reportPerformance}</TabsTrigger>
           </TabsList>
+          <TabsContent value="overview">
+            {tab === "overview" ? <ReportCommentaryPanel commentary={state?.reportCommentary} t={t} /> : null}
+          </TabsContent>
           <TabsContent value="relationships">
             {tab === "relationships" ? <ReportRelationshipPanel state={state} t={t} /> : null}
           </TabsContent>

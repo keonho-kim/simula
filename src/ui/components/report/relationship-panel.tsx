@@ -1,4 +1,3 @@
-import { ReportCommentaryPanel } from "./commentary-panel"
 import { lazy, Suspense, useCallback, useMemo, useState } from "react"
 import type { SimulationState } from "@/shared"
 import type { UiTexts } from "@/ui/types/i18n"
@@ -40,7 +39,6 @@ export function ReportRelationshipPanel({ state, t }: { state?: SimulationState;
           </div>
         ))}
       </dl>
-      <ReportCommentaryPanel commentary={state.reportCommentary} t={t} />
       <RelationshipHeatmap model={model} t={t} />
       <section aria-label={t.reportGraph}>
         <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">

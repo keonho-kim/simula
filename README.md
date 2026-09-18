@@ -169,7 +169,8 @@ round completion, graph deltas, report deltas, and terminal run events.
 
 `state.json` is the final structured simulation state. `report.md` is the human-readable report.
 
-The browser report has three tabs: Relationships, Conversations, and Performance. Relationships
+The browser report has four tabs: Analysis Overview, Relationships, Conversations, and Performance.
+Analysis Overview contains the full commentary and is the default tab. Relationships
 show the heatmap above the network and replay. Conversations use a horizontally
 scrollable round board and the shared message history. Performance reuses the live metric cards
 and charts with role/token filters and call diagnostics. Completed, failed, and canceled runs

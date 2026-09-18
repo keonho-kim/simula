@@ -21,12 +21,14 @@ describe("ReportPage", () => {
       </QueryClientProvider>
     )
 
+    expect(html).toContain("Analysis Overview")
+    expect(html.match(/role="tab"/g)).toHaveLength(4)
     expect(html).toContain("Relationships")
     expect(html).toContain("Conversations")
     expect(html).toContain("Performance")
   })
 
-  test("keeps the empty relationship tab free of actor and stage panels", () => {
+  test("keeps the empty overview tab free of actor and stage panels", () => {
     const html = renderToStaticMarkup(
       <QueryClientProvider client={new QueryClient()}>
         <ReportPage
@@ -37,7 +39,7 @@ describe("ReportPage", () => {
       </QueryClientProvider>
     )
 
-    expect(html).toContain("Select or complete a run")
+    expect(html).toContain("No commentary is stored")
     expect(html).not.toContain("Simulation Stage")
     expect(html).not.toContain("Search actors")
   })

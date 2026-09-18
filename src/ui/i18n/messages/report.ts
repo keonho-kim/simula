@@ -1,4 +1,5 @@
 const en = {
+  reportOverview: "Analysis Overview",
   reportCommentary: "Simulation commentary",
   reportCommentaryEmpty: "No commentary is stored. Generate commentary to interpret the scenario and recorded simulation.",
   reportCommentaryRunning: "Generating commentary",
@@ -202,6 +203,7 @@ const en = {
 } as const
 
 const ko = {
+  reportOverview: "분석 개요",
   reportCommentary: "시뮬레이션 해설",
   reportCommentaryEmpty: "저장된 해설이 없습니다. 해설 생성 버튼으로 시나리오와 기록을 분석할 수 있습니다.",
   reportCommentaryRunning: "해설 생성 중",

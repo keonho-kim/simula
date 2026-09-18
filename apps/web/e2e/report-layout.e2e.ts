@@ -24,7 +24,9 @@ test("report round carousel selects messages independently from browsing and sup
   await page.goto("/")
   await page.getByRole("button", { name: /실행 내역 보기/ }).click()
   await page.getByRole("dialog").getByRole("button", { name: /열기/ }).click()
-  await expect(page.getByRole("tab", { name: "관계 분석", exact: true })).toHaveAttribute("data-state", "active")
+  await expect(page.getByRole("tab", { name: "분석 개요", exact: true })).toHaveAttribute("data-state", "active")
+  await expect(page.getByRole("tab")).toHaveCount(4)
+  await page.getByRole("tab", { name: "관계 분석", exact: true }).click()
   await expect(page.getByPlaceholder("인물 찾기")).toHaveCount(0)
   await expect(page.getByRole("combobox", { name: "연결선 선택" })).toHaveCount(0)
   await expect(page.getByRole("tab", { name: "관계 히트맵", exact: true })).toHaveCount(0)
@@ -78,7 +80,7 @@ test("report round carousel selects messages independently from browsing and sup
   }
   await page.setViewportSize({ width: 390, height: 844 })
   expect(errors).toEqual([])
-  for (const tab of ["관계 분석", "대화 기록", "성능 분석"]) {
+  for (const tab of ["분석 개요", "관계 분석", "대화 기록", "성능 분석"]) {
     await page.getByRole("tab", { name: tab, exact: true }).click()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   }

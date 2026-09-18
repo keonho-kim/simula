@@ -182,7 +182,8 @@ its own context-dependent thought, intent, target, and message.
 
 ### Report workspace
 
-The report page composes three panels in order: relationships, conversations, and performance.
+The report page composes four panels in order: analysis overview, relationships, conversations, and performance.
+The default overview panel owns the full commentary; relationships owns numeric and graph analysis.
 Only the selected panel mounts. Relationship inspection owns its graph selection and uses the
 existing replay cursor; the WebGL renderer is loaded on demand. The heatmap precedes the graph and replay; additional behavior charts stay expanded. Stable graph callbacks preserve the renderer when selection changes.
 
@@ -218,6 +219,6 @@ checkpoint states during finalization and manual generation. Commentary failure 
 simulation results. Cancellation waits for the current bounded batch to settle before releasing
 ownership. The existing run lock prevents overlapping execution or commentary jobs.
 
-The report shows metrics followed by overall conclusion, detailed items, and detailed conclusions.
+The analysis overview tab shows the full commentary: overall conclusion, detailed items, and detailed conclusions. Relationship metrics and charts stay in their own tab.
 All report disclosures are expanded sections. Heatmap precedes the network and replay; the report
 has no edge selector. Actor search is removed from the shared graph renderer in all views.
