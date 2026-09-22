@@ -1,41 +1,32 @@
+/**
+ * Purpose: Orchestrate coordinator stages and the ordered simulation round loop.
+ * Pattern: Workflow node.
+ * Usage: Invoked by the coordinator LangGraph from graph.ts.
+ * Related: src/backend/core/simulation/roles/coordinator/invocation.ts, src/backend/core/simulation/roles/coordinator/snapshot.ts
+ */
 import type {
-  ActorDecision,
-  ActorState,
   CoordinatorTrace,
   CoordinatorTraceStep,
   InjectedEvent,
   Interaction,
-  PlannedEvent,
   RoundDigest,
   RoundReport,
   RoleTrace,
   RunEvent,
   StopReason,
 } from "@/shared"
-import { invokeExactChoiceWithMetrics, invokeRoleTextWithMetrics } from "@/backend/integrations/llm"
-import { withPromptLanguageGuide, withRolePromptGuide } from "@/backend/core/prompts/language"
-import { scalePromptLimit } from "@/backend/core/prompts/prompt"
-import { applyInjectedEventContext, applyInteractionContext, compressActorContext } from "@/backend/core/simulation/actors/memory"
+import { applyInjectedEventContext, compressActorContext } from "@/backend/core/simulation/actors/memory"
 
 import {
   buildPreRoundDigest,
   continuityEvent,
   eventForInjection,
-  eventInjectionAllowedOutputs,
-  eventInjectionDisplayValue,
   injectedEventForRound,
-  isInjectableEvent,
-  selectEventInjection,
 } from "@/backend/core/simulation/events/injection"
-import { applyActorDecision, buildInteraction } from "@/backend/core/simulation/actors/interactions"
-import { emitModelTelemetry } from "@/backend/core/simulation/events/telemetry"
-import { plannerDigestSummary } from "@/backend/core/simulation/planning/digest"
 import { renderReport, summarizeEvents, summarizeInteractions } from "@/backend/core/simulation/outputs/report"
 import { upsertRoleTrace, type WorkflowState } from "@/backend/core/simulation/workflow/state"
 
-import { createActorGraph, createActorGraphState } from "@/backend/core/simulation/roles/actor"
 import { runObserverRound } from "@/backend/core/simulation/roles/observer/nodes"
-import { repairExactChoice } from "@/backend/core/simulation/roles/repair"
 import type { CoordinatorPromptBuilder } from "@/backend/core/simulation/roles/coordinator/prompts"
 import { coordinatorPrompts } from "@/backend/core/simulation/roles/coordinator/prompts"
 import {
@@ -43,12 +34,15 @@ import {
   getCoordinatorTrace,
 } from "@/backend/core/simulation/roles/coordinator/state"
 
-const MAX_ATTEMPTS = 5
-
-interface ActorGraphResult {
-  actorId: string
-  decision: ActorDecision
-}
+import { progressPrompt, progressSnapshot, selectProgressDecision } from "./progress"
+import {
+  resolveEventInjection,
+  runCoordinatorChoice,
+  runCoordinatorText,
+  updateCoordinatorTrace,
+} from "./invocation"
+import { coordinatorSnapshot } from "./snapshot"
+import { runActorRound } from "./actor-round"
 
 export function createCoordinatorStepNode(
   step: CoordinatorTraceStep,
@@ -58,7 +52,7 @@ export function createCoordinatorStepNode(
   return async (state) => {
     const currentTrace = getCoordinatorTrace(state.simulation)
     const partial = coordinatorTracePartial(currentTrace)
-    const result = await runCoordinatorTextNode(state, step, promptBuilder, partial, emit)
+    const result = await runCoordinatorText(state, step, promptBuilder, partial, emit)
     const nextTrace: CoordinatorTrace = {
       ...currentTrace,
       [step]: result.text,
@@ -89,15 +83,22 @@ export async function coordinatorNode(
   const roundDigests: RoundDigest[] = []
   let roundReports: RoundReport[] = [...state.simulation.roundReports]
   let roleTraces: RoleTrace[] = state.simulation.roleTraces
-  let maxRound = Math.max(1, state.scenario.controls.maxRound ?? 8)
+  const maxRound = Math.max(1, state.scenario.controls.maxRound ?? 8)
   let stopReason: StopReason = "simulation_done"
-  for (let roundIndex = 1; roundIndex <= maxRound; roundIndex += 1) {
+  const autonomous = state.scenario.controls.autonomousProgress === true
+  let previousProgress = autonomous ? progressSnapshot(state) : ""
+  const snapshot = () => coordinatorSnapshot(state, {
+    actors,
+    interactions,
+    roundDigests,
+    roundReports,
+    roleTraces,
+    coordinatorTrace,
+    events,
+  })
+  for (let roundIndex = 1; autonomous || roundIndex <= maxRound; roundIndex += 1) {
     throwIfCanceled(isCanceled)
-    const injectionResult = await resolveEventInjection(
-      workflowSnapshot(state, actors, interactions, roundDigests, roundReports, roleTraces, coordinatorTrace, events, maxRound),
-      emit,
-      events
-    )
+    const injectionResult = await resolveEventInjection(snapshot(), events, emit)
     coordinatorTrace = updateCoordinatorTrace(coordinatorTrace, "eventInjection", injectionResult.text, injectionResult.retries)
     const selectedEvent = eventForInjection(injectionResult.text, events)
     const event = selectedEvent ?? continuityEvent(roundIndex)
@@ -128,48 +129,26 @@ export async function coordinatorNode(
       )
     )
 
-    const snapshot = actors
-    await Promise.all(
-      snapshot.map((actor) =>
-        runActorGraph(state, snapshot, actor, event, roundDigest, roundIndex, coordinatorTrace, emit).then(async (result) => {
-          const currentActor = actors.find((item) => item.id === result.actorId)
-          if (!currentActor) {
-            return
-          }
-
-          actors = applyActorDecision(actors, result.decision)
-          const interaction = buildInteraction(roundIndex, event, currentActor, actors, result.decision)
-          interactions.push(interaction)
-          actors = applyInteractionContext(actors, interaction)
-
-          await emit({
-            type: "interaction.recorded",
-            runId: state.runId,
-            timestamp: new Date().toISOString(),
-            interaction,
-          })
-          if (result.decision.message) {
-            await emit({
-              type: "actor.message",
-              runId: state.runId,
-              timestamp: new Date().toISOString(),
-              actorId: currentActor.id,
-              actorName: currentActor.name,
-              content: result.decision.message,
-            })
-          }
-        })
-      )
+    const actorRound = await runActorRound(
+      state,
+      actors,
+      event,
+      roundDigest,
+      roundIndex,
+      coordinatorTrace,
+      emit
     )
+    actors = actorRound.actors
+    interactions.push(...actorRound.interactions)
     throwIfCanceled(isCanceled)
     if (selectedEvent) {
-      const resolutionResult = await runCoordinatorValidatedNode(
-        workflowSnapshot(state, actors, interactions, roundDigests, roundReports, roleTraces, coordinatorTrace, events, maxRound),
+      const resolutionResult = await runCoordinatorChoice(
+        snapshot(),
         "eventResolution",
         coordinatorPrompts.eventResolution,
         emit,
         selectEventResolution,
-        () => ["completed", "partial"]
+        ["completed", "partial"]
       )
       coordinatorTrace = updateCoordinatorTrace(
         coordinatorTrace,
@@ -180,84 +159,27 @@ export async function coordinatorNode(
       selectedEvent.status = resolutionResult.text === "partial" ? "partial" : "completed"
     }
 
-    const progressResult = await runCoordinatorValidatedNode(
-      workflowSnapshot(state, actors, interactions, roundDigests, roundReports, roleTraces, coordinatorTrace, events, maxRound),
-      "progressDecision",
-      coordinatorPrompts.progressDecision,
-      emit,
-      selectProgressDecision,
-      () => ["continue", "stop", "complete"]
-    )
-    coordinatorTrace = updateCoordinatorTrace(coordinatorTrace, "progressDecision", progressResult.text, progressResult.retries)
-    throwIfCanceled(isCanceled)
-    let stopAfterRound = false
-    if (progressResult.text === "complete") {
-      if (hasUnresolvedEvents(events)) {
-        await emit({
-          type: "log",
-          runId: state.runId,
-          timestamp: new Date().toISOString(),
-          level: "info",
-          message: "Coordinator requested complete, but unresolved pending or partial events remain; continuing.",
-        })
-      } else {
-        stopReason = "simulation_done"
-        stopAfterRound = true
-      }
-    }
-    if (progressResult.text === "stop" && isNoProgressCandidate(roundIndex, interactions, roundDigests)) {
-      stopReason = "no_progress"
-      stopAfterRound = true
-    }
-    if (progressResult.text === "stop" && !stopAfterRound) {
-      await emit({
-        type: "log",
-        runId: state.runId,
-        timestamp: new Date().toISOString(),
-        level: "info",
-        message: "Coordinator requested stop, but recent activity still shows possible progress; continuing generously.",
-      })
-    }
-    if (!stopAfterRound && roundIndex === maxRound) {
-      const extensionResult = await runCoordinatorValidatedNode(
-        workflowSnapshot(state, actors, interactions, roundDigests, roundReports, roleTraces, coordinatorTrace, events, maxRound),
-        "extensionDecision",
-        coordinatorPrompts.extensionDecision,
+    let stopAfterRound = !autonomous && roundIndex === maxRound
+    if (autonomous) {
+      const current = snapshot()
+      const currentProgress = progressSnapshot(current)
+      const progressResult = await runCoordinatorChoice(
+        current,
+        "progressDecision",
+        () => progressPrompt(previousProgress, currentProgress, state.scenario.text),
         emit,
-        selectExtensionDecision,
-        () => ["continue", "stop"]
+        selectProgressDecision,
+        ["1", "0"]
       )
-      coordinatorTrace = updateCoordinatorTrace(
-        coordinatorTrace,
-        "extensionDecision",
-        extensionResult.text,
-        extensionResult.retries
-      )
-      if (extensionResult.text === "continue") {
-        maxRound += 5
-        await emit({
-          type: "log",
-          runId: state.runId,
-          timestamp: new Date().toISOString(),
-          level: "info",
-          message: `Coordinator extended the simulation to ${maxRound} rounds.`,
-        })
-      } else {
-        stopReason = isNoProgressCandidate(roundIndex, interactions, roundDigests) ? "no_progress" : "simulation_done"
-        stopAfterRound = true
+      coordinatorTrace = updateCoordinatorTrace(coordinatorTrace, "progressDecision", progressResult.text, progressResult.retries)
+      throwIfCanceled(isCanceled)
+      stopAfterRound = progressResult.text === "0"
+      if (stopAfterRound) {
+        stopReason = events.some(event => event.status !== "completed") ? "no_progress" : "simulation_done"
       }
+      previousProgress = currentProgress
     }
-    const observerInput = workflowSnapshot(
-      state,
-      actors,
-      interactions,
-      roundDigests,
-      roundReports,
-      roleTraces,
-      coordinatorTrace,
-      events,
-      maxRound
-    )
+    const observerInput = snapshot()
     const observed = await runObserverRound(
       {
         ...observerInput,
@@ -280,9 +202,9 @@ export async function coordinatorNode(
     if (stopAfterRound) {
       break
     }
-    if (roundIndex < maxRound && waitForNextRound) {
+    if (waitForNextRound) {
       await waitForNextRound(roundIndex)
-    } else if (roundIndex < maxRound && roundDelayMs > 0) {
+    } else if (roundDelayMs > 0) {
       await sleep(roundDelayMs)
     }
   }
@@ -317,268 +239,9 @@ function throwIfCanceled(isCanceled?: () => boolean): void {
   }
 }
 
-async function runActorGraph(
-  state: WorkflowState,
-  actors: ActorState[],
-  actor: ActorState,
-  event: PlannedEvent,
-  roundDigest: RoundDigest,
-  roundIndex: number,
-  coordinatorTrace: CoordinatorTrace,
-  emit: (event: RunEvent) => Promise<void>
-): Promise<ActorGraphResult> {
-  const graph = createActorGraph(emit)
-  const result = await graph.invoke(
-    createActorGraphState({
-      runId: state.runId,
-      scenario: state.scenario,
-      plannerDigest: plannerDigestSummary(state.simulation.plan, state.scenario.text),
-      settings: state.settings,
-      actor,
-      actors,
-      event,
-      roundDigest,
-      roundIndex,
-      coordinatorTrace,
-    })
-  )
-  if (!result.decision) {
-    throw new Error(`actor graph for ${actor.id} completed without a decision.`)
-  }
-  return { actorId: actor.id, decision: result.decision }
-}
-
-async function runCoordinatorTextNode(
-  state: WorkflowState,
-  step: CoordinatorTraceStep,
-  promptBuilder: CoordinatorPromptBuilder,
-  partial: Partial<Record<CoordinatorTraceStep, string>>,
-  emit: (event: RunEvent) => Promise<void>
-): Promise<{ text: string; retries: number }> {
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const prompt = withRolePromptGuide(promptBuilder(state, partial), {
-      language: state.scenario.language,
-      settings: state.settings,
-      role: "coordinator",
-    })
-    const result = await invokeRoleTextWithMetrics(state.settings, "coordinator", step, attempt, prompt)
-    await emitModelTelemetry(state.runId, result, emit)
-    const response = normalizeCoordinatorText(result.text, step, state)
-    if (response) {
-      await emit({
-        type: "model.message",
-        runId: state.runId,
-        timestamp: timestamp(),
-        role: "coordinator",
-        content: `${step}: ${response}`,
-      })
-      return { text: response, retries: attempt - 1 }
-    }
-
-    await emit({
-      type: "log",
-      runId: state.runId,
-      timestamp: timestamp(),
-      level: "warn",
-      message: `coordinator.${step} returned empty text on attempt ${attempt}/${MAX_ATTEMPTS}.`,
-    })
-  }
-
-  throw new Error(`coordinator.${step} failed after ${MAX_ATTEMPTS} empty responses.`)
-}
-
-async function runCoordinatorValidatedNode(
-  state: WorkflowState,
-  step: CoordinatorTraceStep,
-  promptBuilder: CoordinatorPromptBuilder,
-  emit: (event: RunEvent) => Promise<void>,
-  select: (value: string) => string | undefined,
-  allowedOutputs: (state: WorkflowState) => string[],
-  displayValue: (value: string) => string = (value) => value
-): Promise<{ text: string; retries: number }> {
-  const invalidResponses: string[] = []
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const allowed = allowedOutputs(state)
-    const retryGuide = invalidResponses.length
-      ? `\n\nPrevious invalid responses:\n${invalidResponses.map((item) => `- ${item}`).join("\n")}\nReturn one exact allowed output only:\n${allowed.map((item) => `- ${item}`).join("\n")}`
-      : ""
-    const prompt = withPromptLanguageGuide(promptBuilder(state, {}) + retryGuide, state.scenario.language)
-    const result = await invokeExactChoiceWithMetrics(state.settings, "coordinator", step, attempt, prompt, allowed)
-    await emitModelTelemetry(state.runId, result, emit)
-    const response = result.text.trim()
-    const selected = select(response)
-    if (selected) {
-      await emit({
-        type: "model.message",
-        runId: state.runId,
-        timestamp: timestamp(),
-        role: "coordinator",
-        content: `${step}: ${displayValue(selected)}`,
-      })
-      return { text: selected, retries: attempt - 1 }
-    }
-    const repaired = await repairExactChoice({
-      runId: state.runId,
-      scenario: state.scenario,
-      settings: state.settings,
-      sourceRole: "coordinator",
-      sourceStep: step,
-      invalidText: response || "<empty>",
-      allowedOutputs: allowed,
-      emit,
-    })
-    const repairedSelection = repaired ? select(repaired) : undefined
-    if (repairedSelection) {
-      await emit({
-        type: "model.message",
-        runId: state.runId,
-        timestamp: timestamp(),
-        role: "coordinator",
-        content: `${step}: ${displayValue(repairedSelection)}`,
-      })
-      return { text: repairedSelection, retries: attempt - 1 }
-    }
-    invalidResponses.push(preview(response))
-    await emit({
-      type: "log",
-      runId: state.runId,
-      timestamp: timestamp(),
-      level: "warn",
-      message: `coordinator.${step} returned invalid text on attempt ${attempt}/${MAX_ATTEMPTS}: ${preview(response)}`,
-    })
-  }
-  throw new Error(`coordinator.${step} failed after ${MAX_ATTEMPTS} invalid responses.`)
-}
-
-async function resolveEventInjection(
-  state: WorkflowState,
-  emit: (event: RunEvent) => Promise<void>,
-  events: PlannedEvent[]
-): Promise<{ text: string; retries: number }> {
-  if (!events.some(isInjectableEvent)) {
-    return { text: "None", retries: 0 }
-  }
-
-  return runCoordinatorValidatedNode(
-    state,
-    "eventInjection",
-    coordinatorPrompts.eventInjection,
-    emit,
-    (value) => selectEventInjection(value, events),
-    () => eventInjectionAllowedOutputs(events),
-    (value) => eventInjectionDisplayValue(value, events)
-  )
-}
-
-function normalizeCoordinatorText(value: string, step: CoordinatorTraceStep, state: WorkflowState): string {
-  const trimmed = value.replace(/```[\s\S]*?```/g, "").replace(/\s+/g, " ").trim()
-  const labels = [step, coordinatorStepLabel(step), coordinatorStepLabel(step).replace(/\s+/g, "")]
-  const withoutPrefix = labels.reduce((current, label) => {
-    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    return current.replace(new RegExp(`^\\s*(?:\\*\\*)?${escaped}(?:\\*\\*)?\\s*[:：-]\\s*`, "i"), "")
-  }, trimmed)
-  const maxCharacters = scalePromptLimit(700, state.scenario.controls)
-  return withoutPrefix.length > maxCharacters ? withoutPrefix.slice(0, maxCharacters).trim() : withoutPrefix
-}
-
-function coordinatorStepLabel(step: CoordinatorTraceStep): string {
-  if (step === "runtimeFrame") return "Runtime Frame"
-  if (step === "actorRouting") return "Actor Routing"
-  if (step === "interactionPolicy") return "Interaction Policy"
-  if (step === "outcomeDirection") return "Outcome Direction"
-  if (step === "eventInjection") return "Event Injection"
-  if (step === "eventResolution") return "Event Resolution"
-  if (step === "progressDecision") return "Progress Decision"
-  return "Extension Decision"
-}
-
-function updateCoordinatorTrace(
-  trace: CoordinatorTrace,
-  step: CoordinatorTraceStep,
-  text: string,
-  retries: number
-): CoordinatorTrace {
-  return {
-    ...trace,
-    [step]: text,
-    retryCounts: {
-      ...trace.retryCounts,
-      [step]: retries,
-    },
-  }
-}
-
-function workflowSnapshot(
-  state: WorkflowState,
-  actors: ActorState[],
-  interactions: Interaction[],
-  roundDigests: RoundDigest[],
-  roundReports: RoundReport[],
-  roleTraces: RoleTrace[],
-  coordinatorTrace: CoordinatorTrace,
-  events: PlannedEvent[],
-  maxRound: number
-): WorkflowState {
-  return {
-    ...state,
-    scenario: {
-      ...state.scenario,
-      controls: {
-        ...state.scenario.controls,
-        maxRound,
-      },
-    },
-    simulation: {
-      ...state.simulation,
-      actors,
-      interactions,
-      roundDigests,
-      roundReports,
-      roleTraces: [
-        ...roleTraces.filter((trace) => trace.role !== "coordinator"),
-        coordinatorTrace,
-      ],
-      plan: state.simulation.plan ? { ...state.simulation.plan, majorEvents: events } : state.simulation.plan,
-      worldSummary: `${summarizeInteractions(interactions)} ${summarizeEvents(events)}`,
-    },
-  }
-}
-
-function selectProgressDecision(value: string): string | undefined {
-  const selected = value.trim()
-  return selected === "continue" || selected === "stop" || selected === "complete" ? selected : undefined
-}
-
 function selectEventResolution(value: string): string | undefined {
   const selected = value.trim()
   return selected === "completed" || selected === "partial" ? selected : undefined
-}
-
-function selectExtensionDecision(value: string): string | undefined {
-  const selected = value.trim()
-  return selected === "continue" || selected === "stop" ? selected : undefined
-}
-
-function hasUnresolvedEvents(events: PlannedEvent[]): boolean {
-  return events.some((event) => event.status === "pending" || event.status === "partial")
-}
-
-function isNoProgressCandidate(roundIndex: number, interactions: Interaction[], roundDigests: RoundDigest[]): boolean {
-  if (roundIndex < 2) {
-    return false
-  }
-  const recentRounds = new Set([roundIndex - 1, roundIndex])
-  const recentInteractions = interactions.filter((interaction) => recentRounds.has(interaction.roundIndex))
-  const recentDigests = roundDigests.filter((digest) => recentRounds.has(digest.roundIndex))
-  const noInjectedEvents = recentDigests.every((digest) => !digest.injectedEventId)
-  const noMeaningfulActions =
-    recentInteractions.length === 0 || recentInteractions.every((interaction) => interaction.decisionType === "no_action")
-  return noInjectedEvents && noMeaningfulActions
-}
-
-function preview(value: string): string {
-  const compact = value.replace(/\s+/g, " ").trim()
-  return compact.length > 180 ? `${compact.slice(0, 180)}...` : compact || "<empty>"
 }
 
 function timestamp(): string {

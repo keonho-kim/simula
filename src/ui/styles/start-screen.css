@@ -1,0 +1,27 @@
+/**
+ * Purpose: Provide restrained landing-menu hover and focus motion.
+ * Pattern: Page stylesheet.
+ * Usage: Imported by src/ui/pages/start-screen.tsx.
+ * Related: src/ui/index.css
+ */
+.start-menu-tile,
+.start-menu-icon {
+  transition-property: transform, background-color, border-color, box-shadow;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.start-menu-tile:hover,
+.start-menu-tile:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgb(15 23 42 / 0.04);
+}
+
+.start-menu-tile:hover .start-menu-icon,
+.start-menu-tile:focus-visible .start-menu-icon {
+  transform: translateX(3px);
+}
+
+.start-menu-tile:active {
+  transform: translateY(0) scale(0.995);
+}

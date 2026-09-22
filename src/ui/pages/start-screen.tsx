@@ -1,3 +1,9 @@
+/**
+ * Purpose: Present landing actions and locale controls for starting or resuming work.
+ * Pattern: Page component.
+ * Usage: Rendered by src/ui/app/App.tsx in home mode.
+ * Related: src/ui/styles/start-screen.css, src/ui/i18n/messages/common.ts
+ */
 import {
   ArchiveIcon,
   FileUpIcon,
@@ -20,6 +26,7 @@ import {
 } from "@/ui/components/ui/dropdown-menu"
 import { cn } from "@/ui/lib/class-names"
 import type { LanguagePreference, Locale, UiTexts } from "@/ui/types/i18n"
+import "@/ui/styles/start-screen.css"
 
 interface StartScreenProps {
   t: UiTexts
@@ -150,12 +157,12 @@ function StartTile({
   return (
     <Button
       variant="outline"
-      className="group h-auto justify-start rounded-2xl bg-card/95 p-4 text-left shadow-sm ring-1 ring-border/60 transition-colors duration-100 hover:bg-card sm:p-5"
+      className="start-menu-tile group h-auto justify-start rounded-xl bg-card/95 p-4 text-left ring-1 ring-border/60 hover:bg-card sm:p-5"
       onClick={onClick}
     >
       <span
         className={cn(
-          "flex size-14 shrink-0 items-center justify-center rounded-xl text-foreground ring-1 ring-border/60",
+          "start-menu-icon flex size-14 shrink-0 items-center justify-center rounded-lg text-foreground ring-1 ring-border/60",
           toneClass
         )}
       >

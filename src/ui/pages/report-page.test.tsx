@@ -1,3 +1,9 @@
+/**
+ * Purpose: Verify Report page navigation and always-visible metric composition.
+ * Pattern: Server-rendered page contract test.
+ * Usage: Executed by bun test.
+ * Related: src/ui/pages/report-page.tsx, src/ui/components/report/metric-overview.tsx
+ */
 import { describe, expect, mock, test } from "bun:test"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { renderToStaticMarkup } from "react-dom/server"
@@ -22,10 +28,14 @@ describe("ReportPage", () => {
     )
 
     expect(html).toContain("Analysis Overview")
-    expect(html.match(/role="tab"/g)).toHaveLength(4)
+    expect(html.match(/role="tab"/g)).toHaveLength(3)
     expect(html).toContain("Relationships")
     expect(html).toContain("Conversations")
-    expect(html).toContain("Performance")
+    expect(html).not.toContain(">Performance<")
+    expect(html).toContain('aria-label="LLM metrics"')
+    expect(html.indexOf('aria-label="LLM metrics"')).toBeLessThan(html.indexOf('role="tablist"'))
+    expect(html.match(/0 samples/g)).toHaveLength(4)
+    expect(html.match(/<article/g)).toHaveLength(4)
   })
 
   test("keeps the empty overview tab free of actor and stage panels", () => {

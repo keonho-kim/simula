@@ -1,3 +1,9 @@
+/**
+ * Purpose: Initialize and project coordinator trace state.
+ * Pattern: State factory.
+ * Usage: Used by coordinator graph nodes and actor prompt context.
+ * Related: src/shared/simulation.ts, src/backend/core/simulation/roles/coordinator/nodes.ts
+ */
 import type {
   CoordinatorTrace,
   CoordinatorTraceStep,
@@ -12,7 +18,6 @@ export const COORDINATOR_STEPS: CoordinatorTraceStep[] = [
   "eventInjection",
   "eventResolution",
   "progressDecision",
-  "extensionDecision",
 ]
 
 export function getCoordinatorTrace(state: SimulationState): CoordinatorTrace {
@@ -34,7 +39,6 @@ export function emptyCoordinatorTrace(): CoordinatorTrace {
     eventInjection: "",
     eventResolution: "",
     progressDecision: "",
-    extensionDecision: "",
     retryCounts: {
       runtimeFrame: 0,
       actorRouting: 0,
@@ -43,7 +47,6 @@ export function emptyCoordinatorTrace(): CoordinatorTrace {
       eventInjection: 0,
       eventResolution: 0,
       progressDecision: 0,
-      extensionDecision: 0,
     },
   }
 }

@@ -1,3 +1,9 @@
+/**
+ * Purpose: Compose application views, selected-run lifecycle, and live event subscriptions.
+ * Pattern: Composition root.
+ * Usage: Mounted once by src/ui/main.tsx.
+ * Related: src/ui/app/home-view.tsx, src/ui/hooks/use-run-event-stream.ts
+ */
 import { usePageVisibility } from "@/ui/hooks/use-page-visibility"
 import { readRunSession, updateRunSession } from "@/ui/storage/run-session"
 import { Suspense, lazy, useCallback, useEffect, useRef, useState } from "react"
@@ -21,13 +27,12 @@ import {
 } from "@/ui/api/client"
 import { RoundContinuationDialog } from "@/ui/components/simulation/round-continuation-dialog"
 import { useRunStore } from "@/ui/stores/run-store"
-import { StartScreen } from "@/ui/pages/start-screen"
 import { TopCommandBar } from "@/ui/components/navigation/top-command-bar"
-import type { ScenarioDraft } from "@/ui/types/scenario"
 import { useLocaleText } from "@/ui/hooks/use-locale-text"
 import { downloadExport } from "@/ui/api/download-export"
 import { useRoundProgression } from "@/ui/hooks/use-round-progression"
 import { useRunEventStream } from "@/ui/hooks/use-run-event-stream"
+import { HomeView } from "@/ui/app/home-view"
 
 type ViewMode = "home" | "simulation" | "report"
 
@@ -48,23 +53,8 @@ const LlmMetricsPanel = lazy(() =>
 const ReportPage = lazy(() =>
   import("@/ui/pages/report-page").then((module) => ({ default: module.ReportPage }))
 )
-const RunHistoryDialog = lazy(() =>
-  import("@/ui/components/scenario/run-history-dialog").then((module) => ({ default: module.RunHistoryDialog }))
-)
-const SamplePickerDialog = lazy(() =>
-  import("@/ui/components/scenario/sample-picker-dialog").then((module) => ({ default: module.SamplePickerDialog }))
-)
-const ScenarioPreviewDialog = lazy(() =>
-  import("@/ui/components/scenario/scenario-preview-dialog").then((module) => ({ default: module.ScenarioPreviewDialog }))
-)
-const SettingsDialog = lazy(() =>
-  import("@/ui/components/settings/settings-dialog").then((module) => ({ default: module.SettingsDialog }))
-)
 const SimulationStage = lazy(() =>
   import("@/ui/components/simulation/simulation-stage").then((module) => ({ default: module.SimulationStage }))
-)
-const StoryBuilderDialog = lazy(() =>
-  import("@/ui/components/scenario/story-builder-dialog").then((module) => ({ default: module.StoryBuilderDialog }))
 )
 
 function App() {
@@ -76,27 +66,16 @@ function App() {
   const resetLiveState = useRunStore((state) => state.resetLiveState)
   const pushEvents = useRunStore((state) => state.pushEvents)
   const syncRunDetail = useRunStore((state) => state.syncRunDetail)
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [initialSession] = useState(readRunSession)
   const [viewMode, setViewMode] = useState<ViewMode>(initialSession.viewMode ?? "home")
   const viewModeRef = useRef<ViewMode>(initialSession.viewMode ?? "home")
   const selectedRunIdRef = useRef<string | undefined>(undefined)
-  const [storyBuilderOpen, setStoryBuilderOpen] = useState(false)
-  const [samplePickerOpen, setSamplePickerOpen] = useState(false)
-  const [runHistoryOpen, setRunHistoryOpen] = useState(false)
   const [selectedActorId, setSelectedActorId] = useState<string>()
   const [actorDetailOpen, setActorDetailOpen] = useState(false)
   const [selectedEdgeId, setSelectedEdgeId] = useState<string>()
   const [reportConfirmRunId, setReportConfirmRunId] = useState<string>()
-  const [scenarioPreviewOpen, setScenarioPreviewOpen] = useState(false)
   const { autoContinue, setAutoContinue, skipRoundDelay, roundPromptIndex, roundAction, continueRound, cancelCurrentRun,
     resetRoundProgression, completed } = useRoundProgression(selectedRunId, t)
-  const uploadInputRef = useRef<HTMLInputElement>(null)
-  const [scenarioDraft, setScenarioDraft] = useState<ScenarioDraft>({
-    sourceName: "pasted-scenario.md",
-    text: "",
-    controls: { numCast: 6, allowAdditionalCast: true, actionsPerType: 3, maxRound: 8, fastMode: false, outputLength: "short" },
-  })
 
   useEffect(() => {
     if (initialSession.runId) setSelectedRunId(initialSession.runId)
@@ -117,7 +96,6 @@ function App() {
       selectedRunIdRef.current = run.id
       setSelectedRunId(run.id)
       await queryClient.invalidateQueries({ queryKey: ["runs"] })
-      setScenarioPreviewOpen(false)
       setReportConfirmRunId(undefined)
       setSelectedActorId(undefined)
       setActorDetailOpen(false)
@@ -130,7 +108,6 @@ function App() {
     },
     onSuccess: async () => {
       toast.success(t.simulationStartedToast)
-      setScenarioPreviewOpen(false)
       setViewMode("simulation")
       await queryClient.invalidateQueries({ queryKey: ["runs"] })
     },
@@ -220,119 +197,26 @@ function App() {
     }
   }
 
-  const startDraftRun = () => {
-    if (!scenarioDraft.text.trim()) {
-      return
-    }
-    startDraftMutation.mutate({
-      sourceName: scenarioDraft.sourceName,
-      text: scenarioDraft.text,
-      controls: scenarioDraft.controls,
-      language: promptLanguage,
-    })
-  }
-
-  const loadScenarioFile = (file: File) => {
-    void file.text().then((text) => {
-      setScenarioDraft({
-        ...scenarioDraft,
-        sourceName: file.name,
-        text,
-      })
-      setScenarioPreviewOpen(true)
-    })
-  }
-
   if (viewMode === "home") {
     return (
-      <>
-        <input
-          ref={uploadInputRef}
-          className="sr-only"
-          type="file"
-          accept=".md,.txt"
-          onChange={(event) => {
-            const file = event.target.files?.[0]
-            event.target.value = ""
-            if (file) {
-              loadScenarioFile(file)
-            }
-          }}
-        />
-        <StartScreen
-          t={t}
-          languagePreference={languagePreference}
-          promptLanguage={promptLanguage}
-          onNewScenario={() => setStoryBuilderOpen(true)}
-          onUploadScenario={() => uploadInputRef.current?.click()}
-          onExampleScenario={() => setSamplePickerOpen(true)}
-          onRunHistory={() => setRunHistoryOpen(true)}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onLanguagePreferenceChange={setLanguagePreference}
-        />
-        <Suspense fallback={null}>
-          {storyBuilderOpen ? (
-            <StoryBuilderDialog
-              open={storyBuilderOpen}
-              t={t}
-              promptLanguage={promptLanguage}
-              onOpenChange={setStoryBuilderOpen}
-              onUseDraft={(text, controls) => {
-                setScenarioDraft({ sourceName: "story-builder.md", text, controls })
-                setScenarioPreviewOpen(true)
-              }}
-            />
-          ) : null}
-          {samplePickerOpen ? (
-            <SamplePickerDialog
-              open={samplePickerOpen}
-              t={t}
-              onOpenChange={setSamplePickerOpen}
-              onLoadSample={(sample) => {
-                setScenarioDraft({
-                  sourceName: sample.name,
-                  text: sample.text,
-                  controls: sample.controls,
-                })
-                setScenarioPreviewOpen(true)
-              }}
-            />
-          ) : null}
-          {runHistoryOpen ? (
-            <RunHistoryDialog
-              open={runHistoryOpen}
-              runs={runsQuery.data ?? []}
-              t={t}
-              onOpenChange={setRunHistoryOpen}
-              onOpenRun={(runId) => {
-                selectRun(runId)
-                if (viewModeRef.current !== "report") {
-                  viewModeRef.current = "simulation"
-                  setViewMode("simulation")
-                }
-              }}
-            />
-          ) : null}
-          {scenarioPreviewOpen ? (
-            <ScenarioPreviewDialog
-              open={scenarioPreviewOpen}
-              draft={scenarioDraft}
-              isStarting={isStarting}
-              autoContinue={autoContinue}
-              t={t}
-              onOpenChange={setScenarioPreviewOpen}
-              onDraftChange={setScenarioDraft}
-              onAutoContinueChange={setAutoContinue}
-              onOpenSettings={() => {
-                setScenarioPreviewOpen(false)
-                setSettingsOpen(true)
-              }}
-              onStart={startDraftRun}
-            />
-          ) : null}
-          {settingsOpen ? <SettingsDialog open={settingsOpen} t={t} onOpenChange={setSettingsOpen} /> : null}
-        </Suspense>
-      </>
+      <HomeView
+        t={t}
+        languagePreference={languagePreference}
+        promptLanguage={promptLanguage}
+        runs={runsQuery.data ?? []}
+        isStarting={isStarting}
+        autoContinue={autoContinue}
+        onAutoContinueChange={setAutoContinue}
+        onLanguagePreferenceChange={setLanguagePreference}
+        onStartScenario={(scenario) => startDraftMutation.mutate(scenario)}
+        onOpenRun={(runId) => {
+          selectRun(runId)
+          if (viewModeRef.current !== "report") {
+            viewModeRef.current = "simulation"
+            setViewMode("simulation")
+          }
+        }}
+      />
     )
   }
 

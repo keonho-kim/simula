@@ -1,10 +1,16 @@
+/**
+ * Purpose: Verify server run, settings, sample, model-discovery, and Story Builder APIs.
+ * Pattern: HTTP integration test.
+ * Usage: Executed by bun test against an isolated spawned server.
+ * Related: apps/server/tests/server-test-support.ts, src/backend/api/routes.ts
+ */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { MODEL_ROLES } from "@/backend/core/settings/constants"
 import { defaultSettings } from "@/backend/core/settings/defaults"
-import type { LLMSettings, ModelProvider } from "@/shared"
+import type { LLMSettings } from "@/shared"
+import { continueRoundsFromEventStream, pollRun, setProviderKey } from "./server-test-support"
 
 const port = 3917
 const baseUrl = `http://localhost:${port}`
@@ -84,12 +90,12 @@ describe("server API", () => {
     const eventsController = new AbortController()
     const eventsResponse = await fetch(`${baseUrl}/api/runs/${run.id}/events`, { signal: eventsController.signal })
     expect(eventsResponse.ok).toBe(true)
-    const eventPump = continueRoundsFromEventStream(run.id, eventsResponse)
+    const eventPump = continueRoundsFromEventStream(baseUrl, run.id, eventsResponse)
 
     try {
       await fetch(`${baseUrl}/api/runs/${run.id}/start`, { method: "POST" })
 
-      const completed = await pollRun(run.id, "completed")
+      const completed = await pollRun(baseUrl, run.id, "completed")
       expect(completed.status).toBe("completed")
     } finally {
       eventsController.abort()
@@ -129,7 +135,7 @@ describe("server API", () => {
     })
     const { run } = (await createResponse.json()) as { run: { id: string } }
     await fetch(`${baseUrl}/api/runs/${run.id}/start`, { method: "POST" })
-    const failed = await pollRun(run.id, "failed")
+    const failed = await pollRun(baseUrl, run.id, "failed")
     expect(failed.error).toContain("API key is required")
   })
 
@@ -156,7 +162,7 @@ describe("server API", () => {
     })
     const { run } = (await createResponse.json()) as { run: { id: string } }
     await fetch(`${baseUrl}/api/runs/${run.id}/start`, { method: "POST" })
-    const failed = await pollRun(run.id, "failed")
+    const failed = await pollRun(baseUrl, run.id, "failed")
     expect(failed.error).toContain("planner.coreSituation failed after 5 empty responses")
     const exported = await fetch(`${baseUrl}/api/runs/${run.id}/export?kind=jsonl`).then((response) =>
       response.text()
@@ -327,67 +333,4 @@ function collectStream(stream: ReadableStream<Uint8Array>, onChunk: (chunk: stri
       onChunk(decoder.decode(result.value, { stream: true }))
     }
   })()
-}
-
-async function continueRoundsFromEventStream(runId: string, response: Response): Promise<void> {
-  const reader = response.body?.getReader()
-  if (!reader) {
-    return
-  }
-  const decoder = new TextDecoder()
-  let buffer = ""
-  while (true) {
-    const result = await reader.read()
-    if (result.done) {
-      return
-    }
-    buffer += decoder.decode(result.value, { stream: true })
-    let frameEnd = buffer.indexOf("\n\n")
-    while (frameEnd >= 0) {
-      const frame = buffer.slice(0, frameEnd)
-      buffer = buffer.slice(frameEnd + 2)
-      await continueAfterCompletedRound(runId, frame)
-      frameEnd = buffer.indexOf("\n\n")
-    }
-  }
-}
-
-async function continueAfterCompletedRound(runId: string, frame: string): Promise<void> {
-  const eventType = frame.split("\n").find((line) => line.startsWith("event: "))?.slice("event: ".length)
-  if (eventType !== "round.completed") {
-    return
-  }
-  const dataLine = frame.split("\n").find((line) => line.startsWith("data: "))
-  if (!dataLine) {
-    return
-  }
-  const event = JSON.parse(dataLine.slice("data: ".length)) as { roundIndex?: number }
-  if (!Number.isInteger(event.roundIndex)) {
-    return
-  }
-  await fetch(`${baseUrl}/api/runs/${runId}/continue`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ roundIndex: event.roundIndex }),
-  })
-}
-
-async function pollRun(runId: string, status: "completed" | "failed") {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    const data = (await fetch(`${baseUrl}/api/runs/${runId}`).then((response) => response.json())) as {
-      run: { status: string; error?: string }
-    }
-    if (data.run.status === status) {
-      return data.run
-    }
-    await Bun.sleep(100)
-  }
-  throw new Error(`Run did not reach ${status}.`)
-}
-
-function setProviderKey(settings: LLMSettings, apiKey: string, provider: ModelProvider = "openai"): void {
-  settings.providers[provider].apiKey = apiKey
-  for (const role of MODEL_ROLES) {
-    settings.roles[role].provider = provider
-  }
 }

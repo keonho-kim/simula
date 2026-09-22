@@ -1,3 +1,9 @@
+/**
+ * Purpose: Invoke configured chat models and return normalized text, usage, and diagnostics.
+ * Pattern: Integration adapter.
+ * Usage: Called by backend workflows for prose, streaming text, and exact choices.
+ * Related: src/backend/integrations/llm/model-factory.ts, src/backend/integrations/llm/usage.ts
+ */
 import type {
   ActorCardStep,
   ActorTraceStep,
@@ -76,12 +82,13 @@ export async function invokeExactChoiceWithMetrics(
   prompt: string,
   allowedOutputs: string[]
 ): Promise<RoleTextResult> {
+  const outputs = exactChoiceOutputs(allowedOutputs)
   return invokeRoleInputWithMetrics(
     buildExactChoiceSettings(settings, role),
     role,
     step,
     attempt,
-    exactChoiceMessages(prompt, allowedOutputs)
+    exactChoiceMessages(prompt, outputs)
   )
 }
 
@@ -99,6 +106,7 @@ export function buildExactChoiceSettings(settings: LLMSettings, role: ModelRole)
 }
 
 export function exactChoiceMessages(prompt: string, allowedOutputs: string[]): ChatInput {
+  const outputs = exactChoiceOutputs(allowedOutputs)
   return [
     {
       role: "system",
@@ -110,11 +118,25 @@ export function exactChoiceMessages(prompt: string, allowedOutputs: string[]): C
       content: `${prompt}
 
 Allowed outputs:
-${allowedOutputs.map((output) => `- ${output}`).join("\n")}
+${outputs.map((output) => `- ${output}`).join("\n")}
 
 Return exactly one allowed output in assistant content.`,
     },
   ]
+}
+
+export function exactChoiceOutputs(allowedOutputs: readonly string[]): string[] {
+  if (!allowedOutputs.length) {
+    throw new Error("Exact-choice invocation requires at least one allowed output.")
+  }
+  const outputs = allowedOutputs.map((output) => output.trim())
+  if (outputs.some((output) => !output)) {
+    throw new Error("Exact-choice outputs must be non-empty strings.")
+  }
+  if (new Set(outputs).size !== outputs.length) {
+    throw new Error("Exact-choice outputs must be distinct.")
+  }
+  return outputs
 }
 
 export function reasoningOnlyWarning(result: RoleTextResult): string | undefined {

@@ -1,3 +1,9 @@
+/**
+ * Purpose: Compose the persisted run Report with global metrics and three analysis views.
+ * Pattern: Page Composition.
+ * Usage: Rendered by the application router for a selected simulation run.
+ * Related: src/ui/components/report/metric-overview.tsx, src/ui/styles/report.css
+ */
 import { reportStatusLabel } from "@/ui/models/report/status-label"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -18,7 +24,8 @@ import { useRunStore } from "@/ui/stores/run-store"
 import { ReportCommentaryPanel } from "@/ui/components/report/commentary-panel"
 import { ReportRelationshipPanel } from "@/ui/components/report/relationship-panel"
 import { ReportConversationPanel } from "@/ui/components/report/conversation-panel"
-import { ReportPerformancePanel } from "@/ui/components/report/performance-panel"
+import { ReportMetricOverview } from "@/ui/components/report/metric-overview"
+import "@/ui/styles/report.css"
 
 interface ReportPageProps {
   selectedRunId?: string
@@ -101,27 +108,22 @@ export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExpo
             {query.data.run.error}
           </p>
         ) : null}
-        <Tabs value={tab} onValueChange={setTab} className="min-w-0 gap-5">
-          <TabsList className="w-full overflow-x-auto justify-start">
-            <TabsTrigger value="overview">{t.reportOverview}</TabsTrigger>
-            <TabsTrigger value="relationships">{t.reportRelations}</TabsTrigger>
-            <TabsTrigger value="conversations">{t.reportConversations}</TabsTrigger>
-            <TabsTrigger value="performance">{t.reportPerformance}</TabsTrigger>
+        <ReportMetricOverview events={events} t={t} />
+        <Tabs value={tab} onValueChange={setTab} className="report-tabs min-w-0 gap-0">
+          <TabsList className="report-tab-list w-full justify-start">
+            <TabsTrigger className="report-tab-trigger" value="overview">{t.reportOverview}</TabsTrigger>
+            <TabsTrigger className="report-tab-trigger" value="relationships">{t.reportRelations}</TabsTrigger>
+            <TabsTrigger className="report-tab-trigger" value="conversations">{t.reportConversations}</TabsTrigger>
           </TabsList>
-          <TabsContent value="overview">
+          <TabsContent className="report-tab-panel" value="overview">
             {tab === "overview" ? <ReportCommentaryPanel commentary={state?.reportCommentary} t={t} /> : null}
           </TabsContent>
-          <TabsContent value="relationships">
+          <TabsContent className="report-tab-panel" value="relationships">
             {tab === "relationships" ? <ReportRelationshipPanel state={state} t={t} /> : null}
           </TabsContent>
-          <TabsContent value="conversations">
+          <TabsContent className="report-tab-panel" value="conversations">
             {tab === "conversations" ? (
               <ReportConversationPanel key={selectedRunId} state={state} events={events} t={t} />
-            ) : null}
-          </TabsContent>
-          <TabsContent value="performance">
-            {tab === "performance" ? (
-              <ReportPerformancePanel key={selectedRunId} events={events} t={t} />
             ) : null}
           </TabsContent>
         </Tabs>

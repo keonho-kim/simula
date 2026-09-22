@@ -1,3 +1,9 @@
+/**
+ * Purpose: Parse and normalize scenario text and controls into trusted domain input.
+ * Pattern: Boundary parser.
+ * Usage: Called by API, storage, and tests before simulation workflows.
+ * Related: src/shared/scenario.ts, src/backend/storage/runs/scenario.ts
+ */
 import type { PromptOutputLength, ScenarioControls, ScenarioInput, ScenarioLoadLevel } from "@/shared"
 
 const FRONTMATTER_PATTERN = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/
@@ -30,7 +36,7 @@ export function parseScenarioControls(frontmatter: string): ScenarioControls {
     }
     const key = trimmed.slice(0, separatorIndex).trim()
     const value = trimmed.slice(separatorIndex + 1).trim()
-    if (!["num_cast", "allow_additional_cast", "actions_per_type", "max_round", "fast_mode", "output_length", "load_level"].includes(key)) {
+    if (!["num_cast", "allow_additional_cast", "actions_per_type", "max_round", "fast_mode", "autonomous_progress", "output_length", "load_level"].includes(key)) {
       throw new Error(`Unsupported scenario control: ${key}`)
     }
     values.set(key, value)
@@ -47,6 +53,7 @@ export function parseScenarioControls(frontmatter: string): ScenarioControls {
     allowAdditionalCast: parseBoolean(values.get("allow_additional_cast") ?? "true"),
     actionsPerType: parsePositiveInteger(values.get("actions_per_type") ?? "3", "actions_per_type"),
     maxRound: parsePositiveInteger(values.get("max_round") ?? "8", "max_round"),
+    autonomousProgress: parseBoolean(values.get("autonomous_progress") ?? "false"),
     fastMode: parseBoolean(values.get("fast_mode") ?? "false"),
     outputLength: parseOutputLength(values.get("output_length") ?? "short"),
     loadLevel: parseLoadLevel(values.get("load_level") ?? "middle"),
@@ -54,11 +61,15 @@ export function parseScenarioControls(frontmatter: string): ScenarioControls {
 }
 
 export function normalizeScenarioControls(controls: Partial<ScenarioControls>): ScenarioControls {
+  if (controls.autonomousProgress !== undefined && typeof controls.autonomousProgress !== "boolean") {
+    throw new Error("autonomousProgress must be a boolean.")
+  }
   return {
     numCast: parsePositiveInteger(String(controls.numCast), "num_cast"),
     allowAdditionalCast: controls.allowAdditionalCast ?? true,
     actionsPerType: parsePositiveInteger(String(controls.actionsPerType ?? 3), "actions_per_type"),
     maxRound: parsePositiveInteger(String(controls.maxRound ?? 8), "max_round"),
+    autonomousProgress: controls.autonomousProgress ?? false,
     fastMode: controls.fastMode ?? false,
     outputLength: parseOutputLength(controls.outputLength ?? "short"),
     loadLevel: parseLoadLevel(controls.loadLevel ?? "middle"),
@@ -80,7 +91,7 @@ function parseBoolean(value: string): boolean {
   if (value === "false") {
     return false
   }
-  throw new Error("allow_additional_cast must be true or false.")
+  throw new Error("Boolean scenario controls must be true or false.")
 }
 
 function parseOutputLength(value: string): PromptOutputLength {

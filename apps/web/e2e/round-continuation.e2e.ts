@@ -1,3 +1,9 @@
+/**
+ * Purpose: Verify manual, timed, resumed, and streak-based round continuation behavior.
+ * Pattern: End-to-end workflow test.
+ * Usage: Executed by Playwright through bun run test:e2e.
+ * Related: src/ui/hooks/use-round-progression.ts, src/backend/runtime/round-continuation.ts
+ */
 import { expect, test } from "@playwright/test"
 
 test("requires one explicit Continue click per round when automatic progression is off", async ({ page }) => {
@@ -34,7 +40,8 @@ test("requires one explicit Continue click per round when automatic progression 
 })
 
 test("shows a five-second countdown and cancels it when auto continue is disabled", async ({ page }) => {
-  await page.clock.install()
+  const clockStart = new Date("2026-01-01T00:00:00.000Z")
+  await page.clock.install({ time: clockStart })
   await page.addInitScript(() => localStorage.setItem("simula.language", "en"))
   const { settings } = await (await page.request.get("/api/settings")).json()
   settings.providers.openai.apiKey = "unit-test-api-key"
@@ -52,7 +59,7 @@ test("shows a five-second countdown and cancels it when auto continue is disable
   await page.getByRole("button", { name: "Start", exact: true }).click()
   const prompt = page.getByRole("dialog", { name: "Round complete" })
   await expect(prompt).toBeVisible()
-  await page.clock.pauseAt(new Date(Date.now() + 100))
+  await page.clock.pauseAt(new Date("2026-01-01T01:00:00.000Z"))
   await prompt.getByRole("switch", { name: "Auto continue" }).check()
   await expect(prompt.getByRole("status")).toHaveText("Next round in 5s")
   await page.clock.runFor(4000)

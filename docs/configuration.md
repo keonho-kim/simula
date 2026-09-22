@@ -97,6 +97,7 @@ num_cast: 6
 allow_additional_cast: true
 actions_per_type: 3
 max_round: 8
+autonomous_progress: false
 fast_mode: false
 output_length: short
 ---
@@ -104,6 +105,17 @@ output_length: short
 
 `num_cast` is required. `output_length` accepts `short`, `medium`, or `long` and also controls
 actor memory compression length: 3, 5, or 10 sentences respectively. Unsupported keys fail explicitly.
+
+`autonomous_progress` defaults to `false` (API/UI: `autonomousProgress`). In fixed mode,
+`max_round` is a hard limit and no model-based progress or extension decision is called.
+In autonomous mode, the coordinator compares the previous and current situation, event statuses,
+actor state, and round actions after every round. The initial situation is the baseline for round 1.
+It must return `1` (meaningful progress; allow the next round even beyond `max_round`) or `0`
+(stop). Repeated actions or reinjecting the same event do not count as progress by themselves.
+The existing exact-choice repair and five-attempt validation apply; exhausted invalid responses
+fail explicitly. There is no five-round extension batch. The configured maximum stays unchanged.
+Autonomous progression is separate from the UI's Auto continue switch, which controls waiting
+between rounds. Manual continuation and cancellation still apply in autonomous mode.
 
 ## Settings loading failures
 

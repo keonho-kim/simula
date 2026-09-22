@@ -1,3 +1,9 @@
+/**
+ * Purpose: Provide English and Korean common application messages.
+ * Pattern: Localization dictionary.
+ * Usage: Merged by src/ui/i18n/dictionary.ts.
+ * Related: src/ui/types/i18n.ts
+ */
 const en = {
   appSubtitle: "Agent-based simulation command surface",
   home: "Home",
@@ -25,13 +31,15 @@ const en = {
   scenarioPlaceholder: "Paste scenario body here or generate it with StoryBuilder.",
   castSize: "Cast size",
   maxRound: "Max round",
-  maxRoundHelp: "Default maximum number of actor activity rounds.",
+  maxRoundHelp: "Maximum number of rounds when autonomous progression is off.",
   actionsPerType: "Actions per type",
   outputLength: "Output length",
   outputLengthShort: "Short",
   outputLengthMedium: "Medium",
   outputLengthLong: "Long",
   outputLengthHelp: "Controls LLM response length and actor memory compression length. Short is the current compact default.",
+  autonomousProgress: "Autonomous progression",
+  autonomousProgressHelp: "Compare each round with the previous situation. Continue beyond the maximum while meaningful progress is made; stop when it stalls. Separate from Auto continue. Default: off.",
   fastMode: "Fast Mode",
   fastModeHelp: "Parallelize independent work when consistency remains safe.",
   autoContinue: "Auto continue",
@@ -112,13 +120,15 @@ const ko = {
   scenarioPlaceholder: "시나리오 본문을 붙여넣거나 StoryBuilder로 생성하세요.",
   castSize: "등장 인원",
   maxRound: "최대 라운드",
-  maxRoundHelp: "인물이 활동할 기본 최대 라운드 수입니다.",
+  maxRoundHelp: "자율 진행을 끈 경우 이 라운드 수를 넘지 않습니다.",
   actionsPerType: "유형별 행동 수",
   outputLength: "출력 길이",
   outputLengthShort: "짧게",
   outputLengthMedium: "보통",
   outputLengthLong: "길게",
   outputLengthHelp: "LLM 응답과 인물 메모리 압축의 길이를 조절합니다. 짧게가 현재 기본값입니다.",
+  autonomousProgress: "자율 진행",
+  autonomousProgressHelp: "매 라운드를 이전 상황과 비교해 진전이 있으면 최대 라운드를 넘어 진행하고, 없으면 종료합니다. 자동 진행과 별개이며 기본값은 꺼짐입니다.",
   fastMode: "빠른 실행",
   fastModeHelp: "안정성이 유지되는 독립 작업을 병렬로 처리합니다.",
   autoContinue: "자동 진행",

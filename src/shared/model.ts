@@ -1,3 +1,9 @@
+/**
+ * Purpose: Define serializable model-provider, role, step, and telemetry contracts.
+ * Pattern: Shared contract.
+ * Usage: Imported across backend and browser runtime boundaries.
+ * Related: src/backend/integrations/llm/invoke.ts, src/shared/settings.ts
+ */
 export type ModelProvider = "openai" | "anthropic" | "gemini" | "ollama" | "lmstudio" | "vllm" | "litellm"
 export type ModelRole =
   | "storyBuilder"
@@ -26,6 +32,5 @@ export type CoordinatorTraceStep =
   | "eventInjection"
   | "eventResolution"
   | "progressDecision"
-  | "extensionDecision"
 export type GeneratorRosterStep = "roster"
 export type ActorCardStep = "role" | "backgroundHistory" | "personality" | "preference"

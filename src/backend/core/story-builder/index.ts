@@ -1,15 +1,33 @@
+/**
+ * Purpose: Execute Story Builder graph requests and stream ordered workflow events.
+ * Pattern: Workflow graph.
+ * Usage: Called by Story Builder API routes for draft and streaming responses.
+ * Related: src/backend/core/story-builder/prompts.ts, src/backend/core/story-builder/async-queue.ts
+ */
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph"
 import type {
   LLMSettings,
   StoryBuilderDraftRequest,
   StoryBuilderDraftResponse,
-  StoryBuilderMessage,
   StoryBuilderStreamEvent,
 } from "@/shared"
 import { invokeRoleText, invokeRoleTextStreaming } from "@/backend/integrations/llm"
 import { withRolePromptGuide } from "@/backend/core/prompts/language"
-import { renderOutputLengthGuide } from "@/backend/core/prompts/prompt"
 import { validateRoleSettings } from "@/backend/core/settings"
+import { createAsyncQueue, type AsyncQueue } from "./async-queue"
+import {
+  latestAssistantDraft,
+  renderStoryBuilderChangeSummaryPrompt,
+  renderStoryBuilderPrompt,
+  storyBuilderFallbackDraft,
+  storyBuilderFallbackSummary,
+} from "./prompts"
+
+export {
+  renderStoryBuilderChangeSummaryPrompt,
+  renderStoryBuilderPrompt,
+  storyBuilderFallbackDraft,
+} from "./prompts"
 
 interface StoryBuilderGraphState {
   request: StoryBuilderDraftRequest
@@ -61,116 +79,6 @@ export async function* streamDraftScenario(
   }
 
   await run
-}
-
-export function renderStoryBuilderPrompt(request: StoryBuilderDraftRequest): string {
-  return `StoryBuilder for Simula.
-Draft or revise one simulation scenario in the same structure as Simula sample scenario files.
-${renderOutputLengthGuide(request.controls, "scenario draft")}
-The draft must be concrete, actor-driven, and ready to pass into the simulation preview.
-
-Required markdown structure:
-- One scenario title.
-- "## Purpose and End Condition"
-- "## Core Situation"
-- "## Key Actors"
-- "## Channels"
-- "## Immediate Action Units"
-- "## Behavioral Realism Rules"
-
-Content requirements:
-- Key Actors must include concrete named or role-specific actors with pressure, authority, incentives, and likely behavior.
-- Channels must define public, private, and group communication surfaces.
-- Immediate Action Units must list practical actions actors can take during rounds.
-- Behavioral Realism Rules must prevent magical knowledge, instant consensus, and purely dramatic one-step solutions.
-- Do not include YAML frontmatter. The app keeps controls separately.
-- Do not use code fences.
-
-Cast: ${request.controls.numCast}
-Max rounds: ${request.controls.maxRound ?? 8}
-Additional cast: ${request.controls.allowAdditionalCast ? "yes" : "no"}
-Actions per visibility: ${request.controls.actionsPerType}
-
-Conversation:
-${renderConversation(request.messages)}
-
-Return only the draft. No code fences.`
-}
-
-export function renderStoryBuilderChangeSummaryPrompt(
-  request: StoryBuilderDraftRequest,
-  revisedDraft: string
-): string {
-  const previousDraft = latestAssistantDraft(request.messages)
-  const latestRequest = latestUserRequest(request.messages)
-  return `StoryBuilder change summary for Simula.
-Explain what changed in the revised scenario draft.
-Be concise and concrete. Mention only changes that are reflected in the revised draft.
-Use a natural chat response, not a full scenario.
-
-Latest user request:
-${latestRequest}
-
-Previous draft:
-${previousDraft}
-
-Revised draft:
-${revisedDraft}
-
-Return 2-4 short bullets or short sentences. Do not repeat the full draft.`
-}
-
-function renderConversation(messages: StoryBuilderMessage[]): string {
-  return messages
-    .map((message) => `${message.role === "user" ? "User" : "Assistant"}: ${message.content}`)
-    .join("\n")
-}
-
-export function storyBuilderFallbackDraft(messages: StoryBuilderMessage[]): string {
-  const userInput =
-    messages
-      .filter((message) => message.role === "user")
-      .map((message) => message.content.trim())
-      .filter(Boolean)
-      .at(-1) ?? "A group faces a high-pressure decision with incomplete information."
-
-  return [
-    "# Scenario Draft",
-    "",
-    "## Purpose and End Condition",
-    "- Start when the central pressure becomes visible to every key actor.",
-    "- End when one practical course of action is chosen and the actors understand who carries the cost, authority, and public explanation.",
-    "- The goal is to observe how incentives, responsibility, timing, and incomplete information shape the decision.",
-    "",
-    "## Core Situation",
-    `- ${userInput}`,
-    "- The situation is already under time pressure, but the decisive facts are incomplete or contested.",
-    "- Each actor has a plausible reason to delay, redirect responsibility, or push for a narrower decision.",
-    "",
-    "## Key Actors",
-    "- Primary decision maker: owns the final call and must balance speed, legitimacy, and visible accountability.",
-    "- Operational lead: understands execution constraints and pushes for a practical path that can actually be carried out.",
-    "- Risk controller: watches legal, financial, or safety exposure and slows the decision until responsibility is explicit.",
-    "- Field or channel representative: carries outside pressure back into the room and fears being blamed for delay.",
-    "- External stakeholder: reacts to ambiguity, delay, or visible failure and can change the public cost of the decision.",
-    "",
-    "## Channels",
-    "- `public`: official statements, meeting minutes, announcements, press or stakeholder-facing updates",
-    "- `private`: direct pressure, risk warnings, informal alignment, responsibility negotiation",
-    "- `group`: working meetings, review sessions, cross-functional coordination, fact-check discussions",
-    "",
-    "## Immediate Action Units",
-    "- Reframe the decision around a narrower condition or deadline.",
-    "- Ask for missing evidence, revised numbers, or a risk memo before agreeing.",
-    "- Push a conditional approval that moves responsibility to another actor.",
-    "- Change public wording so the same decision carries less visible risk.",
-    "- Escalate the issue to a higher authority when the current group cannot absorb the downside.",
-    "",
-    "## Behavioral Realism Rules",
-    "- Actors should negotiate responsibility, timing, evidence, and public messaging through concrete moves.",
-    "- No actor should know every fact at once or solve the conflict through a single perfect statement.",
-    "- Progress should come from conditional decisions, tradeoffs, and responsibility allocation rather than long backstory.",
-  ].join("\n")
 }
 
 function createStoryBuilderGraph() {
@@ -299,70 +207,5 @@ async function runStoryBuilderEventStream(
     queue.push({ type: "error", error: error instanceof Error ? error.message : "StoryBuilder failed." })
   } finally {
     queue.close()
-  }
-}
-
-function latestAssistantDraft(messages: StoryBuilderMessage[]): string {
-  return messages
-    .filter((message) => message.role === "assistant")
-    .map((message) => message.content.trim())
-    .filter(Boolean)
-    .at(-1) ?? ""
-}
-
-function latestUserRequest(messages: StoryBuilderMessage[]): string {
-  return messages
-    .filter((message) => message.role === "user")
-    .map((message) => message.content.trim())
-    .filter(Boolean)
-    .at(-1) ?? ""
-}
-
-function storyBuilderFallbackSummary(request: StoryBuilderDraftRequest): string {
-  const latestRequest = latestUserRequest(request.messages)
-  return latestRequest
-    ? `Reflected the latest request: ${latestRequest}`
-    : "Updated the scenario draft."
-}
-
-interface AsyncQueue<T> extends AsyncIterable<T> {
-  push(value: T): void
-  close(): void
-}
-
-function createAsyncQueue<T>(): AsyncQueue<T> {
-  const values: T[] = []
-  const waiting: Array<(result: IteratorResult<T>) => void> = []
-  let closed = false
-
-  return {
-    push(value: T) {
-      const resolve = waiting.shift()
-      if (resolve) {
-        resolve({ value, done: false })
-        return
-      }
-      values.push(value)
-    },
-    close() {
-      closed = true
-      for (const resolve of waiting.splice(0)) {
-        resolve({ value: undefined, done: true })
-      }
-    },
-    [Symbol.asyncIterator]() {
-      return {
-        next(): Promise<IteratorResult<T>> {
-          if (values.length > 0) {
-            const value = values.shift() as T
-            return Promise.resolve({ value, done: false })
-          }
-          if (closed) {
-            return Promise.resolve({ value: undefined, done: true })
-          }
-          return new Promise((resolve) => waiting.push(resolve))
-        },
-      }
-    },
   }
 }

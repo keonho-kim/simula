@@ -1,0 +1,54 @@
+/**
+ * Purpose: Style Report tabs as a compact folder index joined to the active content panel.
+ * Pattern: Scoped Presentation Styles.
+ * Usage: Imported by src/ui/pages/report-page.tsx.
+ * Related: src/ui/components/ui/tabs.tsx
+ */
+.report-tab-list {
+  align-items: end;
+  gap: 0.25rem;
+  height: auto;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  scrollbar-width: thin;
+}
+
+.report-tab-trigger {
+  flex: 0 0 auto;
+  min-height: 2.5rem;
+  margin-bottom: -1px;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border);
+  border-bottom-color: var(--border);
+  border-radius: 0.625rem 0.625rem 0 0;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  box-shadow: none;
+}
+
+.report-tab-trigger[data-active],
+.report-tab-trigger[data-state="active"] {
+  z-index: 1;
+  border-bottom-color: var(--card);
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.report-tab-trigger:focus-visible {
+  z-index: 2;
+}
+
+.report-tab-panel {
+  min-width: 0;
+  margin-top: -1px;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  border: 1px solid var(--border);
+  border-radius: 0 0.75rem 0.75rem 0.75rem;
+  background: var(--card);
+}

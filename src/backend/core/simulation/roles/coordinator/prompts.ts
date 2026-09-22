@@ -1,3 +1,9 @@
+/**
+ * Purpose: Build bounded coordinator prompts for framing and event decisions.
+ * Pattern: Prompt builder.
+ * Usage: Consumed by coordinator graph and round invocation modules.
+ * Related: src/backend/core/simulation/roles/coordinator/invocation.ts
+ */
 import type { CoordinatorTraceStep } from "@/shared"
 import { compactLines, compactPlannerDigest, compactText, renderOutputLengthGuide, scalePromptLimit } from "@/backend/core/prompts/prompt"
 import type { WorkflowState } from "@/backend/core/simulation/workflow/state"
@@ -7,7 +13,7 @@ export type CoordinatorPromptBuilder = (
   partial: Partial<Record<CoordinatorTraceStep, string>>
 ) => string
 
-export const coordinatorPrompts: Record<CoordinatorTraceStep, CoordinatorPromptBuilder> = {
+export const coordinatorPrompts: Record<Exclude<CoordinatorTraceStep, "progressDecision">, CoordinatorPromptBuilder> = {
   runtimeFrame: (current) =>
     `Coordinator runtimeFrame. Return 2 short sentences on communication structure, timing pressure, and interaction chain.
 ${renderOutputLengthGuide(current.scenario.controls, "coordinator frame")}
@@ -83,40 +89,4 @@ Current round: ${roundIndex}
 Round interactions:
 ${recentInteractions.length ? compactLines(recentInteractions, 10, scalePromptLimit(1000, current.scenario.controls)) : "- None"}`
   },
-  progressDecision: (current) => {
-    const roundIndex = current.simulation.roundDigests.length
-    const recentInteractions = current.simulation.interactions
-      .filter((interaction) => interaction.roundIndex >= Math.max(1, roundIndex - 1))
-      .map((interaction) => `- R${interaction.roundIndex} ${interaction.content} Intent: ${interaction.intent}`)
-      .slice(-8)
-    return `Coordinator progressDecision.
-Return exactly one allowed output: continue, stop, or complete.
-Use complete only when there are no unresolved pending or partial events.
-Be generous; one quiet round is not enough to stop.
-No explanation or markdown.
-
-Current round: ${roundIndex}
-Max round: ${current.scenario.controls.maxRound}
-Unresolved events:
-${unresolvedEventLines(current)}
-Recent interactions:
-${recentInteractions.length ? compactLines(recentInteractions, 8, scalePromptLimit(900, current.scenario.controls)) : "- None"}`
-  },
-  extensionDecision: (current) =>
-    `Coordinator extensionDecision.
-Return exactly one allowed output: continue or stop.
-No explanation or markdown.
-
-Current round: ${current.simulation.roundDigests.length}
-Current max round: ${current.scenario.controls.maxRound}
-World: ${compactText(current.simulation.worldSummary, scalePromptLimit(700, current.scenario.controls))}
-Unresolved events: ${(current.simulation.plan?.majorEvents.filter((event) => event.status === "pending" || event.status === "partial").length ?? 0)}`,
-}
-
-function unresolvedEventLines(current: WorkflowState): string {
-  const events = current.simulation.plan?.majorEvents.filter((event) => event.status === "pending" || event.status === "partial") ?? []
-  if (!events.length) {
-    return "- None"
-  }
-  return events.map((event) => `- ${event.id} (${event.status}): ${event.title}. ${event.summary}`).join("\n")
 }

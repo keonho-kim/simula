@@ -53,6 +53,7 @@ num_cast: 6
 allow_additional_cast: true
 actions_per_type: 3
 max_round: 8
+autonomous_progress: false
 fast_mode: false
 output_length: short
 ---

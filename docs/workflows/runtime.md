@@ -32,7 +32,11 @@ Each round can:
 - emit `round.completed`
 - contribute graph timeline frames
 
-`maxRound` controls the actor activity round count.
+`maxRound` is a hard limit by default. With opt-in `autonomousProgress`, `coordinator/progress.ts`
+builds immutable previous/current evidence snapshots for the coordinator's exact `1`/`0` decision.
+`1` permits one more round, including beyond the configured maximum; `0` stops after recording
+the current round and observer summary. Repeated activity alone is not progress. Invalid outputs
+use the existing exact-choice repair/retry path. See [configuration](../configuration.md).
 
 ## Fast Mode
 

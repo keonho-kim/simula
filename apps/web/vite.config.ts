@@ -1,3 +1,9 @@
+/**
+ * Purpose: Configure the web development server and production bundle boundaries.
+ * Pattern: Build Configuration.
+ * Usage: Loaded by Vite through the @simula/web workspace scripts.
+ * Related: src/ui/main.tsx, src/ui/components/markdown/markdown-content.tsx
+ */
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -19,6 +25,19 @@ export default defineConfig({
   build: {
     outDir: `${webRoot}/dist`,
     emptyOutDir: true,
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'markdown-math',
+              test: /node_modules[\\/](?:.*[\\/])?katex[\\/]/,
+              priority: 20,
+            },
+          ],
+        },
+      },
+    },
   },
   server: {
     proxy: {

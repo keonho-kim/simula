@@ -1,3 +1,9 @@
+/**
+ * Purpose: Present live scenario preparation progress and inspectable board details.
+ * Pattern: Memoized presentation component.
+ * Usage: Lazy-loaded by src/ui/app/App.tsx during simulation setup.
+ * Related: src/ui/styles/scenario-board.css, src/ui/models/simulation/scenario-board.ts
+ */
 import { useReducedMotionPreference } from "@/ui/hooks/use-reduced-motion-preference"
 import { LazyMotion, MotionConfig, domMax } from "motion/react"
 import * as m from "motion/react-m"
@@ -10,6 +16,7 @@ import { boardProgress } from "@/ui/models/simulation/scenario-board"
 import { scenarioBoardColumns } from "@/ui/models/simulation/scenario-board-items"
 import type { UiTexts } from "@/ui/types/i18n"
 import { cn } from "@/ui/lib/class-names"
+import "@/ui/styles/scenario-board.css"
 
 const PROGRESS_DOTS = [0, 1, 2, 3, 4]
 

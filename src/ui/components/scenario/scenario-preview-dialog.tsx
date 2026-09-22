@@ -1,3 +1,9 @@
+/**
+ * Purpose: Review scenario text and execution controls before creating a run.
+ * Pattern: Controlled dialog component.
+ * Usage: Lazy-loaded by src/ui/app/App.tsx before run creation.
+ * Related: src/shared/scenario.ts, src/ui/components/scenario/story-builder-dialog.tsx
+ */
 import type { PromptOutputLength } from "@/shared"
 import type { ScenarioDraft } from "@/ui/types/scenario"
 import { Button } from "@/ui/components/ui/button"
@@ -187,6 +193,18 @@ export function ScenarioPreviewDialog({
                         {t.fastMode}
                       </FieldLabel>
                       <FieldDescription>{t.fastModeHelp}</FieldDescription>
+                    </FieldContent>
+                  </Field>
+                  <Field orientation="horizontal" className="items-start rounded-md bg-muted/40 p-3">
+                    <Switch
+                      id="preview-autonomous-progress"
+                      checked={draft.controls.autonomousProgress ?? false}
+                      onCheckedChange={(autonomousProgress) => onDraftChange({ ...draft, controls: { ...draft.controls, autonomousProgress } })}
+                      aria-describedby="preview-autonomous-progress-help"
+                    />
+                    <FieldContent>
+                      <FieldLabel htmlFor="preview-autonomous-progress">{t.autonomousProgress}</FieldLabel>
+                      <FieldDescription id="preview-autonomous-progress-help">{t.autonomousProgressHelp}</FieldDescription>
                     </FieldContent>
                   </Field>
                   <Field

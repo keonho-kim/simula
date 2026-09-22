@@ -1,3 +1,9 @@
+/**
+ * Purpose: Provide English and Korean copy for Report and analysis interfaces.
+ * Pattern: Localization Dictionary.
+ * Usage: Merged into the UI dictionary by src/ui/i18n/dictionary.ts.
+ * Related: src/ui/pages/report-page.tsx
+ */
 const en = {
   reportOverview: "Analysis Overview",
   reportCommentary: "Simulation commentary",
@@ -23,20 +29,10 @@ const en = {
   reportStatusRunning: "Running",
   reportStatusCreated: "Created",
 
-  reportUsageCoverage: "Calls with recorded token usage",
-  reportErrorScope: "Error records cover the full run; token filters apply to calls only.",
   reportLoadError: "Unable to load this report.",
   reportRetryLoad: "Retry",
   reportLoading: "Loading report…",
 
-  reportMetricFilters: "Filters",
-  reportAllRoles: "All roles",
-  reportRoleCalls: "Calls by role",
-  reportCalls: "Calls",
-  reportTotalDuration: "Total call duration",
-  reportErrors: "Error events",
-  reportRetries: "Retries",
-  reportCallDetails: "Call details",
 
   reportGraph: "Relationship graph",
   reportRelationshipDetails: "Relationship details",
@@ -47,7 +43,6 @@ const en = {
 
   reportRelations: "Relationships",
   reportConversations: "Conversations",
-  reportPerformance: "Performance",
   reportExport: "Export",
   reportPreviousRounds: "Previous rounds",
   reportNextRounds: "Next rounds",
@@ -186,20 +181,6 @@ const en = {
   interactionTo: "to",
   intent: "Intent",
   expectation: "Expectation",
-  systemRoleSignals: "System Role Signals",
-  systemRoleSignalsDescription: "Diagnostics are summarized by internal simulation role.",
-  role: "Role",
-  rolePlanner: "Planner",
-  roleGenerator: "Generator",
-  roleCoordinator: "Coordinator",
-  roleActor: "Actor",
-  roleObserver: "Observer",
-  roleRepair: "Repair",
-  nodes: "nodes",
-  noRoleDiagnostics: "No role diagnostics",
-  noRoleDiagnosticsDescription: "This role has not emitted model, metric, node, or log signals.",
-  noDiagnosticSignal: "No diagnostic signal captured.",
-  metricSummaryBody: "tokens, duration, attempt",
 } as const
 
 const ko = {
@@ -227,20 +208,10 @@ const ko = {
   reportStatusRunning: "진행 중",
   reportStatusCreated: "생성됨",
 
-  reportUsageCoverage: "토큰 사용량이 기록된 호출",
-  reportErrorScope: "오류 기록은 실행 전체 기준이며, 토큰 필터는 호출 지표에만 적용됩니다.",
   reportLoadError: "리포트를 불러오지 못했습니다.",
   reportRetryLoad: "다시 시도",
   reportLoading: "리포트를 불러오는 중…",
 
-  reportMetricFilters: "필터",
-  reportAllRoles: "모든 역할",
-  reportRoleCalls: "역할별 호출",
-  reportCalls: "호출 수",
-  reportTotalDuration: "호출 시간 합계",
-  reportErrors: "오류 기록",
-  reportRetries: "재시도",
-  reportCallDetails: "호출 상세",
 
   reportGraph: "관계 그래프",
   reportRelationshipDetails: "관계 상세",
@@ -251,7 +222,6 @@ const ko = {
 
   reportRelations: "관계 분석",
   reportConversations: "대화 기록",
-  reportPerformance: "성능 분석",
   reportExport: "내보내기",
   reportPreviousRounds: "이전 라운드 보기",
   reportNextRounds: "다음 라운드 보기",
@@ -390,20 +360,6 @@ const ko = {
   interactionTo: "→",
   intent: "의도",
   expectation: "기대 변화",
-  systemRoleSignals: "시스템 역할 신호",
-  systemRoleSignalsDescription: "내부 시뮬레이션 역할별로 요약한 진단 정보입니다.",
-  role: "역할",
-  rolePlanner: "기획",
-  roleGenerator: "구성",
-  roleCoordinator: "진행",
-  roleActor: "인물",
-  roleObserver: "관찰",
-  roleRepair: "보정",
-  nodes: "노드",
-  noRoleDiagnostics: "역할 진단 없음",
-  noRoleDiagnosticsDescription: "이 역할은 아직 모델, 지표, 노드, 로그 신호를 내보내지 않았습니다.",
-  noDiagnosticSignal: "기록된 진단 신호가 없습니다.",
-  metricSummaryBody: "토큰, 소요 시간, 시도",
 } as const satisfies Record<keyof typeof en, string>
 
 export const reportTexts = { en, ko } as const

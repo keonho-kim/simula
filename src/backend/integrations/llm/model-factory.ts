@@ -1,3 +1,9 @@
+/**
+ * Purpose: Construct provider-specific streaming chat models from resolved settings.
+ * Pattern: Factory.
+ * Usage: Called only by the LLM invocation adapter.
+ * Related: src/backend/integrations/llm/invoke.ts, src/backend/core/settings/resolve.ts
+ */
 import { ChatAnthropic } from "@langchain/anthropic"
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai"
 import { ChatOpenAI } from "@langchain/openai"
@@ -158,11 +164,9 @@ function unitTestExactChoice(prompt: string): string | undefined {
     return outputs.includes("completed") ? "completed" : outputs[0]
   }
   if (prompt.includes("Coordinator progressDecision.")) {
-    return prompt.includes("Unresolved events:\n- None") && outputs.includes("complete") ? "complete" : outputs[0]
+    return "0"
   }
-  if (prompt.includes("Coordinator extensionDecision.")) {
-    return outputs.includes("stop") ? "stop" : outputs[0]
-  }
+
   return outputs[0]
 }
 

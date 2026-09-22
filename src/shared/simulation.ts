@@ -1,3 +1,9 @@
+/**
+ * Purpose: Define serializable simulation state, actor, interaction, and trace contracts.
+ * Pattern: Shared contract.
+ * Usage: Shared by backend workflows, persistence, APIs, and browser projections.
+ * Related: src/backend/core/simulation/workflow/state.ts, src/shared/run.ts
+ */
 import type { ReportCommentary } from "./report-commentary"
 import type { RoleTraceStep, SimulationRole, PlannerTraceStep, CoordinatorTraceStep, ObserverTraceStep } from "@/shared/model"
 import type { ScenarioInput } from "@/shared/scenario"
@@ -157,7 +163,6 @@ export interface CoordinatorTrace {
   eventInjection: string
   eventResolution: string
   progressDecision: string
-  extensionDecision: string
   retryCounts: Record<CoordinatorTraceStep, number>
 }
 

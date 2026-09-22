@@ -1,3 +1,9 @@
+/**
+ * Purpose: Define serializable scenario input and control contracts.
+ * Pattern: Shared contract.
+ * Usage: Parsed by backend scenario boundaries and edited by UI scenario forms.
+ * Related: src/backend/core/scenario/index.ts, src/ui/types/scenario.ts
+ */
 export type PromptLanguage = "en" | "ko"
 export type PromptOutputLength = "short" | "medium" | "long"
 export type ScenarioLoadLevel = "low" | "middle" | "high"
@@ -8,6 +14,7 @@ export interface ScenarioControls {
   actionsPerType: number
   maxRound: number
   fastMode: boolean
+  autonomousProgress?: boolean
   outputLength?: PromptOutputLength
   loadLevel?: ScenarioLoadLevel
 }
