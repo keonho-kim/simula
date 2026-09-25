@@ -1,7 +1,7 @@
 <h1 align="center">Simula</h1>
 
 <p align="center">
-  <img alt="Runtime Bun" src="https://img.shields.io/badge/runtime-Bun-f472b6">
+  <img alt="Web runtime Node.js" src="https://img.shields.io/badge/web%20runtime-Node.js-417e38">
   <img alt="Language TypeScript" src="https://img.shields.io/badge/language-TypeScript-1f6feb">
   <img alt="Architecture staged" src="https://img.shields.io/badge/architecture-staged-0f766e">
   <img alt="Model actor-based" src="https://img.shields.io/badge/model-actor_based-7c3aed">
@@ -23,8 +23,9 @@ Production source is organized by runtime and responsibility:
 
 | Source | Responsibility |
 | --- | --- |
-| `src/backend/api`, `runtime` | Bun HTTP API, SSE transport, run lifecycle and event publication |
-| `src/backend/integrations`, `storage` | Model providers, settings files, run artifacts and sample loading |
+| `server.ts`, `src/app` | One Next.js host for pages, API, SSE and WebSocket |
+| `src/backend/api`, `runtime` | HTTP adapters, run lifecycle and event publication |
+| `src/backend/integrations`, `storage` | Model providers, temporary run artifacts and sample loading |
 | `src/backend/core/simulation`, `scenario`, `settings`, `story-builder`, `prompts` | Simulation workflows, domain parsing, configuration rules and prompt construction |
 | `src/ui` | Pages, components, hooks, stores, presentation models, browser API and storage |
 | `src/shared` | Shared API, event, scenario, run, graph and simulation types |
@@ -64,17 +65,20 @@ flowchart LR
 
 ```bash
 bun install
-bun run dev:server
-bun run dev:web
+bun run dev
 ```
 
-The server listens on `http://localhost:3001` by default. The web app uses the Vite dev server and
-proxies `/api` to the server.
+The single server listens on `https://localhost:3001` by default. Pages and `/api` share its origin.
+Development certificates are generated
+outside the repository in `~/.config/simula/certs`; trust the certificate in the browser before
+using persistent storage. For a remote VDI, set both `SIMULA_TLS_CERT_FILE` and
+`SIMULA_TLS_KEY_FILE` to files for a certificate trusted by that client.
 
-You can also run both dev servers with:
+On macOS, trust the generated local certificate in the user login keychain if the browser
+reports it as untrusted:
 
 ```bash
-bun run dev
+security add-trusted-cert -d -r trustRoot -k ~/Library/Keychains/login.keychain-db ~/.config/simula/certs/localhost.pem
 ```
 
 ## Build and Start
@@ -84,22 +88,19 @@ bun run build
 bun run start
 ```
 
-`build` builds the backend and frontend concurrently. `start` runs the compiled Bun backend and
-serves the built frontend on the same origin, `http://localhost:3001` by default. Set `PORT` to
-change the port. Production startup requires both build outputs and installed dependencies.
-Run `build:server` or `build:web` to build an individual app. Development commands remain unchanged.
+`build` checks TypeScript and builds Next.js with Webpack. `start` runs the Next custom server
+with Node.js and serves the built pages, API, SSE and WebSocket on one origin. Set `PORT` to
+change the port. Production startup requires `.next`, installed production dependencies, and
+the source files used by the custom server. Terminate TLS at the deployment proxy, or set both
+`SIMULA_TLS_CERT_FILE` and `SIMULA_TLS_KEY_FILE` for direct HTTPS serving.
 
 ## Settings
 
-Model settings resolve from:
-
-1. built-in defaults
-2. `env.toml` at the repository root, or `SIMULA_ENV_TOML_PATH`
-3. `settings.json` at the repository root, or `SIMULA_SETTINGS_PATH`
-4. values saved through the web settings dialog
-
-The server masks saved API keys when returning settings to the client. A masked value sent back as
-`********` keeps the existing secret.
+Model settings begin with built-in defaults and are saved in browser SQLite. Provider keys and
+authorization headers are encrypted there with a passphrase-derived Web Crypto key. Unlock them
+once per browser session. The server receives decrypted settings only for active work and keeps
+them in process memory. A forgotten passphrase requires resetting and re-entering secrets; other
+browser records remain available.
 
 Supported providers are:
 
@@ -151,10 +152,17 @@ Sample scenario seeds live in [`senario.samples/`](./senario.samples/README.md).
 
 ## Run Artifacts
 
-The default live run root is `runs/`. Override it with `SIMULA_DATA_DIR`.
+Run history is stored in the current browser profile's SQLite WASM database. Uploaded source
+files are stored in OPFS. The server uses a temporary directory while the owning tab is connected;
+it does not create new durable `runs/` history. Closing the tab cancels active work after a
+30-second reconnection grace period. Use the landing page's backup actions to move data between
+browser profiles or machines. Older server `runs/` files remain untouched and are not listed in
+the new browser history.
+Uploaded originals remain in OPFS after submission so an interrupted scenario build can submit
+the same source through a new temporary document set.
 
 ```text
-runs/
+browser SQLite / temporary server workspace
   <run_id>/
     manifest.json
     scenario.json
@@ -164,16 +172,17 @@ runs/
     graph.timeline.json
 ```
 
-`events.jsonl` records model messages, metrics, actor readiness, interactions, actor messages,
+The temporary `events.jsonl` records model messages, metrics, actor readiness, interactions, actor messages,
 round completion, graph deltas, report deltas, and terminal run events.
 
-`state.json` is the final structured simulation state. `report.md` is the human-readable report.
+Browser SQLite retains the final structured state and report, plus indexed per-run events and
+graph frames. It marks work lost to a server restart as interrupted rather than completed.
 
-The browser report has four tabs: Analysis Overview, Relationships, Conversations, and Performance.
-Analysis Overview contains the full commentary and is the default tab. Relationships
-show the heatmap above the network and replay. Conversations use a horizontally
-scrollable round board and the shared message history. Performance reuses the live metric cards
-and charts with role/token filters and call diagnostics. Completed, failed, and canceled runs
+The browser report keeps run-level metric cards above three tabs: Analysis Overview,
+Relationships, and Conversations. Analysis Overview contains the full commentary and is the
+default tab. Relationships show the heatmap above the network and replay. Conversations use a
+horizontally scrollable round board and the shared message history. Completed, failed, canceled,
+and interrupted runs
 open this report from history; available partial results and failures remain visible. New runs
 generate evidence-based commentary using the configured observer model. Existing reports can
 use Generate / retry commentary without replaying the simulation. Successful items are preserved
@@ -198,6 +207,7 @@ The server exposes a small local API:
 | `GET /api/runs/:id` | Read run manifest, state, timeline, and events. |
 | `POST /api/runs/:id/start` | Start execution for a created run. |
 | `GET /api/runs/:id/events` | Stream Server-Sent Events for the run. |
+| `POST /api/runs/:id/ack` | Confirm a browser-saved stream cursor or terminal event count and release confirmed transfer records. |
 | `GET /api/runs/:id/report` | Read the Markdown report. |
 | `GET /api/runs/:id/export?kind=json|jsonl|md` | Export state, events, or report. |
 

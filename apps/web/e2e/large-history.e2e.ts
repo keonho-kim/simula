@@ -1,4 +1,10 @@
-import { expect, test } from "@playwright/test"
+/**
+ * Purpose: Verify long actor histories stay bounded and scroll correctly.
+ * Pattern: End-to-end workflow test.
+ * Usage: Executed by Playwright through bun run test:e2e.
+ * Related: src/ui/components/actors/actor-rail.tsx, src/ui/shell/home-view.tsx
+ */
+import { expect, test } from "./fixtures"
 
 test("large history bounds mounted DOM while retaining scroll access and follow-latest behavior", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1100 })
@@ -9,8 +15,9 @@ test("large history bounds mounted DOM while retaining scroll access and follow-
   const errors: string[] = []
   page.on("pageerror", (error) => errors.push(error.message))
   await page.goto("/")
+  await page.waitForFunction(() => Boolean(window.__simulaE2E))
   const chooser = page.waitForEvent("filechooser")
-  await page.getByRole("button", { name: /Upload My Scenario/ }).click()
+  await page.getByRole("button", { name: /Import finished scenario/ }).click()
   await (await chooser).setFiles({ name: "large-history.md", mimeType: "text/markdown", buffer: Buffer.from("A team discusses a release.") })
   await page.getByLabel("Cast size").fill("3")
   await page.getByLabel("Max round").fill("1")
@@ -18,7 +25,7 @@ test("large history bounds mounted DOM while retaining scroll access and follow-
   await page.getByRole("button", { name: "Keep watching" }).click()
   const inject = async (start: number, count: number) => page.evaluate(async ({ start, count }) => {
     const path = "/src/ui/stores/run-store.ts"
-    const { useRunStore } = await import(path)
+    const { useRunStore } = await window.__simulaE2E!.import(path)
     const store = useRunStore.getState()
     store.pushEvents(Array.from({ length: count }, (_, offset) => {
       const index = start + offset
@@ -29,20 +36,20 @@ test("large history bounds mounted DOM while retaining scroll access and follow-
   }, { start, count })
   await inject(0, 4000)
   const rail = page.getByRole("complementary", { name: "Actor history" })
-  const viewport = rail.locator('[data-slot="scroll-area-viewport"]')
-  const gap = () => viewport.evaluate((element) => element.scrollHeight - element.scrollTop - element.clientHeight)
+  await expect(rail.locator('[data-slot="scroll-area-viewport"]')).toHaveCount(0)
+  const gap = () => page.evaluate(() => document.documentElement.scrollHeight - scrollY - innerHeight)
   await expect(rail.getByText("HISTORY 3999", { exact: true })).toBeVisible()
   await expect.poll(gap).toBeLessThanOrEqual(1)
   const mounted = await rail.getByRole("article").count()
   expect(mounted).toBeLessThan(40)
-  await viewport.evaluate((element) => { element.scrollTop = 0 })
+  await page.evaluate(() => window.scrollTo(0, 0))
   await expect(rail.getByText("HISTORY 0", { exact: true })).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
-  await expect.poll(() => viewport.evaluate(element => element.scrollTop)).toBe(0)
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0)
   await page.setViewportSize({ width: 1440, height: 1100 })
   await inject(4000, 100)
-  await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBe(0)
-  await viewport.evaluate((element) => { element.scrollTop = element.scrollHeight })
+  await expect.poll(() => page.evaluate(() => scrollY)).toBe(0)
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
   await expect(rail.getByText("HISTORY 4099", { exact: true })).toBeVisible()
   await expect.poll(gap).toBeLessThanOrEqual(1)
   await inject(4100, 20)

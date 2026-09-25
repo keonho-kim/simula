@@ -1,4 +1,11 @@
+/**
+ * Purpose: Verify simulation stage status and event-notice behavior.
+ * Pattern: Presentation contract test.
+ * Usage: bun test src/ui/components/simulation/simulation-stage.test.ts
+ * Related: src/ui/components/simulation/simulation-stage.tsx, src/ui/components/simulation/simulation-event-notice-card.tsx
+ */
 import { describe, expect, test } from "bun:test"
+import { createElement } from "react"
 import type { ActorState, GraphNodeView, GraphTimelineFrame, RunEvent, SimulationState } from "@/shared"
 import { renderToStaticMarkup } from "react-dom/server"
 import { dictionary } from "@/ui/i18n/dictionary"
@@ -53,7 +60,7 @@ describe("buildSimulationEventNotice", () => {
     ])
 
     const html = renderToStaticMarkup(
-      SimulationEventNoticeCard({
+      createElement(SimulationEventNoticeCard, {
         notice,
         t: dictionary.en,
         onDismiss: () => undefined,

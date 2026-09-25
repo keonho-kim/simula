@@ -1,12 +1,18 @@
-import { readRunSession, updateRunSession } from "@/ui/storage/run-session"
+/**
+ * Purpose: Coordinate browser-owned round approvals while leaving batch worlds under server control.
+ * Pattern: UI lifecycle hook.
+ * Usage: Consumed by the simulation application view.
+ * Related: src/ui/shell/App.tsx, src/ui/browser-storage/run-session.ts
+ */
+import { readRunSession, updateRunSession } from "@/ui/browser-storage/run-session"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { cancelRun, continueRun } from "@/ui/api/client"
+import { cancelRun, continueRun } from "@/ui/api-client/client"
 import { useRunStore } from "@/ui/stores/run-store"
 import { selectCompletedRound, selectTerminalEvent } from "@/ui/stores/run/selectors"
 import type { UiTexts } from "@/ui/types/i18n"
 
-export function useRoundProgression(selectedRunId: string | undefined, t: UiTexts) {
+export function useRoundProgression(selectedRunId: string | undefined, t: UiTexts, serverManaged = false) {
   const completedRound = useRunStore(selectCompletedRound)
   const terminalEvent = useRunStore(selectTerminalEvent)
   const [autoContinue, setAutoContinueState] = useState(() => readRunSession().autoContinue ?? false)
@@ -34,17 +40,17 @@ export function useRoundProgression(selectedRunId: string | undefined, t: UiText
   }, [])
 
   useEffect(() => {
-    if (terminalEvent) setRoundPromptIndex(undefined)
-  }, [terminalEvent])
+    if (terminalEvent || serverManaged) setRoundPromptIndex(undefined)
+  }, [terminalEvent, serverManaged])
 
   useEffect(() => {
-    if (!roundAction && selectedRunId && roundPromptIndex === undefined && completedRound !== undefined && !handledRounds.has(completedRound)) {
+    if (!serverManaged && !roundAction && selectedRunId && roundPromptIndex === undefined && completedRound !== undefined && !handledRounds.has(completedRound)) {
       setRoundPromptIndex(completedRound)
     }
-  }, [selectedRunId, roundPromptIndex, completedRound, handledRounds, roundAction])
+  }, [selectedRunId, roundPromptIndex, completedRound, handledRounds, roundAction, serverManaged])
 
   const continueRound = useCallback(async () => {
-    if (!selectedRunId || roundPromptIndex === undefined || inFlight.current) return
+    if (serverManaged || !selectedRunId || roundPromptIndex === undefined || inFlight.current) return
     inFlight.current = true
     const automatic = autoContinueRef.current
     const roundIndex = roundPromptIndex
@@ -68,11 +74,11 @@ export function useRoundProgression(selectedRunId: string | undefined, t: UiText
       inFlight.current = false
       setRoundAction(undefined)
     }
-  }, [selectedRunId, roundPromptIndex, setAutoContinue, t.roundContinueFailed])
+  }, [selectedRunId, roundPromptIndex, setAutoContinue, t.roundContinueFailed, serverManaged])
 
   useEffect(() => {
-    if (skipRoundDelay && roundPromptIndex !== undefined && !roundAction && !terminalEvent) void continueRound()
-  }, [skipRoundDelay, roundPromptIndex, roundAction, terminalEvent, continueRound])
+    if (!serverManaged && skipRoundDelay && roundPromptIndex !== undefined && !roundAction && !terminalEvent) void continueRound()
+  }, [skipRoundDelay, roundPromptIndex, roundAction, terminalEvent, continueRound, serverManaged])
 
   const cancelCurrentRun = useCallback(async () => {
     if (!selectedRunId) return

@@ -4,7 +4,7 @@
  * Usage: Executed by Playwright through bun run test:e2e.
  * Related: src/ui/hooks/use-round-progression.ts, src/backend/runtime/round-continuation.ts
  */
-import { expect, test } from "@playwright/test"
+import { expect, test } from "./fixtures"
 
 test("requires one explicit Continue click per round when automatic progression is off", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("simula.language", "en"))
@@ -18,8 +18,9 @@ test("requires one explicit Continue click per round when automatic progression 
     }
   })
   await page.goto("/")
+  await page.waitForFunction(() => Boolean(window.__simulaE2E))
   const chooser = page.waitForEvent("filechooser")
-  await page.getByRole("button", { name: /Upload My Scenario/ }).click()
+  await page.getByRole("button", { name: /Import finished scenario/ }).click()
   await (await chooser).setFiles({ name: "manual-rounds.md", mimeType: "text/markdown", buffer: Buffer.from("A product team debates a risky release.") })
   await page.getByLabel("Cast size").fill("3")
   await page.getByLabel("Max round").fill("3")
@@ -51,8 +52,9 @@ test("shows a five-second countdown and cancels it when auto continue is disable
     if (request.method() === "POST" && /\/api\/runs\/[^/]+\/continue$/.test(request.url())) approvals.push(request.postDataJSON().roundIndex)
   })
   await page.goto("/")
+  await page.waitForFunction(() => Boolean(window.__simulaE2E))
   const chooser = page.waitForEvent("filechooser")
-  await page.getByRole("button", { name: /Upload My Scenario/ }).click()
+  await page.getByRole("button", { name: /Import finished scenario/ }).click()
   await (await chooser).setFiles({ name: "countdown.md", mimeType: "text/markdown", buffer: Buffer.from("A product team debates a risky release.") })
   await page.getByLabel("Cast size").fill("3")
   await page.getByLabel("Max round").fill("2")
@@ -81,7 +83,7 @@ test("shows a five-second countdown and cancels it when auto continue is disable
   await expect(page.getByRole("dialog", { name: "Move to the Report page?" })).toBeVisible()
 })
 
-test("reload keeps the active simulation and automatic round progression", async ({ page }) => {
+test("reload keeps the active simulation and automatic round progression", async ({ page, browserName }) => {
   await page.addInitScript(() => localStorage.setItem("simula.language", "en"))
   const { settings } = await (await page.request.get("/api/settings")).json()
   settings.providers.openai.apiKey = "unit-test-api-key"
@@ -89,18 +91,22 @@ test("reload keeps the active simulation and automatic round progression", async
   let continuations = 0
   page.on("request", (request) => { if (request.method() === "POST" && request.url().endsWith("/continue")) continuations++ })
   await page.goto("/")
+  await page.waitForFunction(() => Boolean(window.__simulaE2E))
   const chooser = page.waitForEvent("filechooser")
-  await page.getByRole("button", { name: /Upload My Scenario/ }).click()
+  await page.getByRole("button", { name: /Import finished scenario/ }).click()
   await (await chooser).setFiles({ name: "reload.md", mimeType: "text/markdown", buffer: Buffer.from("A team discusses a release.") })
   await page.getByLabel("Cast size").fill("3")
   await page.getByLabel("Max round").fill("3")
   await page.getByRole("switch", { name: "Auto continue" }).check()
   await page.getByRole("button", { name: "Start", exact: true }).click()
   await expect(page.getByRole("dialog", { name: "Round complete" })).toBeVisible()
-  const cdp = await page.context().newCDPSession(page)
-  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 })
+  if (browserName === "chromium") {
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 })
+  }
   await page.emulateMedia({ reducedMotion: "reduce" })
   await page.reload()
+  await page.waitForFunction(() => Boolean(window.__simulaE2E))
   await expect(page.getByRole("heading", { name: "Start a simulation", exact: true })).toHaveCount(0)
   await expect(page.getByRole("dialog", { name: "Round complete" })).toBeVisible()
   await expect(page.getByRole("switch", { name: "Auto continue" })).toBeChecked()
@@ -120,11 +126,18 @@ test("three automatic approvals remove later waits and disabling resets the stre
   // explicitly to verify the frontend's longer continuation policy.
   const nextBoundary = (round: number) => page.evaluate(async (round) => {
     const path = "/src/ui/stores/run-store.ts"
-    const { useRunStore } = await import(path)
+    const { useRunStore } = await window.__simulaE2E!.import(path)
     const store = useRunStore.getState()
-    store.pushEvent(round === 5
+    const event = round === 5
       ? { type: "run.completed", runId: store.selectedRunId, timestamp: new Date().toISOString(), stopReason: "simulation_done" }
-      : { type: "round.completed", runId: store.selectedRunId, timestamp: new Date().toISOString(), roundIndex: round + 1 })
+      : { type: "round.completed", runId: store.selectedRunId, timestamp: new Date().toISOString(), roundIndex: round + 1 }
+    if (round === 4) {
+      const olderSnapshot = store.liveEvents
+      // Telemetry eviction and an older HTTP snapshot must not erase the fifth round.
+      store.pushEvents([event, ...Array.from({ length: 350 }, (_, index) => ({ type: "log", runId: store.selectedRunId,
+        timestamp: new Date().toISOString(), level: "info", message: `late telemetry ${index}` }))])
+      store.pushEvents(olderSnapshot)
+    } else store.pushEvent(event)
   }, round)
   await page.route("**/api/runs/*/continue", async route => {
     const round = route.request().postDataJSON().roundIndex
@@ -136,8 +149,9 @@ test("three automatic approvals remove later waits and disabling resets the stre
     }
   })
   await page.goto("/")
+  await page.waitForFunction(() => Boolean(window.__simulaE2E))
   const chooser = page.waitForEvent("filechooser")
-  await page.getByRole("button", { name: /Upload My Scenario/ }).click()
+  await page.getByRole("button", { name: /Import finished scenario/ }).click()
   await (await chooser).setFiles({ name: "automatic-streak.md", mimeType: "text/markdown", buffer: Buffer.from("A team discusses a release.") })
   await page.getByLabel("Cast size").fill("3")
   await page.getByLabel("Max round").fill("6")

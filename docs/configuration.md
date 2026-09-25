@@ -4,44 +4,38 @@
 
 ## Resolution Model
 
-Settings resolve in this order:
-
-1. built-in defaults from `src/backend/core/settings`
-2. `env.toml`, or the file pointed to by `SIMULA_ENV_TOML_PATH`
-3. `settings.json`, or the file pointed to by `SIMULA_SETTINGS_PATH`
-4. values saved through `PUT /api/settings`
-
-Saved settings are normalized before writing. When the client sends a masked API key value
-(`********`), the server keeps the previous secret.
+Settings begin with built-in defaults from `src/backend/core/settings`. The browser saves normal
+settings in SQLite WASM and encrypts provider credentials using a user passphrase. `PUT /api/settings`
+loads the unlocked values into the owning server session's memory for active work; it does not
+write `settings.json` or `env.toml`. A masked API key value (`********`) retains the previous
+value within that session.
 
 ## Server Environment Variables
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `PORT` | `3001` | Bun API server port |
-| `SIMULA_DATA_DIR` | `runs` under the repository root | live run artifact root |
-| `SIMULA_SETTINGS_PATH` | `settings.json` under the repository root | saved settings file |
-| `SIMULA_ENV_TOML_PATH` | `env.toml` under the repository root | local TOML settings file |
+| `SIMULA_TLS_CERT_FILE` / `SIMULA_TLS_KEY_FILE` | generated local certificate outside the repository | HTTPS certificate and key; set both for trusted remote access |
 | `SIMULA_SAMPLE_DIR` | repository `senario.samples` directory | scenario sample root |
+| `SIMULA_LIBREOFFICE_BIN` | `soffice` | optional independent PDF text checker executable; required separately for legacy DOC conversion |
+| `SIMULA_MODEL_QUEUE_LIMIT` | `1024` | maximum waiting model calls across pools |
+| `SIMULA_MODEL_QUEUE_TIMEOUT_MS` | `120000` | maximum admission wait before the affected call fails |
 
-Runtime paths are resolved from the backend module's location in the checkout, independent of the
-launch working directory. Relative path overrides are also relative to the repository root;
-explicit absolute overrides are preserved. No developer home directory is embedded in the source.
+Set **Concurrent model calls** in the LLM settings screen (`concurrency`, default 8, range 1–50).
+Changes take effect without a restart. Use 50
+only when the configured provider can accept 50 concurrent requests; this is independent of
+world count and does not claim the provider performs 50 simultaneous inference passes.
+The same allowance applies to each distinct endpoint/model pool. It is not a distributed
+quota across multiple Node.js server processes or a hardware-wide limit across model names.
 
-The `runs/` directory name is also used by backend source modules. Git ignore rules must target
-`/runs/` and `/apps/*/runs/` explicitly; an unanchored `runs/` rule excludes required source files
-and makes fresh checkouts fail with a module-not-found error.
+The bundled sample directory resolves from the checkout, independent of the launch directory.
+The server puts active artifacts under a process-specific OS temporary directory and removes them
+when the browser session expires or the server stops. Existing repository `runs/` and settings files
+are not imported or deleted by this transition.
 
-Earlier versions resolved defaults and relative overrides from the launch directory, commonly
-`apps/server` when started through workspace scripts. Existing files are not moved automatically.
-To keep that data location, explicitly set `SIMULA_DATA_DIR=apps/server/runs`,
-`SIMULA_SETTINGS_PATH=apps/server/settings.json`, and/or `SIMULA_ENV_TOML_PATH=apps/server/env.toml`.
-Otherwise place the desired files in the repository root. Check custom `SIMULA_*` values inherited
-from the shell if an error still names an unexpected absolute path.
-
-For web development, `SIMULA_API_ORIGIN` controls the Vite proxy target for `/api`.
-`bun run start` sets `NODE_ENV=production` and serves the built frontend and API from the same
-server, so the production command does not use the Vite proxy.
+The Next custom server serves pages and `/api` on the same origin in development and production.
+`bun run dev` provides local HTTPS. `bun run start` uses production mode; provide TLS through a
+deployment proxy or the configured certificate paths.
 
 ## Model Roles
 
@@ -56,6 +50,8 @@ Every role resolves to one concrete `RoleSettings` object:
 - `repair`
 
 `actor` may inherit the coordinator settings when no actor-specific settings are provided.
+PDF page interpretation currently uses the configured `storyBuilder` role; select a
+vision-capable model for that role before extracting PDFs.
 
 ## Providers
 
@@ -123,10 +119,9 @@ The settings dialog reads `GET /api/settings`; it does not need provider API key
 servers to open. Missing local configuration files use the built-in defaults. Invalid existing
 configuration files fail explicitly.
 
-If settings cannot load, check the API server's startup output and open
-`http://localhost:3001/api/settings` directly (adjust the port if configured). If the direct request
-works but the web app fails, check the Vite `/api` proxy and `SIMULA_API_ORIGIN`. A running Vite page
-does not prove that the backend process launched by `bun run dev` started successfully.
+If settings cannot load, check the single server's startup output and open
+`https://localhost:3001/api/settings` directly (adjust the port if configured). A page response
+alone does not prove the backend runtime initialized; verify this API response too.
 
 Settings reads time out after ten seconds. Failed reads show an error and an explicit Retry action
 instead of leaving the dialog in its loading state.

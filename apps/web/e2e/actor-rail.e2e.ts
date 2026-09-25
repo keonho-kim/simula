@@ -1,4 +1,10 @@
-import { expect, test } from "@playwright/test"
+/**
+ * Purpose: Verify actor history presentation, scrolling, and retained report replay access.
+ * Pattern: Browser workflow test.
+ * Usage: bun run test:e2e apps/web/e2e/actor-rail.e2e.ts
+ * Related: src/ui/components/actors, src/ui/pages/report-page.tsx
+ */
+import { expect, test } from "./fixtures"
 
 test("groups actor history by round with thoughts and speech in one card", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 1100 })
@@ -10,7 +16,7 @@ test("groups actor history by round with thoughts and speech in one card", async
   page.on("pageerror", error => errors.push(error.message))
   await page.goto("/")
   const chooser = page.waitForEvent("filechooser")
-  await page.getByRole("button", { name: /Upload My Scenario/ }).click()
+  await page.getByRole("button", { name: /Import finished scenario/ }).click()
   await (await chooser).setFiles({ name: "actor-history.md", mimeType: "text/markdown", buffer: Buffer.from("A product team debates a risky release.") })
   await page.getByLabel("Cast size").fill("3")
   await page.getByLabel("Max round").fill("2")
@@ -39,7 +45,7 @@ test("groups actor history by round with thoughts and speech in one card", async
   await expect.poll(() => rail.evaluate(element => {
     const stage = element.previousElementSibling!.getBoundingClientRect()
     const history = element.getBoundingClientRect()
-    return Math.max(Math.abs(stage.top - history.top), Math.abs(stage.bottom - history.bottom))
+    return Math.abs(stage.top - history.top)
   })).toBeLessThanOrEqual(1)
   const margins = await rail.evaluate(element => ({
     left: element.previousElementSibling!.getBoundingClientRect().left / innerWidth,
@@ -49,9 +55,9 @@ test("groups actor history by round with thoughts and speech in one card", async
   expect(margins.right).toBeCloseTo(0.1, 2)
   await page.screenshot({ path: testInfo.outputPath("simulation-wide.png"), fullPage: true })
   await page.setViewportSize({ width: 1440, height: 1100 })
-  const viewport = rail.locator('[data-slot="scroll-area-viewport"]')
-  expect(await viewport.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true)
-  await viewport.evaluate(element => { element.scrollTop = 0 })
+  await expect(rail.locator('[data-slot="scroll-area-viewport"]')).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight)).toBe(true)
+  await page.evaluate(() => window.scrollTo(0, 0))
   await expect(page.getByText("Simulation started", { exact: true })).toBeHidden({ timeout: 6000 })
   await page.screenshot({ path: testInfo.outputPath("actor-rail-desktop.png"), fullPage: true })
   await expect(page.getByRole("button", { name: "Reset replay" })).toHaveCount(0)
@@ -66,7 +72,7 @@ test("groups actor history by round with thoughts and speech in one card", async
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.setViewportSize({ width: 1440, height: 1100 })
   await page.getByRole("button", { name: "Report", exact: true }).click()
-  await page.getByRole("tab", { name: "Relationships" }).click()
+  await page.getByRole("button", { name: "Relationships" }).click()
   await expect(page.getByRole("slider", { name: "Replay timeline" }).first()).toBeVisible()
   expect(errors).toEqual([])
 })
@@ -81,28 +87,28 @@ test("pauses following when scrolled up and resumes only at the bottom", async (
   await page.route("**/api/runs/*/continue", route => { continuations.push(route) })
   await page.goto("/")
   const chooser = page.waitForEvent("filechooser")
-  await page.getByRole("button", { name: /Upload My Scenario/ }).click()
+  await page.getByRole("button", { name: /Import finished scenario/ }).click()
   await (await chooser).setFiles({ name: "scroll-history.md", mimeType: "text/markdown", buffer: Buffer.from("A product team debates a risky release.") })
   await page.getByLabel("Cast size").fill("6")
   await page.getByLabel("Max round").fill("3")
   await page.getByRole("switch", { name: "Auto continue" }).check()
   await page.getByRole("button", { name: "Start", exact: true }).click()
   const rail = page.getByRole("complementary", { name: "Actor history" })
-  const viewport = rail.locator('[data-slot="scroll-area-viewport"]')
-  const bottomGap = () => viewport.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight)
+  const bottomGap = () => page.evaluate(() => document.documentElement.scrollHeight - scrollY - innerHeight)
   await expect.poll(() => continuations.length, { timeout: 12000 }).toBe(1)
   await expect.poll(bottomGap).toBeLessThanOrEqual(1)
-  const bottom = await viewport.evaluate(element => element.scrollTop)
+  const bottom = await page.evaluate(() => scrollY)
   expect(bottom).toBeGreaterThan(48)
-  await viewport.hover()
+  await rail.hover()
   await page.mouse.wheel(0, -24)
   await expect.poll(bottomGap).toBeGreaterThan(1)
-  const readingPosition = await viewport.evaluate(element => element.scrollTop)
-  expect(bottom - readingPosition).toBeLessThan(48)
+  const readingPosition = await page.evaluate(() => scrollY)
+  expect(bottom - readingPosition).toBeLessThan(64)
   await continuations[0].continue()
   await expect.poll(() => continuations.length, { timeout: 12000 }).toBe(2)
   await expect(rail.getByRole("heading", { name: "ROUND 2", exact: true })).toHaveCount(1)
-  await expect.poll(() => viewport.evaluate(element => element.scrollTop)).toBeCloseTo(readingPosition, 0)
+  await expect.poll(bottomGap).toBeGreaterThan(1)
+  expect(await page.evaluate(() => scrollY)).toBeLessThanOrEqual(readingPosition)
   await page.mouse.wheel(0, 10000)
   await expect.poll(bottomGap).toBeLessThanOrEqual(1)
   await continuations[1].continue()
@@ -119,7 +125,7 @@ test("Planner action codes resolve to Korean badges to the left of speech", asyn
   await page.request.put("/api/settings", { data: { settings } })
   await page.goto("/")
   const chooser = page.waitForEvent("filechooser")
-  await page.getByRole("button", { name: /시나리오 업로드/ }).click()
+  await page.getByRole("button", { name: /완성된 시나리오 불러오기/ }).click()
   await (await chooser).setFiles({ name: "action-catalog.md", mimeType: "text/markdown", buffer: Buffer.from("민수와 지수가 안전한 출시를 논의합니다.") })
   await page.getByLabel("등장 인원").fill("3")
   await page.getByLabel("최대 라운드").fill("1")

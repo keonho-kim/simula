@@ -1,63 +1,33 @@
+/**
+ * Purpose: Own partial actor-card output and reject incomplete card assembly.
+ * Pattern: Graph state with deterministic completion.
+ * Usage: Used by the per-actor card graph and its field nodes.
+ * Related: src/backend/core/simulation/roles/generator/cards/context.ts, src/backend/core/simulation/roles/generator/cards/graph.ts
+ */
 import { Annotation } from "@langchain/langgraph"
-import type { ActorCardStep, ActorRosterEntry, LLMSettings, RunEvent, ScenarioInput } from "@/shared"
+import type { ActorCardStep } from "@/shared"
 import type { ActorCard } from "@/backend/core/simulation/roles/generator/state"
+import type { ActorCardContext } from "./context"
 
 export interface ActorCardGraphState {
-  runId: string
-  scenario: ScenarioInput
-  settings: LLMSettings
-  actorIndex: number
-  assignedName: string
-  roleSeed: string
-  fullRoster: ActorRosterEntry[]
-  plannerDigest: string
   card: Partial<ActorCard>
   retryCounts: Record<ActorCardStep, number>
-  emit: (event: RunEvent) => Promise<void>
+}
+export type ActorCardStepInput = ActorCardContext & ActorCardGraphState
+
+export function initialActorCardState(): ActorCardGraphState {
+  return { card: {}, retryCounts: { role: 0, backgroundHistory: 0, personality: 0, preference: 0 } }
 }
 
-export const ACTOR_CARD_STEPS: ActorCardStep[] = [
-  "role",
-  "backgroundHistory",
-  "personality",
-  "preference",
-]
-
-export function initialActorCardState(
-  input: Omit<ActorCardGraphState, "card" | "retryCounts">
-): ActorCardGraphState {
-  return {
-    ...input,
-    card: {},
-    retryCounts: {
-      role: 0,
-      backgroundHistory: 0,
-      personality: 0,
-      preference: 0,
-    },
+export function completeActorCard(state: ActorCardGraphState, assignedName: string): ActorCard {
+  const { role, backgroundHistory, personality, preference } = state.card
+  if (!role?.trim() || !backgroundHistory?.trim() || !personality?.trim() || !preference?.trim()) {
+    throw new Error("Actor card is incomplete; all generated fields are required.")
   }
-}
-
-export function completeActorCard(state: ActorCardGraphState): ActorCard {
-  return {
-    role: state.card.role ?? state.roleSeed,
-    name: state.assignedName,
-    backgroundHistory: state.card.backgroundHistory ?? "No background history generated.",
-    personality: state.card.personality ?? "Pragmatic under pressure.",
-    preference: state.card.preference ?? "Reduce uncertainty while protecting their own position.",
-  }
+  return { name: assignedName, role, backgroundHistory, personality, preference }
 }
 
 export const ActorCardAnnotation = Annotation.Root({
-  runId: Annotation<string>(),
-  scenario: Annotation<ScenarioInput>(),
-  settings: Annotation<LLMSettings>(),
-  actorIndex: Annotation<number>(),
-  assignedName: Annotation<string>(),
-  roleSeed: Annotation<string>(),
-  fullRoster: Annotation<ActorRosterEntry[]>(),
-  plannerDigest: Annotation<string>(),
   card: Annotation<Partial<ActorCard>>(),
   retryCounts: Annotation<Record<ActorCardStep, number>>(),
-  emit: Annotation<(event: RunEvent) => Promise<void>>(),
 })

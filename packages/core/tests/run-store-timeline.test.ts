@@ -1,3 +1,10 @@
+/**
+ * Purpose: Verify accepted actor and interaction events produce persisted graph frames.
+ * Pattern: Run repository contract tests.
+ * Usage: bun test packages/core/tests/run-store-timeline.test.ts
+ * Related: src/backend/storage/runs/run-store.ts, src/backend/storage/runs/testing/fixtures.ts
+ */
+import { seedRunEvent } from "@/backend/storage/runs/testing/fixtures"
 import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
@@ -16,7 +23,7 @@ describe("run store graph timeline", () => {
         controls: { numCast: 2, allowAdditionalCast: false, actionsPerType: 3, maxRound: 1, fastMode: false },
       })
 
-      const actorsFrame = await store.appendEvent({
+      const actorsFrame = await seedRunEvent(store, {
         type: "actors.ready",
         runId: run.id,
         timestamp: "2026-05-14T00:00:00.000Z",
@@ -26,13 +33,13 @@ describe("run store graph timeline", () => {
         ],
       })
 
-      const interactionFrame = await store.appendEvent({
+      const interactionFrame = await seedRunEvent(store, {
         type: "interaction.recorded",
         runId: run.id,
         timestamp: "2026-05-14T00:00:01.000Z",
         interaction: interaction("interaction-1", 1, "actor-1", ["actor-2"], "briefing"),
       })
-      const repeatedInteractionFrame = await store.appendEvent({
+      const repeatedInteractionFrame = await seedRunEvent(store, {
         type: "interaction.recorded",
         runId: run.id,
         timestamp: "2026-05-14T00:00:02.000Z",
@@ -64,6 +71,46 @@ describe("run store graph timeline", () => {
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
+  })
+
+  test("terminal follow-up logs do not reopen a pruned graph projection", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "simula-terminal-timeline-"))
+    try {
+      const store = new RunStore({ rootDir })
+      const run = await store.createRun({ text: "Review", controls: {
+        numCast: 1, allowAdditionalCast: false, actionsPerType: 1, maxRound: 1, fastMode: false } })
+      const lease = store.execution(run.id).claim()
+      if (!lease) throw new Error("Missing test run owner.")
+      const timestamp = "2026-09-25T00:00:00.000Z"
+      await store.appendEvent({ type: "actors.ready", runId: run.id, timestamp, actors: [
+        { id: "actor-1", label: "Actor 1", role: "Lead", intent: "Start", interactionCount: 0 },
+      ] }, lease)
+      await store.appendEvent({ type: "run.completed", runId: run.id, timestamp, stopReason: "simulation_done" }, lease)
+      store.releaseTimeline(run.id)
+      expect(await store.pruneConfirmedEvents(run.id, 2)).toBe(true)
+      await store.appendEvent({ type: "log", runId: run.id, timestamp, level: "info", message: "Report follow-up" }, lease)
+      expect(await store.readTimeline(run.id)).toHaveLength(1)
+      lease.release()
+    } finally { await rm(rootDir, { recursive: true, force: true }) }
+  })
+
+  test("initial events and later events share one frame sequence", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "simula-initial-timeline-"))
+    try {
+      const store = new RunStore({ rootDir })
+      const id = "initial-timeline"
+      const timestamp = "2026-09-25T00:00:00.000Z"
+      const run = await store.createRun({ text: "Review", controls: {
+        numCast: 1, allowAdditionalCast: false, actionsPerType: 1, maxRound: 1, fastMode: false } }, {
+        id, initialEvents: [{ type: "actors.ready", runId: id, timestamp, actors: [
+          { id: "actor-1", label: "Actor 1", role: "Lead", intent: "Start", interactionCount: 0 },
+        ] }],
+      })
+      expect((await store.readTimeline(run.id)).map(frame => frame.index)).toEqual([0])
+      const next = await seedRunEvent(store, { type: "round.completed", runId: run.id, timestamp, roundIndex: 1 })
+      expect(next?.index).toBe(1)
+      expect((await store.readTimeline(run.id)).map(frame => frame.index)).toEqual([0, 1])
+    } finally { await rm(rootDir, { recursive: true, force: true }) }
   })
 })
 

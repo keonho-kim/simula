@@ -5,33 +5,25 @@
  * Related: apps/server/tests/server-test-support.ts, src/backend/api/routes.ts
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
-import { tmpdir } from "node:os"
 import { defaultSettings } from "@/backend/core/settings/defaults"
 import type { LLMSettings } from "@/shared"
-import { continueRoundsFromEventStream, pollRun, setProviderKey } from "./server-test-support"
+import { apiFetch, continueRoundsFromEventStream, pollRun, setProviderKey } from "./server-test-support"
 
 const port = 3917
 const baseUrl = `http://localhost:${port}`
 const repoRoot = join(import.meta.dir, "../../..")
-const serverEntry = join(repoRoot, "src/backend/index.ts")
-let dataDir = ""
-let settingsPath = ""
+const serverEntry = join(repoRoot, "server.ts")
 let processRef: ReturnType<typeof Bun.spawn>
 let serverStdout = ""
 let serverStderr = ""
 
 beforeAll(async () => {
-  dataDir = await mkdtemp(join(tmpdir(), "simula-server-runs-"))
-  settingsPath = join(dataDir, "settings.json")
-  processRef = Bun.spawn(["bun", serverEntry], {
+  processRef = Bun.spawn(["node", "--import", "tsx", serverEntry], {
     cwd: repoRoot,
     env: {
       ...process.env,
       PORT: String(port),
-      SIMULA_DATA_DIR: dataDir,
-      SIMULA_SETTINGS_PATH: settingsPath,
       SIMULA_TEST_MODEL: "1",
     },
     stdout: "pipe",
@@ -49,35 +41,44 @@ beforeAll(async () => {
   }
   await waitForServer()
   try {
-    await fetch(`${baseUrl}/api/settings`)
+    await apiFetch(`${baseUrl}/api/settings`)
   } catch (error) {
     throw new Error(
       `Server started but settings endpoint was unreachable: ${String(error)}\nstdout:\n${serverStdout}\nstderr:\n${serverStderr}`,
       { cause: error }
     )
   }
-}, 15_000)
+}, 45_000)
 
 afterAll(async () => {
   processRef.kill()
   await processRef.exited.catch(() => undefined)
-  await rm(dataDir, { recursive: true, force: true })
-})
+}, 30_000)
 
 describe("server API", () => {
+  test("rejects an unsafe browser execution identifier", async () => {
+    const response = await apiFetch(`${baseUrl}/api/runs`, { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ executionId: "../escape",
+        scenario: { text: "A bounded test scenario.", controls: { numCast: 2, actionsPerType: 1, maxRound: 1,
+          allowAdditionalCast: false, fastMode: false } } }) })
+    expect(response.status).toBe(400)
+  })
+
   test("creates, runs, streams, and reports a completed run", async () => {
     const settings = defaultSettings()
     setProviderKey(settings, "unit-test-api-key")
-    await fetch(`${baseUrl}/api/settings`, {
+    await apiFetch(`${baseUrl}/api/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings }),
     })
 
-    const createResponse = await fetch(`${baseUrl}/api/runs`, {
+    const executionId = crypto.randomUUID()
+    const createResponse = await apiFetch(`${baseUrl}/api/runs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        executionId,
         scenario: {
           sourceName: "api.md",
           text: "A product team debates a critical release.",
@@ -86,14 +87,15 @@ describe("server API", () => {
       }),
     })
     const { run } = (await createResponse.json()) as { run: { id: string } }
+    expect(run.id).toBe(executionId)
 
     const eventsController = new AbortController()
-    const eventsResponse = await fetch(`${baseUrl}/api/runs/${run.id}/events`, { signal: eventsController.signal })
+    const eventsResponse = await apiFetch(`${baseUrl}/api/runs/${run.id}/events`, { signal: eventsController.signal })
     expect(eventsResponse.ok).toBe(true)
     const eventPump = continueRoundsFromEventStream(baseUrl, run.id, eventsResponse)
 
     try {
-      await fetch(`${baseUrl}/api/runs/${run.id}/start`, { method: "POST" })
+      await apiFetch(`${baseUrl}/api/runs/${run.id}/start`, { method: "POST" })
 
       const completed = await pollRun(baseUrl, run.id, "completed")
       expect(completed.status).toBe("completed")
@@ -102,10 +104,10 @@ describe("server API", () => {
       await eventPump.catch(() => undefined)
     }
 
-    const report = await fetch(`${baseUrl}/api/runs/${run.id}/report`).then((response) => response.text())
+    const report = await apiFetch(`${baseUrl}/api/runs/${run.id}/report`).then((response) => response.text())
     expect(report).toContain("# Simula Report")
 
-    const exported = await fetch(`${baseUrl}/api/runs/${run.id}/export?kind=jsonl`).then((response) =>
+    const exported = await apiFetch(`${baseUrl}/api/runs/${run.id}/export?kind=jsonl`).then((response) =>
       response.text()
     )
     expect(exported).toContain("graph.delta")
@@ -117,12 +119,12 @@ describe("server API", () => {
   })
 
   test("fails explicitly when provider keys are missing", async () => {
-    await fetch(`${baseUrl}/api/settings`, {
+    await apiFetch(`${baseUrl}/api/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings: defaultSettings() }),
     })
-    const createResponse = await fetch(`${baseUrl}/api/runs`, {
+    const createResponse = await apiFetch(`${baseUrl}/api/runs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -134,7 +136,7 @@ describe("server API", () => {
       }),
     })
     const { run } = (await createResponse.json()) as { run: { id: string } }
-    await fetch(`${baseUrl}/api/runs/${run.id}/start`, { method: "POST" })
+    await apiFetch(`${baseUrl}/api/runs/${run.id}/start`, { method: "POST" })
     const failed = await pollRun(baseUrl, run.id, "failed")
     expect(failed.error).toContain("API key is required")
   })
@@ -144,12 +146,12 @@ describe("server API", () => {
     setProviderKey(settings, "unit-test-api-key")
     settings.roles.planner.provider = "litellm"
     settings.providers.litellm.apiKey = "unit-test-empty-key"
-    await fetch(`${baseUrl}/api/settings`, {
+    await apiFetch(`${baseUrl}/api/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings }),
     })
-    const createResponse = await fetch(`${baseUrl}/api/runs`, {
+    const createResponse = await apiFetch(`${baseUrl}/api/runs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -161,10 +163,10 @@ describe("server API", () => {
       }),
     })
     const { run } = (await createResponse.json()) as { run: { id: string } }
-    await fetch(`${baseUrl}/api/runs/${run.id}/start`, { method: "POST" })
+    await apiFetch(`${baseUrl}/api/runs/${run.id}/start`, { method: "POST" })
     const failed = await pollRun(baseUrl, run.id, "failed")
     expect(failed.error).toContain("planner.coreSituation failed after 5 empty responses")
-    const exported = await fetch(`${baseUrl}/api/runs/${run.id}/export?kind=jsonl`).then((response) =>
+    const exported = await apiFetch(`${baseUrl}/api/runs/${run.id}/export?kind=jsonl`).then((response) =>
       response.text()
     )
     const retryLogEvents = exported
@@ -180,14 +182,14 @@ describe("server API", () => {
   })
 
   test("lists and reads scenario samples", async () => {
-    const samplesResponse = await fetch(`${baseUrl}/api/scenarios/samples`)
+    const samplesResponse = await apiFetch(`${baseUrl}/api/scenarios/samples`)
     const { samples } = (await samplesResponse.json()) as {
       samples: Array<{ name: string; title: string; controls: { numCast: number } }>
     }
     expect(samples.some((sample) => sample.name === "README.md")).toBe(false)
     expect(samples.length).toBeGreaterThan(0)
 
-    const sampleResponse = await fetch(`${baseUrl}/api/scenarios/samples/${samples[0]?.name}`)
+    const sampleResponse = await apiFetch(`${baseUrl}/api/scenarios/samples/${samples[0]?.name}`)
     const { sample } = (await sampleResponse.json()) as {
       sample: { text: string; controls: { numCast: number } }
     }
@@ -209,29 +211,34 @@ describe("server API", () => {
 
     try {
       const settings = defaultSettings()
+      settings.concurrency = 3
       settings.roles.actor.provider = "lmstudio"
       settings.roles.actor.model = "local-model-a"
       settings.providers.lmstudio.baseUrl = `http://localhost:${modelServer.port}/v1`
       settings.providers.lmstudio.apiKey = "provider-secret"
 
-      await fetch(`${baseUrl}/api/settings`, {
+      await apiFetch(`${baseUrl}/api/settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings }),
       })
 
-      const sanitized = (await fetch(`${baseUrl}/api/settings`).then((response) => response.json())) as {
+      const sanitized = (await apiFetch(`${baseUrl}/api/settings`).then((response) => response.json())) as {
         settings: LLMSettings
       }
       expect(sanitized.settings.providers.lmstudio.apiKey).toBe("********")
+      expect(sanitized.settings.concurrency).toBe(3)
+      const invalid = await apiFetch(`${baseUrl}/api/settings`, { method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: { ...settings, concurrency: 51 } }) })
+      expect(invalid.status).toBe(400)
 
-      await fetch(`${baseUrl}/api/settings`, {
+      await apiFetch(`${baseUrl}/api/settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings: sanitized.settings }),
       })
 
-      const modelsResponse = await fetch(`${baseUrl}/api/settings/models`, {
+      const modelsResponse = await apiFetch(`${baseUrl}/api/settings/models`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -248,7 +255,7 @@ describe("server API", () => {
   })
 
   test("returns an explicit error when model discovery fails", async () => {
-    const response = await fetch(`${baseUrl}/api/settings/models`, {
+    const response = await apiFetch(`${baseUrl}/api/settings/models`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -265,13 +272,13 @@ describe("server API", () => {
   test("drafts a scenario with the StoryBuilder role", async () => {
     const settings = defaultSettings()
     settings.providers.openai.apiKey = "unit-test-api-key"
-    await fetch(`${baseUrl}/api/settings`, {
+    await apiFetch(`${baseUrl}/api/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings }),
     })
 
-    const response = await fetch(`${baseUrl}/api/story-builder/draft`, {
+    const response = await apiFetch(`${baseUrl}/api/story-builder/draft`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -285,12 +292,12 @@ describe("server API", () => {
   })
 
   test("fails StoryBuilder explicitly when its key is missing", async () => {
-    await fetch(`${baseUrl}/api/settings`, {
+    await apiFetch(`${baseUrl}/api/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings: defaultSettings() }),
     })
-    const response = await fetch(`${baseUrl}/api/story-builder/draft`, {
+    const response = await apiFetch(`${baseUrl}/api/story-builder/draft`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -305,12 +312,12 @@ describe("server API", () => {
 })
 
 async function waitForServer(): Promise<void> {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     if (processRef.exitCode !== null) {
       throw new Error(`Server exited before startup.\nstdout:\n${serverStdout}\nstderr:\n${serverStderr}`)
     }
     try {
-      const response = await fetch(`${baseUrl}/api/runs`)
+      const response = await apiFetch(`${baseUrl}/api/runs`)
       if (response.ok) {
         return
       }

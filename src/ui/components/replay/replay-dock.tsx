@@ -1,3 +1,9 @@
+/**
+ * Purpose: Control report graph replay on a wrapping, page-sized timeline row.
+ * Pattern: Controlled replay presentation.
+ * Usage: Rendered inside the report relationship detail.
+ * Related: src/ui/components/report/relationship-panel.tsx
+ */
 import { useEffect, useState } from "react"
 import { PauseIcon, PlayIcon, RotateCcwIcon } from "lucide-react"
 import { Badge } from "@/ui/components/ui/badge"
@@ -33,7 +39,7 @@ export function ReplayDock({ t }: { t: UiTexts }) {
 
   return (
     <footer className="mb-2 rounded-lg bg-card/90 p-3 shadow-sm ring-1 ring-border/60">
-      <div className="grid gap-3 lg:grid-cols-[auto_minmax(220px,1fr)_auto] lg:items-center">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <Button
             aria-label={playing ? t.pauseReplay : t.playReplay}
@@ -58,7 +64,7 @@ export function ReplayDock({ t }: { t: UiTexts }) {
           </Badge>
         </div>
 
-        <div className="grid gap-2">
+        <div className="flex min-w-[220px] flex-[1_1_220px] flex-col gap-2">
           <Input
             aria-label={t.replayTimeline}
             type="range"
@@ -73,7 +79,7 @@ export function ReplayDock({ t }: { t: UiTexts }) {
 
         <div className="flex min-w-0 items-center justify-between gap-3 text-xs text-muted-foreground lg:justify-end">
           <span>{timeline.length ? `${replayIndex + 1}/${timeline.length}` : "0/0"}</span>
-          <span className="max-w-[360px] truncate">{frame?.timestamp ?? t.noFrameSelected}</span>
+          <span className="max-w-[360px] break-words">{frame?.timestamp ?? t.noFrameSelected}</span>
         </div>
       </div>
     </footer>

@@ -1,12 +1,16 @@
 /**
- * Purpose: Review scenario text and execution controls before creating a run.
+ * Purpose: Review a finished scenario in a guarded, bounded editing popup.
  * Pattern: Controlled dialog component.
- * Usage: Lazy-loaded by src/ui/app/App.tsx before run creation.
- * Related: src/shared/scenario.ts, src/ui/components/scenario/story-builder-dialog.tsx
+ * Usage: Lazy-loaded by src/ui/shell/App.tsx before run creation.
+ * Related: src/ui/shell/home-view.tsx, src/ui/browser-storage/database/drafts/save.ts
  */
+import { useState } from "react"
+import { XIcon } from "lucide-react"
 import type { PromptOutputLength } from "@/shared"
 import type { ScenarioDraft } from "@/ui/types/scenario"
 import { Button } from "@/ui/components/ui/button"
+import { UnsavedChangesDialog } from "@/ui/components/ui/unsaved-changes-dialog"
+import { saveDraft } from "@/ui/browser-storage/database/drafts/save"
 import {
   Dialog,
   DialogContent,
@@ -23,10 +27,10 @@ import {
   FieldLabel,
 } from "@/ui/components/ui/field"
 import { Input } from "@/ui/components/ui/input"
-import { ScrollArea } from "@/ui/components/ui/scroll-area"
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -46,6 +50,7 @@ interface ScenarioPreviewDialogProps {
   onAutoContinueChange: (autoContinue: boolean) => void
   onOpenSettings: () => void
   onStart: () => void
+  onDraftSaved: () => void
 }
 
 export function ScenarioPreviewDialog({
@@ -59,33 +64,55 @@ export function ScenarioPreviewDialog({
   onAutoContinueChange,
   onOpenSettings,
   onStart,
+  onDraftSaved,
 }: ScenarioPreviewDialogProps) {
   const canStart = draft.text.trim().length > 0 && draft.controls.numCast > 0
+  const [initial] = useState(() => ({ draft, autoContinue }))
+  const [confirmClose, setConfirmClose] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string>()
+  const dirty = JSON.stringify([draft, autoContinue]) !== JSON.stringify([initial.draft, initial.autoContinue])
+  const requestClose = () => {
+    if (saving) return
+    if (dirty) { setConfirmClose(true); setSaveError(undefined); return }
+    onOpenChange(false)
+  }
+  const saveAndClose = async () => {
+    setSaving(true); setSaveError(undefined)
+    try {
+      await saveDraft("finished-scenario", "scenario-preview", { draft, autoContinue })
+      onDraftSaved()
+      setConfirmClose(false)
+      onOpenChange(false)
+    } catch (error) { setSaveError(error instanceof Error ? error.message : t.builderRequestError) }
+    finally { setSaving(false) }
+  }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="grid h-[92svh] max-h-[760px] w-full grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-[calc(100%-2rem)] lg:max-w-[1120px]">
-        <DialogHeader>
-          <DialogTitle>{t.scenarioPreview}</DialogTitle>
-          <DialogDescription>{t.scenarioPreviewDescription}</DialogDescription>
+    <>
+    <Dialog open={open} onOpenChange={next => { if (!next) requestClose() }}>
+      <DialogContent className="editing-popup" showCloseButton={false}>
+        <DialogHeader className="flex-row items-start gap-4">
+          <div className="flex min-w-0 flex-col gap-2"><DialogTitle>{t.scenarioPreview}</DialogTitle>
+          <DialogDescription>{t.scenarioPreviewDescription}</DialogDescription></div>
+          <Button variant="ghost" size="icon" className="ml-auto shrink-0" aria-label={t.modalClose} onClick={requestClose}><XIcon /></Button>
         </DialogHeader>
 
-        <ScrollArea className="h-full min-h-0 pr-3">
-          <div className="grid min-h-full gap-4 lg:h-full lg:grid-cols-[minmax(0,1fr)_400px]">
-            <div className="flex min-h-0 flex-col gap-3 lg:h-full">
+        <div className="flex min-w-0 flex-col gap-6 lg:flex-row">
+            <div className="flex min-w-0 flex-1 flex-col gap-3">
               <div className="min-w-0">
                 <h3 className="text-sm font-semibold">{t.scenarioText}</h3>
                 <p className="mt-1 break-all text-xs leading-5 text-muted-foreground">
                   {draft.sourceName}
                 </p>
               </div>
-              <ScrollArea className="h-[34svh] rounded-md bg-background/70 p-4 ring-1 ring-border/60 lg:min-h-0 lg:flex-1">
+              <div className="rounded-md bg-background/70 p-4 ring-1 ring-border/60">
                 <MarkdownContent content={draft.text} />
-              </ScrollArea>
+              </div>
             </div>
 
-            <ScrollArea className="min-h-[260px] max-h-[42svh] pr-2 lg:h-full lg:min-h-0 lg:max-h-none lg:pr-0">
-              <FieldGroup className="pr-1 lg:pr-0">
+            <div className="min-w-0 flex-1">
+              <FieldGroup>
                 <Field>
                   <FieldLabel htmlFor="preview-num-cast">{t.castSize}</FieldLabel>
                   <Input
@@ -143,14 +170,16 @@ export function ScenarioPreviewDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="short">{t.outputLengthShort}</SelectItem>
-                      <SelectItem value="medium">{t.outputLengthMedium}</SelectItem>
-                      <SelectItem value="long">{t.outputLengthLong}</SelectItem>
+                      <SelectGroup>
+                        <SelectItem value="short">{t.outputLengthShort}</SelectItem>
+                        <SelectItem value="medium">{t.outputLengthMedium}</SelectItem>
+                        <SelectItem value="long">{t.outputLengthLong}</SelectItem>
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                   <FieldDescription>{t.outputLengthHelp}</FieldDescription>
                 </Field>
-                <FieldGroup className="gap-3">
+                <FieldGroup className="flex-row flex-wrap gap-3 [&>*]:min-w-[220px] [&>*]:flex-[1_1_220px] [&>*]:w-auto">
                   <Field
                     orientation="horizontal"
                     className="items-start rounded-md bg-muted/40 p-3"
@@ -227,9 +256,8 @@ export function ScenarioPreviewDialog({
                   </Field>
                 </FieldGroup>
               </FieldGroup>
-            </ScrollArea>
+            </div>
           </div>
-        </ScrollArea>
 
         <DialogFooter className="sm:items-center">
           <Button variant="outline" onClick={onOpenSettings}>
@@ -241,5 +269,10 @@ export function ScenarioPreviewDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <UnsavedChangesDialog open={confirmClose} busy={saving} error={saveError} t={t}
+      onSave={() => void saveAndClose()}
+      onDiscard={() => { onDraftChange(initial.draft); onAutoContinueChange(initial.autoContinue); setConfirmClose(false); onOpenChange(false) }}
+      onContinue={() => setConfirmClose(false)} />
+    </>
   )
 }

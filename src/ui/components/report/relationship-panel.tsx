@@ -1,3 +1,9 @@
+/**
+ * Purpose: Present relationship analysis and replay without nested content scrolling.
+ * Pattern: Report presentation composition.
+ * Usage: Opened from the report's relationship detail entry.
+ * Related: src/ui/components/report/simulation-dynamics.tsx, src/ui/components/replay/replay-dock.tsx
+ */
 import { lazy, Suspense, useCallback, useMemo, useState } from "react"
 import type { SimulationState } from "@/shared"
 import type { UiTexts } from "@/ui/types/i18n"
@@ -41,8 +47,8 @@ export function ReportRelationshipPanel({ state, t }: { state?: SimulationState;
       </dl>
       <RelationshipHeatmap model={model} t={t} />
       <section aria-label={t.reportGraph}>
-        <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap gap-4">
+          <div className="min-w-0 flex-[2_1_460px]">
             <div className="h-[520px]">
               <Suspense fallback={<p role="status">{t.reportLoading}</p>}>
                 <GraphView
@@ -60,7 +66,7 @@ export function ReportRelationshipPanel({ state, t }: { state?: SimulationState;
           </div>
           <aside
             aria-label={t.reportRelationshipDetails}
-            className="max-h-[640px] overflow-y-auto rounded-md border p-4"
+            className="min-w-0 flex-[1_1_260px] rounded-md border p-4"
           >
             {actor ? (
               <div className="flex flex-col gap-4">

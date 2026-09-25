@@ -29,6 +29,12 @@ Duplicate history updates preserve collection references. Conversation subscribe
 actor readiness and recorded interactions; metric/reasoning traffic does not invalidate them.
 Stage events exclude metric/reasoning/log/chart/report payloads that its models do not consume.
 
+Round controls use a constant-sized, run-scoped progress projection independent of the
+300-event display window. Telemetry eviction and replayed history cannot erase terminal
+state or rewind a completed round. Unrelated events preserve the projection reference;
+an explicit `awaitsContinuation: false` suppresses a final-round approval prompt. This
+is a lifecycle correctness guarantee, not a measured rendering-speed improvement.
+
 ## Measurements
 
 Run from the repository root:
@@ -111,7 +117,7 @@ ForceAtlas2 runs in a module Worker. New layout requests terminate obsolete work
 and backward replay also cancel pending requests. Late messages cannot apply after cancellation.
 The main thread keeps rendering the current graph while waiting and interpolates from its current
 positions when the result arrives. Layout failures are explicit; there is no synchronous fallback.
-Vite emits a separate worker asset in the production build.
+The Next.js Webpack build emits a separate worker asset in the production build.
 
 `models/metrics/metric-data.ts` accumulates new metric points and token totals. `metric-series.ts`
 only formats the shared data for the current locale. `models/actors/conversation-data.ts` normalizes
@@ -162,11 +168,14 @@ the motion policy explicitly to favor immediate feedback on constrained clients.
    entire history. Each bucket retains its minimum and maximum and the first/latest samples remain
    present. Original sample indices preserve their horizontal positions. Chunk extrema allow the
    renderer to avoid scanning every raw sample. Full-resolution data and exact totals are retained.
-2. **Virtual actor history.** `components/actors/history/virtual-history.tsx` uses TanStack Virtual
-   with measured variable heights, overscan, stable keys, and end anchoring inside the existing
-   ScrollArea. Reading above the end pauses following; reaching the end resumes it with a one-pixel
-   tolerance. Width changes invalidate measured heights, and a focused row remains mounted. The
-   component opts out of React Compiler memoization and keeps the mutable virtualizer local.
+2. **Virtual actor history.** Live messages use `components/actors/history/window-history.tsx`
+   with TanStack window virtualization, measured variable heights, overscan, stable keys, and
+   end anchoring against the browser page scroll. Reading upward pauses following; returning to
+   the page bottom resumes it. Archived report messages use `virtual-history.tsx` against the
+   report's full-viewport dialog scroll surface. Neither list introduces a second content
+   scrollbar. Width changes invalidate measurements, focused rows remain mounted, and the
+   mutable virtualizer stays outside React Compiler memoization. A browser test injects 4,120
+   messages and verifies that fewer than 40 cards are mounted.
 3. **Chunked metric snapshots.** Completed groups of 128 samples are shared across snapshots. Only
    the partial tail and new samples are allocated. The unused cumulative-token point history is
    replaced by an exact scalar total; original metric events remain available for analysis/export.
@@ -227,12 +236,41 @@ remount to the home page was independently reproduced and corrected.
 A browser workflow reloads during automatic progression with 6x CPU throttling and reduced motion,
 then verifies that the simulation resumes and only two continuation requests advance three rounds.
 
-Production builds use Vite's dependency-aware chunking. The prior forced vendor partition caused
-an initialization-order error in the built browser app; removing that override was verified in a
-source-free deployment using the built API server and browser workflows.
+The previous Vite build used dependency-aware chunking after a forced vendor partition caused
+an initialization-order error. The current Next.js build uses Webpack and verifies worker loading
+and browser workflows against the same server that hosts the API.
 
-The Scenario Board uses an incremental artifact projection in `models/simulation/scenario-board.ts`. Telemetry-only batches preserve its reference. Only the selected artifact mounts Markdown detail content; the four board columns display titles and status markers. The dialog spans 92% of viewport width, scrolls horizontally on narrow screens, and shows a fixed-width completion percentage between two five-dot waves. Only the dots move via CSS transform; the wave stops when preparation completes and is disabled for reduced motion. Each column scrolls vertically below its fixed heading. At most one active row animates a pastel background using opacity; other active rows keep a static highlight; reduced-motion users receive a static highlight. Phase indicators use gray for waiting, green for active, and blue for complete. Reading an artifact delays automatic closure after the first event until the reader closes details or selects View simulation; terminal events always close the board.
+The Scenario Board uses an incremental artifact projection in `models/simulation/scenario-board.ts`. Telemetry-only batches preserve its reference. Only the selected artifact mounts Markdown detail content; the four board columns display titles and status markers. The board fills the viewport and wraps columns; the whole surface scrolls, while columns and selected details grow with their content. Its completion percentage sits between two five-dot waves. Motion moves only the dots while preparation is visible and running. At most one active row animates a pastel background using opacity; other parallel actors retain a static highlight. Reduced-motion users receive a static highlight. Phase indicators use gray for waiting, green for active, and blue for complete. Reading an artifact delays automatic closure after the first event until the reader closes details or selects View simulation; terminal events always close the board.
 
 Board draft output is delivered immediately through an item-specific SSE subscription only while an unfinished detail is open. The runtime retains the current draft in memory and sends a snapshot before subsequent live deltas; token deltas are neither persisted nor sent through the general run stream. Stream identifiers and sequence numbers prevent repeated chunks after reconnects; retries reset the affected draft. Accepted results replace drafts, and board events are excluded from graph stage subscriptions.
 
 Selecting an item switches to its column at 40% width and detail at 60% on desktop. Other columns are unmounted until All columns is selected. Motion animates the selected column position over 240 ms without remounting it; the detail fades in over 150 ms. Streamed text updates only the memoized detail renderer, outside the Motion layout tree. Reduced-motion users get an immediate switch, including when the preference changes while the page is open. See [the full animation audit](animation-audit.md) for frontend-wide decisions, measurements, and limitations.
+
+## Current startup, history, and report pass
+
+The browser now paints a localized startup surface before claiming the single-tab lock and
+opening SQLite WASM. The database connection, credential gate, and application body load after
+the first paint. Bundled examples are seeded only when the example picker requests them. SQLite
+failure remains explicit, and a locked credential vault still gates the application. Landing
+history reads run manifests without prefetching full run details; detail loading begins when a
+run is opened.
+
+Live actor history indexes round starts rather than creating a flat object for every message on
+each append. The virtualizer resolves a visible row by binary search. A local synthetic fixture
+with 500 rounds and 50,000 messages took 92.3 ms to flatten 100 times versus 2.3 ms to build
+100 round indices and resolve 100 rows; these are CPU timings, not browser FPS. The 4,120-message
+browser workflow still mounted only 15 rows at its measured scroll position.
+
+The analytical report keeps a run-level metric summary and appends only new analytical calls
+when polling returns an unchanged prefix. A changed report identity, base run event array, or
+replaced metric prefix resets the summary. This preserves whole-run averages and provider-only
+token accounting without rescanning base run events each second. The API still returns the full
+analytical metric list on each poll, so network payload and parsing cost remain candidates for a
+future measured change.
+
+The server's active graph timeline uses an event projector with bounded message and log tails.
+It no longer rereads the full event file or rewrites the full timeline after each graph frame;
+the temporary timeline file is flushed at state and terminal boundaries. A local 2,101-event
+projection fixture took 22.3 ms with full round replay and 2.4 ms with the projector, with equal
+final frames. Browser-acknowledged event pruning retains active projection state. Server restart
+does not resume an active run from a partial event log.

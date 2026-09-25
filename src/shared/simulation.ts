@@ -5,8 +5,10 @@
  * Related: src/backend/core/simulation/workflow/state.ts, src/shared/run.ts
  */
 import type { ReportCommentary } from "./report-commentary"
+import type { ActorMemoryLedger } from "./actor-memory"
 import type { RoleTraceStep, SimulationRole, PlannerTraceStep, CoordinatorTraceStep, ObserverTraceStep } from "@/shared/model"
 import type { ScenarioInput } from "@/shared/scenario"
+import type { KnownSourceFact } from "./scenario-builder"
 
 export type StopReason = "" | "simulation_done" | "no_progress" | "failed" | "canceled"
 export type ActionVisibility = "public" | "semi-public" | "private" | "solitary"
@@ -20,6 +22,7 @@ export interface ActorState {
   personality: string
   preference: string
   privateGoal: string
+  knownSourceFacts?: KnownSourceFact[]
   intent: string
   actions: ActorAction[]
   context: ActorContextMemory
@@ -46,18 +49,21 @@ export interface ActorAction {
 
 export interface ActorContextMemory {
   visible: ActorVisibleContextEntry[]
+  ledger?: ActorMemoryLedger
 }
 
 export type ActorVisibleContextKind = "event" | "out" | "in" | "observed" | "self"
 
 export interface ActorVisibleContextEntry {
   id: string
+  interactionId?: string
   kind: ActorVisibleContextKind
   roundIndex: number
   content: string
   decisionType?: ActorDecisionType
   visibility?: ActionVisibility
   sourceActorId?: string
+  sourceActorName?: string
   targetActorIds?: string[]
   eventId?: string
 }
@@ -81,6 +87,7 @@ export interface PlannedEvent {
   summary: string
   status: "pending" | "active" | "partial" | "completed" | "missed"
   participantIds: string[]
+  visibleToActorIds?: string[]
 }
 
 export interface InjectedEvent {
@@ -89,6 +96,7 @@ export interface InjectedEvent {
   sourceEventId: string
   title: string
   summary: string
+  visibleToActorIds?: string[]
 }
 
 export interface ScenarioDigest {

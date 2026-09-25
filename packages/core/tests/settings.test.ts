@@ -4,13 +4,14 @@
  * Usage: Executed by bun test.
  * Related: src/backend/core/settings/normalize.ts, src/backend/integrations/llm/invoke.ts
  */
+import { exactChoiceMessages } from "@/backend/integrations/llm/prompts/exact-choice"
 import { describe, expect, test } from "bun:test"
 import { defaultSettings } from "@/backend/core/settings/defaults"
 import { normalizeSettings } from "@/backend/core/settings/normalize"
 import { resolveRoleSettings } from "@/backend/core/settings/resolve"
 import { validateSettings } from "@/backend/core/settings/validate"
 import { renderPromptReasoningGuide, withRolePromptGuide } from "@/backend/core/prompts/language"
-import { buildExactChoiceSettings, exactChoiceMessages, reasoningOnlyWarning } from "@/backend/integrations/llm"
+import { buildExactChoiceSettings, reasoningOnlyWarning } from "@/backend/integrations/llm"
 import { readUsage } from "@/backend/integrations/llm/usage"
 import { emitModelTelemetry } from "@/backend/core/simulation/events/telemetry"
 
@@ -168,7 +169,7 @@ test("fails explicitly when provider key is missing", () => {
     const exact = buildExactChoiceSettings(settings, "actor")
 
     expect(exact.temperature).toBe(0)
-    expect(exact.maxTokens).toBe(64)
+    expect(exact.maxTokens).toBe(2_048)
     expect(exact.reasoningEffort).toBeUndefined()
     expect(exact.extraBody).toEqual({ seed: 7, reasoning_effort: "none" })
     expect(resolveRoleSettings(settings, "actor").reasoningEffort).toBe("medium")

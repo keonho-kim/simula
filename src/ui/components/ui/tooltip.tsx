@@ -1,9 +1,25 @@
+/**
+ * Purpose: Compose accessible tooltips with Motion-owned popup transitions.
+ * Pattern: Controlled popup presence.
+ * Usage: Used by report explanations and settings help.
+ * Related: src/ui/hooks/use-popup-open-state.ts, src/ui/animation/provider.tsx
+ */
 "use client"
 
 import * as React from "react"
+import { AnimatePresence } from "motion/react"
+import * as m from "motion/react-m"
 import { Tooltip as TooltipPrimitive } from "radix-ui"
 
 import { cn } from "@/ui/lib/class-names"
+import { usePopupOpenState } from "@/ui/hooks/use-popup-open-state"
+import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
+import { slidePresence } from "@/ui/animation/presence"
+
+const TooltipOpenContext = React.createContext(false)
+const MotionTooltipContent = m.create(TooltipPrimitive.Content)
+type TooltipContentProps = Pick<React.ComponentProps<typeof TooltipPrimitive.Content>,
+  "className" | "children" | "sideOffset" | "side" | "align">
 
 function TooltipProvider({
   delayDuration = 0,
@@ -19,9 +35,15 @@ function TooltipProvider({
 }
 
 function Tooltip({
+  open: controlledOpen,
+  defaultOpen,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+  const [open, changeOpen] = usePopupOpenState(controlledOpen, defaultOpen, onOpenChange)
+  return <TooltipOpenContext.Provider value={open}>
+    <TooltipPrimitive.Root data-slot="tooltip" open={open} onOpenChange={changeOpen} {...props} />
+  </TooltipOpenContext.Provider>
 }
 
 function TooltipTrigger({
@@ -35,21 +57,24 @@ function TooltipContent({
   sideOffset = 0,
   children,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+}: TooltipContentProps) {
+  const open = React.useContext(TooltipOpenContext)
+  const reducedMotion = useReducedMotionPreference()
   return (
-    <TooltipPrimitive.Portal>
-      <TooltipPrimitive.Content
+    <TooltipPrimitive.Portal forceMount>
+      <AnimatePresence>{open ? <MotionTooltipContent key="tooltip" forceMount
         data-slot="tooltip-content"
         sideOffset={sideOffset}
+        {...slidePresence(reducedMotion, "y", 3, 3, "feedback")}
         className={cn(
-          "z-50 inline-flex w-fit max-w-xs duration-100 origin-(--radix-tooltip-content-transform-origin) items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs text-background has-data-[slot=kbd]:pr-1.5     **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm data-[state=delayed-open]:animate-in data-[state=delayed-open]:fade-in-0 data-open:animate-in data-open:fade-in-0  data-closed:animate-out data-closed:fade-out-0 ",
+          "z-50 inline-flex w-fit max-w-xs origin-(--radix-tooltip-content-transform-origin) items-center gap-1.5 rounded-md bg-foreground px-3 py-1.5 text-xs text-background has-data-[slot=kbd]:pr-1.5 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm",
           className
         )}
         {...props}
       >
         {children}
         <TooltipPrimitive.Arrow className="z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px] bg-foreground fill-foreground" />
-      </TooltipPrimitive.Content>
+      </MotionTooltipContent> : null}</AnimatePresence>
     </TooltipPrimitive.Portal>
   )
 }

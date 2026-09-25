@@ -1,4 +1,11 @@
+/**
+ * Purpose: Define serializable run lifecycle, model measurements, and event contracts.
+ * Pattern: Shared domain contract.
+ * Usage: Consumed by backend persistence and browser event projections.
+ * Related: src/shared/run-schema.ts, src/backend/integrations/llm/invoke.ts
+ */
 import type { ReportCommentary } from "./report-commentary"
+import type { ModelCallFailure } from "./model-failure"
 import type { ScenarioBoardUpdate } from "./scenario-board"
 import type { ActorReadyView, GraphTimelineFrame } from "@/shared/graph"
 import type {
@@ -12,7 +19,7 @@ import type {
 } from "@/shared/model"
 import type { InjectedEvent, Interaction, StopReason } from "@/shared/simulation"
 
-export type RunStatus = "created" | "running" | "completed" | "failed" | "canceled"
+export type RunStatus = "created" | "running" | "completed" | "failed" | "canceled" | "interrupted"
 
 export interface RunArtifactPaths {
   manifest: string
@@ -25,7 +32,9 @@ export interface RunArtifactPaths {
 export interface RunManifest {
   id: string
   status: RunStatus
+  usageAccountingVersion?: 1
   createdAt: string
+  batchId?: string
   startedAt?: string
   completedAt?: string
   scenarioName?: string
@@ -44,11 +53,13 @@ export interface ModelMetrics {
     | GeneratorRosterStep
     | ActorCardStep
     | "actionCatalog"
+    | "eventAudience"
     | "reportCommentary"
     | "draft"
   attempt: number
   ttftMs: number
   durationMs: number
+  queueWaitMs?: number
   inputTokens: number
   reasoningTokens: number
   outputTokens: number
@@ -77,11 +88,12 @@ export type RunEvent =
       actorName?: string
     }
   | { type: "model.metrics"; runId: string; timestamp: string; metrics: ModelMetrics }
+  | { type: "model.attempt.failed"; runId: string; timestamp: string; failure: ModelCallFailure }
   | { type: "actors.ready"; runId: string; timestamp: string; actors: ActorReadyView[] }
   | { type: "event.injected"; runId: string; timestamp: string; event: InjectedEvent }
   | { type: "interaction.recorded"; runId: string; timestamp: string; interaction: Interaction }
   | { type: "actor.message"; runId: string; timestamp: string; actorId: string; actorName: string; content: string }
-  | { type: "round.completed"; runId: string; timestamp: string; roundIndex: number }
+  | { type: "round.completed"; runId: string; timestamp: string; roundIndex: number; awaitsContinuation?: boolean }
   | { type: "graph.delta"; runId: string; timestamp: string; frame: GraphTimelineFrame }
   | { type: "log"; runId: string; timestamp: string; level: "info" | "warn" | "error"; message: string }
   | { type: "report.delta"; runId: string; timestamp: string; content: string }

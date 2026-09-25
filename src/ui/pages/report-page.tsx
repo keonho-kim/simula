@@ -1,133 +1,67 @@
 /**
- * Purpose: Compose the persisted run Report with global metrics and three analysis views.
- * Pattern: Page Composition.
- * Usage: Rendered by the application router for a selected simulation run.
- * Related: src/ui/components/report/metric-overview.tsx, src/ui/styles/report.css
+ * Purpose: Compose a single-page analytical report with retained simulation inspection.
+ * Pattern: Page composition with deferred detail renderers.
+ * Usage: Rendered by the application for a selected terminal run.
+ * Related: src/ui/components/report/analysis/workspace.tsx, src/ui/styles/report.css
  */
-import { reportStatusLabel } from "@/ui/models/report/status-label"
-import { useState } from "react"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { DownloadIcon, HomeIcon } from "lucide-react"
+import { lazy, Suspense, useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { HomeIcon } from "lucide-react"
 import { Badge } from "@/ui/components/ui/badge"
 import { Button } from "@/ui/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/components/ui/tabs"
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem
-} from "@/ui/components/ui/dropdown-menu"
-import { generateCommentary, fetchRun } from "@/ui/api/client"
+import { fetchRun } from "@/ui/api-client/client"
 import type { UiTexts } from "@/ui/types/i18n"
+import type { RunEvent } from "@/shared/run"
 import { useRunStore } from "@/ui/stores/run-store"
-import { ReportCommentaryPanel } from "@/ui/components/report/commentary-panel"
-import { ReportRelationshipPanel } from "@/ui/components/report/relationship-panel"
-import { ReportConversationPanel } from "@/ui/components/report/conversation-panel"
+import { reportStatusLabel } from "@/ui/models/report/status-label"
 import { ReportMetricOverview } from "@/ui/components/report/metric-overview"
+import { ReportExportMenu } from "@/ui/components/report/analysis/export-menu"
+import { AnalysisWorkspace } from "@/ui/components/report/analysis/workspace"
+import { ReportDetailDialog } from "@/ui/components/report/analysis/detail-dialog"
 import "@/ui/styles/report.css"
 
+const ReportRelationshipPanel = lazy(() => import("@/ui/components/report/relationship-panel").then(module => ({ default: module.ReportRelationshipPanel })))
+const ReportConversationPanel = lazy(() => import("@/ui/components/report/conversation-panel").then(module => ({ default: module.ReportConversationPanel })))
+const ReportCommentaryPanel = lazy(() => import("@/ui/components/report/commentary-panel").then(module => ({ default: module.ReportCommentaryPanel })))
+const EMPTY_EVENTS: RunEvent[] = []
 interface ReportPageProps {
   selectedRunId?: string
   selectedRunStatus?: string
+  language: "en" | "ko"
   t: UiTexts
   onHome: () => void
   onExport: (kind: "json" | "jsonl" | "md") => void
 }
-
-export function ReportPage({ selectedRunId, selectedRunStatus, t, onHome, onExport }: ReportPageProps) {
-  const queryClient = useQueryClient()
-  const [tab, setTab] = useState("overview")
-  const liveEvents = useRunStore((state) => state.liveEvents)
-  const storedRunState = useRunStore((state) => state.runState)
-  const query = useQuery({
-    queryKey: ["runs", selectedRunId],
-    queryFn: () => fetchRun(selectedRunId ?? ""),
-    enabled: Boolean(selectedRunId),
-    refetchInterval: query => query.state.data?.state?.reportCommentary?.status === "running" ? 2000 : false,
-    retry: 2
-  })
-  const state = query.data?.state ?? (storedRunState?.runId === selectedRunId ? storedRunState : undefined)
-  const events = query.data?.events ?? (state ? liveEvents : [])
-  const generation = useMutation({ mutationFn: () => generateCommentary(selectedRunId ?? ""), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["runs", selectedRunId] }) })
+export function ReportPage({ selectedRunId, selectedRunStatus, language, t, onHome, onExport }: ReportPageProps) {
+  const [batch, setBatch] = useState(false)
+  const liveEvents = useRunStore(state => state.liveEvents)
+  const stored = useRunStore(state => state.runState)
+  const query = useQuery({ queryKey: ["runs", selectedRunId], queryFn: () => fetchRun(selectedRunId ?? ""), enabled: !!selectedRunId, retry: 2 })
+  const state = query.data?.state ?? (stored?.runId === selectedRunId ? stored : undefined)
+  const events = query.data?.events ?? (state ? liveEvents : EMPTY_EVENTS)
   const title = query.data?.run.scenarioName || state?.scenario.sourceName || t.report
   const status = query.data?.run.status ?? selectedRunStatus
-  return (
-    <main className="min-h-svh bg-white text-foreground">
-      <div className="mx-auto flex w-[94vw] max-w-[1600px] flex-col gap-5 py-5">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button aria-label={t.home} variant="ghost" size="icon" onClick={onHome}>
-              <HomeIcon />
-            </Button>
-            <div className="min-w-0">
-              <h1 className="truncate text-lg font-semibold">{title}</h1>
-              <p className="text-xs text-muted-foreground">{t.report}</p>
-            </div>
-            {status ? (
-              <Badge variant={status === "failed" ? "destructive" : "secondary"}>
-                {reportStatusLabel(status, t)}
-              </Badge>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" disabled={!state || state.reportCommentary?.status === "running" || generation.isPending} onClick={() => generation.mutate()}>{state?.reportCommentary?.status === "running" ? t.reportCommentaryRunning : t.reportGenerateCommentary}</Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" disabled={!selectedRunId}>
-                <DownloadIcon data-icon="inline-start" />
-                {t.reportExport}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuGroup>
-                <DropdownMenuItem onSelect={() => onExport("json")}>{t.exportJson}</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onExport("jsonl")}>{t.exportJsonl}</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onExport("md")}>{t.exportMarkdown}</DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          </div>
-        </header>
-        {generation.isError ? <p role="alert" className="text-sm text-destructive">{t.reportCommentaryUnavailable}</p> : null}
-        {query.isError ? (
-          <div role="alert" className="text-sm text-destructive">
-            {t.reportLoadError}{" "}
-            <Button variant="link" onClick={() => void query.refetch()}>
-              {t.reportRetryLoad}
-            </Button>
-          </div>
-        ) : null}
-        {query.isLoading && !state ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            {t.reportLoading}
-          </p>
-        ) : null}
-        {query.data?.run.error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {query.data.run.error}
-          </p>
-        ) : null}
-        <ReportMetricOverview events={events} t={t} />
-        <Tabs value={tab} onValueChange={setTab} className="report-tabs min-w-0 gap-0">
-          <TabsList className="report-tab-list w-full justify-start">
-            <TabsTrigger className="report-tab-trigger" value="overview">{t.reportOverview}</TabsTrigger>
-            <TabsTrigger className="report-tab-trigger" value="relationships">{t.reportRelations}</TabsTrigger>
-            <TabsTrigger className="report-tab-trigger" value="conversations">{t.reportConversations}</TabsTrigger>
-          </TabsList>
-          <TabsContent className="report-tab-panel" value="overview">
-            {tab === "overview" ? <ReportCommentaryPanel commentary={state?.reportCommentary} t={t} /> : null}
-          </TabsContent>
-          <TabsContent className="report-tab-panel" value="relationships">
-            {tab === "relationships" ? <ReportRelationshipPanel state={state} t={t} /> : null}
-          </TabsContent>
-          <TabsContent className="report-tab-panel" value="conversations">
-            {tab === "conversations" ? (
-              <ReportConversationPanel key={selectedRunId} state={state} events={events} t={t} />
-            ) : null}
-          </TabsContent>
-        </Tabs>
+  const batchId = query.data?.run.batchId
+  const subject = batch && batchId ? { kind: "batch" as const, id: batchId } : { kind: "run" as const, id: selectedRunId ?? "" }
+  return <main className="min-h-svh bg-card text-foreground"><div className="mx-auto flex w-[94vw] max-w-[1600px] flex-col gap-5 py-5">
+    <header className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+      <div className="flex min-w-0 items-center gap-3"><Button aria-label={t.home} variant="ghost" size="icon" onClick={onHome}><HomeIcon /></Button>
+        <div className="min-w-0"><h1 className="truncate text-lg font-semibold">{title}</h1><p className="text-xs text-muted-foreground">{t.report}</p></div>
+        {status ? <Badge variant={status === "failed" ? "destructive" : "secondary"}>{reportStatusLabel(status, t)}</Badge> : null}
       </div>
-    </main>
-  )
+      <div className="flex flex-wrap gap-2">{batchId ? <Button variant="outline" onClick={() => setBatch(!batch)}>{batch ? t.analysisSingle : t.analysisBatch}</Button> : null}
+        <ReportExportMenu runId={selectedRunId} subject={subject} onRunExport={onExport} t={t} />
+      </div>
+    </header>
+    {query.isError ? <div role="alert" className="text-sm text-destructive">{t.reportLoadError}<Button variant="link" onClick={() => void query.refetch()}>{t.reportRetryLoad}</Button></div> : null}
+    {query.data?.run.error ? <p role="alert" className="text-sm text-destructive">{query.data.run.error}</p> : null}
+    {selectedRunId ? <AnalysisWorkspace key={`${subject.kind}:${subject.id}`} subject={subject} events={events} language={language} t={t} /> : <ReportMetricOverview events={events} t={t} />}
+    <section className="flex flex-col gap-3" aria-label={t.analysisRecords}><h2 className="text-base font-semibold">{t.analysisRecords}</h2>
+      <div className="report-analysis-columns">
+        <ReportDetailDialog title={t.reportRelations} t={t}><Suspense fallback={<p role="status">{t.reportLoading}</p>}><ReportRelationshipPanel state={state} t={t} /></Suspense></ReportDetailDialog>
+        <ReportDetailDialog title={t.reportConversations} t={t}><Suspense fallback={<p role="status">{t.reportLoading}</p>}><ReportConversationPanel key={selectedRunId} state={state} events={events} t={t} /></Suspense></ReportDetailDialog>
+        {state?.reportCommentary ? <ReportDetailDialog title={t.reportCommentary} t={t}><Suspense fallback={<p role="status">{t.reportLoading}</p>}><ReportCommentaryPanel commentary={state.reportCommentary} t={t} /></Suspense></ReportDetailDialog> : null}
+      </div>
+    </section>
+  </div></main>
 }

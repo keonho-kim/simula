@@ -2,11 +2,12 @@
  * Purpose: Verify primary browser workflows across landing, simulation, and report pages.
  * Pattern: End-to-end contract test.
  * Usage: Executed by Playwright through bun run test:e2e.
- * Related: src/ui/app/App.tsx, src/backend/api/routes.ts
+ * Related: src/ui/shell/App.tsx, src/backend/api/routes.ts
  */
-import { expect, test, type Page } from "@playwright/test"
+import { expect, test, type Page } from "./fixtures"
 
 test("runs the engine flow from settings to report", async ({ page }, testInfo) => {
+  test.setTimeout(60_000)
   await setUnitTestApiKeys(page)
   await page.goto("/")
 
@@ -17,7 +18,7 @@ test("runs the engine flow from settings to report", async ({ page }, testInfo) 
 
   await expect(page.getByRole("button", { name: /New Scenario/ })).toBeVisible()
   const uploadChooser = page.waitForEvent("filechooser")
-  await page.getByRole("button", { name: /Upload My Scenario/ }).click()
+  await page.getByRole("button", { name: /Import finished scenario/ }).click()
   const chooser = await uploadChooser
   await chooser.setFiles({
     name: "uploaded-scenario.md",
@@ -37,34 +38,41 @@ test("runs the engine flow from settings to report", async ({ page }, testInfo) 
   const startRequest = page.waitForRequest(request => request.url().endsWith("/api/runs") && request.method() === "POST")
   await page.getByRole("button", { name: "Start", exact: true }).click()
   expect((await startRequest).postDataJSON().scenario.controls.autonomousProgress ?? false).toBe(false)
+  await expect.poll(() => new URL(page.url()).pathname).toBe("/simulation")
 
   await expect(page.getByRole("button", { name: "Open menu" })).toHaveCount(0)
 
   await expect(page.getByRole("dialog", { name: "Move to the Report page?" })).toBeVisible({ timeout: 20_000 })
   await expect(page.getByRole("heading", { name: "Report", exact: true })).toHaveCount(0)
   await page.getByRole("button", { name: "Open Report" }).click()
-  await expect(page.getByRole("tab", { name: "Relationships", exact: true })).toBeVisible()
-  await expect(page.getByRole("heading", { name: "Overall conclusion", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Relationships", exact: true })).toBeVisible()
+  await expect.poll(() => new URL(page.url()).pathname).toMatch(/^\/reports\/[^/]+$/)
+  await page.reload()
+  await expect(page.getByRole("button", { name: "Relationships", exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Analysis board", exact: true })).toBeVisible()
   await expect(page.getByPlaceholder("Find actor")).toHaveCount(0)
   expect(await page.locator("details").count()).toBe(0)
   await page.screenshot({ path: testInfo.outputPath("report-commentary.png"), fullPage: true })
-  const commentaryResponse = page.waitForResponse(response => response.url().endsWith("/commentary") && response.request().method() === "POST")
-  await page.getByRole("button", { name: "Generate / retry commentary" }).click()
-  const generated = await commentaryResponse
+  const response = page.waitForResponse(response => response.url().endsWith("/api/analysis") && response.request().method() === "POST")
+  await page.getByRole("button", { name: "Generate analysis", exact: true }).click()
+  const generated = await response
   expect(generated.status()).toBe(202)
-  const runUrl = generated.url().replace(/\/commentary$/, "")
-  await expect.poll(async () => (await (await page.request.get(runUrl)).json()).state.reportCommentary.status).toBe("ready")
+  const { analysis } = await generated.json()
+  await expect.poll(async () => (await (await page.request.get(`/api/analysis/${analysis.id}`)).json()).analysis.status).toBe("ready")
+  await expect(page.getByRole("heading", { name: "Overall conclusion", exact: true })).toBeVisible()
   await expect(page.getByRole("button", { name: "Home" })).toBeVisible()
-  await expect(page.getByRole("tab", { name: "Relationships" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Relationships", exact: true })).toBeVisible()
   await page.getByRole("button", { name: "Export", exact: true }).click()
   await expect(page.getByRole("menuitem", { name: "Export Markdown" })).toBeVisible()
   await page.keyboard.press("Escape")
-  await page.getByRole("tab", { name: "Relationships" }).click()
+  await page.getByRole("button", { name: "Relationships", exact: true }).click()
   await expect(page.getByRole("heading", { name: "Overall conclusion", exact: true })).toHaveCount(0)
   await page.getByRole("button", { name: "Play replay" }).click()
   await expect(page.getByLabel("Replay timeline")).toBeEnabled()
-  await page.getByRole("tab", { name: "Conversations", exact: true }).click()
+  await page.getByRole("button", { name: "Close details" }).click()
+  await page.getByRole("button", { name: "Conversations", exact: true }).click()
   await expect(page.getByRole("region", { name: "Round board" })).toBeVisible()
+  await page.getByRole("button", { name: "Close details" }).click()
   await expect(page.getByRole("region", { name: "LLM metrics" })).toBeVisible()
   await expect(page.getByRole("tab", { name: "Performance", exact: true })).toHaveCount(0)
 })
@@ -79,26 +87,13 @@ test("supports scenario builder, samples, history, and Korean locale", async ({ 
 
   await expect(page.getByRole("heading", { name: "시뮬레이션 시작하기" })).toBeVisible()
 
-  await page.getByRole("button", { name: /새 시나리오 만들기/ }).click()
-  await page.getByRole("switch", { name: "자율 진행", exact: true }).check()
-  await page.getByLabel("만들고 싶은 상황").fill("시장이 재난 대피 결정을 미루는 상황")
-  await page.getByRole("button", { name: "초안 만들기" }).click()
-  await expect(page.getByRole("heading", { name: "Scenario Draft", exact: true })).toBeVisible()
-  await expect(page.getByText("대화 내역")).toBeVisible()
-  await expect(page.getByLabel("수정 요청")).toBeVisible()
-  const storyBuilderSession = await page.evaluate(() =>
-    localStorage.getItem("simula.story-builder.session")
-  )
-  expect(storyBuilderSession).toContain("시장이 재난 대피 결정을 미루는 상황")
-  await page.getByRole("button", { name: "초안 확인" }).click()
-  const storyPreview = page.getByRole("dialog", { name: "시나리오 미리보기" })
-  await expect(storyPreview).toBeVisible()
-  await expect(storyPreview.getByRole("heading", { name: "Scenario Draft", exact: true })).toBeVisible()
-  await expect(storyPreview.getByLabel("등장 인원")).toBeVisible()
-  await expect(storyPreview.getByLabel("최대 라운드")).toBeVisible()
-  await expect(storyPreview.getByRole("switch", { name: "자율 진행", exact: true })).toBeChecked()
-  await expect(storyPreview.getByRole("button", { name: "설정" })).toBeVisible()
-  await page.keyboard.press("Escape")
+  await page.getByRole("button", { name: /새 시나리오/ }).click()
+  const builder = page.getByRole("dialog", { name: "새 시나리오" })
+  await expect(builder.getByText("참고 파일 · 선택", { exact: true })).toBeVisible()
+  await builder.getByLabel("시뮬레이션할 상황 · 선택").fill("시장이 재난 대피 결정을 미루는 상황")
+  await builder.getByRole("button", { name: "실행", exact: true }).click()
+  await expect(builder.getByRole("button", { name: "시나리오 확정", exact: true })).toBeVisible({ timeout: 15_000 })
+  await builder.getByRole("button", { name: "닫기", exact: true }).click()
 
   await page.getByRole("button", { name: /예시 시나리오 실행/ }).click()
   await expect(page.getByRole("dialog", { name: "예시 시나리오" })).toBeVisible()
@@ -126,7 +121,7 @@ test("autonomous progression reaches the backend and stops on a zero decision be
   await setUnitTestApiKeys(page)
   await page.goto("/")
   const chooserPromise = page.waitForEvent("filechooser")
-  await page.getByRole("button", { name: /Upload My Scenario/ }).click()
+  await page.getByRole("button", { name: /Import finished scenario/ }).click()
   await (await chooserPromise).setFiles({ name: "autonomous.md", mimeType: "text/markdown", buffer: Buffer.from("A team decides a release date.") })
   await page.getByLabel("Cast size").fill("2")
   await page.getByLabel("Max round").fill("3")

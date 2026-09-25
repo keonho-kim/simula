@@ -1,6 +1,14 @@
-import { expect, test, type Route } from "@playwright/test"
+/**
+ * Purpose: Verify simulation navigation stays usable under throttling.
+ * Pattern: End-to-end workflow test.
+ * Usage: Executed by Playwright through bun run test:e2e.
+ * Related: src/ui/components/simulation/scenario-board.tsx, src/ui/shell/home-view.tsx
+ */
+import { expect, test, type Route } from "./fixtures"
+import { motionRange } from "./motion-range"
 
-test("board navigation stays usable under CPU and network throttling", async ({ page }, testInfo) => {
+test("board navigation stays usable under CPU and network throttling", async ({ page, browserName }, testInfo) => {
+  test.skip(browserName !== "chromium", "CPU and network throttling require Chromium DevTools.")
   test.setTimeout(60000)
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.addInitScript(() => localStorage.setItem("simula.language", "en"))
@@ -10,14 +18,15 @@ test("board navigation stays usable under CPU and network throttling", async ({ 
   let start: Route | undefined
   await page.route("**/api/runs/*/start", route => { start = route })
   await page.goto("/")
+  await page.waitForFunction(() => Boolean(window.__simulaE2E))
   const chooser = page.waitForEvent("filechooser")
-  await page.getByRole("button", { name: /Upload My Scenario/ }).click()
+  await page.getByRole("button", { name: /Import finished scenario/ }).click()
   await (await chooser).setFiles({ name: "motion.md", mimeType: "text/markdown", buffer: Buffer.from("A team plans a release.") })
   await page.getByRole("button", { name: "Start", exact: true }).click()
   await expect.poll(() => Boolean(start)).toBe(true)
   await page.evaluate(async () => {
     const path = "/src/ui/stores/run-store.ts"
-    const { useRunStore } = await import(path)
+    const { useRunStore } = await window.__simulaE2E!.import(path)
     const store = useRunStore.getState()
     const base = { runId: store.selectedRunId, timestamp: new Date().toISOString() }
     store.pushEvents([{ ...base, type: "run.started" },
@@ -50,7 +59,7 @@ test("board navigation stays usable under CPU and network throttling", async ({ 
   await testInfo.attach("motion-metrics", { body: JSON.stringify(metrics), contentType: "application/json" })
   await page.evaluate(async () => {
     const path = "/src/ui/stores/run-store.ts"
-    const { useRunStore } = await import(path)
+    const { useRunStore } = await window.__simulaE2E!.import(path)
     const store = useRunStore.getState()
     const base = { runId: store.selectedRunId, timestamp: new Date().toISOString(), type: "board.updated" }
     store.pushEvents([
@@ -64,7 +73,7 @@ test("board navigation stays usable under CPU and network throttling", async ({ 
     Object.defineProperty(document, "hidden", { configurable: true, value: true })
     document.dispatchEvent(new Event("visibilitychange"))
   })
-  expect(await board.locator(".scenario-progress-dot").first().evaluate(element => getComputedStyle(element).animationPlayState)).toBe("paused")
+  await expect.poll(() => motionRange(board.locator(".scenario-progress-dot").first(), "top")).toBeLessThan(0.1)
   await page.evaluate(() => {
     Reflect.deleteProperty(document, "hidden")
     document.dispatchEvent(new Event("visibilitychange"))
@@ -73,7 +82,7 @@ test("board navigation stays usable under CPU and network throttling", async ({ 
   await board.getByRole("button", { name: /Event 0$/ }).click()
   await expect(board.getByRole("complementary")).toBeVisible()
   expect(await board.locator('section[aria-label="Expected events"]').evaluate(element => getComputedStyle(element).transform)).toBe("none")
-  expect(await board.locator(".scenario-progress-dot").first().evaluate(element => getComputedStyle(element).animationName)).toBe("none")
+  await expect.poll(() => motionRange(board.locator(".scenario-progress-dot").first(), "top")).toBeLessThan(0.1)
   await page.screenshot({ path: testInfo.outputPath("motion-detail.png") })
   await start!.abort()
 })

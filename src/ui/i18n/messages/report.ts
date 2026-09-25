@@ -28,6 +28,7 @@ const en = {
   reportStatusCanceled: "Canceled",
   reportStatusRunning: "Running",
   reportStatusCreated: "Created",
+  reportStatusInterrupted: "Interrupted",
 
   reportLoadError: "Unable to load this report.",
   reportRetryLoad: "Retry",
@@ -207,6 +208,7 @@ const ko = {
   reportStatusCanceled: "취소",
   reportStatusRunning: "진행 중",
   reportStatusCreated: "생성됨",
+  reportStatusInterrupted: "중단됨",
 
   reportLoadError: "리포트를 불러오지 못했습니다.",
   reportRetryLoad: "다시 시도",

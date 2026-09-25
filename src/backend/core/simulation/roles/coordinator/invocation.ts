@@ -4,6 +4,7 @@
  * Usage: Coordinator graph nodes call these functions for prose and exact choices.
  * Related: src/backend/integrations/llm/invoke.ts, src/backend/core/simulation/roles/repair.ts
  */
+import { retryChoice } from "../repair/prompts/retry-choice"
 import type { CoordinatorTrace, CoordinatorTraceStep, PlannedEvent, RunEvent } from "@/shared"
 import { invokeExactChoiceWithMetrics, invokeRoleTextWithMetrics } from "@/backend/integrations/llm"
 import { withPromptLanguageGuide, withRolePromptGuide } from "@/backend/core/prompts/language"
@@ -67,9 +68,7 @@ export async function runCoordinatorChoice(
 ): Promise<CoordinatorStepResult> {
   const invalidResponses: string[] = []
   for (let attempt = 1; attempt <= MAX_COORDINATOR_ATTEMPTS; attempt += 1) {
-    const retryGuide = invalidResponses.length
-      ? `\n\nPrevious invalid responses:\n${invalidResponses.map((item) => `- ${item}`).join("\n")}\nReturn one exact allowed output only:\n${allowedOutputs.map((item) => `- ${item}`).join("\n")}`
-      : ""
+    const retryGuide = retryChoice(invalidResponses, allowedOutputs)
     const prompt = withPromptLanguageGuide(
       promptBuilder(state, {}) + retryGuide,
       state.scenario.language

@@ -1,3 +1,9 @@
+/**
+ * Purpose: Present relationship, round, and behavior metrics within the report.
+ * Pattern: Read-only report presentation.
+ * Usage: Rendered by the report relationship panel.
+ * Related: src/ui/components/report/relationship-panel.tsx
+ */
 import type { ReactNode } from "react"
 import { ActivityIcon, CircleHelpIcon, WaypointsIcon } from "lucide-react"
 import { Badge } from "@/ui/components/ui/badge"
@@ -17,14 +23,14 @@ export function RelationshipHeatmap({ model, t }: { model: ReportAnalysisViewMod
         </Badge>
       </div>
       {model.heatmapRows.length ? (
-        <div className="mt-3 overflow-x-auto">
+        <div className="mt-3 min-w-0">
           <div
-            className="grid min-w-[520px] overflow-hidden rounded-md border border-border/70 text-[10px]"
-            style={{ gridTemplateColumns: `112px repeat(${Math.max(1, columnCount - 1)}, minmax(56px, 1fr))` }}
+            className="grid min-w-0 rounded-md border border-border/70 text-[10px]"
+            style={{ gridTemplateColumns: `minmax(72px, 1.5fr) repeat(${Math.max(1, columnCount - 1)}, minmax(0, 1fr))` }}
           >
             <div className="border-r border-b border-border/60 bg-muted/40 px-2 py-1 text-muted-foreground">{t.actor}</div>
             {model.heatmapActors.map((actor) => (
-              <div key={actor.actorId} className="truncate border-b border-border/60 bg-muted/40 px-2 py-1 text-center text-muted-foreground">
+              <div key={actor.actorId} title={actor.actorName} className="min-w-0 break-all border-b border-border/60 bg-muted/40 px-1 py-1 text-center text-muted-foreground">
                 {actor.actorName}
               </div>
             ))}
@@ -43,7 +49,7 @@ export function RelationshipHeatmap({ model, t }: { model: ReportAnalysisViewMod
 function HeatmapRow({ row, max }: { row: ReportAnalysisViewModel["heatmapRows"][number]; max: number }) {
   return (
     <>
-      <div className="truncate border-r border-border/60 bg-muted/30 px-2 py-1.5 text-muted-foreground">{row.actorName}</div>
+      <div title={row.actorName} className="min-w-0 break-all border-r border-border/60 bg-muted/30 px-1 py-1.5 text-muted-foreground">{row.actorName}</div>
       {row.cells.map((value, index) => {
         const intensity = max > 0 ? value / max : 0
         return (
@@ -68,7 +74,7 @@ export function RoundEvolution({ model, t }: { model: ReportAnalysisViewModel; t
   return (
     <section className="rounded-md border border-border/70 bg-background/80 p-3">
       <SectionTitle title={t.roundEvolution} help={t.roundEvolutionDescription} icon={<ActivityIcon data-icon="inline-start" />} />
-      <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
+      <div className="mt-3 flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_280px]">
         <Sparkline
           series={[
             { label: t.actions, values: rounds.map((round) => round.actionCount), color: "var(--chart-1)" },
@@ -76,7 +82,7 @@ export function RoundEvolution({ model, t }: { model: ReportAnalysisViewModel; t
             { label: t.newTies, values: rounds.map((round) => round.newTies), color: "var(--chart-3)" },
           ]}
         />
-        <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+        <div className="flex flex-wrap gap-2 [&>*]:min-w-0 [&>*]:flex-[1_1_120px]">
           <MiniMetric label={t.rounds} value={rounds.length.toLocaleString()} />
           <MiniMetric label={t.newTies} value={rounds.reduce((total, round) => total + round.newTies, 0).toLocaleString()} />
           <MiniMetric label={t.activeActors} value={Math.max(...rounds.map((round) => round.activeActorCount)).toLocaleString()} />
@@ -90,7 +96,7 @@ export function BehaviorRanking({ model, t }: { model: ReportAnalysisViewModel; 
   return (
     <section className="rounded-md border border-border/70 bg-background/80 p-3">
       <SectionTitle title={t.behaviorDiversity} help={t.behaviorDiversityHelp} icon={<ActivityIcon data-icon="inline-start" />} />
-      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+      <div className="mt-3 flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_320px]">
         {model.behaviorRanking.length ? (
           model.behaviorRanking.map((actor) => (
             <article key={actor.actorId} className="rounded-md bg-muted/25 p-3">
@@ -105,7 +111,7 @@ export function BehaviorRanking({ model, t }: { model: ReportAnalysisViewModel; 
                   {formatPercent(nonRepeatDiversity(actor.consecutiveRepeatRate))} {t.repeatRate}
                 </Badge>
               </div>
-              <div className="mt-3 grid gap-2">
+              <div className="mt-3 flex flex-col gap-2">
                 <MetricBar label={t.actionDiversity} help={t.actionDiversityHelp} value={actor.normalizedActionTypeEntropy} max={1} percent />
                 <MetricBar label={t.visibilityDiversity} help={t.visibilityDiversityHelp} value={actor.normalizedVisibilityEntropy} max={1} percent />
                 <MetricBar label={t.targetSpread} help={t.targetSpreadHelp} value={actor.targetSpread} max={1} percent />

@@ -17,7 +17,7 @@ import { applyInteractionContext } from "@/backend/core/simulation/actors/memory
 import { applyActorDecision, buildInteraction } from "@/backend/core/simulation/actors/interactions"
 import { plannerDigestSummary } from "@/backend/core/simulation/planning/digest"
 import type { WorkflowState } from "@/backend/core/simulation/workflow/state"
-import { createActorGraph, createActorGraphState } from "@/backend/core/simulation/roles/actor"
+import { createActorContext, createActorGraph, createActorGraphState } from "@/backend/core/simulation/roles/actor"
 
 interface ActorGraphResult {
   actorId: string
@@ -46,7 +46,7 @@ export async function runActorRound(
       batch.map((actor) => runActorGraph(
         state,
         snapshot,
-        actor,
+        actor.id,
         event,
         roundDigest,
         roundIndex,
@@ -77,25 +77,27 @@ export function actorExecutionBatches(
 async function runActorGraph(
   state: WorkflowState,
   actors: ActorState[],
-  actor: ActorState,
+  actorId: string,
   event: PlannedEvent,
   roundDigest: RoundDigest,
   roundIndex: number,
   coordinatorTrace: CoordinatorTrace,
   emit: (event: RunEvent) => Promise<void>
 ): Promise<ActorGraphResult> {
-  const result = await createActorGraph(emit).invoke(createActorGraphState({
+  const actor = actors.find(candidate => candidate.id === actorId)
+  if (!actor) throw new Error(`Actor ${actorId} is absent from the current round snapshot.`)
+  const context = createActorContext({
     runId: state.runId,
     scenario: state.scenario,
     plannerDigest: plannerDigestSummary(state.simulation.plan, state.scenario.text),
-    settings: state.settings,
     actor,
     actors,
     event,
     roundDigest,
     roundIndex,
     coordinatorTrace,
-  }))
+  })
+  const result = await createActorGraph(context, state.settings, emit).invoke(createActorGraphState())
   if (!result.decision) {
     throw new Error(`actor graph for ${actor.id} completed without a decision.`)
   }

@@ -1,3 +1,9 @@
+/**
+ * Purpose: Present archived conversation rounds and selected message details.
+ * Pattern: Report presentation composition.
+ * Usage: Opened from the report's conversation detail entry.
+ * Related: src/ui/components/actors/history/virtual-history.tsx
+ */
 import { useMemo, useState } from "react"
 import type { RunEvent, SimulationState } from "@/shared"
 import type { UiTexts } from "@/ui/types/i18n"
@@ -84,7 +90,6 @@ export function ReportConversationPanel({
         key={`${round.roundIndex}:${actorFilter}`}
         rounds={visible}
         t={t}
-        mode="archive"
         onActorSelect={setActorId}
         onMessageSelect={setMessageId}
       />
@@ -104,7 +109,7 @@ export function ReportConversationPanel({
           if (!open) setMessageId(undefined)
         }}
       >
-        <DialogContent className="max-h-[85svh] overflow-y-auto">
+        <DialogContent className="page-scroll-dialog">
           <DialogHeader>
             <DialogTitle>{t.reportMessageDetails}</DialogTitle>
           </DialogHeader>

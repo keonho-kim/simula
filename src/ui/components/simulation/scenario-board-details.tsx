@@ -1,3 +1,9 @@
+/**
+ * Purpose: Render selected preparation content and live previews without nested scrolling.
+ * Pattern: Memoized selected-detail presentation.
+ * Usage: Rendered inside the full-viewport scenario board.
+ * Related: src/ui/components/simulation/scenario-board.tsx, src/ui/hooks/use-board-preview.ts
+ */
 import { memo } from "react"
 import { X } from "lucide-react"
 import { Button } from "@/ui/components/ui/button"
@@ -20,7 +26,7 @@ export const ScenarioBoardDetails = memo(function ScenarioBoardDetails({ item, r
       <h3 className="text-sm font-semibold">{item.title}</h3>
       <Button variant="ghost" size="icon-sm" aria-label={t.boardClose} onClick={onClose}><X /></Button>
     </header>
-    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-auto p-5">
+    <div className="flex min-w-0 flex-col gap-5 p-5">
       {!item.fields ? <>
         <p className="text-xs text-muted-foreground">{t.boardDraft}</p>
         {selectedDraft && Object.values(selectedDraft).some(Boolean) ? Object.entries(selectedDraft).map(([field, content]) => (

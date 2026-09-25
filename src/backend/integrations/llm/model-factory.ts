@@ -10,6 +10,8 @@ import { ChatOpenAI } from "@langchain/openai"
 import type { ModelProvider, ResolvedRoleSettings } from "@/shared"
 import { isOpenAICompatibleProvider } from "@/backend/core/settings"
 import type { ChatInput, StreamingChatModel } from "@/backend/integrations/llm/types"
+import { testScenarioBuilderResponse } from "./testing/scenario-builder-response"
+import { testAnalyticalReportResponse } from "./testing/analysis-response"
 
 export function createChatModel(config: ResolvedRoleSettings): StreamingChatModel {
   const unitTestModel = createUnitTestModel(config)
@@ -19,6 +21,7 @@ export function createChatModel(config: ResolvedRoleSettings): StreamingChatMode
 
   if (config.provider === "anthropic") {
     return new ChatAnthropic({
+      maxRetries: 0,
       apiKey: config.apiKey,
       model: config.model,
       maxTokens: config.maxTokens,
@@ -27,6 +30,7 @@ export function createChatModel(config: ResolvedRoleSettings): StreamingChatMode
   }
   if (config.provider === "gemini") {
     return new ChatGoogleGenerativeAI({
+      maxRetries: 0,
       apiKey: config.apiKey,
       model: config.model,
       maxOutputTokens: config.maxTokens,
@@ -40,6 +44,7 @@ export function createChatModel(config: ResolvedRoleSettings): StreamingChatMode
     })
   }
   return new ChatOpenAI({
+    maxRetries: 0,
     apiKey: apiKeyForOpenAICompatibleProvider(config.provider, config.apiKey),
     model: config.model,
     temperature: isOpenAICompatibleProvider(config.provider) ? config.temperature : undefined,
@@ -102,6 +107,10 @@ function unitTestStream(content: string): AsyncIterable<{ content: string }> {
 
 function unitTestResponse(input: ChatInput): string {
   const prompt = chatInputText(input)
+  const reportResponse = testAnalyticalReportResponse(prompt)
+  if (reportResponse) return reportResponse
+  const builderResponse = testScenarioBuilderResponse(prompt)
+  if (builderResponse) return builderResponse
   const exactChoice = unitTestExactChoice(prompt)
   if (exactChoice) {
     return exactChoice
@@ -114,17 +123,23 @@ function unitTestResponse(input: ChatInput): string {
   }
   if (prompt.includes("Planner actionCatalog.")) {
     const scope = prompt.match(/Scope: ([^\n]+)/)?.[1] ?? "public"
+    const field = prompt.match(/Field: (label|intentHint|expectedOutcome)/)?.[1]
     const korean = prompt.includes("Language: Korean.")
+    if (field === "intentHint") return korean ? "판단에 필요한 정보나 협력이 부족할 때" : "Use when information or cooperation is needed"
+    if (field === "expectedOutcome") return korean ? "관련 정보를 얻거나 다음 행동을 준비하려 한다" : "Seek evidence or prepare the next step"
     const names: Record<string, [string[], string[]]> = {
       public: [["근거 요청", "대안 제안", "공개 이의 제기"], ["Request evidence", "Propose an alternative", "Challenge an assumption"]],
       "semi-public": [["실무 의견 수렴", "공동 계획 조정", "그룹 중재 요청"], ["Gather team feedback", "Coordinate a joint plan", "Request group mediation"]],
       private: [["비공개 협상", "우려 확인", "개별 지원 요청"], ["Negotiate privately", "Clarify concerns", "Request individual support"]],
       solitary: [["자료 검토", "입장 재평가", "대응안 준비"], ["Review evidence", "Reconsider a position", "Prepare a response"]],
     }
-    const options = names[scope]![korean ? 0 : 1]
-    const used = prompt.split("Accepted actions (keep unchanged; do not repeat):")[1] ?? ""
+    const options = (names[scope] ?? names.public)[korean ? 0 : 1]
+    const used = prompt.split("<PREVIOUS_RESULT>")[1] ?? ""
     const label = options.find(name => !used.includes(JSON.stringify(name))) ?? options[0]!
-    return JSON.stringify({ label, intentHint: korean ? "판단에 필요한 정보나 협력이 부족할 때" : "Use when information or cooperation is needed", expectedOutcome: korean ? "관련 정보를 얻거나 다음 행동을 준비한다" : "Seek evidence or prepare the next step" })
+    return label
+  }
+  if (prompt.includes("Assign initial recipients for ONE planned event.")) {
+    return "0"
   }
   if (prompt.includes("Planner majorEvents")) {
     return [
@@ -137,13 +152,18 @@ function unitTestResponse(input: ChatInput): string {
     return "Decision stakeholder"
   }
   if (prompt.includes("Report commentary.")) {
-    const evidenceIds = JSON.parse(prompt.match(/Evidence IDs: (.+)/)?.[1] ?? "[]") as string[]
-    return JSON.stringify(prompt.includes("Language: Korean.")
-      ? { summary: "기록에서 시나리오의 제약과 인물의 선택을 확인할 수 있습니다.", findings: ["인물은 주어진 상황에서 대응을 선택했습니다."], conclusion: "관측된 결과를 바탕으로 판단하며 이후 전개는 불확실합니다.", evidenceIds: evidenceIds.slice(0, 1) }
-      : { summary: "The recorded scenario constrains the actors' choices.", findings: ["Actors selected responses within the visible situation."], conclusion: "The observed outcomes support a bounded interpretation; later developments remain uncertain.", evidenceIds: evidenceIds.slice(0, 1) })
+    const korean = prompt.includes("Language: Korean.")
+    if (prompt.includes("Field: summary")) return korean ? "기록에서 시나리오의 제약과 인물의 선택을 확인할 수 있습니다." : "The recorded scenario constrains the actors' choices."
+    if (prompt.includes("Field: finding-count")) return "1"
+    if (prompt.includes("Field: finding-")) return korean ? "인물은 주어진 상황에서 대응을 선택했습니다." : "Actors selected responses within the visible situation."
+    return korean ? "관측된 결과를 바탕으로 판단하며 이후 전개는 불확실합니다." : "The observed outcomes support a bounded interpretation; later developments remain uncertain."
   }
   if (prompt.includes("Actor message.")) {
     return "We need a bounded decision with clear ownership."
+  }
+  if (prompt.includes("Actor retained memory.") || prompt.includes("Shared accepted memory extraction.")
+    || prompt.includes("Recipient retained-memory closure.")) {
+    return "0"
   }
   if (prompt.includes("Observer roundSummary.")) {
     return "The round moved the decision forward through concrete pressure, visible ownership, and bounded next steps."
@@ -152,7 +172,10 @@ function unitTestResponse(input: ChatInput): string {
 }
 
 function chatInputText(input: ChatInput): string {
-  return typeof input === "string" ? input : input.map((message) => message.content).join("\n\n")
+  return typeof input === "string" ? input : input.map((message) => typeof message.content === "string"
+    ? message.content
+    : message.content.filter(part => part.type === "text").map(part => part.text).join("\n")
+  ).join("\n\n")
 }
 
 function unitTestExactChoice(prompt: string): string | undefined {

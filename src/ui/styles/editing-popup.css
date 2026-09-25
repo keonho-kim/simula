@@ -1,0 +1,23 @@
+/**
+ * Purpose: Keep editing dialogs visibly modal with one bounded full-content scroll surface.
+ * Pattern: Shared presentation contract.
+ * Usage: Applied to settings and finished-scenario editing dialogs.
+ * Related: src/ui/components/settings/settings-dialog.tsx, src/ui/components/scenario/scenario-preview-dialog.tsx
+ */
+.editing-popup[data-slot="dialog-content"] {
+  top: 50%;
+  left: 50%;
+  display: flex;
+  width: min(1120px, calc(100vw - 2rem));
+  max-width: none;
+  max-height: calc(100svh - 2rem);
+  min-height: 0;
+  flex-direction: column;
+  gap: 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: clamp(16px, 2.5vw, 32px);
+  translate: -50% -50%;
+  transform: none;
+}
+.editing-popup--settings[data-slot="dialog-content"] { width: min(960px, calc(100vw - 2rem)); }

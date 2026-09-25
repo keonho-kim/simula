@@ -1,6 +1,14 @@
-import type { ActorState } from "@/shared"
+/**
+ * Purpose: Replace actor and action identifiers with their visible labels.
+ * Pattern: Pure text projection.
+ * Usage: Used by actor decisions and simulation narrative construction.
+ * Related: src/backend/core/simulation/roles/actor/state.ts
+ */
+import type { ActorAction, ActorState } from "@/shared"
 
-export function sanitizeActorVisibleText(value: string | undefined, actors: ActorState[]): string {
+type ActorVisibleLabels = Pick<ActorState, "id" | "name"> & { actions: readonly Pick<ActorAction, "id" | "label">[] }
+
+export function sanitizeActorVisibleText(value: string | undefined, actors: readonly ActorVisibleLabels[]): string {
   const text = value?.trim()
   if (!text) {
     return ""
@@ -12,7 +20,7 @@ export function sanitizeActorVisibleText(value: string | undefined, actors: Acto
   )
 }
 
-function actorVisibleTextReplacements(actors: ActorState[]): Array<[string, string]> {
+function actorVisibleTextReplacements(actors: readonly ActorVisibleLabels[]): Array<[string, string]> {
   const replacements = new Map<string, string>()
   for (const actor of actors) {
     for (const action of actor.actions) {

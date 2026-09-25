@@ -1,5 +1,12 @@
+/**
+ * Purpose: Apply actor decisions and construct accepted interaction records.
+ * Pattern: Pure state transition.
+ * Usage: Called by coordinator actor-round after a validated actor graph decision.
+ * Related: src/backend/core/simulation/roles/coordinator/actor-round.ts, src/backend/core/simulation/events/injection.ts
+ */
 import type { ActorDecision, ActorState, Interaction, PlannedEvent } from "@/shared"
 import { sanitizeActorVisibleText } from "@/backend/core/simulation/actors/visible-text"
+import { projectEventForActor } from "@/backend/core/simulation/events/injection"
 
 export function applyActorDecision(actors: ActorState[], decision: ActorDecision): ActorState[] {
   return actors.map((actor) => {
@@ -40,7 +47,7 @@ export function buildInteraction(
     targetActorIds: decision.targetActorIds,
     actionCode: decision.actionId,
     actionType: actionLabel(actor, decision.actionId) ?? decision.decisionType,
-    content: sanitizeActorVisibleText(interactionContent(actor, actors, event, decision), actors),
+    content: sanitizeActorVisibleText(interactionContent(actor, actors, projectEventForActor(event, actor.id).event, decision), actors),
     eventId: event.id,
     visibility: decision.visibility,
     decisionType: decision.decisionType,

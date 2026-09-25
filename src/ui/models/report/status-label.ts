@@ -1,3 +1,9 @@
+/**
+ * Purpose: Map run and report lifecycle states to localized UI labels.
+ * Pattern: Pure presentation function.
+ * Usage: Imported by report and navigation components.
+ * Related: src/ui/i18n/messages/report.ts, src/ui/components/navigation/top-command-bar.tsx
+ */
 import type { UiTexts } from "@/ui/types/i18n"
 
 export function reportStatusLabel(status: string, t: UiTexts): string {
@@ -10,7 +16,8 @@ export function reportStatusLabel(status: string, t: UiTexts): string {
     failed: t.reportStatusFailed,
     canceled: t.reportStatusCanceled,
     running: t.reportStatusRunning,
-    created: t.reportStatusCreated
+    created: t.reportStatusCreated,
+    interrupted: t.reportStatusInterrupted
   }
   return labels[status] ?? status
 }

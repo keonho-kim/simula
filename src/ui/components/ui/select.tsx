@@ -1,15 +1,38 @@
+/**
+ * Purpose: Compose accessible Radix selects with Motion-owned popup transitions.
+ * Pattern: Controlled popup presence.
+ * Usage: Used by scenario options, settings, run selection, and report filters.
+ * Related: src/ui/hooks/use-popup-open-state.ts, src/ui/animation/provider.tsx
+ */
 "use client"
 
 import * as React from "react"
+import { AnimatePresence } from "motion/react"
+import * as m from "motion/react-m"
 import { Select as SelectPrimitive } from "radix-ui"
 
 import { cn } from "@/ui/lib/class-names"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
+import { usePopupOpenState } from "@/ui/hooks/use-popup-open-state"
+import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
+import { slidePresence } from "@/ui/animation/presence"
+
+const SelectOpenContext = React.createContext(false)
+const MotionSelectContent = m.create(SelectPrimitive.Content)
+type SelectContentProps = Pick<React.ComponentProps<typeof SelectPrimitive.Content>,
+  "className" | "children" | "position" | "align" | "onCloseAutoFocus" | "onEscapeKeyDown" |
+  "onPointerDownOutside">
 
 function Select({
+  open: controlledOpen,
+  defaultOpen,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />
+  const [open, changeOpen] = usePopupOpenState(controlledOpen, defaultOpen, onOpenChange)
+  return <SelectOpenContext.Provider value={open}>
+    <SelectPrimitive.Root data-slot="select" open={open} onOpenChange={changeOpen} {...props} />
+  </SelectOpenContext.Provider>
 }
 
 function SelectGroup({
@@ -44,7 +67,7 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex w-fit items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors duration-100 outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-8 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "flex w-fit items-center justify-between gap-1.5 rounded-lg border border-input bg-transparent py-2 pr-2 pl-2.5 text-sm whitespace-nowrap transition-colors duration-[var(--animation-feedback-duration)] outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground data-[size=default]:h-8 data-[size=sm]:h-7 data-[size=sm]:rounded-[min(var(--radius-md),10px)] *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
@@ -63,13 +86,16 @@ function SelectContent({
   position = "item-aligned",
   align = "center",
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
+}: SelectContentProps) {
+  const open = React.useContext(SelectOpenContext)
+  const reducedMotion = useReducedMotionPreference()
   return (
-    <SelectPrimitive.Portal>
-      <SelectPrimitive.Content
+    <SelectPrimitive.Portal forceMount>
+      <AnimatePresence>{open ? <MotionSelectContent key="select" forceMount
         data-slot="select-content"
         data-align-trigger={position === "item-aligned"}
-        className={cn("relative z-50 max-h-(--radix-select-content-available-height) min-w-36 origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[align-trigger=true]:animate-none     data-open:animate-in data-open:fade-in-0  data-closed:animate-out data-closed:fade-out-0 ", position ==="popper"&&"data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1", className )}
+        {...slidePresence(reducedMotion, "y", -4, -4, "popup")}
+        className={cn("relative z-50 max-h-(--radix-select-content-available-height) min-w-36 origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10", position ==="popper"&&"data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1", className )}
         position={position}
         align={align}
         {...props}
@@ -85,7 +111,7 @@ function SelectContent({
           {children}
         </SelectPrimitive.Viewport>
         <SelectScrollDownButton />
-      </SelectPrimitive.Content>
+      </MotionSelectContent> : null}</AnimatePresence>
     </SelectPrimitive.Portal>
   )
 }

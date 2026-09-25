@@ -5,6 +5,7 @@ import type { ModelProvider } from "@/shared/model"
 
 export interface CreateRunRequest {
   scenario: ScenarioInput
+  executionId?: string
 }
 
 export interface SettingsResponse {

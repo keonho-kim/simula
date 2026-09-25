@@ -1,10 +1,16 @@
+/**
+ * Purpose: Render model role settings and the shared concurrency control.
+ * Pattern: Settings composition component.
+ * Usage: Mounted by the settings dialog on its roles page.
+ * Related: src/ui/components/settings/settings-dialog.tsx, src/ui/models/settings/draft-updates.ts
+ */
 import { useMemo, type Dispatch, type SetStateAction } from "react"
 import { useQuery } from "@tanstack/react-query"
 import type { LLMSettings, ModelRole, RoleSettings } from "@/shared"
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@/ui/components/ui/field"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/components/ui/tabs"
-import { fetchProviderModels } from "@/ui/api/client"
+import { fetchProviderModels } from "@/ui/api-client/client"
 import type { UiTexts } from "@/ui/types/i18n"
 import {
   extraBodyExamples,
@@ -17,7 +23,7 @@ import {
 } from "@/ui/models/settings/settings-options"
 import { JsonTextarea, NumberField, OptionalNumberField } from "@/ui/components/settings/form-fields"
 import { updateRoleJsonDraft } from "@/ui/models/settings/json-draft"
-import { providerModelsCacheKey, readProviderModelsCache, writeProviderModelsCache } from "@/ui/storage/provider-model-cache"
+import { providerModelsCacheKey, readProviderModelsCache, writeProviderModelsCache } from "@/ui/browser-storage/provider-model-cache"
 import { ModelField } from "@/ui/components/settings/model-field"
 import { ProviderSelect } from "@/ui/components/settings/provider-select"
 import { applyProviderDefaults, patchRole, updateRole } from "@/ui/models/settings/draft-updates"
@@ -31,7 +37,13 @@ export function RoleSettingsPanel({ settings, t, setDraft, jsonDraft, setJsonDra
   setJsonDraft: Dispatch<SetStateAction<RoleJsonDraft>>
 }) {
   return (
-    <Tabs defaultValue={roles[0]} className="min-w-0 gap-4">
+    <div className="grid min-w-0 gap-4">
+      <FieldSet className="rounded-lg bg-background/70 p-4 ring-1 ring-border/60">
+        <FieldTitle>{t.settingsConcurrency}</FieldTitle>
+        <p className="text-sm text-muted-foreground">{t.settingsConcurrencyHelp}</p>
+        <NumberField label={t.settingsConcurrency} value={settings.concurrency} onChange={(concurrency) => setDraft(current => current && { ...current, concurrency })} />
+      </FieldSet>
+      <Tabs defaultValue={roles[0]} className="min-w-0 gap-4">
       <TabsList className="flex h-auto w-full flex-wrap justify-start">
         {roles.map((role) => (
           <TabsTrigger key={role} value={role}>
@@ -51,7 +63,8 @@ export function RoleSettingsPanel({ settings, t, setDraft, jsonDraft, setJsonDra
           />
         </TabsContent>
       ))}
-    </Tabs>
+      </Tabs>
+    </div>
   )
 }
 

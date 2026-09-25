@@ -1,3 +1,10 @@
+/**
+ * Purpose: Retry a rejected finite choice through the configured repair role.
+ * Pattern: Simple Module.
+ * Usage: Imported by the owning workflow.
+ * Related: src/backend/core/simulation/roles/repair/prompts/exact-choice.ts
+ */
+import { buildRepairChoicePrompt } from "./repair/prompts/exact-choice"
 import type { ActorTraceStep, CoordinatorTraceStep, RunEvent, ScenarioInput, LLMSettings } from "@/shared"
 import { invokeExactChoiceWithMetrics } from "@/backend/integrations/llm"
 import { withPromptLanguageGuide } from "@/backend/core/prompts/language"
@@ -5,7 +12,7 @@ import { emitModelTelemetry, timestamp } from "@/backend/core/simulation/events/
 
 interface RepairChoiceInput {
   runId: string
-  scenario: ScenarioInput
+  scenario: Pick<ScenarioInput, "language">
   settings: LLMSettings
   sourceRole: "actor" | "coordinator"
   sourceStep: ActorTraceStep | CoordinatorTraceStep
@@ -42,18 +49,6 @@ export async function repairExactChoice(input: RepairChoiceInput): Promise<strin
   return undefined
 }
 
-export function buildRepairChoicePrompt(input: Pick<RepairChoiceInput, "sourceRole" | "sourceStep" | "sourceId" | "invalidText" | "allowedOutputs">): string {
-  return `Repair ${input.sourceRole}.${input.sourceStep}.
-Return exactly one allowed output from the list.
-No explanation, markdown, punctuation, or translation.
-
-Source: ${input.sourceRole}${input.sourceId ? ` ${input.sourceId}` : ""}
-Invalid response:
-${input.invalidText}
-
-Allowed outputs:
-${input.allowedOutputs.map((output) => `- ${output}`).join("\n")}`
-}
 
 function preview(value: string): string {
   const compact = value.replace(/\s+/g, " ").trim()

@@ -1,3 +1,9 @@
+/**
+ * Purpose: Hold a round for manual approval or a cancellable automatic countdown.
+ * Pattern: Controlled modal workflow.
+ * Usage: Mounted by src/ui/shell/App.tsx while a round awaits continuation.
+ * Related: src/ui/components/ui/dialog.tsx, src/ui/animation/use-exit-presence.ts
+ */
 import { useEffect, useState } from "react"
 import { Button } from "@/ui/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/ui/components/ui/dialog"
@@ -8,6 +14,7 @@ import type { UiTexts } from "@/ui/types/i18n"
 const AUTO_CONTINUE_DELAY_MS = 5000
 
 interface RoundContinuationDialogProps {
+  open: boolean
   autoContinue: boolean
   action?: "continue" | "cancel"
   t: UiTexts
@@ -16,11 +23,11 @@ interface RoundContinuationDialogProps {
   onCancel: () => Promise<void>
 }
 
-export function RoundContinuationDialog({ autoContinue, action, t, onAutoContinueChange, onContinue, onCancel }: RoundContinuationDialogProps) {
+export function RoundContinuationDialog({ open, autoContinue, action, t, onAutoContinueChange, onContinue, onCancel }: RoundContinuationDialogProps) {
   const [seconds, setSeconds] = useState(AUTO_CONTINUE_DELAY_MS / 1000)
 
   useEffect(() => {
-    if (!autoContinue || action) return
+    if (!open || !autoContinue || action) return
     const deadline = Date.now() + AUTO_CONTINUE_DELAY_MS
     setSeconds(AUTO_CONTINUE_DELAY_MS / 1000)
     const interval = window.setInterval(() => {
@@ -31,10 +38,10 @@ export function RoundContinuationDialog({ autoContinue, action, t, onAutoContinu
       window.clearInterval(interval)
       window.clearTimeout(timeout)
     }
-  }, [autoContinue, action, onContinue])
+  }, [open, autoContinue, action, onContinue])
 
   return (
-    <Dialog open onOpenChange={() => undefined}>
+    <Dialog open={open} onOpenChange={() => undefined}>
       <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{t.roundContinueTitle}</DialogTitle>

@@ -4,6 +4,7 @@
  * Usage: Executed by bun test.
  * Related: src/backend/core/story-builder/index.ts
  */
+import { testPromptBlock } from "@/backend/integrations/llm/testing/prompt-input"
 import { describe, expect, test } from "bun:test"
 import { defaultSettings } from "@/backend/core/settings/defaults"
 import {
@@ -49,11 +50,14 @@ test("renders sample-shaped fallback drafts", () => {
 
     expect(prompt).toContain("same structure as Simula sample scenario files")
     expect(prompt).toContain("Do not include YAML frontmatter")
-    expect(prompt).toContain("Cast: 5")
-    expect(prompt).toContain("Max rounds: 6")
-    expect(prompt).toContain("Actions per visibility: 2")
-    expect(prompt).toContain("Assistant: # Scenario Draft")
-    expect(prompt).toContain("User: Make the finance pressure sharper.")
+    expect(testPromptBlock(prompt, "CONSTRAINTS")).toMatchObject({ numCast: 5, maxRound: 6, actionsPerType: 2 })
+    expect(testPromptBlock(prompt, "USER_INPUT")).toEqual([
+      { index: 0, content: "A city council faces a controversial infrastructure vote." },
+      { index: 2, content: "Make the finance pressure sharper." },
+    ])
+    expect(testPromptBlock(prompt, "PREVIOUS_RESULT")).toEqual([
+      { index: 1, content: "# Scenario Draft\n\n## Core Situation\n- First draft." },
+    ])
   })
 
   test("streams initial drafts without a change summary", async () => {
@@ -163,11 +167,11 @@ test("renders sample-shaped fallback drafts", () => {
       "# Scenario Draft\n\n## Core Situation\n- Finance pressure is sharper."
     )
 
-    expect(prompt).toContain("Latest user request:")
+    expect(prompt).toContain("<USER_INPUT>")
     expect(prompt).toContain("Make the finance pressure sharper.")
-    expect(prompt).toContain("Previous draft:")
+    expect(prompt).toContain("<PREVIOUS_RESULT>")
     expect(prompt).toContain("First draft.")
-    expect(prompt).toContain("Revised draft:")
+    expect(prompt).toContain("<SCENARIO>")
     expect(prompt).toContain("Finance pressure is sharper.")
   })
 })

@@ -2,10 +2,20 @@
  * Purpose: Provide run polling, SSE continuation, and provider setup for server API tests.
  * Pattern: Test support module.
  * Usage: Imported by apps/server/tests/server.test.ts.
- * Related: src/backend/api/event-stream.ts, src/backend/core/settings/constants.ts
+ * Related: src/backend/api/runs/event-stream.ts, src/backend/core/settings/constants.ts
  */
 import { MODEL_ROLES } from "@/backend/core/settings/constants"
 import type { LLMSettings, ModelProvider } from "@/shared"
+
+let sessionCookie = ""
+export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers)
+  if (sessionCookie) headers.set("Cookie", sessionCookie)
+  const response = await fetch(input, { ...init, headers })
+  const issued = response.headers.get("set-cookie")?.match(/simula-session=[^;]+/)
+  if (issued) sessionCookie = issued[0]
+  return response
+}
 
 export async function continueRoundsFromEventStream(
   baseUrl: string,
@@ -36,7 +46,7 @@ export async function pollRun(
   status: "completed" | "failed"
 ): Promise<{ status: string; error?: string }> {
   for (let attempt = 0; attempt < 80; attempt += 1) {
-    const data = (await fetch(`${baseUrl}/api/runs/${runId}`).then((response) => response.json())) as {
+    const data = (await apiFetch(`${baseUrl}/api/runs/${runId}`).then((response) => response.json())) as {
       run: { status: string; error?: string }
     }
     if (data.run.status === status) return data.run
@@ -67,7 +77,7 @@ async function continueAfterCompletedRound(
   if (!dataLine) return
   const event = JSON.parse(dataLine.slice("data: ".length)) as { roundIndex?: number }
   if (!Number.isInteger(event.roundIndex)) return
-  await fetch(`${baseUrl}/api/runs/${runId}/continue`, {
+  await apiFetch(`${baseUrl}/api/runs/${runId}/continue`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ roundIndex: event.roundIndex }),

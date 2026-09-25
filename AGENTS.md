@@ -2,7 +2,7 @@
 
 This file applies to the entire repository. It defines the default rules for humans and coding agents acting as lead engineers on this open source project. Prefer the smallest correct change that preserves these rules.
 
-`simula` is a TypeScript and Bun agent-based virtual simulation system. Its virtual world is driven by actors with explicit state, intent, memory, relationships, and interactions. The visual design authority is `DESIGN.md`.
+`simula` is a TypeScript agent-based virtual simulation system with a Next.js/Node web server and Bun tooling. Its virtual world is driven by actors with explicit state, intent, memory, relationships, and interactions. The visual design authority is `DESIGN.md`.
 
 ## 1. Priorities
 
@@ -109,14 +109,14 @@ Organize production source by runtime, then by function and responsibility. Keep
 
 ```text
 src/
+├─ app/              # Next.js page routes; browser work stays behind Client Components
 ├─ backend/
-│  ├─ index.ts          # Bun composition root
 │  ├─ config.ts         # Environment and runtime paths
-│  ├─ api/              # HTTP routes, controllers, responses, SSE transport
-│  ├─ runtime/          # Run execution, continuation, event persistence/publication
+│  ├─ api/              # Function-grouped HTTP controllers, SSE and WebSocket adapters
+│  ├─ runtime/          # Run execution, continuation, temporary event publication
 │  ├─ integrations/llm/ # Provider construction, invocation, model discovery, usage
-│  ├─ storage/          # Settings files and bundled scenario loading
-│  │  └─ runs/          # Run artifacts and timeline persistence
+│  ├─ storage/          # Temporary server artifacts and bundled scenario loading
+│  │  └─ runs/          # Active run artifacts and timeline publication
 │  └─ core/             # Simulation and application domain logic
 │     ├─ simulation/
 │     │  ├─ workflow/   # Top-level graph, shared state, stages and finalization
@@ -132,18 +132,20 @@ src/
 │     └─ prompts/       # Shared prompt and language construction
 ├─ shared/              # Cross-runtime domain types and API/event contracts
 └─ ui/
-   ├─ app/              # Application composition and view orchestration
-   ├─ pages/            # Start and report page composition
+   ├─ shell/            # Browser startup, application composition and view orchestration
+   ├─ animation/        # Motion timing/presets, presence, visibility and CSS feedback policy
+   ├─ pages/            # Start, report and browser-level page composition
    ├─ components/       # UI grouped by scenario, settings, graph, activity, etc.
    │  └─ ui/            # Existing shadcn primitives
    ├─ hooks/            # React lifecycle and subscription hooks
    ├─ stores/           # Cross-cutting Zustand state and event projections
    ├─ types/            # Shared browser-only type contracts
    ├─ models/           # Presentation calculations and form-state transformations
-   ├─ api/              # HTTP client and export download operations
-   ├─ storage/          # Browser language preference and provider-model cache
+   ├─ api-client/       # Outbound HTTP requests and export downloads
+   ├─ browser-storage/  # SQLite WASM, OPFS, browser session and preference storage
    ├─ i18n/             # Dictionaries and pure locale resolution
    └─ lib/              # Existing class-name utility
+server.ts               # Single Next, API, SSE and WebSocket listener
 ```
 
 `apps/*` and `packages/*` retain workspace configuration and tests. They are not production source layers. `src/backend/core` owns backend domain logic; it is distinct from the former top-level core entry point. Do not restore old `src/core` or UI `features/widgets/entities` entry points, and do not create empty folders to fill this tree.
@@ -151,31 +153,34 @@ src/
 | Boundary | Owns | Must not own |
 | --- | --- | --- |
 | `backend/api` | HTTP request/response handling, settings-to-provider request coordination, SSE transport | Actor decisions, simulation state transitions |
-| `backend/runtime` | Execution lifecycle, cancellation, persistence and event publication coordination | HTTP responses, React state, provider protocols |
+| `backend/runtime` | Execution lifecycle, cancellation, temporary artifacts and event publication coordination | HTTP responses, React state, provider protocols |
 | `backend/integrations` | External model API translation, invocation, discovery, usage | Settings file loading, HTTP route dispatch, UI behavior |
-| `backend/storage` | Settings and run artifact I/O, samples, storage caches | HTTP response construction, provider selection, presentation policy |
+| `backend/storage` | Temporary run artifact I/O, process-scoped settings, bundled samples | Browser-owned durable history, HTTP response construction, provider selection |
 | `backend/core/simulation` | Actor behavior, accepted interactions, stages, timeline derivation, reports | HTTP transport, browser rendering, filesystem access |
 | `backend/core/settings`, `backend/core/scenario` | Domain parsing, normalization, defaults, validation | HTTP responses, UI form state, file access |
 | `shared` | Serializable shared types and API/event contracts | Runtime orchestration, platform I/O, provider clients, React |
-| `ui/app`, `ui/pages` | Composition, navigation, user workflow orchestration | Authoritative simulation rules, filesystem access |
+| `ui/shell`, `ui/pages` | Browser startup, composition, navigation, user workflow orchestration | Authoritative simulation rules, filesystem access |
+| `ui/animation` | Shared Motion timing, presence and interaction presets, visibility/reduced-motion policy, native CSS feedback | Page-specific state, navigation policy, domain data |
 | `ui/components` | Reusable and feature-specific rendering and interactions | Backend rules, provider credentials, imports from pages or app |
 | `ui/hooks`, `ui/stores` | Browser lifecycle, subscriptions, UI state and projections | JSX composition, server authority |
 | `ui/models`, `ui/types` | Presentation transformations and browser contracts | Component/page imports, HTTP or storage I/O |
-| `ui/api`, `ui/storage`, `ui/i18n` | Browser transport/downloads, browser persistence, translation data | React page composition, authoritative simulation state |
+| `ui/api-client`, `ui/browser-storage`, `ui/i18n` | Outbound transport/downloads, SQLite WASM and OPFS persistence, translation data | React page composition, authoritative simulation state |
 
 Dependency and placement rules:
 
 - `shared` imports no backend or browser implementations.
-- The backend entry point wires API and runtime modules. API controllers coordinate runtime, storage, and integrations; runtime owns execution, not transport.
+- `server.ts` wires the Next request handler and backend runtime on one listener. API controllers coordinate runtime, storage, and integrations; runtime owns execution, not transport.
+- Keep `src/app` limited to Next route and layout entry points. Browser OPFS, SQLite WASM, Web Locks, and their startup stay behind the client component boundary in `src/ui/shell`.
 - Simulation and story-builder workflows may call model integrations, while deterministic transformations stay free of I/O. Settings, scenario parsing, and prompt construction do not depend on API or runtime modules.
-- Storage may use pure parsing or timeline transformations. Integrations receive resolved connection settings rather than reading settings files.
+- Storage may use pure parsing or timeline transformations. Integrations receive resolved connection settings rather than reading browser storage. Active server artifacts are temporary; browser SQLite WASM owns durable history and settings.
 - Use each actual graph as a cohesive module: `graph.ts` owns graph construction and edges; `state.ts` owns its state types, annotations, initialization, and state helpers; nodes and prompts stay alongside them. The top-level graph lives in `workflow/`.
 - Share the existing `WorkflowState` and annotation from `workflow/state.ts` across planner, generator, and coordinator graphs. Do not duplicate the same schema or add forwarding state declarations to make folders look uniform. Graph-specific actor and card annotations belong in their own `state.ts`.
 - Keep shared memory behavior in `actors/memory.ts`. Separate pure transformations and model calls as functions; do not require separate files solely because one function performs I/O. A memory operation or observer function does not need a graph folder unless it actually constructs a graph.
 - `roles/generator/cards` owns per-actor card generation; its parent generator owns roster generation and assembly. Keep each role's graph, nodes, state, and prompts cohesive rather than creating generic registries.
 - Core workflows may invoke `integrations/llm`; core must not import `api`, `runtime`, `storage`, or browser modules. Integrations may consume pure core settings but must not import simulation orchestration.
 - Browser modules consume `shared` contracts and HTTP/SSE. They must not import `backend`.
-- UI composition flows from app/pages to components, hooks, stores, and models. Lower layers must not import app/pages/components. Local component helpers and rendering-engine code may stay with their component.
+- UI composition flows from shell/pages to components, animation, hooks, stores, and models. Lower layers must not import shell/pages/components. Local component helpers and rendering-engine code may stay with their component.
+- Define reusable Motion timing and effects in `ui/animation`. Components choose an effect and own their rendering, keys, and accessibility. Keep graph canvas interpolation beside its renderer and preserve native focus, scroll, and bounded color feedback.
 - Keep component-only props and implementation types local. Move types to `ui/types` when multiple responsibilities share them; do not split every interface into its own file.
 - Group components and models by actual function. Do not put all components or all logic in one flat folder, and do not create a generic service layer.
 - If no listed location fits, reconsider the responsibility before creating `common`, `utils`, `helpers`, `services`, `managers`, or `misc`; catch-all folders are not architecture.
@@ -206,12 +211,12 @@ A routine pure transformation can complete this loop with a short `Simple Module
 | Pattern or role | Use when | Expected location |
 | --- | --- | --- |
 | Simple Module / Pure Function | A focused calculation, parser, formatter, or validation rule needs no lifecycle | The owning backend, shared, or UI module |
-| Composition Root | Dependencies and runtime entry points need wiring, without domain policy | `src/backend/index.ts`, `src/ui/main.tsx`, `src/ui/app` |
+| Composition Root | Dependencies and runtime entry points need wiring, without domain policy | `server.ts`, `src/backend/runtime/composition.ts`, `src/ui/shell/client-root.tsx` |
 | Use Case / Command | One user or system intention coordinates a bounded operation | Backend run control, simulation or story-builder workflows |
 | State Machine / Workflow Graph | Role or stage progression has explicit states and transitions | Existing LangGraph workflows under `src/backend/core/simulation/roles` |
 | Reducer | Events or decisions produce deterministic next state | Simulation state transformations and browser event projections |
-| Adapter | A real provider or external API needs translation into a narrow internal contract | `src/backend/integrations/llm`, `src/ui/api/client.ts`, concrete transport boundaries |
-| Repository | Durable run artifact access needs a cohesive owner | Existing `RunStore` in `src/backend/storage/runs` |
+| Adapter | A real provider or external API needs translation into a narrow internal contract | `src/backend/integrations/llm`, `src/ui/api-client/client.ts`, concrete transport boundaries |
+| Repository | Browser history and active run artifacts need separate storage owners | SQLite repositories in `src/ui/browser-storage/database`; temporary `RunStore` in `src/backend/storage/runs` |
 | Observer / Subscription | Run events must reach subscribers or update browser projections | Backend SSE and browser stream subscriptions |
 | Factory / Strategy | Multiple current implementations require construction or behavior selection | Existing provider selection in `src/backend/integrations/llm`, other proven variants |
 
@@ -231,7 +236,7 @@ A routine pure transformation can complete this loop with a short `Simple Module
 
 ## 6. TypeScript rules
 
-- Use Bun as package manager, runtime, script runner, and test runner unless a specific tool requires otherwise.
+- Use Bun as package manager, script runner, and test runner. The Next custom server and build run under Node.js.
 - Write production code in TypeScript. Use JavaScript only when build, test, or framework tooling requires it.
 - Keep TypeScript strict mode enabled. Prefer `unknown` with boundary parsing over `any`. An unavoidable `any` or assertion at an external or framework boundary requires a narrow comment explaining the constraint.
 - Model finite alternatives with discriminated unions instead of ambiguous boolean combinations.
@@ -264,6 +269,8 @@ A routine pure transformation can complete this loop with a short `Simple Module
 - Translate complete messages rather than concatenating fragments. Preserve interpolation names and meaning across locales, and format locale-sensitive numbers and dates with `Intl` and the active locale.
 - Keep identifiers, event types, structured errors, and machine-readable tokens language-neutral. Missing English or Korean keys, empty translations, and placeholder mismatches are defects.
 - Respect the selected prompt language through existing scenario and model-call contracts.
+- Keep each generation or response-repair purpose in its own file under the owning module's `prompts/` directory. Use functional filenames such as `thought.ts`, `catalog-entry.ts`, and `retry-message.ts`, without `Prompt` suffixes. Keep language variants of one purpose together; indexes may select builders but must not contain multiple prompt templates.
+- Insert context with the shared program-owned flat block formatter, choosing meaningful blocks such as `SOURCE`, `SCENARIO`, `SIMULATION`, `HISTORY`, and `FEEDBACK`. Do not nest XML or ask models to generate these input tags. Preserve existing JSON, prose, or finite-choice output contracts, and keep invocation, validation, and retries in their workflow owners.
 - Follow `DESIGN.md` for UI decisions: clean white surfaces, cool neutrals, restrained status colors, semantic tokens, and existing components.
 - Keep workflows keyboard-accessible and controls meaningfully labeled. Verify loading, empty, and error states relevant to the changed workflow.
 
@@ -311,7 +318,7 @@ Use the existing root scripts and installed tools:
 | Logic and integration tests | Bun | `bun test` or `bun test <test-path>` |
 | Type checking | TypeScript | `bun run typecheck` |
 | Static linting | ESLint | `bun run lint` |
-| Browser build | Vite | `bun run build` |
+| Browser build | Next.js | `bun run build` |
 | Browser workflows | Playwright | `bun run test:e2e` |
 
 - Run focused tests while iterating. For production code changes, run type checking and linting before handoff; run build or browser checks when the affected boundary requires them.

@@ -1,3 +1,9 @@
+/**
+ * Purpose: Show simulation navigation, execution status, and playback controls.
+ * Pattern: Presentation component.
+ * Usage: Rendered by App above the current simulation or report view.
+ * Related: src/ui/shell/App.tsx, src/ui/models/report/status-label.ts
+ */
 import { Switch } from "@/ui/components/ui/switch"
 import {
   ArrowRightIcon,
@@ -6,6 +12,7 @@ import {
 import { Badge } from "@/ui/components/ui/badge"
 import { Button } from "@/ui/components/ui/button"
 import type { UiTexts } from "@/ui/types/i18n"
+import { reportStatusLabel } from "@/ui/models/report/status-label"
 
 interface TopCommandBarProps {
   autoContinue?: boolean
@@ -42,7 +49,7 @@ export function TopCommandBar({
               <h1 className="truncate font-heading text-lg font-semibold tracking-normal">Simula</h1>
               {selectedRunStatus ? (
                 <Badge variant="secondary" className="rounded-md px-2 py-0.5 text-[11px] uppercase tracking-normal">
-                  {selectedRunStatus}
+                  {reportStatusLabel(selectedRunStatus, t)}
                 </Badge>
               ) : null}
             </div>

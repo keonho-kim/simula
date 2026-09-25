@@ -2,8 +2,9 @@
  * Purpose: Invoke configured chat models and return normalized text, usage, and diagnostics.
  * Pattern: Integration adapter.
  * Usage: Called by backend workflows for prose, streaming text, and exact choices.
- * Related: src/backend/integrations/llm/model-factory.ts, src/backend/integrations/llm/usage.ts
+ * Related: src/backend/integrations/llm/model-factory.ts, src/backend/integrations/llm/stream.ts
  */
+import { exactChoiceMessages } from "./prompts/exact-choice"
 import type {
   ActorCardStep,
   ActorTraceStep,
@@ -17,10 +18,21 @@ import type {
   ResolvedRoleSettings,
 } from "@/shared"
 import { resolveRoleSettings } from "@/backend/core/settings"
-import { contentToText } from "@/backend/integrations/llm/content"
 import { createChatModel } from "@/backend/integrations/llm/model-factory"
-import { readUsage, zeroUsage } from "@/backend/integrations/llm/usage"
-import type { ChatInput, TokenUsage } from "@/backend/integrations/llm/types"
+import { collectModelStream, DEFAULT_RESPONSE_BYTE_LIMIT } from "./stream"
+import type { ChatInput } from "@/backend/integrations/llm/types"
+import { currentModelExecution, modelResourcePool } from "./execution-context"
+
+export interface RoleInvocationOptions {
+  maxOutputTokens?: number
+  maxResponseBytes?: number
+  signal?: AbortSignal
+  onAdmission?: (status: "waiting" | "running") => Promise<void>
+  taskId?: string
+}
+
+const EXACT_CHOICE_OUTPUT_TOKENS = 2_048
+const TRUNCATED_FINISH_REASONS = new Set(["length", "max_tokens", "MAX_TOKENS"])
 
 export interface RoleTextResult {
   text: string
@@ -40,6 +52,7 @@ export type RoleTextStep =
   | GeneratorRosterStep
   | ActorCardStep
   | "actionCatalog"
+  | "eventAudience"
   | "reportCommentary"
   | "draft"
 
@@ -57,9 +70,10 @@ export async function invokeRoleTextStreaming(
   step: RoleTextStep,
   attempt: number,
   prompt: string,
-  onDelta: (text: string) => Promise<void> | void
+  onDelta: (text: string) => Promise<void> | void,
+  options: RoleInvocationOptions = {}
 ): Promise<RoleTextResult> {
-  return invokeRoleTextWithMetrics(settings, role, step, attempt, prompt, onDelta)
+  return invokeRoleTextWithMetrics(settings, role, step, attempt, prompt, onDelta, options)
 }
 
 export async function invokeRoleTextWithMetrics(
@@ -68,10 +82,23 @@ export async function invokeRoleTextWithMetrics(
   step: RoleTextStep,
   attempt: number,
   prompt: string,
-  onDelta?: (text: string) => Promise<void> | void
+  onDelta?: (text: string) => Promise<void> | void,
+  options: RoleInvocationOptions = {}
 ): Promise<RoleTextResult> {
-  const config = resolveRoleSettings(settings, role)
-  return invokeRoleInputWithMetrics(config, role, step, attempt, prompt, onDelta)
+  return invokeRoleInputWithMetrics(settings, role, step, attempt, prompt, onDelta, options)
+}
+
+export async function invokeRoleInputWithMetrics(
+  settings: LLMSettings,
+  role: ModelRole,
+  step: RoleTextStep,
+  attempt: number,
+  input: ChatInput,
+  onDelta?: (text: string) => Promise<void> | void,
+  options: RoleInvocationOptions = {}
+): Promise<RoleTextResult> {
+  const config = applyInvocationBudget(resolveRoleSettings(settings, role), options)
+  return invokeConfiguredInput(config, role, step, attempt, input, onDelta, options)
 }
 
 export async function invokeExactChoiceWithMetrics(
@@ -80,15 +107,18 @@ export async function invokeExactChoiceWithMetrics(
   step: RoleTextStep,
   attempt: number,
   prompt: string,
-  allowedOutputs: string[]
+  allowedOutputs: string[],
+  options: RoleInvocationOptions = {}
 ): Promise<RoleTextResult> {
   const outputs = exactChoiceOutputs(allowedOutputs)
-  return invokeRoleInputWithMetrics(
-    buildExactChoiceSettings(settings, role),
+  return invokeConfiguredInput(
+    applyInvocationBudget(buildExactChoiceSettings(settings, role), options),
     role,
     step,
     attempt,
-    exactChoiceMessages(prompt, outputs)
+    exactChoiceMessages(prompt, outputs),
+    undefined,
+    options
   )
 }
 
@@ -100,30 +130,11 @@ export function buildExactChoiceSettings(settings: LLMSettings, role: ModelRole)
   return {
     ...exactConfig,
     temperature: 0,
-    maxTokens: 64,
+    maxTokens: Math.min(config.maxTokens, EXACT_CHOICE_OUTPUT_TOKENS),
     extraBody: exactExtraBody,
   }
 }
 
-export function exactChoiceMessages(prompt: string, allowedOutputs: string[]): ChatInput {
-  const outputs = exactChoiceOutputs(allowedOutputs)
-  return [
-    {
-      role: "system",
-      content:
-        "You are an exact-choice classifier. Do not reason. Answer immediately in assistant content with exactly one allowed output. No markdown, labels, punctuation, or explanation.",
-    },
-    {
-      role: "user",
-      content: `${prompt}
-
-Allowed outputs:
-${outputs.map((output) => `- ${output}`).join("\n")}
-
-Return exactly one allowed output in assistant content.`,
-    },
-  ]
-}
 
 export function exactChoiceOutputs(allowedOutputs: readonly string[]): string[] {
   if (!allowedOutputs.length) {
@@ -148,59 +159,65 @@ export function reasoningOnlyWarning(result: RoleTextResult): string | undefined
     : "model returned reasoning content without assistant content."
 }
 
-async function invokeRoleInputWithMetrics(
+async function invokeConfiguredInput(
   config: ResolvedRoleSettings,
   role: ModelRole,
   step: RoleTextStep,
   attempt: number,
   input: ChatInput,
-  onDelta?: (text: string) => Promise<void> | void
+  onDelta?: (text: string) => Promise<void> | void,
+  options: RoleInvocationOptions = {}
 ): Promise<RoleTextResult> {
-  const startedAt = performance.now()
-
-  const model = createChatModel(config)
-
-  let text = ""
-  let firstChunkAt: number | undefined
-  let usage: TokenUsage | undefined
-  let reasoningContent = ""
-  let finishReason: string | undefined
-
-  for await (const chunk of await model.stream(input)) {
-    firstChunkAt ??= performance.now()
-    const delta = contentToText(chunk.content)
-    text += delta
-    if (delta) {
-      await onDelta?.(delta)
+  const execution = currentModelExecution()
+  const signals = [execution?.signal, options.signal].filter((signal): signal is AbortSignal => !!signal)
+  const signal = signals.length ? AbortSignal.any(signals) : undefined
+  signal?.throwIfAborted()
+  execution?.assertActive?.()
+  if (execution) await options.onAdmission?.("waiting")
+  const queuedAt = performance.now()
+  const release = await execution?.admission.acquire(modelResourcePool(config), execution.owner, signal)
+  const queueWaitMs = Math.max(0, Math.round(performance.now() - queuedAt))
+  try {
+    signal?.throwIfAborted()
+    execution?.assertActive?.()
+    if (execution) await options.onAdmission?.("running")
+    const model = createChatModel(config)
+    let result: Awaited<ReturnType<typeof collectModelStream>>
+    try {
+      result = await collectModelStream(model, input, {
+        timeoutMs: config.timeoutSeconds * 1000,
+        maxResponseBytes: options.maxResponseBytes ?? DEFAULT_RESPONSE_BYTE_LIMIT,
+        signal,
+        onDelta,
+      })
+    } catch (error) {
+      await execution?.onModelCallFailure?.({ role, step, attempt, taskId: options.taskId,
+        outcome: signal?.aborted ? "canceled" : "failed", queueWaitMs })
+      throw error
     }
-    usage = readUsage(chunk.usage_metadata) ?? usage
-    reasoningContent += readReasoningContent(chunk)
-    finishReason = readFinishReason(chunk) ?? finishReason
-  }
+    return {
+      text: result.text,
+      metrics: { role, step, attempt, ttftMs: result.ttftMs, durationMs: result.durationMs,
+        queueWaitMs, ...result.usage, tokenSource: result.tokenSource },
+      diagnostics: result.diagnostics,
+    }
+  } finally { release?.() }
+}
 
-  const completedAt = performance.now()
-  const tokenUsage = usage ?? zeroUsage()
-  const trimmedReasoningContent = reasoningContent.trim()
-  return {
-    text: text.trim(),
-    metrics: {
-      role,
-      step,
-      attempt,
-      ttftMs: Math.max(0, Math.round(firstChunkAt ? firstChunkAt - startedAt : completedAt - startedAt)),
-      durationMs: Math.max(0, Math.round(completedAt - startedAt)),
-      inputTokens: tokenUsage.inputTokens,
-      reasoningTokens: tokenUsage.reasoningTokens,
-      outputTokens: tokenUsage.outputTokens,
-      totalTokens: tokenUsage.totalTokens,
-      tokenSource: usage ? "provider" : "unavailable",
-    },
-    diagnostics: {
-      reasoningContentObserved: Boolean(trimmedReasoningContent),
-      reasoningContent: trimmedReasoningContent,
-      finishReason,
-    },
+export function applyInvocationBudget(config: ResolvedRoleSettings, options: RoleInvocationOptions): ResolvedRoleSettings {
+  const maximum = options.maxOutputTokens ?? config.maxTokens
+  if (!Number.isSafeInteger(maximum) || maximum < 1) throw new Error("Output token limit must be a positive integer.")
+  return { ...config, maxTokens: Math.min(config.maxTokens, maximum) }
+}
+
+export function assertCompleteModelOutput(result: RoleTextResult): void {
+  if (modelOutputTruncated(result)) {
+    throw new Error("Model output was truncated; generate a smaller complete response.")
   }
+}
+
+export function modelOutputTruncated(result: RoleTextResult): boolean {
+  return !!result.diagnostics.finishReason && TRUNCATED_FINISH_REASONS.has(result.diagnostics.finishReason)
 }
 
 function buildExactChoiceExtraBody(
@@ -213,61 +230,4 @@ function buildExactChoiceExtraBody(
     return { ...rest, reasoning_effort: "none" }
   }
   return Object.keys(rest).length ? rest : undefined
-}
-
-function readReasoningContent(chunk: unknown): string {
-  const candidates = [
-    getPath(chunk, ["reasoning_content"]),
-    getPath(chunk, ["additional_kwargs", "reasoning_content"]),
-    getPath(chunk, ["response_metadata", "reasoning_content"]),
-    getPath(chunk, ["kwargs", "additional_kwargs", "reasoning_content"]),
-    readReasoningContentBlock(getPath(chunk, ["content"])),
-  ]
-  return candidates.filter((value): value is string => typeof value === "string" && value.length > 0).join("")
-}
-
-function readReasoningContentBlock(content: unknown): string | undefined {
-  if (!Array.isArray(content)) {
-    return undefined
-  }
-  return content
-    .map((part) => {
-      if (typeof part !== "object" || part === null) {
-        return ""
-      }
-      const record = part as Record<string, unknown>
-      if (record.type === "reasoning_content") {
-        return typeof record.reasoningText === "string"
-          ? record.reasoningText
-          : typeof record.text === "string"
-            ? record.text
-            : ""
-      }
-      if (record.type === "reasoning" && typeof record.text === "string") {
-        return record.text
-      }
-      return ""
-    })
-    .join("")
-}
-
-function readFinishReason(chunk: unknown): string | undefined {
-  const candidates = [
-    getPath(chunk, ["finish_reason"]),
-    getPath(chunk, ["response_metadata", "finish_reason"]),
-    getPath(chunk, ["response_metadata", "finishReason"]),
-    getPath(chunk, ["generation_info", "finish_reason"]),
-  ]
-  return candidates.find((value): value is string => typeof value === "string")
-}
-
-function getPath(value: unknown, path: string[]): unknown {
-  let current = value
-  for (const key of path) {
-    if (typeof current !== "object" || current === null || !(key in current)) {
-      return undefined
-    }
-    current = (current as Record<string, unknown>)[key]
-  }
-  return current
 }

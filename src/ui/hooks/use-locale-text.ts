@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { dictionary } from "@/ui/i18n/dictionary"
 import { resolvePromptLanguage } from "@/ui/i18n/locale"
-import { readLanguagePreference, writeLanguagePreference } from "@/ui/storage/language-preference"
+import { readLanguagePreference, writeLanguagePreference } from "@/ui/browser-storage/language-preference"
 import type { LanguagePreference, UiTexts } from "@/ui/types/i18n"
 
 export function useLocaleText() {

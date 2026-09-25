@@ -65,7 +65,7 @@
 
   .simula-markdown pre {
     max-width: 100%;
-    overflow-x: auto;
+    overflow-wrap: anywhere;
     border-radius: 0.45rem;
     background: var(--muted);
     padding: 0.85rem;
@@ -74,13 +74,13 @@
   .simula-markdown pre code {
     background: transparent;
     padding: 0;
-    white-space: pre;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
   }
 
   .simula-markdown table {
-    display: block;
-    max-width: 100%;
-    overflow-x: auto;
+    width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
   }
 
@@ -90,6 +90,7 @@
     padding: 0.35rem 0.5rem;
     text-align: left;
     vertical-align: top;
+    overflow-wrap: anywhere;
   }
 
   .simula-markdown th {
@@ -113,8 +114,7 @@
 
   .simula-markdown .katex-display {
     max-width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: visible;
     padding-block: 0.2rem;
   }
 

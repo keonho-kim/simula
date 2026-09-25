@@ -1,3 +1,9 @@
+/**
+ * Purpose: Define English and Korean simulation-stage controls and status messages.
+ * Pattern: Localization dictionary.
+ * Usage: Composed by the simulation message family.
+ * Related: src/ui/i18n/messages/simulation.ts
+ */
 export const simulationStageTexts = {
   en: {
     boardActionName: "Action name",
@@ -28,6 +34,7 @@ export const simulationStageTexts = {
     roundContinue: "Continue",
     roundContinuePending: "Continuing...",
     roundContinueFailed: "Could not continue the run.",
+    runStreamUnavailable: "Stored run events could not be read. Reload to retry; the simulation has not been canceled.",
     roundStop: "Stop",
     roundStopPending: "Stopping...",
     roundStopFailed: "Could not stop the run.",
@@ -96,6 +103,7 @@ export const simulationStageTexts = {
     roundContinue: "계속",
     roundContinuePending: "진행 중...",
     roundContinueFailed: "실행을 이어갈 수 없습니다.",
+    runStreamUnavailable: "저장된 실행 기록을 읽지 못했습니다. 새로고침하여 다시 시도하세요. 시뮬레이션은 취소되지 않았습니다.",
     roundStop: "중지",
     roundStopPending: "중지 중...",
     roundStopFailed: "실행을 중지할 수 없습니다.",

@@ -1,3 +1,9 @@
+/**
+ * Purpose: Project Planner trace into a bounded simulation plan and planned events.
+ * Pattern: Pure state projection.
+ * Usage: Called after Planner generation and before actor construction.
+ * Related: src/backend/core/simulation/roles/planner/prompts/major-events.ts, src/backend/core/simulation/roles/planner/events/assignment.ts
+ */
 import type { PlannedEvent, PlannerTrace, PlannerTraceStep, ScenarioDigest, ScenarioInput, SimulationState } from "@/shared"
 import { renderScenarioDigest } from "@/backend/core/simulation/planning/digest"
 
@@ -43,7 +49,8 @@ export function applyPlannerTrace(state: SimulationState, scenario: ScenarioInpu
     conflictDynamics: trace.conflictDynamics,
     simulationDirection: trace.simulationDirection,
   }
-  const majorEvents = parsePlannerMajorEvents(trace.majorEvents, scenario.controls.maxRound ?? 8)
+  const majorEvents = parsePlannerMajorEvents(trace.majorEvents, scenario.controls.maxRound ?? 8,
+    scenario.controls.autonomousProgress === true)
   return {
     ...state,
     plan: {
@@ -56,13 +63,17 @@ export function applyPlannerTrace(state: SimulationState, scenario: ScenarioInpu
   }
 }
 
-export function parsePlannerMajorEvents(value: string, maxRound: number): PlannedEvent[] {
+export function parsePlannerMajorEvents(value: string, maxRound: number, autonomousProgress = false): PlannedEvent[] {
   const lines = value
     .replace(/```[\s\S]*?```/g, "")
     .split("\n")
     .map((line) => line.replace(/^\s*(?:[-*]|\d+[.)])\s*/, "").trim())
     .filter(Boolean)
-  const events = lines.map((line, index) => {
+  const requested = autonomousProgress ? Math.max(3, maxRound) : maxRound
+  if (lines.length < Math.min(3, requested)) {
+    throw new Error(`planner.majorEvents must produce at least ${Math.min(3, requested)} major events.`)
+  }
+  return lines.slice(0, requested).map((line, index) => {
     const separatorIndex = line.includes(" - ") ? line.indexOf(" - ") : line.indexOf(":")
     const title = separatorIndex > 0 ? line.slice(0, separatorIndex).trim() : `Major Event ${index + 1}`
     const summary = separatorIndex > 0 ? line.slice(separatorIndex + (line.includes(" - ") ? 3 : 1)).trim() : line
@@ -74,8 +85,4 @@ export function parsePlannerMajorEvents(value: string, maxRound: number): Planne
       participantIds: [],
     }
   })
-  if (events.length < Math.min(3, maxRound)) {
-    throw new Error("planner.majorEvents must produce at least 3 major events.")
-  }
-  return events
 }

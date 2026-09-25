@@ -1,3 +1,11 @@
+/**
+ * Purpose: Generate planner digests while retaining authoritative prepared-world constraints.
+ * Pattern: Planner workflow nodes.
+ * Usage: Called by the Planner graph before action-catalog generation.
+ * Related: src/backend/core/simulation/planning/world-constraints.ts, src/backend/core/simulation/roles/planner/state.ts
+ */
+import { renderPromptBlock } from "@/backend/core/prompts/blocks"
+import { renderWorldConstraints } from "@/backend/core/simulation/planning/world-constraints"
 import { createBoardStream } from "@/backend/core/simulation/events/board-stream"
 import type { PlannerTrace, PlannerTraceStep, RunEvent } from "@/shared"
 import { invokeRoleTextWithMetrics } from "@/backend/integrations/llm"
@@ -54,7 +62,7 @@ async function runPlannerTextNode(
   emit: (event: RunEvent) => Promise<void>
 ): Promise<{ text: string; retries: number }> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const prompt = withRolePromptGuide(promptBuilder(state, partial), {
+    const prompt = withRolePromptGuide([promptBuilder(state, partial), renderPromptBlock("CONSTRAINTS", state.scenario.world ? renderWorldConstraints(state.scenario.world) : undefined)].filter(Boolean).join("\n\n"), {
       language: state.scenario.language,
       settings: state.settings,
       role: "planner",

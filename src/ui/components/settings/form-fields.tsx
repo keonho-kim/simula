@@ -1,4 +1,10 @@
-import { useEffect, useState } from "react"
+/**
+ * Purpose: Render labeled numeric and JSON fields for model settings.
+ * Pattern: Controlled settings inputs.
+ * Usage: Imported by provider and role settings panels.
+ * Related: src/ui/components/settings/role-settings-panel.tsx, src/ui/components/settings/provider-settings-panel.tsx
+ */
+import { useEffect, useId, useState } from "react"
 import { Field, FieldLabel } from "@/ui/components/ui/field"
 import { Input } from "@/ui/components/ui/input"
 import { Textarea } from "@/ui/components/ui/textarea"
@@ -9,6 +15,7 @@ export function NumberField({ label, value, step, onChange }: {
   step?: string
   onChange: (value: number) => void
 }) {
+  const id = useId()
   const [text, setText] = useState(String(value))
   const [editing, setEditing] = useState(false)
 
@@ -31,8 +38,9 @@ export function NumberField({ label, value, step, onChange }: {
 
   return (
     <Field>
-      <FieldLabel>{label}</FieldLabel>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Input
+        id={id}
         type="number"
         step={step}
         value={text}
@@ -54,6 +62,7 @@ export function OptionalNumberField({ label, value, step, onChange }: {
   step?: string
   onChange: (value: number | undefined) => void
 }) {
+  const id = useId()
   const [text, setText] = useState(value === undefined ? "" : String(value))
   const [editing, setEditing] = useState(false)
 
@@ -77,8 +86,9 @@ export function OptionalNumberField({ label, value, step, onChange }: {
 
   return (
     <Field>
-      <FieldLabel>{label}</FieldLabel>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Input
+        id={id}
         type="number"
         step={step}
         value={text}
@@ -116,4 +126,3 @@ export function JsonTextarea({ label, value, placeholder, onChange }: {
     </Field>
   )
 }
-

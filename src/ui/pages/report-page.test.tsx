@@ -4,22 +4,19 @@
  * Usage: Executed by bun test.
  * Related: src/ui/pages/report-page.tsx, src/ui/components/report/metric-overview.tsx
  */
-import { describe, expect, mock, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { renderToStaticMarkup } from "react-dom/server"
 import { dictionary } from "@/ui/i18n/dictionary"
 
-mock.module("@/ui/components/simulation/simulation-stage", () => ({
-  SimulationStage: () => <section>Mock Simulation Stage</section>,
-}))
-
 const { ReportPage } = await import("@/ui/pages/report-page")
 
 describe("ReportPage", () => {
-  test("renders top-level report tabs", () => {
+  test("renders permanent metrics and deferred record entry points without report tabs", () => {
     const html = renderToStaticMarkup(
       <QueryClientProvider client={new QueryClient()}>
         <ReportPage
+          language="en"
           t={dictionary.en}
           onHome={() => undefined}
           onExport={() => undefined}
@@ -27,21 +24,22 @@ describe("ReportPage", () => {
       </QueryClientProvider>
     )
 
-    expect(html).toContain("Analysis Overview")
-    expect(html.match(/role="tab"/g)).toHaveLength(3)
+    expect(html).toContain("Recorded simulation")
+    expect(html).not.toContain('role="tab"')
     expect(html).toContain("Relationships")
     expect(html).toContain("Conversations")
     expect(html).not.toContain(">Performance<")
     expect(html).toContain('aria-label="LLM metrics"')
-    expect(html.indexOf('aria-label="LLM metrics"')).toBeLessThan(html.indexOf('role="tablist"'))
+    expect(html.indexOf('aria-label="LLM metrics"')).toBeLessThan(html.indexOf('aria-label="Recorded simulation"'))
     expect(html.match(/0 samples/g)).toHaveLength(4)
     expect(html.match(/<article/g)).toHaveLength(4)
   })
 
-  test("keeps the empty overview tab free of actor and stage panels", () => {
+  test("does not mount actor, replay, or simulation panels before a detail is opened", () => {
     const html = renderToStaticMarkup(
       <QueryClientProvider client={new QueryClient()}>
         <ReportPage
+          language="en"
           t={dictionary.en}
           onHome={() => undefined}
           onExport={() => undefined}
@@ -49,7 +47,9 @@ describe("ReportPage", () => {
       </QueryClientProvider>
     )
 
-    expect(html).toContain("No commentary is stored")
+    expect(html).toContain('aria-haspopup="dialog"')
+    expect(html).not.toContain('role="dialog"')
+    expect(html).not.toContain("Replay timeline")
     expect(html).not.toContain("Simulation Stage")
     expect(html).not.toContain("Search actors")
   })

@@ -1,13 +1,15 @@
 /**
- * Purpose: Define global design tokens, base elements, and application-wide motion policy.
+ * Purpose: Define global design tokens and base element styling.
  * Pattern: Global stylesheet.
- * Usage: Imported once by src/ui/main.tsx.
- * Related: src/ui/styles/markdown.css, src/ui/styles/scenario-board.css, src/ui/styles/start-screen.css
+ * Usage: Imported once by src/app/layout.tsx.
+ * Related: src/ui/animation/styles.css, src/ui/styles/editing-popup.css, src/ui/styles/page-dialog.css
  */
 @import "tailwindcss";
-@import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "./styles/page-dialog.css";
+@import "./styles/editing-popup.css";
+@import "./animation/styles.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -160,19 +162,4 @@ select {
   html {
     @apply font-sans;
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation: none !important;
-    transition-duration: 0ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-
-html[data-page-hidden="true"] *,
-html[data-page-hidden="true"] *::before,
-html[data-page-hidden="true"] *::after {
-  animation-play-state: paused !important;
 }

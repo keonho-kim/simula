@@ -1,22 +1,37 @@
 /**
- * Purpose: Verify Report metrics, folder tabs, analysis layouts, and compact-screen behavior.
+ * Purpose: Verify Report metrics, analysis board, analysis layouts, and compact-screen behavior.
  * Pattern: Browser Workflow Test.
  * Usage: Run through `bun run test:e2e`.
  * Related: src/ui/pages/report-page.tsx, src/ui/styles/report.css
  */
-import { expect, test } from "@playwright/test"
+import { expect, test, type Page } from "./fixtures"
+import type { RunManifest } from "@/shared"
+import type { BrowserRunDetail } from "@/ui/shell/e2e-queries/runs"
+
+async function seedRun(page: Page, detail: BrowserRunDetail): Promise<void> {
+  await page.goto("/")
+  await page.waitForFunction(() => Boolean(window.__simulaE2E))
+  await page.evaluate(async saved => {
+    const moduleUrl = "/src/ui/shell/e2e-queries/runs.ts"
+    const { saveRunDetail } = await window.__simulaE2E!.import(moduleUrl) as typeof import("@/ui/shell/e2e-queries/runs")
+    await saveRunDetail(saved)
+  }, detail)
+  await page.reload()
+  await page.waitForFunction(() => Boolean(window.__simulaE2E))
+}
 
 function reportFixture() {
   const actors = ["민수", "지수"].map((name, index) => ({ id: `a${index}`, name, role: "담당자", backgroundHistory: "출시 준비", personality: "신중함", preference: "안전한 출시", privateGoal: "", intent: "검토", actions: [], context: { visible: [] }, contextSummary: "", memory: [], relationships: {} }))
   const interactions = Array.from({ length: 8 }, (_, index) => ({ id: `i${index}`, roundIndex: index + 1, sourceActorId: "a0", targetActorIds: ["a1"], thought: `생각 ${index + 1}`, actionType: "근거 요청", content: `민수: 발화 ${index + 1}`, eventId: "event", visibility: "private", decisionType: "action", intent: `의도 ${index + 1}`, expectation: `기대 ${index + 1}` }))
-  const run = { id: "report-fixture", status: "completed", createdAt: "2026-09-17T00:00:00Z", scenarioName: "리포트 검증", artifactPaths: {} }
+  const run: RunManifest = { id: "report-fixture", status: "completed", createdAt: "2026-09-17T00:00:00Z", scenarioName: "리포트 검증",
+    artifactPaths: { manifest: "", events: "", state: "", report: "", timeline: "" } }
   const state = { runId: run.id, scenario: { text: "출시 준비", sourceName: "리포트 검증", language: "ko", controls: { numCast: 2, actionsPerType: 1, maxRound: 8, fastMode: true, allowAdditionalCast: false } }, plan: { interpretation: "", backgroundStory: "", actionCatalog: {}, majorEvents: [{ id: "event", title: "출시 일정", summary: "일정 협의", status: "completed", participantIds: [] }] }, actors, interactions, roundDigests: [], roundReports: interactions.map(item => ({ roundIndex: item.roundIndex, title: `협의 ${item.roundIndex}`, roundSummary: `요약 ${item.roundIndex}` })), roleTraces: [], worldSummary: "", reportMarkdown: "", stopReason: "simulation_done", errors: [] as string[] }
   const timeline = [{ index: 0, timestamp: run.createdAt, nodes: actors.map(actor => ({ id: actor.id, label: actor.name, role: actor.role, intent: actor.intent, interactionCount: 8 })), edges: [{ id: "a0-a1", source: "a0", target: "a1", weight: 8, visibility: "private", roundIndex: 8, latestContent: "발화 8" }], messages: [], activeNodeIds: [], logRefs: [] }]
   const events = [{ type: "model.metrics", runId: run.id, timestamp: run.createdAt, metrics: { role: "actor", step: "message", attempt: 1, ttftMs: 200, durationMs: 1000, inputTokens: 100, outputTokens: 50, reasoningTokens: 0, totalTokens: 150, tokenSource: "provider" } }]
   return { run, state, timeline, events }
 }
 
-test("report round carousel selects messages independently from browsing and supports compact screens", async ({ page }, testInfo) => {
+test("report round carousel selects messages independently from browsing and supports compact screens", async ({ page, browserName }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 900 })
   await page.emulateMedia({ reducedMotion: "reduce" })
   await page.addInitScript(() => localStorage.setItem("simula.language", "ko"))
@@ -25,34 +40,18 @@ test("report round carousel selects messages independently from browsing and sup
   const detail = reportFixture()
   const first = detail.state.interactions[0]!
   detail.state.interactions.push(...Array.from({ length: 100 }, (_, index) => ({ ...first, id: `long-${index}`, content: `민수: 긴 기록 ${index}`, thought: "긴 생각 ".repeat(10) })))
-  await page.route("**/api/runs", route => route.fulfill({ json: { runs: [detail.run] } }))
-  await page.route("**/api/runs/report-fixture", route => route.fulfill({ json: detail }))
-  await page.goto("/")
+  await seedRun(page, detail as unknown as BrowserRunDetail)
   await page.getByRole("button", { name: /실행 내역 보기/ }).click()
   await page.getByRole("dialog").getByRole("button", { name: /열기/ }).click()
   const metrics = page.getByRole("region", { name: "모델 지표" })
-  const tabList = page.getByRole("tablist")
   await expect(metrics).toBeVisible()
   await expect(metrics.getByRole("article")).toHaveCount(4)
   await expect(metrics).toContainText("200 ms")
   await expect(metrics).toContainText("150")
   await expect(metrics).toContainText("1 샘플")
-  const metricsBox = await metrics.boundingBox()
-  const tabListBox = await tabList.boundingBox()
-  expect(metricsBox!.y + metricsBox!.height).toBeLessThan(tabListBox!.y)
-  await expect(page.getByRole("tab", { name: "분석 개요", exact: true })).toHaveAttribute("data-state", "active")
-  await expect(page.getByRole("tab")).toHaveCount(3)
-  const activeTab = page.getByRole("tab", { name: "분석 개요", exact: true })
-  const tabPanel = page.getByRole("tabpanel")
-  const activeTabStyles = await activeTab.evaluate((element) => {
-    const style = getComputedStyle(element)
-    return { borderBottomColor: style.borderBottomColor, radius: parseFloat(style.borderTopLeftRadius) }
-  })
-  const panelBackground = await tabPanel.evaluate((element) => getComputedStyle(element).backgroundColor)
-  expect(activeTabStyles.borderBottomColor).toBe(panelBackground)
-  expect(activeTabStyles.radius).toBeGreaterThan(0)
-  await page.getByRole("tab", { name: "관계 분석", exact: true }).click()
-  await expect(metrics).toBeVisible()
+  await expect(page.getByRole("tab")).toHaveCount(0)
+  await expect(page.getByRole("heading", { name: "분석 보드", exact: true })).toBeVisible()
+  await page.getByRole("button", { name: "관계 분석", exact: true }).click()
   await expect(page.getByPlaceholder("인물 찾기")).toHaveCount(0)
   await expect(page.getByRole("combobox", { name: "연결선 선택" })).toHaveCount(0)
   await expect(page.getByRole("tab", { name: "관계 히트맵", exact: true })).toHaveCount(0)
@@ -62,8 +61,13 @@ test("report round carousel selects messages independently from browsing and sup
   expect(heatmap!.y).toBeLessThan(graph!.y)
   expect(await page.locator("details").count()).toBe(0)
   await page.screenshot({ path: testInfo.outputPath("01-relationships.png"), fullPage: true })
-  await page.getByRole("tab", { name: "대화 기록", exact: true }).click()
+  await page.getByRole("button", { name: "상세 닫기" }).click()
   await expect(metrics).toBeVisible()
+  await page.getByRole("button", { name: "대화 기록", exact: true }).click()
+  const conversationDialog = page.getByRole("dialog", { name: "대화 기록" })
+  await expect(conversationDialog.locator('[data-slot="scroll-area-viewport"]')).toHaveCount(0)
+  expect(await conversationDialog.evaluate(element => getComputedStyle(element).overflowY)).toBe("auto")
+  expect((await conversationDialog.boundingBox())!.height).toBe(900)
   const previous = page.getByRole("button", { name: "이전 라운드 보기" })
   const next = page.getByRole("button", { name: "다음 라운드 보기" })
   await expect(page.getByText("발화 1", { exact: true })).toBeVisible()
@@ -79,12 +83,10 @@ test("report round carousel selects messages independently from browsing and sup
   await expect(page.getByText("발화 5", { exact: true })).toBeVisible()
   await expect(page.getByText("발화 1", { exact: true })).toHaveCount(0)
   await page.getByRole("button", { name: "메시지 상세", exact: true }).click()
-  await expect(page.getByRole("dialog")).toContainText("의도 5")
+  await expect(page.getByRole("dialog", { name: "메시지 상세" })).toContainText("의도 5")
   await page.keyboard.press("Escape")
   await page.screenshot({ path: testInfo.outputPath("02-conversations.png"), fullPage: true })
-  await page.getByRole("tab", { name: "대화 기록", exact: true }).focus()
-  await page.keyboard.press("ArrowLeft")
-  await expect(page.getByRole("tab", { name: "관계 분석", exact: true })).toHaveAttribute("data-state", "active")
+  await page.getByRole("button", { name: "상세 닫기" }).click()
   await page.route("**/api/runs/report-fixture/export?kind=*", route => route.fulfill({ body: "test export", headers: { "content-type": "text/plain", "content-disposition": "attachment; filename=report.txt" } }))
   for (const label of ["JSON 내보내기", "JSONL 내보내기", "Markdown 내보내기"]) {
     await page.getByRole("button", { name: "내보내기", exact: true }).click()
@@ -93,11 +95,17 @@ test("report round carousel selects messages independently from browsing and sup
     await download
   }
   await page.setViewportSize({ width: 390, height: 844 })
-  expect(errors).toEqual([])
-  for (const tab of ["분석 개요", "관계 분석", "대화 기록"]) {
-    await page.getByRole("tab", { name: tab, exact: true }).click()
+  const unexpectedErrors = errors.filter(error => !(browserName === "webkit" &&
+    error.includes("/api/runs/report-fixture due to access control checks.")))
+  expect(unexpectedErrors).toEqual([])
+  for (const label of ["관계 분석", "대화 기록"]) {
+    await page.getByRole("button", { name: label, exact: true }).click()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    const dialog = await page.getByRole("dialog").boundingBox()
+    expect(dialog!.width).toBeLessThanOrEqual(390)
+    await page.getByRole("button", { name: "상세 닫기" }).click()
   }
+
 })
 
 test("empty failed report remains readable", async ({ page }) => {
@@ -107,15 +115,14 @@ test("empty failed report remains readable", async ({ page }) => {
   detail.state.roundReports = []
   detail.state.actors = []
   detail.state.errors = ["test failure"]
-  const failed = { ...detail, run: { ...detail.run, status: "failed", error: "test failure" }, timeline: [], events: [] }
-  await page.route("**/api/runs", route => route.fulfill({ json: { runs: [failed.run] } }))
-  await page.route("**/api/runs/report-fixture", route => route.fulfill({ json: failed }))
-  await page.goto("/")
+  const failed = { ...detail, run: { ...detail.run, status: "failed" as const, error: "test failure" }, timeline: [], events: [] }
+  await seedRun(page, failed as unknown as BrowserRunDetail)
   await page.getByRole("button", { name: /실행 내역 보기/ }).click()
   await page.getByRole("dialog").getByRole("button", { name: /열기/ }).click()
-  await expect(page.getByRole("alert")).toContainText("test failure")
-  await page.getByRole("tab", { name: "대화 기록", exact: true }).click()
+  await expect(page.getByRole("alert").filter({ hasText: "test failure" })).toContainText("test failure")
+  await page.getByRole("button", { name: "대화 기록", exact: true }).click()
   await expect(page.getByRole("button", { name: "다음 라운드 보기" })).toHaveCount(0)
+  await page.getByRole("button", { name: "상세 닫기" }).click()
   const metrics = page.getByRole("region", { name: "모델 지표" })
   await expect(metrics.getByRole("article")).toHaveCount(4)
   await expect(metrics).toContainText("—")

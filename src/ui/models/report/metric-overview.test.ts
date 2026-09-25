@@ -7,7 +7,7 @@
 import { expect, test } from "bun:test"
 import type { RunEvent } from "@/shared"
 import { dictionary } from "@/ui/i18n/dictionary"
-import { buildReportMetricSeries } from "./metric-overview"
+import { appendReportMetricSummary, buildReportMetricSeries, emptyReportMetricSummary, reportMetricSeries } from "./metric-overview"
 
 test("uses run averages for latency and throughput and cumulative provider token usage", () => {
   const series = buildReportMetricSeries([
@@ -35,6 +35,15 @@ test("keeps recorded latency but marks throughput and tokens unavailable without
   expect(series[3]?.latestValue).toBe("—")
   expect(series[3]?.tokenBreakdown).toEqual({ inputTokens: "—", reasoningTokens: "—", outputTokens: "—" })
   expect(series.map((item) => item.sampleCount)).toEqual([1, 1, 0, 0])
+})
+
+test("incremental metric batches produce the same report overview as a complete scan", () => {
+  const first = metric({ ttftMs: 120, durationMs: 800, totalTokens: 100, inputTokens: 70, outputTokens: 30 })
+  const second = metric({ ttftMs: 240, durationMs: 1200, tokenSource: "unavailable" })
+  const third = metric({ ttftMs: 360, durationMs: 400, totalTokens: 80, inputTokens: 60, outputTokens: 20 })
+  const partial = appendReportMetricSummary(emptyReportMetricSummary(), [first, second])
+  const completed = appendReportMetricSummary(partial, [third])
+  expect(reportMetricSeries(completed, dictionary.en)).toEqual(buildReportMetricSeries([first, second, third], dictionary.en))
 })
 
 function metric(overrides: Partial<Extract<RunEvent, { type: "model.metrics" }>["metrics"]>): Extract<RunEvent, { type: "model.metrics" }> {

@@ -1,6 +1,7 @@
 # Simula Web
 
-`apps/web` is the Vite React client for `simula`. It provides the local command surface for:
+`apps/web` retains browser tests and benchmarks. Next.js serves production UI from `src/app`
+and `src/ui`, providing the local command surface for:
 
 - editing or loading scenarios
 - drafting scenarios with Story Builder
@@ -11,25 +12,13 @@
 
 ## Development
 
-Run the API server and web app from the repository root:
-
-```bash
-bun run dev:server
-bun run dev:web
-```
-
-Or run both with:
+Run the single web and API server from the repository root:
 
 ```bash
 bun run dev
 ```
 
-The Vite dev server proxies `/api` to `http://localhost:3001` by default. Override the server origin
-with:
-
-```bash
-SIMULA_API_ORIGIN=http://127.0.0.1:3001 bun --filter @simula/web dev
-```
+The Next custom server serves pages and `/api` from one HTTPS origin.
 
 ## App Structure
 
@@ -37,7 +26,7 @@ Production source lives in `src/ui` and is organized by responsibility:
 
 | Path | Purpose |
 | --- | --- |
-| `src/ui/app` | application composition, view selection and workflow wiring |
+| `src/ui/shell` | application composition, view selection and workflow wiring |
 | `src/ui/pages` | start and report page composition |
 | `src/ui/components` | components grouped by scenario, settings, activity, actors, graph and other UI responsibilities |
 | `src/ui/components/ui` | shadcn primitives |
@@ -45,8 +34,8 @@ Production source lives in `src/ui` and is organized by responsibility:
 | `src/ui/stores` | cross-cutting Zustand state and event projections |
 | `src/ui/types` | browser contracts shared across modules |
 | `src/ui/models` | presentation calculations, round prompts and settings form transformations |
-| `src/ui/api` | HTTP client and export download operations |
-| `src/ui/storage` | language preference and provider-model browser cache |
+| `src/ui/api-client` | HTTP client and export download operations |
+| `src/ui/browser-storage` | language preference and provider-model browser cache |
 | `src/ui/i18n` | English/Korean dictionaries and locale resolution |
 | `src/ui/lib` | class-name utility |
 
@@ -82,9 +71,9 @@ locale while machine-readable tokens remain unchanged.
 From the repository root:
 
 ```bash
-bun --filter @simula/web typecheck
-bun --filter @simula/web lint
-bun --filter @simula/web build
+bun run typecheck
+bun run lint
+bun run build
 ```
 
 End-to-end smoke tests are configured at the repository root:
@@ -96,10 +85,10 @@ bun run test:e2e
 ## Naming and Local Helpers
 
 - `components/graph/graph-view.tsx` renders the graph. `node-degree.ts` calculates connectivity; renderer helpers stay with the graph component.
-- `components/settings/*-settings-panel.tsx` renders sections inside the settings dialog. Full-screen composition belongs in `pages/`.
+- `components/settings/*-settings-panel.tsx` renders sections inside the settings dialog. Full-page composition belongs in `pages/`.
 - `models/settings/draft-updates.ts` updates form drafts; `settings-options.ts` owns available options, defaults, and capability checks.
 - `components/report/presentation.tsx` contains report-specific presentation elements and formatting.
-- `storage/provider-model-cache.ts` owns the browser provider-model cache.
+- `browser-storage/provider-model-cache.ts` owns the browser provider-model cache.
 - `i18n/messages/` contains translation data, not executable scripts.
 - `lib/class-names.ts` contains the generic `cn` utility; the shadcn utils alias points here.
 

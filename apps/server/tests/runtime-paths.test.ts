@@ -1,3 +1,9 @@
+/**
+ * Purpose: Verify bundled sample paths stay relative to the checkout.
+ * Pattern: Runtime configuration contract test.
+ * Usage: bun test apps/server/tests/runtime-paths.test.ts
+ * Related: src/backend/config.ts
+ */
 import { copyFile, mkdir, mkdtemp, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { expect, test } from "bun:test"
@@ -8,8 +14,8 @@ const root = fileURLToPath(new URL("../../../", import.meta.url))
 const entry = join(root, "src/backend/config.ts")
 async function readPaths(cwd: string, overrides: Record<string, string> = {}, configEntry = entry) {
   const env = { ...process.env }
-  for (const key of ["SIMULA_DATA_DIR", "SIMULA_SETTINGS_PATH", "SIMULA_ENV_TOML_PATH", "SIMULA_SAMPLE_DIR"]) delete env[key]
-  const child = Bun.spawn([process.execPath, "-e", `const config = await import(${JSON.stringify(configEntry)}); console.log(JSON.stringify([config.DATA_ROOT, config.SETTINGS_PATH, config.ENV_TOML_PATH, config.SAMPLE_ROOT]))`], {
+  delete env.SIMULA_SAMPLE_DIR
+  const child = Bun.spawn([process.execPath, "-e", `const config = await import(${JSON.stringify(configEntry)}); console.log(JSON.stringify([config.SAMPLE_ROOT]))`], {
     cwd, env: { ...env, ...overrides }, stdout: "pipe", stderr: "pipe",
   })
   const [output, error, status] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
@@ -18,16 +24,14 @@ async function readPaths(cwd: string, overrides: Record<string, string> = {}, co
 }
 
 test("runtime defaults resolve against the checkout regardless of launch directory", async () => {
-  const expected = ["runs", "settings.json", "env.toml", "senario.samples"].map((path) => resolve(root, path))
+  const expected = [resolve(root, "senario.samples")]
   expect(await readPaths(root)).toEqual(expected)
   expect(await readPaths(join(root, "apps/server"))).toEqual(expected)
 })
 
-test("relative overrides use the checkout while explicit absolute paths remain intact", async () => {
-  const customSettings = resolve(root, "custom/settings.json")
-  const paths = await readPaths(join(root, "apps/server"), { SIMULA_DATA_DIR: "custom/runs", SIMULA_SETTINGS_PATH: customSettings })
-  expect(paths[0]).toBe(resolve(root, "custom/runs"))
-  expect(paths[1]).toBe(customSettings)
+test("sample override uses the checkout", async () => {
+  const paths = await readPaths(join(root, "apps/server"), { SIMULA_SAMPLE_DIR: "custom/samples" })
+  expect(paths).toEqual([resolve(root, "custom/samples")])
 })
 
 
@@ -39,7 +43,7 @@ test("moving the checkout changes all default paths to the new location", async 
     const config = join(backend, "config.ts")
     await copyFile(entry, config)
     expect(await readPaths(root, {}, config)).toEqual(
-      ["runs", "settings.json", "env.toml", "senario.samples"].map((path) => join(relocated, path))
+      [join(relocated, "senario.samples")]
     )
   } finally {
     await rm(relocated, { recursive: true, force: true })

@@ -1,3 +1,9 @@
+/**
+ * Purpose: Project accepted simulation events into graph timeline frames.
+ * Pattern: Pure Function.
+ * Usage: Called by the run timeline projector and projection tests.
+ * Related: src/backend/core/simulation/outputs/timeline-projector.ts, src/shared/run.ts
+ */
 import type { GraphEdgeView, GraphNodeView, GraphTimelineFrame, Interaction, RunEvent } from "@/shared"
 
 export function buildTimelineFrame(
@@ -92,15 +98,27 @@ function buildRoundFrame(
     }
   }
 
+  return buildRoundTimelineFrame(index, roundCompleted, nodes, edges, activeNodeIds, messages, logRefs)
+}
+
+export function buildRoundTimelineFrame(
+  index: number,
+  event: Extract<RunEvent, { type: "round.completed" }>,
+  nodes: GraphNodeView[],
+  edges: GraphEdgeView[],
+  activeNodeIds: string[],
+  messages: string[],
+  logRefs: string[]
+): GraphTimelineFrame {
   return {
     index,
-    timestamp: roundCompleted.timestamp,
+    timestamp: event.timestamp,
     nodes,
     edges,
     activeNodeIds: [...new Set(activeNodeIds)],
     messages: messages.slice(-12),
     logRefs: logRefs.slice(-20),
-    layoutRoundIndex: roundIndex,
+    layoutRoundIndex: event.roundIndex,
   }
 }
 

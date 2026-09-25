@@ -5,6 +5,7 @@
  * Related: src/backend/core/simulation/roles/coordinator/invocation.ts, src/backend/core/simulation/roles/coordinator/snapshot.ts
  */
 import type {
+  ActorState,
   CoordinatorTrace,
   CoordinatorTraceStep,
   InjectedEvent,
@@ -13,9 +14,11 @@ import type {
   RoundReport,
   RoleTrace,
   RunEvent,
+  SimulationState,
   StopReason,
 } from "@/shared"
 import { applyInjectedEventContext, compressActorContext } from "@/backend/core/simulation/actors/memory"
+import { retainActorMemories } from "@/backend/core/simulation/actors/retain-memory"
 
 import {
   buildPreRoundDigest,
@@ -34,7 +37,8 @@ import {
   getCoordinatorTrace,
 } from "@/backend/core/simulation/roles/coordinator/state"
 
-import { progressPrompt, progressSnapshot, selectProgressDecision } from "./progress"
+import { progressPrompt } from "./prompts/progress-decision"
+import { progressSnapshot, selectProgressDecision } from "./progress"
 import {
   resolveEventInjection,
   runCoordinatorChoice,
@@ -42,7 +46,7 @@ import {
   updateCoordinatorTrace,
 } from "./invocation"
 import { coordinatorSnapshot } from "./snapshot"
-import { runActorRound } from "./actor-round"
+import { actorExecutionBatches, runActorRound } from "./actor-round"
 
 export function createCoordinatorStepNode(
   step: CoordinatorTraceStep,
@@ -73,7 +77,8 @@ export async function coordinatorNode(
   emit: (event: RunEvent) => Promise<void>,
   roundDelayMs = 0,
   waitForNextRound?: (roundIndex: number) => Promise<void>,
-  isCanceled?: () => boolean
+  isCanceled?: () => boolean,
+  saveState?: (state: SimulationState) => Promise<void>
 ): Promise<Partial<WorkflowState>> {
   const trace = getCoordinatorTrace(state.simulation)
   const events = (state.simulation.plan?.majorEvents ?? []).map((event) => ({ ...event }))
@@ -96,6 +101,11 @@ export async function coordinatorNode(
     coordinatorTrace,
     events,
   })
+  const saveSnapshot = async () => {
+    if (!saveState) return
+    const current = snapshot().simulation
+    await saveState({ ...current, reportMarkdown: renderReport(current) })
+  }
   for (let roundIndex = 1; autonomous || roundIndex <= maxRound; roundIndex += 1) {
     throwIfCanceled(isCanceled)
     const injectionResult = await resolveEventInjection(snapshot(), events, emit)
@@ -104,7 +114,7 @@ export async function coordinatorNode(
     const event = selectedEvent ?? continuityEvent(roundIndex)
     let injectedEvent: InjectedEvent | undefined = undefined
     if (selectedEvent) {
-      injectedEvent = injectedEventForRound(roundIndex, selectedEvent)
+      injectedEvent = injectedEventForRound(roundIndex, selectedEvent, actors)
       selectedEvent.status = "active"
       await emit({
         type: "event.injected",
@@ -117,8 +127,8 @@ export async function coordinatorNode(
 
     const roundDigest = buildPreRoundDigest(roundIndex, injectedEvent)
     roundDigests.push(roundDigest)
-    actors = await Promise.all(
-      actors.map((actor) =>
+    actors = await updateActorMemories(actors, state.scenario.controls.fastMode,
+      (actor) =>
         compressActorContext(actor, {
           runId: state.runId,
           scenario: state.scenario,
@@ -126,7 +136,6 @@ export async function coordinatorNode(
           roundIndex,
           emit,
         })
-      )
     )
 
     const actorRound = await runActorRound(
@@ -140,6 +149,10 @@ export async function coordinatorNode(
     )
     actors = actorRound.actors
     interactions.push(...actorRound.interactions)
+    await saveSnapshot()
+    actors = await retainActorMemories(actors, { runId: state.runId, scenario: state.scenario,
+      settings: state.settings, emit }, state.scenario.controls.fastMode)
+    await saveSnapshot()
     throwIfCanceled(isCanceled)
     if (selectedEvent) {
       const resolutionResult = await runCoordinatorChoice(
@@ -198,6 +211,7 @@ export async function coordinatorNode(
       runId: state.runId,
       timestamp: new Date().toISOString(),
       roundIndex,
+      awaitsContinuation: !stopAfterRound && Boolean(waitForNextRound),
     })
     if (stopAfterRound) {
       break
@@ -231,6 +245,12 @@ export async function coordinatorNode(
       stopReason,
     },
   }
+}
+
+async function updateActorMemories(actors: ActorState[], fastMode: boolean, update: (actor: ActorState) => Promise<ActorState>): Promise<ActorState[]> {
+  const updated: ActorState[] = []
+  for (const batch of actorExecutionBatches(actors, fastMode)) updated.push(...await Promise.all(batch.map(update)))
+  return updated
 }
 
 function throwIfCanceled(isCanceled?: () => boolean): void {

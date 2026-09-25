@@ -1,9 +1,10 @@
-import { expect, test } from "@playwright/test"
+import { expect, test } from "./fixtures"
 
 test("large graph layout leaves browser animation frames available", async ({ page }, testInfo) => {
   await page.goto("/")
+  await page.waitForFunction(() => Boolean(window.__simulaE2E))
   const measurement = await page.evaluate(async (workerModule) => {
-    const { default: LayoutWorker } = await import(workerModule)
+    const { default: LayoutWorker } = await window.__simulaE2E!.import(workerModule) as { default: new () => Worker }
     const worker: Worker = new LayoutWorker()
     const count = 1000
     const input = {

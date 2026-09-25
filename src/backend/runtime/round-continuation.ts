@@ -1,5 +1,11 @@
-type Resolver = () => void
-type Rejecter = (error: Error) => void
+/**
+ * Purpose: Own cancellation signals and wait for notified per-round approvals.
+ * Pattern: Run lifecycle with a scoped process subscription.
+ * Usage: API controls and runtime execution share one instance.
+ * Related: src/backend/runtime/execute-run.ts, src/backend/api/runs/run-controller.ts
+ */
+import type { ExecutionLease } from "@/backend/storage/generation/execution-lease"
+import type { RoundApprovals } from "@/backend/storage/runs/round-approvals"
 
 export class RunCanceledError extends Error {
   constructor() {
@@ -9,66 +15,60 @@ export class RunCanceledError extends Error {
 }
 
 export class RoundContinuationStore {
-  private readonly approved = new Set<string>()
   private readonly canceled = new Set<string>()
-  private readonly waiters = new Map<string, { resolve: Resolver; reject: Rejecter }>()
+  private readonly controllers = new Map<string, AbortController>()
+  private readonly waiters = new Map<string, () => void>()
 
-  continue(runId: string, roundIndex: number): void {
-    const key = continuationKey(runId, roundIndex)
-    const waiter = this.waiters.get(key)
-    if (!waiter) {
-      this.approved.add(key)
-      return
-    }
-    this.waiters.delete(key)
-    waiter.resolve()
-  }
+  notify(runId: string): void { this.waiters.get(runId)?.() }
 
-  wait(runId: string, roundIndex: number): Promise<void> {
-    if (this.canceled.has(runId)) {
-      return Promise.reject(new RunCanceledError())
-    }
-    const key = continuationKey(runId, roundIndex)
-    if (this.approved.delete(key)) {
-      return Promise.resolve()
-    }
+  wait(runId: string, roundIndex: number, approvals: RoundApprovals, lease: ExecutionLease): Promise<void> {
+    const signal = this.signal(runId)
+    if (signal.aborted) return Promise.reject(new RunCanceledError())
+    if (this.waiters.has(runId)) return Promise.reject(new Error("A round wait is already registered."))
+    approvals.open(roundIndex, lease)
     return new Promise((resolve, reject) => {
-      this.waiters.set(key, { resolve, reject })
+      let settled = false
+      const finish = (error?: unknown) => {
+        if (settled) return
+        settled = true
+        signal.removeEventListener("abort", abort)
+        this.waiters.delete(runId)
+        if (error) reject(error)
+        else resolve()
+      }
+      const abort = () => finish(new RunCanceledError())
+      const check = () => {
+        try { if (approvals.consume(roundIndex, lease)) finish() }
+        catch (error) { finish(error) }
+      }
+      this.waiters.set(runId, check)
+      signal.addEventListener("abort", abort, { once: true })
+      check()
     })
   }
 
   cancel(runId: string): void {
     this.canceled.add(runId)
-    const prefix = `${runId}:`
-    for (const [key, waiter] of this.waiters) {
-      if (key.startsWith(prefix)) {
-        this.waiters.delete(key)
-        waiter.reject(new RunCanceledError())
-      }
-    }
+    this.controllers.get(runId)?.abort(new RunCanceledError())
   }
 
   isCanceled(runId: string): boolean {
     return this.canceled.has(runId)
   }
 
-  clearRun(runId: string): void {
-    const prefix = `${runId}:`
-    this.canceled.delete(runId)
-    for (const key of this.approved) {
-      if (key.startsWith(prefix)) {
-        this.approved.delete(key)
-      }
+  signal(runId: string): AbortSignal {
+    let controller = this.controllers.get(runId)
+    if (!controller) {
+      controller = new AbortController()
+      this.controllers.set(runId, controller)
+      if (this.canceled.has(runId)) controller.abort(new RunCanceledError())
     }
-    for (const [key, waiter] of this.waiters) {
-      if (key.startsWith(prefix)) {
-        this.waiters.delete(key)
-        waiter.reject(new RunCanceledError())
-      }
-    }
+    return controller.signal
   }
-}
 
-function continuationKey(runId: string, roundIndex: number): string {
-  return `${runId}:${roundIndex}`
+  clearRun(runId: string): void {
+    this.controllers.get(runId)?.abort(new RunCanceledError())
+    this.controllers.delete(runId)
+    this.canceled.delete(runId)
+  }
 }

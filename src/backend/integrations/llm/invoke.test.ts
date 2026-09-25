@@ -4,11 +4,25 @@
  * Usage: Executed by bun test.
  * Related: src/backend/integrations/llm/invoke.ts
  */
+import { exactChoiceMessages } from "@/backend/integrations/llm/prompts/exact-choice"
 import { describe, expect, test } from "bun:test"
 import type { RoleTextResult } from "./invoke"
-import { exactChoiceMessages, exactChoiceOutputs, reasoningOnlyWarning } from "./invoke"
+import { applyInvocationBudget, exactChoiceOutputs, reasoningOnlyWarning } from "./invoke"
+import { defaultSettings } from "@/backend/core/settings/defaults"
+import { resolveRoleSettings } from "@/backend/core/settings/resolve"
 
 describe("LLM invocation contracts", () => {
+  test("caps each call without mutating role settings or increasing a configured ceiling", () => {
+    const config = resolveRoleSettings(defaultSettings(), "planner")
+    const first = applyInvocationBudget(config, { maxOutputTokens: 512 })
+    const second = applyInvocationBudget(config, { maxOutputTokens: 256 })
+    expect(first.maxTokens).toBe(512)
+    expect(second.maxTokens).toBe(256)
+    expect(config.maxTokens).toBe(4096)
+    expect(applyInvocationBudget(config, { maxOutputTokens: 8000 }).maxTokens).toBe(4096)
+    expect(() => applyInvocationBudget(config, { maxOutputTokens: -1 })).toThrow("positive integer")
+  })
+
   test("exact choices reject impossible or ambiguous output sets before provider I/O", () => {
     expect(() => exactChoiceOutputs([])).toThrow("at least one")
     expect(() => exactChoiceOutputs(["continue", " continue "])).toThrow("distinct")

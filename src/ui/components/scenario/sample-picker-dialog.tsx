@@ -1,3 +1,9 @@
+/**
+ * Purpose: Let users choose an example scenario on one full-viewport scroll surface.
+ * Pattern: Read-only selection workflow.
+ * Usage: Opened from the landing page.
+ * Related: src/ui/shell/home-view.tsx, src/ui/styles/page-dialog.css
+ */
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { Gamepad2Icon } from "lucide-react"
 import type { ScenarioLoadLevel, ScenarioSampleDetail, ScenarioSampleSummary } from "@/shared"
@@ -10,9 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/components/ui/dialog"
-import { ScrollArea } from "@/ui/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/components/ui/tabs"
-import { fetchScenarioSample, fetchScenarioSamples } from "@/ui/api/client"
+import { fetchScenarioSample, fetchScenarioSamples } from "@/ui/api-client/client"
 import type { UiTexts } from "@/ui/types/i18n"
 
 const loadLevels: ScenarioLoadLevel[] = ["low", "middle", "high"]
@@ -46,13 +51,13 @@ export function SamplePickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88svh] overflow-hidden sm:max-w-[840px]">
+      <DialogContent className="page-scroll-dialog">
         <DialogHeader>
           <DialogTitle>{t.samplePicker}</DialogTitle>
           <DialogDescription>{t.samplePickerDescription}</DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="middle" className="min-h-0 gap-3">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="middle" className="gap-3">
+          <TabsList className="flex w-full [&>*]:flex-1">
             {loadLevels.map((level) => (
               <TabsTrigger key={level} value={level}>
                 {loadLevelLabel(level, t)}
@@ -60,9 +65,8 @@ export function SamplePickerDialog({
             ))}
           </TabsList>
           {loadLevels.map((level) => (
-            <TabsContent key={level} value={level} className="min-h-0 overflow-hidden">
-              <ScrollArea className="h-[54svh] pr-2 sm:pr-3">
-                <div className="grid gap-3">
+            <TabsContent key={level} value={level}>
+                <div className="flex flex-col gap-3">
                   {samples
                     .filter((sample) => sampleLoadLevel(sample) === level)
                     .map((sample) => (
@@ -97,7 +101,6 @@ export function SamplePickerDialog({
                       </div>
                     ))}
                 </div>
-              </ScrollArea>
             </TabsContent>
           ))}
         </Tabs>

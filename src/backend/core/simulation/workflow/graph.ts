@@ -1,9 +1,16 @@
+/**
+ * Purpose: Compose causal planning, actor generation, rounds, and final artifact generation.
+ * Pattern: Workflow graph.
+ * Usage: Executed by the run lifecycle owner for individual and batch worlds.
+ * Related: src/backend/core/simulation/workflow/state.ts, src/backend/core/simulation/workflow/finalization.ts
+ */
 import { END, START, StateGraph } from "@langchain/langgraph"
 import type { LLMSettings, RunEvent, ScenarioInput, SimulationState } from "@/shared"
 import { validateSettings } from "@/backend/core/settings"
 import { createCoordinatorGraph } from "@/backend/core/simulation/roles/coordinator"
 import { createGeneratorGraph } from "@/backend/core/simulation/roles/generator"
 import { createPlannerGraph } from "@/backend/core/simulation/roles/planner"
+import { assignEventAudiences } from "@/backend/core/simulation/roles/planner/events/assignment"
 import { finalizationNode } from "@/backend/core/simulation/workflow/finalization"
 import { runStage } from "@/backend/core/simulation/workflow/stages"
 import { initialSimulationState, WorkflowAnnotation, type WorkflowState } from "@/backend/core/simulation/workflow/state"
@@ -18,7 +25,8 @@ export interface SimulationRunInput {
   roundDelayMs?: number
   waitForNextRound?: (roundIndex: number) => Promise<void>
   isCanceled?: () => boolean
-  saveReportState?: (state: SimulationState) => Promise<void>
+  saveState?: (state: SimulationState) => Promise<void>
+  commentary?: "generate" | "defer"
 }
 
 export async function runSimulation(input: SimulationRunInput): Promise<SimulationState> {
@@ -65,6 +73,9 @@ export async function runSimulation(input: SimulationRunInput): Promise<Simulati
     .addNode("generator", async (state) =>
       runCancelableNode(() => runStage("generator", "Generator", state, input.emit, createGeneratorGraph(input.emit)))
     )
+    .addNode("eventAudiences", async (state) => runCancelableNode(async () => ({
+      simulation: await assignEventAudiences(state.simulation, state.settings, input.emit, input.saveState),
+    })))
     .addNode("coordinator", async (state) =>
       runCancelableNode(() =>
         runStage(
@@ -72,14 +83,15 @@ export async function runSimulation(input: SimulationRunInput): Promise<Simulati
           "Coordinator",
           state,
           input.emit,
-          createCoordinatorGraph(input.emit, input.roundDelayMs ?? 0, input.waitForNextRound, input.isCanceled)
+          createCoordinatorGraph(input.emit, input.roundDelayMs ?? 0, input.waitForNextRound, input.isCanceled, input.saveState)
         )
       )
     )
-    .addNode("finalization", async (state) => runCancelableNode(() => finalizationNode(state, input.emit, input.isCanceled, input.saveReportState)))
+    .addNode("finalization", async (state) => runCancelableNode(() => finalizationNode(state, input.emit, input.isCanceled, input.saveState, input.commentary)))
     .addEdge(START, "planner")
     .addEdge("planner", "generator")
-    .addEdge("generator", "coordinator")
+    .addEdge("generator", "eventAudiences")
+    .addEdge("eventAudiences", "coordinator")
     .addEdge("coordinator", "finalization")
     .addEdge("finalization", END)
     .compile()

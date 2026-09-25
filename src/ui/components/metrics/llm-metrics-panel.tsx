@@ -21,7 +21,7 @@ export function LlmMetricsPanelView({ data, t }: { data: MetricData; t: UiTexts 
   const series = useMemo(() => buildMetricSeries(data, t), [data, t])
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label={t.llmMetrics}>
+    <section className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_240px]" aria-label={t.llmMetrics}>
       {series.map((item) => (
         <MetricPanel key={item.title} series={item} t={t} />
       ))}
@@ -71,7 +71,7 @@ function TokenTotalPanel({ series, t }: { series: MetricSeries; t: UiTexts }) {
       <div className="flex min-h-9 items-center justify-end">
         <div className="truncate font-mono text-3xl leading-none text-[#0284a8]">{series.latestValue}</div>
       </div>
-      <div className="grid grid-cols-3 gap-2 border-t border-border/60 pt-2">
+      <div className="flex gap-2 border-t border-border/60 pt-2 [&>*]:min-w-0 [&>*]:flex-1">
         <TokenSubStat label={t.metricInputTokens} value={series.tokenBreakdown?.inputTokens ?? "0"} />
         <TokenSubStat label={t.metricReasoningTokens} value={series.tokenBreakdown?.reasoningTokens ?? "0"} />
         <TokenSubStat label={t.metricOutputTokens} value={series.tokenBreakdown?.outputTokens ?? "0"} />

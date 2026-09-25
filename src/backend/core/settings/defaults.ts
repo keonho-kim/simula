@@ -1,4 +1,11 @@
+/**
+ * Purpose: Supply default provider, role, and model concurrency settings.
+ * Pattern: Settings defaults.
+ * Usage: Called by settings normalization and tests.
+ * Related: src/backend/core/settings/normalize.ts, src/shared/settings.ts
+ */
 import type { LLMSettings, ModelProvider, ModelRole, ProviderSettings, RoleSettings } from "@/shared"
+import { DEFAULT_MODEL_CONCURRENCY } from "@/shared/settings"
 import { MODEL_PROVIDERS, MODEL_ROLES } from "@/backend/core/settings/constants"
 
 export const PROVIDER_DEFAULTS: Record<ModelProvider, ProviderSettings> = {
@@ -36,6 +43,7 @@ export const ROLE_PROVIDER_DEFAULTS: Partial<Record<ModelProvider, Partial<RoleS
 
 export function defaultSettings(): LLMSettings {
   return {
+    concurrency: DEFAULT_MODEL_CONCURRENCY,
     providers: Object.fromEntries(
       MODEL_PROVIDERS.map((provider) => [provider, { ...PROVIDER_DEFAULTS[provider] }])
     ) as LLMSettings["providers"],

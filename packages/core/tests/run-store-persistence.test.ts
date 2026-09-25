@@ -4,6 +4,7 @@
  * Usage: Executed by bun test with an isolated temporary directory.
  * Related: src/backend/storage/runs/run-store.ts
  */
+import { seedRunEvent, seedRunState } from "@/backend/storage/runs/testing/fixtures"
 import { describe, expect, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
@@ -21,14 +22,14 @@ describe("run store", () => {
         controls: { numCast: 2, allowAdditionalCast: false, actionsPerType: 3, maxRound: 8, fastMode: false },
       })
 
-      const frame = await store.appendEvent({
+      const frame = await seedRunEvent(store, {
         type: "run.started",
         runId: run.id,
         timestamp: new Date().toISOString(),
       })
       expect(frame).toBeUndefined()
 
-      const actorsFrame = await store.appendEvent({
+      const actorsFrame = await seedRunEvent(store, {
         type: "actors.ready",
         runId: run.id,
         timestamp: new Date().toISOString(),
@@ -42,7 +43,7 @@ describe("run store", () => {
       expect(actorsFrame?.edges).toEqual([])
       expect(actorsFrame?.activeNodeIds).toEqual(["actor-1", "actor-2"])
 
-      const interactionFrame = await store.appendEvent({
+      const interactionFrame = await seedRunEvent(store, {
         type: "interaction.recorded",
         runId: run.id,
         timestamp: new Date().toISOString(),
@@ -66,7 +67,7 @@ describe("run store", () => {
       expect(interactionFrame?.edges[0]?.weight).toBe(1)
       expect(interactionFrame?.activeNodeIds).toEqual(["actor-1", "actor-2"])
 
-      const messageFrame = await store.appendEvent({
+      const messageFrame = await seedRunEvent(store, {
         type: "actor.message",
         runId: run.id,
         timestamp: new Date().toISOString(),
@@ -76,7 +77,7 @@ describe("run store", () => {
       })
       expect(messageFrame).toBeUndefined()
 
-      const roundFrame = await store.appendEvent({
+      const roundFrame = await seedRunEvent(store, {
         type: "round.completed",
         runId: run.id,
         timestamp: new Date().toISOString(),
@@ -90,7 +91,7 @@ describe("run store", () => {
       expect(roundFrame?.nodes.find((node) => node.id === "actor-2")?.interactionCount).toBe(1)
       expect(roundFrame?.activeNodeIds).toEqual(["actor-1", "actor-2"])
 
-      await store.writeState({
+      await seedRunState(store, {
         runId: run.id,
         scenario: await store.readScenario(run.id),
         actors: [],

@@ -1,3 +1,9 @@
+/**
+ * Purpose: Supply localized provider, role, and concurrency settings messages.
+ * Pattern: Localization dictionary.
+ * Usage: Merged into the UI dictionary for settings screens.
+ * Related: src/ui/i18n/dictionary.ts, src/ui/components/settings/role-settings-panel.tsx
+ */
 export const simulationSettingsTexts = {
   en: {
     settingsTitle: "LLM settings",
@@ -6,6 +12,8 @@ export const simulationSettingsTexts = {
     settingsProviderConnections: "Connection settings",
     settingsRoles: "Roles",
     settingsRoleGeneration: "Model and generation settings",
+    settingsConcurrency: "Concurrent model calls",
+    settingsConcurrencyHelp: "Maximum in-flight calls per endpoint and model (1–50). Fast Mode uses this limit for independent document pages.",
     settingsRoleStoryBuilder: "StoryBuilder",
     settingsRolePlanner: "Planner",
     settingsRoleGenerator: "Generator",
@@ -18,6 +26,16 @@ export const simulationSettingsTexts = {
     settingsLoadHint: "Check that the API server started successfully and that /api/settings is reachable, then retry.",
     settingsRetry: "Retry",
     settingsSave: "Save settings",
+    vaultPassphrase: "Credentials passphrase",
+    vaultCreateHelp: "Create a passphrase to encrypt provider API keys and authentication headers in this browser. Enter it again after a browser restart.",
+    vaultUnlockHelp: "Unlock provider credentials to edit or use model settings in this browser.",
+    vaultUnlock: "Unlock credentials",
+    vaultPassphraseRequired: "Enter a credentials passphrase before saving.",
+    vaultUnlockRequired: "Unlock provider credentials before saving.",
+    vaultUnlockFailed: "Could not unlock provider credentials.",
+    vaultReset: "Reset provider credentials",
+    vaultResetHelp: "The encrypted API keys and authentication headers will be deleted. Other browser records and settings remain.",
+    settingsSyncFailed: "Browser settings were unlocked, but the model server could not be updated. Model work may fail until it reconnects.",
     settingsSavedToast: "Settings saved",
     settingsSaveFailedToast: "Failed to save settings",
     settingsInvalidToast: "Invalid settings",
@@ -60,6 +78,8 @@ export const simulationSettingsTexts = {
     settingsProviderConnections: "연결 설정",
     settingsRoles: "역할",
     settingsRoleGeneration: "모델 및 생성 설정",
+    settingsConcurrency: "동시 모델 호출 수",
+    settingsConcurrencyHelp: "동일 엔드포인트·모델의 동시 호출 상한입니다(1~50). 빠른 실행에서 독립적인 문서 페이지 처리에도 적용됩니다.",
     settingsRoleStoryBuilder: "StoryBuilder",
     settingsRolePlanner: "기획",
     settingsRoleGenerator: "구성",
@@ -72,6 +92,16 @@ export const simulationSettingsTexts = {
     settingsLoadHint: "API 서버가 정상적으로 시작됐는지, /api/settings에 연결할 수 있는지 확인한 뒤 다시 시도하세요.",
     settingsRetry: "다시 시도",
     settingsSave: "설정 저장",
+    vaultPassphrase: "인증 정보 암호",
+    vaultCreateHelp: "이 브라우저의 API 키와 인증 헤더를 암호화할 암호를 만드세요. 브라우저를 다시 열면 잠금 해제가 필요합니다.",
+    vaultUnlockHelp: "모델 설정을 편집하거나 사용하려면 인증 정보를 잠금 해제하세요.",
+    vaultUnlock: "인증 정보 잠금 해제",
+    vaultPassphraseRequired: "저장하기 전에 인증 정보 암호를 입력하세요.",
+    vaultUnlockRequired: "저장하기 전에 인증 정보를 잠금 해제하세요.",
+    vaultUnlockFailed: "인증 정보를 잠금 해제하지 못했습니다.",
+    vaultReset: "공급자 인증 정보 초기화",
+    vaultResetHelp: "암호화된 API 키와 인증 헤더를 삭제합니다. 다른 브라우저 기록과 설정은 유지됩니다.",
+    settingsSyncFailed: "브라우저 설정은 열렸지만 모델 서버에 전달하지 못했습니다. 다시 연결할 때까지 모델 작업이 실패할 수 있습니다.",
     settingsSavedToast: "설정을 저장했습니다",
     settingsSaveFailedToast: "설정 저장에 실패했습니다",
     settingsInvalidToast: "설정이 올바르지 않습니다",

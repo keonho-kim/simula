@@ -1,22 +1,15 @@
+/**
+ * Purpose: Compose Radix menu triggers, items, labels, and selection indicators.
+ * Pattern: Menu component contract.
+ * Usage: Used by landing language and report export menus.
+ * Related: src/ui/components/ui/dropdown-menu-presence.tsx
+ */
 import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
 import { cn } from "@/ui/lib/class-names"
 import { CheckIcon, ChevronRightIcon } from "lucide-react"
-
-function DropdownMenu({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
-  return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />
-}
-
-function DropdownMenuPortal({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Portal>) {
-  return (
-    <DropdownMenuPrimitive.Portal data-slot="dropdown-menu-portal" {...props} />
-  )
-}
+import { DropdownMenu, DropdownMenuPortal, DropdownMenuContent, DropdownMenuSub, DropdownMenuSubContent } from "./dropdown-menu-presence"
 
 function DropdownMenuTrigger({
   ...props
@@ -26,25 +19,6 @@ function DropdownMenuTrigger({
       data-slot="dropdown-menu-trigger"
       {...props}
     />
-  )
-}
-
-function DropdownMenuContent({
-  className,
-  align = "start",
-  sideOffset = 4,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
-  return (
-    <DropdownMenuPrimitive.Portal>
-      <DropdownMenuPrimitive.Content
-        data-slot="dropdown-menu-content"
-        sideOffset={sideOffset}
-        align={align}
-        className={cn("z-50 max-h-(--radix-dropdown-menu-content-available-height) w-(--radix-dropdown-menu-trigger-width) min-w-32 origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100     data-[state=closed]:overflow-hidden data-open:animate-in data-open:fade-in-0  data-closed:animate-out data-closed:fade-out-0 ", className )}
-        {...props}
-      />
-    </DropdownMenuPrimitive.Portal>
   )
 }
 
@@ -205,12 +179,6 @@ function DropdownMenuShortcut({
   )
 }
 
-function DropdownMenuSub({
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.Sub>) {
-  return <DropdownMenuPrimitive.Sub data-slot="dropdown-menu-sub" {...props} />
-}
-
 function DropdownMenuSubTrigger({
   className,
   inset,
@@ -232,19 +200,6 @@ function DropdownMenuSubTrigger({
       {children}
       <ChevronRightIcon className="ml-auto" />
     </DropdownMenuPrimitive.SubTrigger>
-  )
-}
-
-function DropdownMenuSubContent({
-  className,
-  ...props
-}: React.ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
-  return (
-    <DropdownMenuPrimitive.SubContent
-      data-slot="dropdown-menu-sub-content"
-      className={cn("z-50 min-w-[96px] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-lg bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100     data-open:animate-in data-open:fade-in-0  data-closed:animate-out data-closed:fade-out-0 ", className )}
-      {...props}
-    />
   )
 }
 

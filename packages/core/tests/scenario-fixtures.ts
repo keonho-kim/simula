@@ -5,7 +5,7 @@
  * Related: packages/core/tests/prompt-contracts.test.ts, packages/core/tests/actor-contracts.test.ts
  */
 import { defaultSettings } from "@/backend/core/settings/defaults"
-import type { ActorGraphState } from "@/backend/core/simulation/roles/actor"
+import { createActorContext, createActorGraphState, type ActorStepInput } from "@/backend/core/simulation/roles/actor"
 import type { WorkflowState } from "@/backend/core/simulation/workflow/state"
 import type { PlannedEvent, SimulationState } from "@/shared"
 
@@ -88,7 +88,7 @@ export function plannedEvent(id: string, status: PlannedEvent["status"]): Planne
   }
 }
 
-export function buildActorChoiceState(): ActorGraphState {
+export function buildActorChoiceState(): ActorStepInput {
   const simulation = buildDigestSimulation()
   const baseActor = simulation.actors[0]
   const event = simulation.plan?.majorEvents[0]
@@ -114,11 +114,10 @@ export function buildActorChoiceState(): ActorGraphState {
     backgroundHistory: "Target history.",
     actions: [],
   }
-  return {
+  return { ...createActorContext({
     runId: "choice-run",
     scenario: simulation.scenario,
     plannerDigest: "Digest.",
-    settings: defaultSettings(),
     actor,
     actors: [actor, target],
     event,
@@ -146,13 +145,5 @@ export function buildActorChoiceState(): ActorGraphState {
         progressDecision: 0,
       },
     },
-    trace: {
-      thought: "",
-      target: "",
-      action: "",
-      intent: "",
-      message: "",
-      retryCounts: { thought: 0, target: 0, action: 0, intent: 0, message: 0, context: 0 },
-    },
-  }
+  }), ...createActorGraphState() }
 }

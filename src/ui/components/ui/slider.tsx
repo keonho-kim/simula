@@ -1,3 +1,9 @@
+/**
+ * Purpose: Render an accessible range slider.
+ * Pattern: Radix control composition.
+ * Usage: Used by browser settings controls.
+ * Related: src/ui/lib/class-names.ts, src/ui/animation/styles.css
+ */
 "use client"
 
 import * as React from "react"
@@ -25,7 +31,7 @@ function Slider({
         <SliderPrimitive.Thumb
           key={index}
           data-slot="slider-thumb"
-          className="block size-4 rounded-full border border-primary bg-background shadow-sm ring-offset-background transition-colors duration-100 hover:ring-3 hover:ring-ring/20 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+          className="block size-4 rounded-full border border-primary bg-background shadow-sm ring-offset-background transition-colors duration-[var(--animation-feedback-duration)] hover:ring-3 hover:ring-ring/20 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
         />
       ))}
     </SliderPrimitive.Root>

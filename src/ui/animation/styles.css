@@ -1,0 +1,22 @@
+/* Purpose: Own native color feedback and browser-wide reduced-motion behavior.
+ * Pattern: Shared CSS animation policy.
+ * Usage: Imported once by src/ui/index.css.
+ * Related: src/ui/animation/timing.ts, src/ui/index.css
+ */
+:root {
+  --animation-feedback-duration: 100ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+html[data-page-hidden="true"] *,
+html[data-page-hidden="true"] *::before,
+html[data-page-hidden="true"] *::after {
+  animation-play-state: paused !important;
+}

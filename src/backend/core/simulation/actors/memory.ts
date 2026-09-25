@@ -1,8 +1,18 @@
+/**
+ * Purpose: Maintain visible actor history and compress accumulated memory.
+ * Pattern: State projection and model invocation.
+ * Usage: Called by the actor memory lifecycle before model invocation.
+ * Related: src/backend/core/simulation/roles/coordinator/actor-round.ts, src/backend/core/simulation/actors/prompts/compress-memory.ts
+ */
+import { compressMemory } from "./prompts/compress-memory"
+import { activeMemoryRecords } from "./memory-records"
+import { retainActorMemory } from "./retain-memory"
 import type { ActorContextMemory, ActorState, ActorVisibleContextEntry, InjectedEvent, Interaction, LLMSettings, PromptOutputLength, RunEvent, ScenarioControls, ScenarioInput } from "@/shared"
 import { invokeRoleTextWithMetrics } from "@/backend/integrations/llm"
 import { withRolePromptGuide } from "@/backend/core/prompts/language"
 import { compactLines, compactText, resolvePromptOutputLength, scalePromptLimit } from "@/backend/core/prompts/prompt"
 import { emitModelTelemetry } from "@/backend/core/simulation/events/telemetry"
+import { eventVisibleToActor } from "@/backend/core/simulation/events/injection"
 
 const ACTOR_MEMORY_PROMPT_CHARS = 260
 
@@ -21,10 +31,11 @@ export function emptyActorContext(): ActorContextMemory {
 }
 
 export function contextUsedByActor(actor: ActorState): string[] {
-  return [
+  const recent = [
     actor.contextSummary ? `summary: ${actor.contextSummary}` : "",
     ...actor.context.visible.map(renderVisibleEntry),
   ].filter(Boolean).slice(-12)
+  return [...activeMemoryRecords(actor.context.ledger).map(record => `${record.kind}: ${record.quote}`), ...recent]
 }
 
 export function actorPromptContext(actor: ActorState, controls?: ScenarioControls): string {
@@ -38,6 +49,9 @@ export function actorPromptContext(actor: ActorState, controls?: ScenarioControl
 
   return `Memory summary:
 ${memory}
+Retained source-quoted records (statements, not independently verified facts):
+${JSON.stringify(activeMemoryRecords(actor.context.ledger).map(record => ({ kind: record.kind, quote: record.quote,
+  speaker: record.sourceActorName ?? record.sourceActorId, round: record.roundIndex })))}
 Current and recent events:
 ${events}
 Own recent actions:
@@ -64,17 +78,18 @@ export function applyInjectedEventContext(actors: ActorState[], event: InjectedE
     eventId: event.sourceEventId,
     content: `${event.title}: ${event.summary}`,
   }
-  return actors.map((actor) => appendVisibleEntry(actor, entry))
+  return actors.map((actor) => eventVisibleToActor(event, actor.id) ? appendVisibleEntry(actor, entry) : actor)
 }
 
 export function applyInteractionContext(actors: ActorState[], interaction: Interaction): ActorState[] {
+  const sourceName = actors.find(actor => actor.id === interaction.sourceActorId)?.name
   return actors.map((actor) => {
-    const entry = visibleEntryForActor(actor.id, interaction)
+    const entry = visibleEntryForActor(actor.id, interaction, sourceName)
     return entry ? appendVisibleEntry(actor, entry) : actor
   })
 }
 
-function visibleEntryForActor(actorId: string, interaction: Interaction): ActorVisibleContextEntry | undefined {
+function visibleEntryForActor(actorId: string, interaction: Interaction, sourceName: string | undefined): ActorVisibleContextEntry | undefined {
   const isSource = actorId === interaction.sourceActorId
   const isTarget = interaction.targetActorIds.includes(actorId)
   if (!isSource && !isTarget && interaction.visibility !== "public") {
@@ -88,14 +103,19 @@ function visibleEntryForActor(actorId: string, interaction: Interaction): ActorV
     : isTarget ? "in" : "observed"
   return {
     id: `${interaction.id}:${actorId}`,
+    interactionId: interaction.id,
     kind,
     roundIndex: interaction.roundIndex,
     decisionType: interaction.decisionType,
     visibility: interaction.visibility,
     sourceActorId: interaction.sourceActorId,
+    sourceActorName: sourceName,
     targetActorIds: interaction.targetActorIds,
     eventId: interaction.eventId,
-    content: `${interaction.content} Intent: ${interaction.intent} Expectation: ${interaction.expectation}`,
+    // Visibility grants access to the accepted action, not to its author's internal motives.
+    content: isSource
+      ? `${interaction.content} Intent: ${interaction.intent} Expectation: ${interaction.expectation}`
+      : interaction.content,
   }
 }
 
@@ -103,7 +123,7 @@ function appendVisibleEntry(actor: ActorState, entry: ActorVisibleContextEntry):
   const visible = [...actor.context.visible, entry]
   return {
     ...actor,
-    context: { visible },
+    context: { ...actor.context, visible },
     memory: visible.map(renderVisibleEntry).slice(-12),
   }
 }
@@ -131,8 +151,6 @@ function renderVisibleEntry(entry: ActorVisibleContextEntry): string {
 
 const MAX_CONTEXT_COMPRESSION_ATTEMPTS = 5
 
-const CONTEXT_COMPRESSION_INPUT_CHARS = 700
-
 const CONTEXT_SUMMARY_CHARS = 520
 
 const CONTEXT_EVENT_CHARS = 280
@@ -147,16 +165,11 @@ export async function compressActorContext(
     emit: (event: RunEvent) => Promise<void>
   }
 ): Promise<ActorState> {
+  actor = await retainActorMemory(actor, input)
   const context = actor.context.visible.map(renderVisibleEntry).join("\n")
   for (let attempt = 1; attempt <= MAX_CONTEXT_COMPRESSION_ATTEMPTS; attempt += 1) {
     const prompt = withRolePromptGuide(
-      `Compress memory for ${actor.name}. ${renderActorMemoryLengthGuide(input.scenario.controls)}
-Keep only actionable facts, pressure, commitment, and important promises.
-
-Profile: ${actor.role}; ${compactText(actor.personality, scalePromptLimit(100, input.scenario.controls))}; wants ${compactText(actor.preference, scalePromptLimit(120, input.scenario.controls))}.
-Previous: ${compactText(actor.contextSummary || "None", scalePromptLimit(220, input.scenario.controls))}
-Visible history:
-${context ? compactLines(context.split("\n"), 8, scalePromptLimit(CONTEXT_COMPRESSION_INPUT_CHARS, input.scenario.controls)) : "No visible runtime history yet."}`,
+      compressMemory(actor, context, input.scenario.controls, renderActorMemoryLengthGuide(input.scenario.controls)),
       {
         language: input.scenario.language,
         settings: input.settings,

@@ -2,7 +2,7 @@
  * Purpose: Verify planner, coordinator, generator, and prompt compaction contracts.
  * Pattern: Prompt contract test.
  * Usage: Executed by bun test.
- * Related: src/backend/core/prompts/prompt.ts, src/backend/core/simulation/roles/coordinator/prompts.ts
+ * Related: src/backend/core/prompts/prompt.ts, src/backend/core/simulation/roles/coordinator/prompts/index.ts
  */
 import { describe, expect, test } from "bun:test"
 import { defaultSettings } from "@/backend/core/settings/defaults"
@@ -13,8 +13,9 @@ import { actorPrompts } from "@/backend/core/simulation/roles/actor/prompts"
 import { coordinatorPrompts } from "@/backend/core/simulation/roles/coordinator/prompts"
 import { eventInjectionAllowedOutputs } from "@/backend/core/simulation/events/injection"
 import { initialActorCardState } from "@/backend/core/simulation/roles/generator/cards/state"
-import { parseActorRoster, renderRosterPrompt } from "@/backend/core/simulation/roles/generator/roster"
-import type { ActorGraphState } from "@/backend/core/simulation/roles/actor"
+import { renderRosterPrompt } from "@/backend/core/simulation/roles/generator/prompts/roster"
+import { parseActorRoster } from "@/backend/core/simulation/roles/generator/roster"
+import { createActorContext, createActorGraphState } from "@/backend/core/simulation/roles/actor"
 import type { WorkflowState } from "@/backend/core/simulation/workflow/state"
 import { buildCoordinatorPromptState, buildDigestSimulation, plannedEvent } from "./scenario-fixtures"
 
@@ -40,11 +41,10 @@ test("renders prompt language guide without changing machine-readable tokens", (
       settings: defaultSettings(),
       simulation,
     } satisfies WorkflowState
-    const actorState = {
+    const actorState = { ...createActorContext({
       runId: "digest-run",
       scenario: simulation.scenario,
       plannerDigest: plannerDigestSummary(simulation.plan, simulation.scenario.text),
-      settings: defaultSettings(),
       actor,
       actors: simulation.actors,
       event,
@@ -72,28 +72,18 @@ test("renders prompt language guide without changing machine-readable tokens", (
           progressDecision: 0,
         },
       },
-      trace: {
-        thought: "",
-        target: "",
-        action: "",
-        intent: "",
-        message: "",
-        retryCounts: { thought: 0, target: 0, action: 0, intent: 0, message: 0, context: 0 },
-      },
-    } satisfies ActorGraphState
+    }), ...createActorGraphState() }
 
     expect(
       actorCardPrompts.role(
-        initialActorCardState({
+        ({ ...initialActorCardState(),
           runId: "digest-run",
-          scenario: simulation.scenario,
-          settings: defaultSettings(),
+          language: simulation.scenario.language,
           actorIndex: 1,
           assignedName: "Actor 1",
           roleSeed: "Primary decision maker",
           fullRoster: [{ index: 1, name: "Actor 1", roleSeed: "Primary decision maker" }],
           plannerDigest: plannerDigestSummary(simulation.plan, simulation.scenario.text),
-          emit: async () => {},
         })
       )
     ).toContain("Actor pressures: Stakeholders face cost.")
@@ -122,7 +112,7 @@ test("renders prompt language guide without changing machine-readable tokens", (
       "도널드 트럼프 미국 대통령과 JD 밴스와 백악관 협상 라인이 충돌한다."
     )
 
-    expect(prompt).toContain("<name>: <short role>; <name>: <short role>")
+    expect(prompt).toContain("name: short role; name: short role")
     expect(prompt).toContain("Use exact person, organization, or line names")
     expect(prompt).toContain("authoritative actor candidates")
     expect(prompt).toContain("places, meetings, channels")

@@ -1,4 +1,10 @@
-import type { RunEvent } from "@/shared"
+/**
+ * Purpose: Apply one actor decision step using external context and model settings.
+ * Pattern: Workflow node factory.
+ * Usage: Bound to per-turn dependencies by the actor graph constructor.
+ * Related: src/backend/core/simulation/roles/actor/graph.ts, src/backend/core/simulation/roles/actor/node.ts
+ */
+import type { LLMSettings, RunEvent } from "@/shared"
 import { actorPrompts, type ActorPromptStep } from "@/backend/core/simulation/roles/actor/prompts"
 import { runActorTextNode } from "@/backend/core/simulation/roles/actor/node"
 import {
@@ -10,13 +16,19 @@ import {
   normalizeActorAction,
   targetAllowedOutputs,
   type ActorGraphState,
+  type ActorStepInput,
 } from "@/backend/core/simulation/roles/actor/state"
+
+import type { ActorContext } from "./context"
 
 export function createActorStepNode(
   step: ActorPromptStep,
+  context: ActorContext,
+  settings: LLMSettings,
   emit: (event: RunEvent) => Promise<void>
 ): (state: ActorGraphState) => Promise<Partial<ActorGraphState>> {
-  return async (state) => {
+  return async (graphState) => {
+    const state: ActorStepInput = { ...context, ...graphState }
     const selectedAction = normalizeActorAction(state.trace.action, state)
     if (step === "target" && (!selectedAction || selectedAction === "no_action")) {
       return {
@@ -38,14 +50,14 @@ export function createActorStepNode(
     }
     const validate =
       step === "target" ? isValidActorTarget : step === "action" ? isValidActorAction : undefined
-    const result = await runActorTextNode(state, step, actorPrompts[step], partial, emit, validate, actorAllowedOutputs(step))
+    const result = await runActorTextNode(state, settings, step, actorPrompts[step], partial, emit, validate, actorAllowedOutputs(step))
     return {
       trace: applyActorTraceStep(state.trace, step, result.text, result.retries),
     }
   }
 }
 
-export async function actorNode(state: ActorGraphState): Promise<Partial<ActorGraphState>> {
+export async function actorNode(state: ActorStepInput): Promise<Partial<ActorGraphState>> {
   return {
     decision: buildActorDecision(state),
   }
@@ -53,7 +65,7 @@ export async function actorNode(state: ActorGraphState): Promise<Partial<ActorGr
 
 function actorAllowedOutputs(
   step: ActorPromptStep
-): ((state: ActorGraphState) => string[]) | undefined {
+): ((state: ActorStepInput) => string[]) | undefined {
   if (step === "target") {
     return targetAllowedOutputs
   }

@@ -1,11 +1,5 @@
 {
   "name": "@simula/server",
   "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "bun --watch ../../src/backend/index.ts",
-    "start": "NODE_ENV=production bun ../../dist/backend/index.js",
-    "typecheck": "tsc -b",
-    "build": "tsc -b && bun ../../scripts/build-server.ts"
-  }
+  "type": "module"
 }

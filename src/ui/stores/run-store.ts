@@ -1,3 +1,10 @@
+/**
+ * Purpose: Maintain browser projections of the selected run and stable execution progress.
+ * Pattern: Zustand store with incremental event projections.
+ * Usage: Updated by run subscriptions and run-detail hydration; consumed by views and selectors.
+ * Related: src/ui/models/simulation/round-continuation.ts, src/ui/stores/run/event-collections.ts
+ */
+import { reduceRoundProgress, type RoundProgress } from "@/ui/models/simulation/round-continuation"
 import { emptyScenarioBoard, updateScenarioBoard, type ScenarioBoardState } from "@/ui/models/simulation/scenario-board"
 import { emptyMetricData, appendMetricData, type MetricData } from "@/ui/models/metrics/metric-data"
 import { emptyConversationData, updateConversationData, type ConversationData } from "@/ui/models/actors/conversation-data"
@@ -7,6 +14,7 @@ import { appendRetainedEvents, actorEvents, conversationEvents, mergeLiveEvents,
 import type { GraphTimelineFrame, RunEvent, RunManifest, SimulationState } from "@/shared"
 
 interface RunUiState {
+  roundProgress: RoundProgress
   scenarioBoard: ScenarioBoardState
   selectedRunId?: string
   liveEvents: RunEvent[]
@@ -33,6 +41,7 @@ export const useRunStore = create<RunUiState>((set) => {
   const actorIds = new Set<string>()
   const conversationIds = new Set<string>()
   return {
+    roundProgress: {},
     scenarioBoard: emptyScenarioBoard(),
     metricData: emptyMetricData(),
     conversationData: emptyConversationData(),
@@ -51,7 +60,7 @@ export const useRunStore = create<RunUiState>((set) => {
       metricIds.clear()
       actorIds.clear()
       conversationIds.clear()
-      set({ scenarioBoard: emptyScenarioBoard(), metricData: emptyMetricData(), conversationData: emptyConversationData(), liveEvents: [], metricEvents: [], actorEvents: [], conversationEvents: [], stageEvents: [], timeline: [], runState: undefined, replayIndex: 0 })
+      set({ roundProgress: {}, scenarioBoard: emptyScenarioBoard(), metricData: emptyMetricData(), conversationData: emptyConversationData(), liveEvents: [], metricEvents: [], actorEvents: [], conversationEvents: [], stageEvents: [], timeline: [], runState: undefined, replayIndex: 0 })
     },
     pushEvent: (event) =>
       set((state) => applyEvents(state, [event], metricIds, actorIds, conversationIds, boardIds)),
@@ -84,6 +93,7 @@ function applyEvents(state: RunUiState, events: RunEvent[], metricIds: Set<strin
   const retainedMetrics = appendRetainedEvents(state.metricEvents, nextMetricEvents, metricIds)
   const retainedConversation = appendRetainedEvents(state.conversationEvents, conversationEvents(events), conversationIds)
   return {
+    roundProgress: reduceRoundProgress(state.roundProgress, events, state.selectedRunId ?? events[0]?.runId),
     scenarioBoard: updateScenarioBoard(state.scenarioBoard, appendRetainedEvents([], events.filter(event =>
       event.type === "board.updated" || event.type === "run.started" || event.type === "event.injected" ||
       event.type === "run.completed" || event.type === "run.failed" || event.type === "run.canceled"

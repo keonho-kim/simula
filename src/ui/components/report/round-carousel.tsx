@@ -1,9 +1,18 @@
+/**
+ * Purpose: Show all report rounds in a wrapping board with keyboard-friendly navigation.
+ * Pattern: Controlled selection board.
+ * Usage: Rendered by the report conversation panel.
+ * Related: src/ui/components/report/conversation-panel.tsx
+ */
 import { reportStatusLabel } from "@/ui/models/report/status-label"
-import { useLayoutEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import * as m from "motion/react-m"
 import { Button } from "@/ui/components/ui/button"
 import { Badge } from "@/ui/components/ui/badge"
-import { useReducedMotionPreference } from "@/ui/hooks/use-reduced-motion-preference"
+import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
+import { roundCardMotion } from "@/ui/animation/interaction"
+import { motionTransition } from "@/ui/animation/timing"
 import type { ConversationRound } from "@/ui/models/report/conversation-board"
 import type { UiTexts } from "@/ui/types/i18n"
 import { cn } from "@/ui/lib/class-names"
@@ -19,33 +28,14 @@ export function RoundCarousel({
   onSelect: (round: number) => void
   t: UiTexts
 }) {
-  const viewport = useRef<HTMLDivElement>(null)
+  const cards = useRef<Array<HTMLButtonElement | null>>([])
   const reducedMotion = useReducedMotionPreference()
-  const [edges, setEdges] = useState({ start: true, end: true })
-  useLayoutEffect(() => {
-    const element = viewport.current
-    if (!element) return
-    const update = () => {
-      const start = element.scrollLeft <= 1
-      const end = element.scrollWidth - element.clientWidth - element.scrollLeft <= 1
-      setEdges((previous) => (previous.start === start && previous.end === end ? previous : { start, end }))
-    }
-    update()
-    element.addEventListener("scroll", update, { passive: true })
-    const observer = new ResizeObserver(update)
-    observer.observe(element)
-    return () => {
-      element.removeEventListener("scroll", update)
-      observer.disconnect()
-    }
-  }, [rounds])
+  const [cursor, setCursor] = useState(0)
   const move = (direction: number) => {
-    const element = viewport.current
-    if (element)
-      element.scrollBy({
-        left: direction * element.clientWidth,
-        behavior: reducedMotion ? "instant" : "smooth"
-      })
+    const next = Math.max(0, Math.min(rounds.length - 1, cursor + direction))
+    setCursor(next)
+    cards.current[next]?.focus()
+    cards.current[next]?.scrollIntoView({ block: "nearest", behavior: reducedMotion ? "instant" : "smooth" })
   }
   return (
     <section aria-label={t.reportRoundBoard} className="min-w-0">
@@ -56,7 +46,7 @@ export function RoundCarousel({
             variant="outline"
             size="icon"
             aria-label={t.reportPreviousRounds}
-            disabled={edges.start}
+            disabled={cursor === 0}
             onClick={() => move(-1)}
           >
             <ChevronLeftIcon />
@@ -65,36 +55,37 @@ export function RoundCarousel({
             variant="outline"
             size="icon"
             aria-label={t.reportNextRounds}
-            disabled={edges.end}
+            disabled={cursor >= rounds.length - 1}
             onClick={() => move(1)}
           >
             <ChevronRightIcon />
           </Button>
         </div>
       </div>
-      <div
-        ref={viewport}
-        className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3"
-        tabIndex={0}
-        aria-label={t.reportRoundBoard}
-      >
-        {rounds.map((round) => (
-          <button
+      <div className="flex flex-wrap gap-3 pb-3" aria-label={t.reportRoundBoard}>
+        {rounds.map((round, index) => (
+          <m.button
             key={round.roundIndex}
+            initial={false}
+            {...roundCardMotion(reducedMotion)}
+            ref={element => { cards.current[index] = element }}
             type="button"
             aria-pressed={selected === round.roundIndex}
             aria-label={`${t.round} ${round.roundIndex}`}
-            onClick={() => onSelect(round.roundIndex)}
+            onClick={() => { setCursor(index); onSelect(round.roundIndex) }}
             className={cn(
-              "flex w-[min(280px,80vw)] shrink-0 snap-start flex-col gap-3 rounded-md border p-4 text-left focus-visible:outline-2 focus-visible:outline-ring",
-              selected === round.roundIndex ? "border-primary bg-accent/30" : "border-border bg-card"
+              "relative isolate flex min-w-0 max-w-[320px] flex-[1_1_230px] flex-col gap-3 rounded-md border bg-card p-4 text-left focus-visible:outline-2 focus-visible:outline-ring",
+              selected === round.roundIndex ? "border-primary" : "border-border"
             )}
           >
+            <m.span aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 rounded-md bg-accent/30"
+              initial={false} animate={{ opacity: selected === round.roundIndex ? 1 : 0 }}
+              transition={motionTransition(reducedMotion, "content")} />
             <span className="text-xs font-medium text-muted-foreground">
               {t.round} {round.roundIndex}
             </span>
             {round.title ? <span className="text-sm font-semibold">{round.title}</span> : null}
-            <span className="flex max-h-28 flex-col gap-2 overflow-y-auto">
+            <span className="flex flex-col gap-2">
               {round.events.map((event) => (
                 <span key={event.id} className="flex flex-wrap items-center gap-2 text-xs">
                   <span>{event.title}</span>
@@ -106,10 +97,10 @@ export function RoundCarousel({
                 </span>
               ))}
             </span>
-            <span className="line-clamp-3 text-xs leading-5 text-muted-foreground">
+            <span className="text-xs leading-5 text-muted-foreground">
               {round.summary || t.waitingForActivity}
             </span>
-          </button>
+          </m.button>
         ))}
       </div>
     </section>

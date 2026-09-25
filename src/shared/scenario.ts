@@ -4,6 +4,8 @@
  * Usage: Parsed by backend scenario boundaries and edited by UI scenario forms.
  * Related: src/backend/core/scenario/index.ts, src/ui/types/scenario.ts
  */
+import type { WorldStory } from "./world-story"
+
 export type PromptLanguage = "en" | "ko"
 export type PromptOutputLength = "short" | "medium" | "long"
 export type ScenarioLoadLevel = "low" | "middle" | "high"
@@ -24,6 +26,7 @@ export interface ScenarioInput {
   text: string
   controls: ScenarioControls
   language?: PromptLanguage
+  world?: WorldStory
 }
 
 export interface ScenarioSampleSummary {

@@ -1,14 +1,15 @@
 # Analysis and Inspection
 
-The current TypeScript implementation writes live run artifacts under `runs/`. It does not write
-the older integrated analysis bundle for new runs.
+The browser profile owns durable run history in SQLite WASM and OPFS. The Bun server writes
+temporary artifacts only while the owning browser session is active. The older integrated
+analysis bundle is not written for new runs.
 
 ## Current Live Artifacts
 
-For each run, inspect:
+The temporary server workspace has this shape while the run is active:
 
 ```text
-runs/<run_id>/
+<OS temporary workspace>/<run_id>/
   manifest.json
   scenario.json
   events.jsonl
@@ -27,12 +28,13 @@ Recommended reading order:
 
 ## Event Stream
 
-`events.jsonl` is the main source of truth for runtime inspection. It records lifecycle events,
+Browser SQLite is the source of truth for saved history. The server's temporary `events.jsonl`
+feeds the active SSE transport. It records lifecycle events,
 model messages, model metrics, actor readiness, accepted interactions, actor messages, graph
 deltas, report deltas, logs, and terminal run status.
 
-Because the file is newline-delimited JSON, it can be streamed during a run and exported afterward
-through `GET /api/runs/:id/export?kind=jsonl`.
+The browser saves ordered events before projecting them into the UI. Saved events can be exported
+from browser storage after the server workspace has disappeared.
 
 ## Graph Timeline
 

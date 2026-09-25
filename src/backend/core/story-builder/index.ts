@@ -2,7 +2,7 @@
  * Purpose: Execute Story Builder graph requests and stream ordered workflow events.
  * Pattern: Workflow graph.
  * Usage: Called by Story Builder API routes for draft and streaming responses.
- * Related: src/backend/core/story-builder/prompts.ts, src/backend/core/story-builder/async-queue.ts
+ * Related: src/backend/core/story-builder/prompts/draft.ts, src/backend/core/story-builder/async-queue.ts
  */
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph"
 import type {
@@ -15,19 +15,13 @@ import { invokeRoleText, invokeRoleTextStreaming } from "@/backend/integrations/
 import { withRolePromptGuide } from "@/backend/core/prompts/language"
 import { validateRoleSettings } from "@/backend/core/settings"
 import { createAsyncQueue, type AsyncQueue } from "./async-queue"
-import {
-  latestAssistantDraft,
-  renderStoryBuilderChangeSummaryPrompt,
-  renderStoryBuilderPrompt,
-  storyBuilderFallbackDraft,
-  storyBuilderFallbackSummary,
-} from "./prompts"
+import { latestAssistantDraft, storyBuilderFallbackDraft, storyBuilderFallbackSummary } from "./conversation"
+import { renderStoryBuilderPrompt } from "./prompts/draft"
+import { renderStoryBuilderChangeSummaryPrompt } from "./prompts/change-summary"
 
-export {
-  renderStoryBuilderChangeSummaryPrompt,
-  renderStoryBuilderPrompt,
-  storyBuilderFallbackDraft,
-} from "./prompts"
+export { renderStoryBuilderPrompt } from "./prompts/draft"
+export { renderStoryBuilderChangeSummaryPrompt } from "./prompts/change-summary"
+export { storyBuilderFallbackDraft } from "./conversation"
 
 interface StoryBuilderGraphState {
   request: StoryBuilderDraftRequest

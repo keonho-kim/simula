@@ -1,3 +1,9 @@
+/**
+ * Purpose: Show stored runs on a full-viewport scrolling selection surface.
+ * Pattern: Read-only selection workflow.
+ * Usage: Opened from the landing page.
+ * Related: src/ui/shell/home-view.tsx, src/ui/models/report/status-label.ts
+ */
 import { ArchiveIcon } from "lucide-react"
 import type { RunManifest } from "@/shared"
 import { Button } from "@/ui/components/ui/button"
@@ -8,8 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/components/ui/dialog"
-import { ScrollArea } from "@/ui/components/ui/scroll-area"
 import type { UiTexts } from "@/ui/types/i18n"
+import { reportStatusLabel } from "@/ui/models/report/status-label"
 
 interface RunHistoryDialogProps {
   open: boolean
@@ -28,13 +34,12 @@ export function RunHistoryDialog({
 }: RunHistoryDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88svh] overflow-hidden sm:max-w-[760px]">
+      <DialogContent className="page-scroll-dialog">
         <DialogHeader>
           <DialogTitle>{t.historyPicker}</DialogTitle>
           <DialogDescription>{t.historyPickerDescription}</DialogDescription>
         </DialogHeader>
-        <ScrollArea className="h-[52svh] pr-2 sm:pr-3">
-          <div className="grid gap-3">
+          <div className="flex flex-col gap-3">
             {runs.length ? (
               runs.map((run) => (
                 <div
@@ -45,7 +50,7 @@ export function RunHistoryDialog({
                     <div className="min-w-0">
                       <h3 className="break-words text-sm font-semibold leading-5">{run.scenarioName ?? run.id}</h3>
                       <p className="mt-1 flex flex-wrap gap-x-1.5 gap-y-1 text-xs leading-5 text-muted-foreground">
-                        <span>{run.status}</span>
+                        <span>{reportStatusLabel(run.status, t)}</span>
                         <span>· {run.createdAt}</span>
                       </p>
                     </div>
@@ -69,7 +74,6 @@ export function RunHistoryDialog({
               </div>
             )}
           </div>
-        </ScrollArea>
       </DialogContent>
     </Dialog>
   )

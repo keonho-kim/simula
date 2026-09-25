@@ -1,3 +1,9 @@
+/**
+ * Purpose: Show relationship interactions and actor names in one full-viewport reading surface.
+ * Pattern: Read-only edge detail composition.
+ * Usage: Opened from the live graph when a relationship is selected.
+ * Related: src/ui/components/graph/edge-history.ts, src/ui/styles/page-dialog.css
+ */
 import { useMemo } from "react"
 import { ArrowRightIcon } from "lucide-react"
 import type { ActorState } from "@/shared"
@@ -9,7 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/ui/components/ui/dialog"
-import { ScrollArea } from "@/ui/components/ui/scroll-area"
 import type { UiTexts } from "@/ui/types/i18n"
 import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 import { useRunStore } from "@/ui/stores/run-store"
@@ -44,7 +49,7 @@ export function EdgeDetailDialog({
 
   return (
     <Dialog open={Boolean(edge)} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[82svh] flex-col overflow-hidden sm:max-w-[860px]">
+      <DialogContent className="page-scroll-dialog">
         {edge ? (
           <>
             <DialogHeader className="shrink-0">
@@ -58,7 +63,7 @@ export function EdgeDetailDialog({
                 <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground" />
                 <span className="truncate text-sm font-semibold">{targetName}</span>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="flex flex-wrap gap-2 [&>*]:min-w-0 [&>*]:flex-[1_1_150px]">
                 <EdgeStat label={t.graphEdgeInteractions} value={history.length} />
                 <EdgeStat label={t.graphEdgeWeight} value={edge.weight} />
                 <EdgeStat label={t.graphEdgeLatestRound} value={edge.roundIndex} prefix="R" />
@@ -73,8 +78,7 @@ export function EdgeDetailDialog({
               </div>
             </div>
 
-            <ScrollArea className="min-h-0 flex-1 pr-3">
-              <div className="flex flex-col gap-2 pr-3 pt-3">
+              <div className="flex flex-col gap-2 pt-3">
                 {history.length ? history.map((item) => (
                   <EdgeHistoryCard key={item.id} item={item} t={t} actorNames={names} actors={runState?.actors ?? []} />
                 )) : (
@@ -86,7 +90,6 @@ export function EdgeDetailDialog({
                   </div>
                 )}
               </div>
-            </ScrollArea>
           </>
         ) : null}
       </DialogContent>
@@ -123,8 +126,8 @@ function EdgeHistoryCard({
         <Badge variant="outline" className="h-4 rounded-sm bg-background px-1.5 text-[10px]">{item.decisionType}</Badge>
         <Badge variant="outline" className="h-4 rounded-sm bg-background px-1.5 text-[10px]">{actionType || item.actionType}</Badge>
       </div>
-      <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">{item.content || "-"}</p>
-      <div className="mt-3 grid gap-2 md:grid-cols-2">
+      <p className="mt-2 break-words text-xs leading-5 text-muted-foreground">{item.content || "-"}</p>
+      <div className="mt-3 flex flex-wrap gap-2 [&>*]:min-w-0 [&>*]:flex-[1_1_250px]">
         <MiniField label={t.intent} value={item.intent} />
         <MiniField label={t.expectation} value={item.expectation} />
       </div>

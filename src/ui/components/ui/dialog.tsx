@@ -1,16 +1,40 @@
+/**
+ * Purpose: Compose accessible Radix dialogs with Motion-owned entrance and exit.
+ * Pattern: Controlled presence boundary.
+ * Usage: Shared by settings, scenario, simulation, and report dialogs.
+ * Related: src/ui/animation/provider.tsx, src/ui/animation/use-reduced-motion-preference.ts
+ */
 "use client"
 
 import * as React from "react"
+import { AnimatePresence } from "motion/react"
+import * as m from "motion/react-m"
 import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/ui/lib/class-names"
 import { Button } from "@/ui/components/ui/button"
 import { XIcon } from "lucide-react"
+import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
+import { usePopupOpenState } from "@/ui/hooks/use-popup-open-state"
+import { fadePresence } from "@/ui/animation/presence"
+
+const DialogOpenContext = React.createContext(false)
+const MotionOverlay = m.create(DialogPrimitive.Overlay)
+const MotionContent = m.create(DialogPrimitive.Content)
+type DialogContentProps = Pick<React.ComponentProps<typeof DialogPrimitive.Content>,
+  "className" | "children" | "aria-describedby" | "onEscapeKeyDown" | "onInteractOutside" |
+  "onPointerDownOutside" | "onFocusOutside" | "onOpenAutoFocus" | "onCloseAutoFocus"> & { showCloseButton?: boolean }
 
 function Dialog({
+  open: controlledOpen,
+  defaultOpen,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+  const [open, changeOpen] = usePopupOpenState(controlledOpen, defaultOpen, onOpenChange)
+  return <DialogOpenContext.Provider value={open}>
+    <DialogPrimitive.Root data-slot="dialog" open={open} onOpenChange={changeOpen} {...props} />
+  </DialogOpenContext.Provider>
 }
 
 function DialogTrigger({
@@ -31,37 +55,25 @@ function DialogClose({
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
 }
 
-function DialogOverlay({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
-  return (
-    <DialogPrimitive.Overlay
-      data-slot="dialog-overlay"
-      className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100  data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
-        className
-      )}
-      {...props}
-    />
-  )
-}
-
 function DialogContent({
   className,
   children,
   showCloseButton = true,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & {
-  showCloseButton?: boolean
-}) {
+}: DialogContentProps) {
+  const open = React.useContext(DialogOpenContext)
+  const reducedMotion = useReducedMotionPreference()
   return (
-    <DialogPortal>
-      <DialogOverlay />
-      <DialogPrimitive.Content
+    <DialogPortal forceMount>
+      <AnimatePresence>{open ? [
+      <MotionOverlay key="overlay" forceMount data-slot="dialog-overlay"
+        {...fadePresence(reducedMotion, "popup")}
+        className="fixed inset-0 isolate z-50 bg-black/10" />,
+      <MotionContent key="content" forceMount
         data-slot="dialog-content"
+        {...fadePresence(reducedMotion, "popup")}
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0  data-closed:animate-out data-closed:fade-out-0 ",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none sm:max-w-sm",
           className
         )}
         {...props}
@@ -80,7 +92,8 @@ function DialogContent({
             </Button>
           </DialogPrimitive.Close>
         )}
-      </DialogPrimitive.Content>
+      </MotionContent>,
+      ] : null}</AnimatePresence>
     </DialogPortal>
   )
 }
@@ -161,7 +174,6 @@ export {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogOverlay,
   DialogPortal,
   DialogTitle,
   DialogTrigger,

@@ -1,15 +1,12 @@
+/**
+ * Purpose: Own actor graph decision state and deterministic choice normalization.
+ * Pattern: Graph state and pure decision transformations.
+ * Usage: Used by actor graph nodes with a separate per-turn context projection.
+ * Related: src/backend/core/simulation/roles/actor/context.ts, src/backend/core/simulation/roles/actor/graph.ts
+ */
 import { Annotation } from "@langchain/langgraph"
-import type {
-  ActorDecision,
-  ActorTraceStep,
-  ActorState,
-  CoordinatorTrace,
-  LLMSettings,
-  PlannedEvent,
-  RoundDigest,
-  ScenarioInput,
-} from "@/shared"
-import { contextUsedByActor } from "@/backend/core/simulation/actors/memory"
+import type { ActorDecision, ActorTraceStep } from "@/shared"
+import type { ActorContext, ActorPublicContext } from "./context"
 import { sanitizeActorVisibleText } from "@/backend/core/simulation/actors/visible-text"
 
 export interface ActorTrace {
@@ -22,19 +19,10 @@ export interface ActorTrace {
 }
 
 export interface ActorGraphState {
-  runId: string
-  scenario: ScenarioInput
-  plannerDigest: string
-  settings: LLMSettings
-  actor: ActorState
-  actors: ActorState[]
-  event: PlannedEvent
-  roundDigest: RoundDigest
-  roundIndex: number
-  coordinatorTrace: CoordinatorTrace
   trace: ActorTrace
   decision?: ActorDecision
 }
+export type ActorStepInput = ActorContext & ActorGraphState
 
 export function initialActorTrace(): ActorTrace {
   return {
@@ -70,7 +58,7 @@ export function applyActorTraceStep(
   }
 }
 
-export function buildActorDecision(state: ActorGraphState): ActorDecision {
+export function buildActorDecision(state: ActorStepInput): ActorDecision {
   const selectedAction = normalizeActorAction(state.trace.action, state)
   const intent = sanitizeActorVisibleText(state.trace.intent, state.actors)
   const thought = sanitizeActorVisibleText(state.trace.thought, state.actors)
@@ -86,7 +74,7 @@ export function buildActorDecision(state: ActorGraphState): ActorDecision {
         `Hold position while considering ${state.coordinatorTrace.outcomeDirection.toLowerCase()}.`,
         state.actors
       ),
-      contextUsed: contextUsedByActor(state.actor),
+      contextUsed: state.contextUsed,
     }
   }
 
@@ -111,11 +99,11 @@ export function buildActorDecision(state: ActorGraphState): ActorDecision {
     intent,
     message,
     expectation: sanitizeActorVisibleText(action.expectedOutcome, state.actors),
-    contextUsed: contextUsedByActor(state.actor),
+    contextUsed: state.contextUsed,
   }
 }
 
-export function normalizeActorTarget(value: string, state: ActorGraphState): string | undefined {
+export function normalizeActorTarget(value: string, state: ActorStepInput): string | undefined {
   const normalized = value.trim()
   if (normalized === "None") {
     return "none"
@@ -124,7 +112,7 @@ export function normalizeActorTarget(value: string, state: ActorGraphState): str
   return candidates.find((actor) => actor.id === normalized)?.id
 }
 
-export function normalizeActorAction(value: string, state: ActorGraphState): string | undefined {
+export function normalizeActorAction(value: string, state: ActorStepInput): string | undefined {
   const normalized = value.trim()
   if (normalized === "no_action") {
     return "no_action"
@@ -140,15 +128,15 @@ export function normalizeActorMessage(value: string): string | undefined {
   return trimmed
 }
 
-export function isValidActorTarget(value: string, state: ActorGraphState): boolean {
+export function isValidActorTarget(value: string, state: ActorStepInput): boolean {
   return targetAllowedOutputs(state).includes(value.trim())
 }
 
-export function isValidActorAction(value: string, state: ActorGraphState): boolean {
+export function isValidActorAction(value: string, state: ActorStepInput): boolean {
   return actionAllowedOutputs(state).includes(value.trim())
 }
 
-export function actionAllowedOutputs(state: ActorGraphState): string[] {
+export function actionAllowedOutputs(state: ActorStepInput): string[] {
   const actions =
     targetActors(state).length === 0
       ? state.actor.actions.filter((action) => action.visibility === "solitary")
@@ -156,7 +144,7 @@ export function actionAllowedOutputs(state: ActorGraphState): string[] {
   return [...actions.map((action) => action.id), "no_action"]
 }
 
-export function targetAllowedOutputs(state: ActorGraphState): string[] {
+export function targetAllowedOutputs(state: ActorStepInput): string[] {
   const selectedAction = normalizeActorAction(state.trace.action, state)
   if (!selectedAction || selectedAction === "no_action") {
     return ["None"]
@@ -170,7 +158,7 @@ export function targetAllowedOutputs(state: ActorGraphState): string[] {
   return targetActors(state).map((actor) => actor.id)
 }
 
-export function targetActors(state: ActorGraphState): ActorState[] {
+export function targetActors(state: ActorStepInput): ActorPublicContext[] {
   return state.actors.filter((actor) => actor.id !== state.actor.id)
 }
 
@@ -183,23 +171,10 @@ function compact(value: string): string {
 }
 
 export const ActorAnnotation = Annotation.Root({
-  runId: Annotation<string>(),
-  scenario: Annotation<ScenarioInput>(),
-  plannerDigest: Annotation<string>(),
-  settings: Annotation<LLMSettings>(),
-  actor: Annotation<ActorState>(),
-  actors: Annotation<ActorState[]>(),
-  event: Annotation<PlannedEvent>(),
-  roundDigest: Annotation<RoundDigest>(),
-  roundIndex: Annotation<number>(),
-  coordinatorTrace: Annotation<CoordinatorTrace>(),
   trace: Annotation<ActorTrace>(),
   decision: Annotation<ActorDecision | undefined>(),
 })
 
-export function createActorGraphState(input: Omit<ActorGraphState, "trace" | "decision">): ActorGraphState {
-  return {
-    ...input,
-    trace: initialActorTrace(),
-  }
+export function createActorGraphState(): ActorGraphState {
+  return { trace: initialActorTrace() }
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { listProviderModels } from "@/backend/api/model-controller"
+import { listProviderModels } from "@/backend/api/settings/model-controller"
 
 const realFetch = globalThis.fetch
 
