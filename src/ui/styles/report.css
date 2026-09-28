@@ -51,7 +51,7 @@
 .report-preparation-task { position: relative; isolation: isolate; width: 100%; height: auto; min-height: 4rem; padding: 0.75rem; justify-content: flex-start; text-align: left; white-space: normal; overflow-wrap: anywhere; }
 .report-preparation-task[aria-pressed="true"] { border-color: var(--ring); }
 .report-preparation-indicator { width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--muted-foreground); flex-shrink: 0; }
-.report-preparation-indicator[data-status="running"] { background: var(--chart-2); }
+.report-preparation-indicator[data-status="running"], .report-preparation-indicator[data-status="retrying"] { background: var(--chart-2); }
 .report-preparation-indicator[data-status="completed"] { background: var(--ring); }
 .report-preparation-indicator[data-status="failed"] { background: var(--destructive); }
 .report-preparation-marker { color: var(--muted-foreground); }

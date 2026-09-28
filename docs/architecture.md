@@ -591,9 +591,14 @@ and its reducer now live in `hooks/use-generation-stream.ts` and `models/generat
 Scenario-specific stage mapping stays under `models/scenario-builder`.
 
 Preparation initially shows three kanban columns: evidence, analysis, and synthesis.
-No task detail or text subscription mounts until a card is clicked. Selection shows that
-column at 40% width and its live/accepted content at 60%, with shared Motion presets.
-Back/Escape restores the full board and keyboard focus. Only the selected task output
+Each column contains semantic group cards, not one repeated heading per model call.
+`models/report/preparation-groups.ts` folds retries into one task identity, groups evidence,
+perspective, and section work, and derives received-task completion counts. Task subtitles
+identify the actual field, evidence selection, interpretation, score, or detail operation.
+Opening a group shows its subtasks at 40% width and a selection prompt at 60%. Only an
+explicit subtask click mounts its live/accepted output with shared Motion presets. Counts
+refer to the bounded received task window, not a predicted total for the entire workflow.
+Back/Escape returns from content to subtasks, then to the full board, restoring keyboard focus. Only the selected task output
 receives a detailed subscription. Named plain-text previews are provisional; completed Markdown is
 rendered through the existing sanitizer in an opened detail. Readers retain scroll control.
 Four accepted SWOT score tasks can reveal the chart before final prose completes; missing
