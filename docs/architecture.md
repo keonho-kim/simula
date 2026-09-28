@@ -561,8 +561,9 @@ its own context-dependent thought, intent, target, and message.
 ### Report workspace
 
 Report navigation separates preparation from accepted results. Missing or outdated analysis
-starts automatically in a preparation screen, with explicit recovery after failure. Completion
-opens the result screen, which contains metrics, the accepted board, and recorded simulation
+starts automatically at `/reports/:runId/prepare`, with explicit recovery after failure.
+`ui/shell/report-flow.tsx` owns discovery, generation, and route replacement. Completion
+opens `/reports/:runId`, which contains metrics, the accepted board, and recorded simulation
 details without generation controls or live output.
 The selected run can switch to its parent Multiverse analysis when batch ownership exists.
 Reading a saved analysis never generates it. Subject discovery supplies version freshness;
@@ -574,8 +575,11 @@ lifecycle; `api/analytical-report` validates HTTP contracts. Common generation s
 and its reducer now live in `hooks/use-generation-stream.ts` and `models/generation`.
 Scenario-specific stage mapping stays under `models/scenario-builder`.
 
-Only the selected task output mounts in the preparation screen and receives a detailed
-subscription. Named plain-text previews are provisional; completed Markdown is
+Preparation initially shows three kanban columns: evidence, analysis, and synthesis.
+No task detail or text subscription mounts until a card is clicked. Selection shows that
+column at 40% width and its live/accepted content at 60%, with shared Motion presets.
+Back/Escape restores the full board and keyboard focus. Only the selected task output
+receives a detailed subscription. Named plain-text previews are provisional; completed Markdown is
 rendered through the existing sanitizer in an opened detail. Readers retain scroll control.
 Four accepted SWOT score tasks can reveal the chart before final prose completes; missing
 values remain unknown and never form a fabricated polygon. Chart loading fades locally
@@ -709,7 +713,7 @@ accepted prose. This preservation does not constitute durable mid-task graph rec
 its graph and live actor history share the remaining height. Live history uses its own
 virtualized scroll surface, preserving manual reading until the reader returns to the bottom.
 Report navigation first loads retained analysis. Missing or outdated analysis starts in
-`ui/pages/report-preparation-page.tsx`, which shows three stages and one selected task stream.
+`ui/pages/report-preparation-page.tsx`, which shows three kanban columns with click-to-open task details.
 A completed analysis switches to the read-only result; saved accepted reports cause no model
-calls. Failed work stays in preparation with an explicit retry or a path to recorded results.
+calls. Failed work without an accepted report stays in preparation with an explicit retry.
 The result composition owns neither generation controls nor live task subscriptions.

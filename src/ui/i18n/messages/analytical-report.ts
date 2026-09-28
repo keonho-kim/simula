@@ -6,8 +6,7 @@
  */
 const en = {
   analysisPreparing: "Preparing report",
-  analysisPreparationDescription: "Reviewing evidence, analyzing developments, and composing the assessment. The finished report will open automatically.",
-  analysisViewRecorded: "View available results and records",
+  analysisPreparationDescription: "Select a card to inspect its content as it is written. The finished report will open automatically.",
   analysisExportJson: "Analysis JSON", analysisExportMarkdown: "Analysis Markdown",
   analysisExportRevision: "Source revision", analysisExportStatus: "Execution status",
   analysisExportFreshness: "Source status", analysisExportCalls: "Analysis generation calls",
@@ -42,8 +41,7 @@ const en = {
 } as const
 const ko = {
   analysisPreparing: "리포트 작성",
-  analysisPreparationDescription: "근거 정리, 관점별 분석, 종합 평가 순서로 작성합니다. 완료되면 결과 화면으로 이동합니다.",
-  analysisViewRecorded: "확보된 결과와 기록 보기",
+  analysisPreparationDescription: "카드를 선택하면 작성 중인 내용을 확인할 수 있습니다. 완료되면 결과 화면으로 이동합니다.",
   analysisExportJson: "분석 JSON", analysisExportMarkdown: "분석 Markdown",
   analysisExportRevision: "원본 버전", analysisExportStatus: "생성 상태",
   analysisExportFreshness: "원본 상태", analysisExportCalls: "분석 생성 호출",

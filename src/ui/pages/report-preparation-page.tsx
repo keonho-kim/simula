@@ -1,7 +1,7 @@
 /**
  * Purpose: Show report generation and recovery before the accepted result screen.
  * Pattern: Preparation page composition.
- * Usage: Rendered by ReportPage while analysis is absent, running, or awaiting recovery.
+ * Usage: Rendered by ReportFlow while analysis is absent, running, or awaiting recovery.
  * Related: src/ui/hooks/use-analytical-report.ts, src/ui/components/report/analysis/activity.tsx
  */
 import { HomeIcon } from "lucide-react"
@@ -13,13 +13,13 @@ import { Alert, AlertDescription } from "@/ui/components/ui/alert"
 import { ReportMetricOverview } from "@/ui/components/report/metric-overview"
 import { AnalysisActivity } from "@/ui/components/report/analysis/activity"
 
-export function ReportPreparationPage({ title, analysis, events, t, onHome, onShowResults, batch, onToggleScope }: {
+export function ReportPreparationPage({ title, analysis, events, t, onHome, batch, onToggleScope, runError }: {
+  runError?: string
   title: string
   analysis: ReturnType<typeof useAnalyticalReport>
   events: RunEvent[]
   t: UiTexts
   onHome: () => void
-  onShowResults: () => void
   batch: boolean
   onToggleScope?: () => void
 }) {
@@ -36,15 +36,15 @@ export function ReportPreparationPage({ title, analysis, events, t, onHome, onSh
       <ReportMetricOverview events={events} additionalMetrics={analysis.metrics.data} scopeId={record?.id} t={t} />
       <p className="text-sm text-muted-foreground">{t.analysisPreparationDescription}</p>
       {query.isError || command.isError ? <Alert variant="destructive"><AlertDescription>{t.analysisUnavailable}</AlertDescription></Alert> : null}
+      {runError ? <Alert variant="destructive"><AlertDescription>{runError}</AlertDescription></Alert> : null}
       {unavailable ? <Alert><AlertDescription>{t.analysisSourceUnavailable}</AlertDescription></Alert> : null}
       {stopped ? <Alert><AlertDescription>{t.analysisPartial}</AlertDescription></Alert> : null}
-      {record && running ? <AnalysisActivity id={record.id} t={t} /> : null}
-      {!record && !query.isError && !command.isError ? <p role="status" className="text-sm">{t.reportLoading}</p> : null}
+      <AnalysisActivity key={record?.id ?? "pending"} id={record?.id} running={running} t={t} />
+      {!record && !unavailable && !query.isError && !command.isError ? <p role="status" className="text-sm">{t.reportLoading}</p> : null}
       <div className="flex flex-wrap gap-2">
         {running ? <Button variant="outline" disabled={command.isPending} onClick={() => command.mutate("cancel")}>{t.analysisCancel}</Button> : null}
         {query.isError ? <Button disabled={query.isFetching} onClick={() => void query.refetch()}>{t.reportRetryLoad}</Button>
           : !unavailable && (stopped || command.isError) ? <Button disabled={command.isPending} onClick={() => command.mutate("generate")}>{t.analysisRetry}</Button> : null}
-        {!running && (stopped || unavailable || query.isError || command.isError) ? <Button variant="outline" onClick={onShowResults}>{t.analysisViewRecorded}</Button> : null}
       </div>
     </div>
   </main>

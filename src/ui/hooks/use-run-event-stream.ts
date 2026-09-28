@@ -5,6 +5,7 @@
  * Related: src/shared/run-stream.ts, src/ui/browser-storage/database/runs/append-events.ts
  */
 import { MAX_RUN_EVENT_BYTES, RUN_EVENT_TYPES, RUN_STREAM_END, RUN_STREAM_ERROR, parseRunCursor, parseRunEventEnvelope } from "@/shared/run-stream"
+import type { RunSession } from "@/ui/browser-storage/run-session"
 import { toast } from "sonner"
 import { useEffect, useState, type MutableRefObject } from "react"
 import type { QueryClient } from "@tanstack/react-query"
@@ -21,7 +22,7 @@ interface UseRunEventStreamInput {
   selectedRunStatus?: string
   streamErrorText: string
   selectedRunIdRef: MutableRefObject<string | undefined>
-  viewModeRef: MutableRefObject<"home" | "board" | "simulation" | "report">
+  viewModeRef: MutableRefObject<NonNullable<RunSession["viewMode"]>>
   queryClient: QueryClient
   resetLiveState: () => void
   pushEvents: (events: RunEvent[]) => void

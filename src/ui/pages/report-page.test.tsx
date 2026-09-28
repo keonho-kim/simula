@@ -1,15 +1,15 @@
 /**
- * Purpose: Verify Report page navigation and always-visible metric composition.
+ * Purpose: Verify report routing gates generation and preserves read-only result composition.
  * Pattern: Server-rendered page contract test.
  * Usage: Executed by bun test.
- * Related: src/ui/pages/report-page.tsx, src/ui/components/report/metric-overview.tsx
+ * Related: src/ui/shell/report-flow.tsx, src/ui/pages/report-page.tsx
  */
 import { describe, expect, test } from "bun:test"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { renderToStaticMarkup } from "react-dom/server"
 import { dictionary } from "@/ui/i18n/dictionary"
 
-const { ReportPage } = await import("@/ui/pages/report-page")
+const { ReportFlow } = await import("@/ui/shell/report-flow")
 
 describe("ReportPage", () => {
   test("a saved report displays results without generation controls or streams", () => {
@@ -22,7 +22,7 @@ describe("ReportPage", () => {
       },
     } })
     const html = renderToStaticMarkup(<QueryClientProvider client={client}>
-      <ReportPage selectedRunId="saved-run" language="en" t={dictionary.en} onHome={() => undefined} onExport={() => undefined} />
+      <ReportFlow mode="report" onNavigate={() => undefined} selectedRunId="saved-run" language="en" t={dictionary.en} onHome={() => undefined} onExport={() => undefined} />
     </QueryClientProvider>)
     expect(html).toContain("Analysis board")
     expect(html).not.toContain("Preparing report")
@@ -33,17 +33,32 @@ describe("ReportPage", () => {
     const client = new QueryClient()
     client.setQueryData(["analysis", "run", "run-one"], { analysis: null, freshness: null })
     const html = renderToStaticMarkup(<QueryClientProvider client={client}>
-      <ReportPage selectedRunId="run-one" language="en" t={dictionary.en} onHome={() => undefined} onExport={() => undefined} />
+      <ReportFlow mode="report-preparation" onNavigate={() => undefined} selectedRunId="run-one" language="en" t={dictionary.en} onHome={() => undefined} onExport={() => undefined} />
     </QueryClientProvider>)
     expect(html).toContain("Preparing report")
+    expect(html).toContain("Evidence review")
+    expect(html).toContain("Overall assessment")
+    expect(html).not.toContain("report-task-output")
     expect(html).not.toContain("Recorded simulation")
     expect(html).not.toContain("Generate analysis")
     expect(html).toContain('aria-label="LLM metrics"')
   })
+  test("the result URL does not render generation or unfinished results while routing", () => {
+    const client = new QueryClient()
+    client.setQueryData(["analysis", "run", "unfinished"], { analysis: null, freshness: null })
+    const html = renderToStaticMarkup(<QueryClientProvider client={client}>
+      <ReportFlow mode="report" onNavigate={() => undefined} selectedRunId="unfinished"
+        language="en" t={dictionary.en} onHome={() => undefined} onExport={() => undefined} />
+    </QueryClientProvider>)
+    expect(html).not.toContain("Recorded simulation")
+    expect(html).not.toContain("Live analysis")
+    expect(html).not.toContain("report-task-output")
+    expect(html).toContain('role="status"')
+  })
   test("renders permanent metrics and deferred record entry points without report tabs", () => {
     const html = renderToStaticMarkup(
       <QueryClientProvider client={new QueryClient()}>
-        <ReportPage
+        <ReportFlow mode="report" onNavigate={() => undefined}
           language="en"
           t={dictionary.en}
           onHome={() => undefined}
@@ -66,7 +81,7 @@ describe("ReportPage", () => {
   test("does not mount actor, replay, or simulation panels before a detail is opened", () => {
     const html = renderToStaticMarkup(
       <QueryClientProvider client={new QueryClient()}>
-        <ReportPage
+        <ReportFlow mode="report" onNavigate={() => undefined}
           language="en"
           t={dictionary.en}
           onHome={() => undefined}

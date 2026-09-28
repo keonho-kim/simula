@@ -14,8 +14,8 @@ import type { UiTexts } from "@/ui/types/i18n"
 import { analysisLabel } from "@/ui/models/report/analytical-view"
 import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
-export function AnalysisTaskOutput({ reportId, task, t }: { reportId: string; task: GenerationTaskView; t: UiTexts }) {
-  const active = task.status === "running" || task.status === "waiting" || task.status === "retrying"
+export function AnalysisTaskOutput({ reportId, task, live, t }: { reportId: string; task: GenerationTaskView; live: boolean; t: UiTexts }) {
+  const active = live && (task.status === "running" || task.status === "retrying")
   const stream = useGenerationStream(reportId, task.taskId, active, "analysis")
   const accepted = useQuery({ queryKey: ["generation-task", "analysis", reportId, task.taskId, task.attempt], enabled: task.status === "completed", retry: false,
     queryFn: ({ signal }) => fetchGenerationTask(reportId, task.taskId, signal, "analysis") })

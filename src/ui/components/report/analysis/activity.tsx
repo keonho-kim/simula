@@ -1,48 +1,79 @@
 /**
- * Purpose: Present report preparation stages with one selected live task detail.
- * Pattern: Scoped generation composition.
- * Usage: Mounted only by the report preparation page while analysis is running.
- * Related: src/ui/hooks/use-generation-stream.ts, src/ui/components/report/analysis/task-output.tsx
+ * Purpose: Present report generation as a kanban board with opt-in live task details.
+ * Pattern: Scoped subscription and master-detail composition.
+ * Usage: Mounted only by the report preparation page.
+ * Related: src/ui/components/report/analysis/preparation-column.tsx, src/ui/components/report/analysis/task-output.tsx
  */
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { ArrowLeft } from "lucide-react"
+import * as m from "motion/react-m"
 import { useGenerationStream } from "@/ui/hooks/use-generation-stream"
-import { analysisTaskLabel, analysisTaskStage, analysisLabel, REPORT_STAGES } from "@/ui/models/report/analytical-view"
+import { analysisTaskLabel, analysisTaskStage, REPORT_STAGES } from "@/ui/models/report/analytical-view"
 import { Button } from "@/ui/components/ui/button"
-import { builderLabel } from "@/ui/models/scenario-builder/labels"
 import type { UiTexts } from "@/ui/types/i18n"
+import type { GenerationTaskView } from "@/ui/models/generation/progress"
+import { useDocumentVisible } from "@/ui/animation/use-document-visible"
+import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
+import { fadePresence, slidePresence } from "@/ui/animation/presence"
 import { LiveSwotRadar } from "./live-radar"
 import { AnalysisTaskOutput } from "./task-output"
+import { PreparationColumn } from "./preparation-column"
 
-export function AnalysisActivity({ id, t }: { id: string; t: UiTexts }) {
-  const progress = useGenerationStream(id, undefined, true, "analysis")
-  const [selectedStage, setStage] = useState<typeof REPORT_STAGES[number]>()
-  const [selectedId, setSelectedId] = useState<string>()
-  const stage = selectedStage ?? REPORT_STAGES.reduce((current, stage) => progress.tasks.some(task => analysisTaskStage(task) === stage) ? stage : current, REPORT_STAGES[0])
-  const tasks = progress.tasks.filter(task => analysisTaskStage(task) === stage).toSorted((a, b) => a.taskId.localeCompare(b.taskId))
-  const selected = tasks.find(task => task.taskId === selectedId)
-    ?? tasks.find(task => task.status === "running" || task.status === "retrying") ?? tasks.at(-1)
+export function AnalysisActivity({ id, running, t }: { id?: string; running: boolean; t: UiTexts }) {
+  const progress = useGenerationStream(id ?? "", undefined, Boolean(id), "analysis")
   return <section className="flex min-w-0 flex-col gap-4" aria-label={t.analysisLive}>
-    <nav className="report-stage-timeline" aria-label={t.analysisPreparing}>
-      {REPORT_STAGES.map(value => <Button key={value} variant={stage === value ? "secondary" : "ghost"}
-        aria-pressed={stage === value} onClick={() => { setStage(value); setSelectedId(undefined) }}>{analysisLabel(value, t)}</Button>)}
-    </nav>
     {progress.disconnected ? <p role="status" className="text-sm text-muted-foreground">{t.builderReconnecting}</p> : null}
-    <div className="flex min-w-0 flex-col gap-4 md:flex-row">
-      <div className="flex min-w-0 flex-col gap-1 md:w-1/3" aria-label={analysisLabel(stage, t)}>
-        {tasks.map(task => <Button key={task.taskId} variant={selected?.taskId === task.taskId ? "secondary" : "ghost"}
-          className="h-auto justify-start whitespace-normal py-3 text-left" aria-pressed={selected?.taskId === task.taskId}
-          onClick={() => { setStage(stage); setSelectedId(task.taskId) }}>
-          <span className="flex min-w-0 flex-1 flex-col gap-1"><span>{analysisTaskLabel(task, t)}</span>
-            <span className="text-xs text-muted-foreground">{builderLabel(task.status, t)}</span></span>
-          {task.status === "completed" ? <span aria-hidden="true">✓</span> : null}
-        </Button>)}
-      </div>
-      <div className="min-w-0 flex-1 rounded-lg border bg-card p-4" aria-label={t.analysisContent}>
-        {selected ? <><h2 className="mb-3 text-sm font-semibold">{analysisTaskLabel(selected, t)}</h2>
-          <AnalysisTaskOutput key={selected.taskId} reportId={id} task={selected} t={t} /></>
-          : <p role="status" className="text-sm text-muted-foreground">{t.builderNoPreview}</p>}
-      </div>
-    </div>
-    <LiveSwotRadar reportId={id} tasks={progress.tasks} t={t} />
+    <ReportPreparationBoard reportId={id} tasks={progress.tasks} running={running} t={t} />
   </section>
+}
+
+export function ReportPreparationBoard({ reportId, tasks, running, t }: {
+  reportId?: string; tasks: GenerationTaskView[]; running: boolean; t: UiTexts
+}) {
+  const [selectedId, setSelectedId] = useState<string>()
+  const root = useRef<HTMLDivElement>(null)
+  const back = useRef<HTMLButtonElement>(null)
+  const returnTask = useRef<string | undefined>(undefined)
+  const visible = useDocumentVisible()
+  const reduced = useReducedMotionPreference()
+  const still = reduced || !visible
+  const selected = tasks.find(task => task.taskId === selectedId)
+  const stage = selected && analysisTaskStage(selected)
+  const closeDetails = () => {
+    returnTask.current = selectedId
+    setSelectedId(undefined)
+  }
+  useEffect(() => {
+    if (selectedId) back.current?.focus({ preventScroll: true })
+    else if (returnTask.current) {
+      root.current?.querySelector<HTMLButtonElement>(`[data-task-id="${returnTask.current}"]`)?.focus({ preventScroll: true })
+      returnTask.current = undefined
+    }
+  }, [selectedId])
+  return <div ref={root} className="flex min-w-0 flex-col gap-4" onKeyDown={event => {
+    if (event.key === "Escape" && selected) { event.stopPropagation(); closeDetails() }
+  }}>
+    <header className="flex items-center gap-2 border-b pb-3">
+      <span className="flex size-8 shrink-0 items-center justify-center">
+        {selected ? <Button ref={back} variant="ghost" size="icon-sm" aria-label={t.boardBack} onClick={closeDetails}><ArrowLeft /></Button> : null}
+      </span>
+      <h2 className="text-base font-semibold">{t.analysisBoard}</h2>
+    </header>
+    <div className="report-preparation-layout" data-detail={Boolean(selected)}>
+      <m.div key={stage ?? "overview"} className="report-preparation-columns" {...slidePresence(still, "x", -20, 0, "reveal")}>
+        {REPORT_STAGES.filter(value => !selected || value === stage).map(value => <PreparationColumn key={value}
+          stage={value} tasks={tasks.filter(task => analysisTaskStage(task) === value).toSorted((a, b) => a.taskId.localeCompare(b.taskId))}
+          selectedId={selectedId} moving={running && !still} running={running} t={t}
+          onSelect={setSelectedId} />)}
+      </m.div>
+        {selected && reportId ? <m.aside key="details" className="report-preparation-detail" aria-label={t.analysisContent}
+          {...slidePresence(still, "x", 32, 0, "reveal")}>
+          <m.div key={selected.taskId} {...fadePresence(still, "quick")}>
+            <h3 className="border-b p-4 text-sm font-semibold">{analysisTaskLabel(selected, t)}</h3>
+            <AnalysisTaskOutput reportId={reportId} task={selected} live={running} t={t} />
+          </m.div>
+          {analysisTaskStage(selected) === "analysis" ? <div className="p-4"><LiveSwotRadar reportId={reportId} tasks={tasks} t={t} /></div> : null}
+        </m.aside> : null}
+    </div>
+  </div>
 }

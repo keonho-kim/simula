@@ -8,11 +8,14 @@ import { expect, test, type Page } from "./fixtures"
 import type { RunManifest } from "@/shared"
 import type { BrowserRunDetail } from "@/ui/shell/e2e-queries/runs"
 
-async function seedRun(page: Page, detail: BrowserRunDetail): Promise<void> {
+async function seedRun(page: Page, detail: BrowserRunDetail, accepted = true): Promise<void> {
   await page.route("**/api/analysis?*", route => route.fulfill({ json: {
     analysis: { id: "55555555-5555-4555-8555-555555555555", subject: { kind: "run", id: detail.run.id },
       inputRevision: "fixture", language: "ko", fastMode: false, createdAt: detail.run.createdAt,
-      deadlineAt: detail.run.createdAt, maxCalls: 1, status: "failed" }, freshness: "unavailable",
+      deadlineAt: detail.run.createdAt, maxCalls: 1, status: accepted ? "ready" : "failed",
+      report: accepted ? { perspective: { focus: "검토", objective: "판단", horizon: "현재", boundary: "일정", evidenceIds: [] },
+        coverage: { requested: 1, completed: 1, analyzed: 1, failed: 0, canceled: 0, interrupted: 0 },
+        trajectories: { categories: [], unclassifiedWorldIds: [] }, sections: [], evidenceIds: [], unavailableInputs: [] } : undefined }, freshness: "current",
   } }))
   await page.goto("/")
   await page.waitForFunction(() => Boolean(window.__simulaE2E))
@@ -48,7 +51,6 @@ test("report round carousel selects messages independently from browsing and sup
   await seedRun(page, detail as unknown as BrowserRunDetail)
   await page.getByRole("button", { name: /실행 내역 보기/ }).click()
   await page.getByRole("dialog").getByRole("button", { name: /열기/ }).click()
-  await page.getByRole("button", { name: "확보된 결과와 기록 보기", exact: true }).click()
   const metrics = page.getByRole("region", { name: "모델 지표" })
   await expect(metrics).toBeVisible()
   await expect(metrics.getByRole("article")).toHaveCount(4)
@@ -120,7 +122,7 @@ test("report round carousel selects messages independently from browsing and sup
 
 })
 
-test("empty failed report remains readable", async ({ page }) => {
+test("empty failed report remains in preparation with metrics and recovery", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("simula.language", "ko"))
   const detail = reportFixture()
   detail.state.interactions = []
@@ -128,14 +130,13 @@ test("empty failed report remains readable", async ({ page }) => {
   detail.state.actors = []
   detail.state.errors = ["test failure"]
   const failed = { ...detail, run: { ...detail.run, status: "failed" as const, error: "test failure" }, timeline: [], events: [] }
-  await seedRun(page, failed as unknown as BrowserRunDetail)
+  await seedRun(page, failed as unknown as BrowserRunDetail, false)
   await page.getByRole("button", { name: /실행 내역 보기/ }).click()
   await page.getByRole("dialog").getByRole("button", { name: /열기/ }).click()
-  await page.getByRole("button", { name: "확보된 결과와 기록 보기", exact: true }).click()
   await expect(page.getByRole("alert").filter({ hasText: "test failure" })).toContainText("test failure")
-  await page.getByRole("button", { name: "대화 기록", exact: true }).click()
-  await expect(page.getByRole("button", { name: "다음 라운드 보기" })).toHaveCount(0)
-  await page.getByRole("button", { name: "상세 닫기" }).click()
+  await expect(page).toHaveURL(`/reports/${detail.run.id}/prepare`)
+  await expect(page.getByRole("button", { name: "미완료 분석 재시도", exact: true })).toBeVisible()
+  await expect(page.locator(".report-preparation-column")).toHaveCount(3)
   const metrics = page.getByRole("region", { name: "모델 지표" })
   await expect(metrics.getByRole("article")).toHaveCount(4)
   await expect(metrics).toContainText("—")

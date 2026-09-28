@@ -38,8 +38,8 @@ const ActorDetailDialog = lazy(() =>
 const EdgeDetailDialog = lazy(() =>
   import("@/ui/components/graph/edge-detail-dialog").then((module) => ({ default: module.EdgeDetailDialog }))
 )
-const ReportPage = lazy(() =>
-  import("@/ui/pages/report-page").then((module) => ({ default: module.ReportPage }))
+const ReportFlow = lazy(() =>
+  import("@/ui/shell/report-flow").then((module) => ({ default: module.ReportFlow }))
 )
 
 function App() {
@@ -203,6 +203,13 @@ function App() {
     }
   }
 
+  const navigateReport = useCallback((mode: "report" | "report-preparation") => {
+    const path = pathForView(mode, selectedRunId)
+    if (path) window.history.replaceState(null, "", path)
+    viewModeRef.current = mode
+    setViewMode(mode)
+  }, [selectedRunId])
+
   let content: ReactNode
   if (viewMode === "home") {
     content = <HomeView
@@ -233,9 +240,9 @@ function App() {
         if (selectedRunCompleted) setReportConfirmRunId(selectedRunId)
       }} />
     </Suspense>
-  } else if (viewMode === "report") {
+  } else if (viewMode === "report" || viewMode === "report-preparation") {
     content = <Suspense fallback={null}>
-        <ReportPage
+        <ReportFlow key={selectedRunId} mode={viewMode} onNavigate={navigateReport}
           selectedRunId={selectedRunId}
           selectedRunStatus={selectedRunStatus}
           language={promptLanguage}
@@ -303,7 +310,7 @@ function App() {
         ) : null}
     </SimulationPage></Suspense>
   }
-  return <PageTransition viewKey={viewMode}>{content}</PageTransition>
+  return <PageTransition viewKey={viewMode === "report-preparation" ? "report" : viewMode}>{content}</PageTransition>
 }
 
 export default App

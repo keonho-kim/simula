@@ -405,8 +405,10 @@ restartable round/countdown checkpoints, provisional streams and target-filesyst
 
 The analytical backend is available for terminal individual runs and terminal Multiverse
 batches. Opening Report loads saved results without additional model calls. If no current
-result exists, a separate preparation screen starts generation and opens the result when
-finished. Failures expose retry controls only in preparation. A run owned by a batch can
+result exists, `/reports/:runId/prepare` starts generation and shows a three-column
+kanban board. Clicking a task subscribes to its detail; closing it stops that text
+subscription. Completion replaces the URL with `/reports/:runId` and opens accepted
+results. Reloading either URL restores the appropriate stage without duplicating work. Failures expose retry controls only in preparation. A run owned by a batch can
 switch to **Analyze this Multiverse**; generation still requires
 that every world is terminal.
 

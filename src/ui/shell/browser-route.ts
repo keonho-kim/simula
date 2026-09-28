@@ -6,13 +6,13 @@
  */
 import type { RunSession } from "@/ui/browser-storage/run-session"
 
-export type ViewMode = "home" | "board" | "simulation" | "report"
+export type ViewMode = NonNullable<RunSession["viewMode"]>
 
 export function viewFromPath(pathname: string, session: RunSession): { viewMode: ViewMode; runId?: string } {
   if (pathname === "/scenario-board") return session.runId ? { viewMode: "board", runId: session.runId } : { viewMode: "home" }
   if (pathname === "/simulation") return { viewMode: "simulation", runId: session.runId }
-  const match = /^\/reports\/([a-zA-Z0-9][a-zA-Z0-9._-]{0,199})$/.exec(pathname)
-  if (match) return { viewMode: "report", runId: match[1] }
+  const match = /^\/reports\/([a-zA-Z0-9][a-zA-Z0-9._-]{0,199})(\/prepare)?$/.exec(pathname)
+  if (match) return { viewMode: match[2] ? "report-preparation" : "report", runId: match[1] }
   return { viewMode: "home", runId: session.runId }
 }
 
@@ -20,5 +20,5 @@ export function pathForView(viewMode: ViewMode, runId: string | undefined): stri
   if (viewMode === "home") return "/"
   if (viewMode === "board") return runId ? "/scenario-board" : undefined
   if (viewMode === "simulation") return "/simulation"
-  return runId ? `/reports/${encodeURIComponent(runId)}` : undefined
+  return runId ? `/reports/${encodeURIComponent(runId)}${viewMode === "report-preparation" ? "/prepare" : ""}` : undefined
 }

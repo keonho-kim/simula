@@ -6,7 +6,7 @@
  */
 export interface RunSession {
   runId?: string
-  viewMode?: "home" | "board" | "simulation" | "report"
+  viewMode?: "home" | "board" | "simulation" | "report" | "report-preparation"
   autoContinue?: boolean
   handledRounds?: number[]
   automaticStreak?: number

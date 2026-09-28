@@ -30,3 +30,11 @@ test("view URLs are stable and a report requires its run", () => {
   expect(pathForView("report", "run-1")).toBe("/reports/run-1")
   expect(pathForView("report", undefined)).toBeUndefined()
 })
+
+
+test("report preparation has its own reloadable URL", () => {
+  expect(viewFromPath("/reports/new-run/prepare", { runId: "old-run" }))
+    .toEqual({ viewMode: "report-preparation", runId: "new-run" })
+  expect(pathForView("report-preparation", "new-run")).toBe("/reports/new-run/prepare")
+  expect(pathForView("report-preparation", undefined)).toBeUndefined()
+})
