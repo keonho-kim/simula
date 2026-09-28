@@ -72,9 +72,8 @@ test("Ornith completes a tiny document scenario, two actor rounds and an analysi
   expect(runDetail.run.status).toBe("completed")
   expect(runDetail.state.roundDigests.length).toBeGreaterThanOrEqual(2)
   expect(runDetail.state.reportCommentary?.status).toBe("ready")
-  await page.getByRole("button", { name: "Open Report" }).click()
   const analysisStarted = page.waitForResponse(response => response.url().endsWith("/api/analysis") && response.request().method() === "POST")
-  await page.getByRole("button", { name: "Generate analysis", exact: true }).click()
+  await page.getByRole("button", { name: "Open Report" }).click()
   const { analysis } = await (await analysisStarted).json()
   await expect.poll(async () => {
     const record = (await (await page.request.get(`/api/analysis/${analysis.id}`)).json()).analysis

@@ -1,3 +1,9 @@
+/**
+ * Purpose: Render a bounded SVG trace for one model metric series.
+ * Pattern: Pure chart presentation.
+ * Usage: Mounted by live and report metric cards.
+ * Related: src/ui/models/metrics/line-path.ts, src/ui/components/metrics/llm-metrics-panel.tsx
+ */
 import type { UiTexts } from "@/ui/types/i18n"
 import { latestMetricPoint, type MetricHistory } from "@/ui/models/metrics/sample-history"
 import { buildLineGeometry, chartWidth, chartHeight, baselineY, firstX, lastX } from "@/ui/models/metrics/line-path"
@@ -9,7 +15,7 @@ export function LineChart({ id, points, t }: { id: string; points: MetricHistory
   const latest = latestMetricPoint(points)
 
   return (
-    <div className="relative h-14 overflow-hidden rounded-sm border border-border/70 bg-background">
+    <div data-slot="metric-chart" className="relative h-14 overflow-hidden rounded-sm border border-border/70 bg-background">
       <svg className="h-full w-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none">
         <defs>
           <pattern id={`metric-grid-${safeId}`} width="10" height="7" patternUnits="userSpaceOnUse">

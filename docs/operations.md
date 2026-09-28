@@ -404,9 +404,10 @@ restartable round/countdown checkpoints, provisional streams and target-filesyst
 ## Analytical report API
 
 The analytical backend is available for terminal individual runs and terminal Multiverse
-batches. The Report page now shows a single-page analysis workspace. Select **Generate
-analysis** to start, or reopen a saved analysis without additional model calls. A run
-owned by a batch can switch to **Analyze this Multiverse**; generation still requires
+batches. Opening Report loads saved results without additional model calls. If no current
+result exists, a separate preparation screen starts generation and opens the result when
+finished. Failures expose retry controls only in preparation. A run owned by a batch can
+switch to **Analyze this Multiverse**; generation still requires
 that every world is terminal.
 
 `POST /api/analysis` accepts a UUID `Idempotency-Key` header and a JSON body containing

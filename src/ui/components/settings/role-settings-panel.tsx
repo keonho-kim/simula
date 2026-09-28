@@ -4,7 +4,7 @@
  * Usage: Mounted by the settings dialog on its roles page.
  * Related: src/ui/components/settings/settings-dialog.tsx, src/ui/models/settings/draft-updates.ts
  */
-import { useMemo, type Dispatch, type SetStateAction } from "react"
+import { useMemo, useState, type Dispatch, type SetStateAction } from "react"
 import { useQuery } from "@tanstack/react-query"
 import type { LLMSettings, ModelRole, RoleSettings } from "@/shared"
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@/ui/components/ui/field"
@@ -14,6 +14,7 @@ import { fetchProviderModels } from "@/ui/api-client/client"
 import type { UiTexts } from "@/ui/types/i18n"
 import {
   extraBodyExamples,
+  hasProviderConnection,
   isOpenAICompatible,
   roles,
   safetySettingsExample,
@@ -26,7 +27,7 @@ import { updateRoleJsonDraft } from "@/ui/models/settings/json-draft"
 import { providerModelsCacheKey, readProviderModelsCache, writeProviderModelsCache } from "@/ui/browser-storage/provider-model-cache"
 import { ModelField } from "@/ui/components/settings/model-field"
 import { ProviderSelect } from "@/ui/components/settings/provider-select"
-import { applyProviderDefaults, patchRole, updateRole } from "@/ui/models/settings/draft-updates"
+import { selectRoleProvider, patchRole, updateRole } from "@/ui/models/settings/draft-updates"
 import type { RoleJsonDraft } from "@/ui/types/settings"
 
 export function RoleSettingsPanel({ settings, t, setDraft, jsonDraft, setJsonDraft }: {
@@ -36,6 +37,7 @@ export function RoleSettingsPanel({ settings, t, setDraft, jsonDraft, setJsonDra
   jsonDraft: RoleJsonDraft
   setJsonDraft: Dispatch<SetStateAction<RoleJsonDraft>>
 }) {
+  const [selectedRoles, setSelectedRoles] = useState<ReadonlySet<ModelRole>>(() => new Set())
   return (
     <div className="grid min-w-0 gap-4">
       <FieldSet className="rounded-lg bg-background/70 p-4 ring-1 ring-border/60">
@@ -55,6 +57,8 @@ export function RoleSettingsPanel({ settings, t, setDraft, jsonDraft, setJsonDra
         <TabsContent key={role} value={role}>
           <RoleSection
             role={role}
+            explicitlySelected={selectedRoles.has(role)}
+            onProviderSelect={() => setSelectedRoles(current => new Set([...current, role]))}
             settings={settings}
             t={t}
             setDraft={setDraft}
@@ -68,8 +72,10 @@ export function RoleSettingsPanel({ settings, t, setDraft, jsonDraft, setJsonDra
   )
 }
 
-function RoleSection({ role, settings, t, setDraft, jsonDraft, setJsonDraft }: {
+function RoleSection({ role, explicitlySelected, onProviderSelect, settings, t, setDraft, jsonDraft, setJsonDraft }: {
   role: ModelRole
+  explicitlySelected: boolean
+  onProviderSelect: () => void
   settings: LLMSettings
   t: UiTexts
   setDraft: Dispatch<SetStateAction<LLMSettings | undefined>>
@@ -78,7 +84,9 @@ function RoleSection({ role, settings, t, setDraft, jsonDraft, setJsonDraft }: {
 }) {
   const active = settings.roles[role]
   const connection = settings.providers[active.provider]
-  const shouldLoadModels = supportsModelDiscovery(active.provider)
+  const connectionReady = hasProviderConnection(active.provider, connection)
+  const providerSelected = explicitlySelected || connectionReady || active.model === ""
+  const shouldLoadModels = providerSelected && connectionReady && supportsModelDiscovery(active.provider)
   const modelCacheKey = providerModelsCacheKey(active.provider, connection)
   const modelsQuery = useQuery({
     queryKey: ["provider-models", modelCacheKey],
@@ -107,13 +115,16 @@ function RoleSection({ role, settings, t, setDraft, jsonDraft, setJsonDraft }: {
           <Field>
             <FieldLabel>{t.settingsProvider}</FieldLabel>
             <ProviderSelect
-              value={active.provider}
-              onChange={(provider) => updateRole(role, applyProviderDefaults(active, provider), setDraft)}
+              value={providerSelected ? active.provider : undefined}
+              t={t}
+              onChange={(provider) => { onProviderSelect(); updateRole(role, selectRoleProvider(active, provider), setDraft) }}
             />
           </Field>
           <ModelField
             role={role}
             active={active}
+            providerSelected={providerSelected}
+            connectionReady={connectionReady}
             models={models}
             loading={shouldLoadModels && modelsQuery.isLoading}
             error={shouldLoadModels && modelsQuery.isError}
@@ -126,29 +137,29 @@ function RoleSection({ role, settings, t, setDraft, jsonDraft, setJsonDraft }: {
       <FieldSet className="rounded-lg bg-background/70 p-4 ring-1 ring-border/60">
         <FieldLegend>{t.settingsGeneration}</FieldLegend>
         <div className="grid gap-3 pt-3">
-          {supportsTemperature(active.provider) ? (
+          {providerSelected && supportsTemperature(active.provider) ? (
             <NumberField label={t.settingsTemperature} value={active.temperature} step="0.1" onChange={(value) => patchRole(role, { temperature: value }, setDraft)} />
           ) : null}
           <NumberField label={t.settingsMaxTokens} value={active.maxTokens} onChange={(value) => patchRole(role, { maxTokens: value }, setDraft)} />
           <NumberField label={t.settingsTimeoutSeconds} value={active.timeoutSeconds} onChange={(value) => patchRole(role, { timeoutSeconds: value }, setDraft)} />
           <OptionalNumberField label={t.settingsTopP} value={active.topP} step="0.05" onChange={(value) => patchRole(role, { topP: value }, setDraft)} />
-          {active.provider === "gemini" ? (
+          {providerSelected && active.provider === "gemini" ? (
             <OptionalNumberField label={t.settingsTopK} value={active.topK} onChange={(value) => patchRole(role, { topK: value }, setDraft)} />
           ) : null}
-          {active.provider !== "anthropic" && active.provider !== "gemini" ? (
+          {providerSelected && active.provider !== "anthropic" && active.provider !== "gemini" ? (
             <>
               <OptionalNumberField label={t.settingsFrequencyPenalty} value={active.frequencyPenalty} step="0.1" onChange={(value) => patchRole(role, { frequencyPenalty: value }, setDraft)} />
               <OptionalNumberField label={t.settingsPresencePenalty} value={active.presencePenalty} step="0.1" onChange={(value) => patchRole(role, { presencePenalty: value }, setDraft)} />
               <OptionalNumberField label={t.settingsSeed} value={active.seed} onChange={(value) => patchRole(role, { seed: value }, setDraft)} />
             </>
           ) : null}
-          {supportsReasoningEffort(active.provider) ? (
+          {providerSelected && supportsReasoningEffort(active.provider) ? (
             <ReasoningEffortField active={active} role={role} t={t} setDraft={setDraft} />
           ) : null}
         </div>
       </FieldSet>
 
-      {isOpenAICompatible(active.provider) || active.provider === "gemini" ? (
+      {providerSelected && (isOpenAICompatible(active.provider) || active.provider === "gemini") ? (
         <FieldSet className="rounded-lg bg-background/70 p-4 ring-1 ring-border/60">
           <FieldLegend>{t.settingsProviderExtras}</FieldLegend>
           <div className="grid gap-3 pt-3">

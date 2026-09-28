@@ -2,7 +2,7 @@
  * Purpose: Verify virtual history indices preserve round and message order without flattening messages.
  * Pattern: Pure mapping contract test.
  * Usage: bun test src/ui/models/actors/history-index.test.ts
- * Related: src/ui/models/actors/history-index.ts, src/ui/components/actors/history/window-history.tsx
+ * Related: src/ui/models/actors/history-index.ts, src/ui/components/actors/history/live-history.tsx
  */
 import { expect, test } from "bun:test"
 import type { ActorRound } from "./actor-conversation"

@@ -17,12 +17,12 @@ export const GraphView = memo(function GraphView(props: GraphViewProps) {
   const { containerRef, selectedActor, selectedPopoverStyle, selectedActorIntent,
     previewEdge, edgePreviewStyle, actorNames, actors, resetCamera } = useGraphRenderer(props)
   return (
-    <div className="relative h-full min-h-[520px] overflow-hidden rounded-lg bg-white ring-1 ring-border/60">
+    <div className="relative h-full min-h-0 overflow-hidden rounded-lg bg-white ring-1 ring-border/60">
       <div className="absolute right-3 top-3 z-10">
         <Button variant="outline" size="icon" aria-label={t.graphResetView} onClick={resetCamera}><CrosshairIcon /></Button>
       </div>
 
-      <div ref={containerRef} className="h-full min-h-[520px] bg-[radial-gradient(circle_at_center,#f8fafc_1px,transparent_1px)] [background-size:24px_24px]" />
+      <div ref={containerRef} className="absolute inset-0 bg-[radial-gradient(circle_at_center,#f8fafc_1px,transparent_1px)] [background-size:24px_24px]" />
 
       {showActorPopover && selectedActor && selectedPopoverStyle ? (
         <div

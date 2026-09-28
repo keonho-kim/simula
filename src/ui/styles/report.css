@@ -1,16 +1,16 @@
 /**
- * Purpose: Bound the single-page report board, live columns, and read-only detail surfaces.
+ * Purpose: Style report preparation and the accepted report's read-only surfaces.
  * Pattern: Scoped presentation styles.
  * Usage: Imported by src/ui/pages/report-page.tsx.
  * Related: src/ui/components/report/analysis
  */
-.report-analysis-columns, .report-live-columns {
+.report-analysis-columns {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
   min-width: 0;
 }
-.report-analysis-columns > *, .report-live-columns > * { flex: 1 1 290px; min-width: 0; }
+.report-analysis-columns > * { flex: 1 1 290px; min-width: 0; }
 .report-board-entry {
   width: 100%;
   height: auto;
@@ -38,13 +38,7 @@
 .report-radar > * { flex: 1 1 300px; min-width: 0; }
 .report-radar svg { width: 100%; max-height: 240px; }
 .report-stage-timeline { display: flex; flex-wrap: wrap; gap: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
-.report-live-task { min-width: 0; border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; }
 .report-task-output { display: flex; flex-direction: column; gap: 1rem; padding: 1rem; }
-.report-task-indicator { display: inline-flex; justify-content: center; align-items: center; width: 0.9rem; height: 0.9rem; border-radius: 50%; background: var(--muted); color: var(--muted-foreground); font-size: 0.65rem; }
-.report-live-task[data-status="running"] .report-task-indicator { background: var(--chart-2); }
-.report-live-task[data-status="running"] > header { background: color-mix(in srgb, var(--chart-2) 8%, var(--background)); }
-.report-live-task[data-status="completed"] .report-task-indicator { background: var(--chart-1); color: var(--background); }
-.report-live-task[data-status="failed"] .report-task-indicator { background: var(--destructive); }
 
 .report-chart-wait { display: flex; align-items: center; gap: 0.75rem; min-height: 4rem; color: var(--muted-foreground); font-size: 0.75rem; }
 .report-chart-wait-mark { width: 1.2rem; height: 1.2rem; border: 1px solid var(--border); transform: rotate(45deg); }

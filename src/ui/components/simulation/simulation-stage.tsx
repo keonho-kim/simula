@@ -1,3 +1,9 @@
+/**
+ * Purpose: Fit live simulation status and the graph into the available panel height.
+ * Pattern: Memoized presentation composition.
+ * Usage: Mounted by the viewport-sized simulation page.
+ * Related: src/ui/pages/simulation-page.tsx, src/ui/components/graph/graph-view.tsx
+ */
 import { memo, useMemo, useState, type ReactNode } from "react"
 import { Badge } from "@/ui/components/ui/badge"
 import { Progress } from "@/ui/components/ui/progress"
@@ -54,7 +60,7 @@ export const SimulationStage = memo(function SimulationStage({
 
   return (
     <section className={cn("flex min-h-0 min-w-0 flex-col rounded-lg bg-card/80 shadow-sm ring-1 ring-border/60", className)}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
         <div>
           <h2 className="font-heading text-sm font-semibold">{t.simulationStageTitle}</h2>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -83,8 +89,8 @@ export const SimulationStage = memo(function SimulationStage({
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
         <Progress value={progress} className="h-1.5" />
-        <div className={cn("relative min-h-[560px] flex-1", graphClassName)}>
-          <div className="h-full min-h-[560px]">
+        <div className={cn("relative min-h-0 flex-1", graphClassName)}>
+          <div className="absolute inset-0">
             <GraphView
               frame={frame}
               t={t}

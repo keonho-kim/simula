@@ -168,12 +168,12 @@ the motion policy explicitly to favor immediate feedback on constrained clients.
    entire history. Each bucket retains its minimum and maximum and the first/latest samples remain
    present. Original sample indices preserve their horizontal positions. Chunk extrema allow the
    renderer to avoid scanning every raw sample. Full-resolution data and exact totals are retained.
-2. **Virtual actor history.** Live messages use `components/actors/history/window-history.tsx`
-   with TanStack window virtualization, measured variable heights, overscan, stable keys, and
-   end anchoring against the browser page scroll. Reading upward pauses following; returning to
-   the page bottom resumes it. Archived report messages use `virtual-history.tsx` against the
-   report's full-viewport dialog scroll surface. Neither list introduces a second content
-   scrollbar. Width changes invalidate measurements, focused rows remain mounted, and the
+2. **Virtual actor history.** Live messages use `components/actors/history/live-history.tsx`
+   with TanStack element virtualization, measured variable heights, overscan, stable keys, and
+   end anchoring inside the bounded chat panel. Reading upward pauses following; returning to
+   the panel bottom resumes it. Archived report messages use `virtual-history.tsx` against the
+   report's bounded dialog scroll surface. The simulation itself fits the viewport; only
+   its chat history scrolls. Width changes invalidate measurements, focused rows remain mounted, and the
    mutable virtualizer stays outside React Compiler memoization. A browser test injects 4,120
    messages and verifies that fewer than 40 cards are mounted.
 3. **Chunked metric snapshots.** Completed groups of 128 samples are shared across snapshots. Only

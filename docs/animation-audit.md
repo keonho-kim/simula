@@ -10,7 +10,7 @@ popup accessibility behavior. Native CSS remains for static states and short col
 
 | Surface | Implementation and decision |
 | --- | --- |
-| Dialog and dropdown | Radix owns state and focus. Motion uses a short dialog fade/vertical entrance and trigger-origin scale for menus and selects. No new blur. |
+| Dialog and dropdown | Radix owns state and focus. Motion uses a short dialog fade/vertical entrance and trigger-origin scale for menus. Select uses Radix-owned CSS presence to retain its closed item collection and value labels. No new blur. |
 | Tooltip | Radix owns hover/focus state; Motion uses a brief opacity-only entrance/exit. |
 | Button, input, textarea, select, badge, slider, settings/actor choices | Keep native interactions and explicitly bounded 100 ms color feedback. |
 | Switch and tab indicator | Motion owns the thumb and a shared selection indicator. Tab content changes without a generic vertical slide. |
@@ -103,3 +103,8 @@ The current motion pass replaced the board's wait-mode swap, corrected popup clo
 tab-selection continuity, and made page navigation and report-round arrows reflect their
 destination. This pass has no browser timing or VDI measurement; the figures above remain
 historical and must not be used to claim a new performance improvement.
+
+Select content remains mounted in React while Radix moves its closed item collection into a
+DocumentFragment. Conditional Motion presence must not remove that collection: doing so clears
+the selected text. Select entrance/exit CSS follows Radix data-state and the shared reduced-motion
+policy; the trigger has an opaque semantic background in both selected and placeholder states.

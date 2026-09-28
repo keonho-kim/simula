@@ -1,3 +1,9 @@
+/**
+ * Purpose: Present model discovery only after a provider connection is ready.
+ * Pattern: Controlled form field.
+ * Usage: Rendered by role settings with query state and connection readiness.
+ * Related: src/ui/components/settings/role-settings-panel.tsx, src/ui/components/ui/select.tsx
+ */
 import type { Dispatch, SetStateAction } from "react"
 import { AlertCircleIcon } from "lucide-react"
 import type { LLMSettings, ModelRole, RoleSettings } from "@/shared"
@@ -10,15 +16,20 @@ import { cn } from "@/ui/lib/class-names"
 import { supportsModelDiscovery } from "@/ui/models/settings/settings-options"
 import { patchRole } from "@/ui/models/settings/draft-updates"
 
-export function ModelField({ role, active, models, loading, error, t, setDraft }: {
+export function ModelField({ role, active, providerSelected, connectionReady, models, loading, error, t, setDraft }: {
   role: ModelRole
   active: RoleSettings
+  providerSelected: boolean
+  connectionReady: boolean
   models: string[]
   loading: boolean
   error: boolean
   t: UiTexts
   setDraft: Dispatch<SetStateAction<LLMSettings | undefined>>
 }) {
+  const ready = providerSelected && connectionReady
+  const placeholder = !providerSelected ? t.settingsSelectProviderFirst : !connectionReady ? t.settingsConfigureProvider
+    : loading ? t.settingsLoadingModels : models.length ? t.settingsSelectModel : t.settingsNoModels
   if (!supportsModelDiscovery(active.provider)) {
     return (
       <Field>
@@ -44,12 +55,12 @@ export function ModelField({ role, active, models, loading, error, t, setDraft }
         ) : null}
       </div>
       <Select
-        value={active.model}
-        disabled={loading || error || models.length === 0}
+        value={ready ? active.model : ""}
+        disabled={!ready || loading || models.length === 0}
         onValueChange={(value) => patchRole(role, { model: value }, setDraft)}
       >
         <SelectTrigger className={cn("w-full", error && "border-destructive text-destructive ring-destructive/20")}>
-          <SelectValue placeholder={loading ? t.settingsLoadingModels : active.model || t.settingsNoModels} />
+          <SelectValue placeholder={placeholder}>{ready && active.model ? active.model : undefined}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           {models.map((model) => (

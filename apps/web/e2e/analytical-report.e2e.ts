@@ -46,6 +46,34 @@ async function openRun(page: Page, selectedRun = run) {
   await page.getByRole("dialog").getByRole("button", { name: /열기/ }).click()
 }
 
+test("missing analysis prepares once, then opens a read-only result", async ({ page }) => {
+  let record: AnalysisRecord | undefined
+  let requests = 0
+  await page.route(url => url.pathname.startsWith("/api/analysis"), route => {
+    const url = new URL(route.request().url())
+    if (route.request().method() === "POST" && url.pathname === "/api/analysis") {
+      requests++
+      record = { ...analysisFixture(), status: "running", report: undefined }
+      return route.fulfill({ status: 202, json: { analysis: record } })
+    }
+    if (url.pathname.endsWith("/metrics")) return route.fulfill({ json: { calls: [] } })
+    if (url.pathname.endsWith("/accounting")) return route.fulfill({ json: { accounting: accountingFixture } })
+    if (url.pathname.endsWith("/events")) return route.fulfill({ contentType: "text/event-stream", body: "" })
+    return route.fulfill({ json: record ? { analysis: record, freshness: "current" } : { analysis: null, freshness: null } })
+  })
+  await openRun(page)
+  await expect(page.getByRole("heading", { name: "리포트 작성", exact: true })).toBeVisible()
+  await expect.poll(() => requests).toBe(1)
+  record = analysisFixture()
+  await expect(page.getByRole("heading", { name: "종합 결론", exact: true })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "리포트 작성", exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "분석 생성", exact: true })).toHaveCount(0)
+  await expect(page.locator(".report-task-output")).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole("heading", { name: "종합 결론", exact: true })).toBeVisible()
+  expect(requests).toBe(1)
+})
+
 test("saved analysis opens without generation and exposes evidence, unknown scores, and accessible detail", async ({ page }, testInfo) => {
   const record = analysisFixture()
   let modelRequests = 0
@@ -127,7 +155,7 @@ test("batch accounting shows fifty per-world rows in the full page scroll on mob
     if (url.pathname.endsWith("/metrics")) return route.fulfill({ json: { calls: [] } })
     if (url.pathname.endsWith("/accounting")) return route.fulfill({ json: { accounting } })
     return route.fulfill({ json: url.searchParams.get("kind") === "batch" ? { analysis: record, freshness: "current" }
-      : { analysis: null, freshness: null } })
+      : { analysis: { ...record, subject: { kind: "run", id: run.id } }, freshness: "current" } })
   })
   await openRun(page, selectedRun)
   await page.getByRole("button", { name: "이 멀티버스 종합 분석" }).click()
@@ -169,15 +197,14 @@ data: ${JSON.stringify(event)}
     return route.fulfill({ json: { analysis: record, freshness: "current" } })
   })
   await openRun(page)
-  await expect(page.locator(".report-live-task")).toHaveCount(3)
-  await expect(page.locator(".report-live-task").filter({ hasText: "시뮬레이션 관찰" })).toHaveCount(1)
-  await expect(page.locator(".report-live-task").filter({ hasText: "시사점·확인 과제" })).toHaveCount(1)
-  await expect(page.getByText("수정된 분석을 실시간으로 작성합니다.", { exact: true })).toHaveCount(3)
+  await expect(page.getByRole("heading", { name: "리포트 작성", exact: true })).toBeVisible()
+  await expect(page.locator(".report-task-output")).toHaveCount(1)
+  await expect(page.getByText("수정된 분석을 실시간으로 작성합니다.", { exact: true })).toHaveCount(1)
   await expect(page.getByText("폐기된 초안", { exact: true })).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath("analysis-live.png"), fullPage: true })
   await page.getByRole("button", { name: "생성 중지", exact: true }).click()
   await expect(page.getByRole("button", { name: "미완료 분석 재시도", exact: true })).toBeEnabled()
-  await expect(page.locator(".report-live-task")).toHaveCount(0)
+  await expect(page.locator(".report-task-output")).toHaveCount(0)
 })
 
 test("a fully assessed radar appears once and honors reduced motion", async ({ page }, testInfo) => {

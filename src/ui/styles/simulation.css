@@ -1,0 +1,11 @@
+/**
+ * Purpose: Reserve viewport height for the graph and chat on compact simulation screens.
+ * Pattern: Responsive page layout policy.
+ * Usage: Imported only by the simulation page.
+ * Related: src/ui/pages/simulation-page.tsx, src/ui/components/metrics/llm-metrics-panel.tsx
+ */
+@media (max-height: 740px), (max-width: 767px) {
+  .simulation-page [data-slot="live-metrics"] article > div { min-height: 0; padding: .5rem; }
+  .simulation-page [data-slot="metric-chart"] { display: none; }
+  .simulation-page [data-slot="live-metrics"] article h2 { font-size: .65rem; }
+}

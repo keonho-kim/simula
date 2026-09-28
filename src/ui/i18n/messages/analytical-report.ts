@@ -2,9 +2,12 @@
  * Purpose: Localize analytical report generation, reading, and evidence inspection.
  * Pattern: Localization dictionary.
  * Usage: Composed into the English and Korean UI dictionaries.
- * Related: src/ui/components/report/analysis/workspace.tsx
+ * Related: src/ui/pages/report-preparation-page.tsx, src/ui/components/report/analysis/results.tsx
  */
 const en = {
+  analysisPreparing: "Preparing report",
+  analysisPreparationDescription: "Reviewing evidence, analyzing developments, and composing the assessment. The finished report will open automatically.",
+  analysisViewRecorded: "View available results and records",
   analysisExportJson: "Analysis JSON", analysisExportMarkdown: "Analysis Markdown",
   analysisExportRevision: "Source revision", analysisExportStatus: "Execution status",
   analysisExportFreshness: "Source status", analysisExportCalls: "Analysis generation calls",
@@ -15,9 +18,9 @@ const en = {
   analysisCallCount: "Calls", analysisObservedCalls: "observed {count}",
   analysisRecordedOnly: "Recorded calls only. — means unavailable or not applicable.", analysisUsageUnavailable: "Resource accounting could not be read.",
   analysisContent: "Analysis content", analysisRunReference: "Run {id}",
-  analysisBoard: "Analysis board", analysisGenerate: "Generate analysis", analysisRetry: "Retry unfinished analysis", analysisNew: "Generate updated analysis",
+  analysisBoard: "Analysis board", analysisRetry: "Retry unfinished analysis",
   analysisCancel: "Stop generation", analysisClose: "Close details", analysisOpen: "Read details", analysisEmpty: "Explore the recorded scenario",
-  analysisEmptyBody: "Generate SWOT, development paths, and assessments grounded in the materials and simulation. Viewing a saved report makes no model calls.",
+  analysisEmptyBody: "No accepted analysis is available. The recorded relationships and conversations remain accessible below.",
   analysisUnavailable: "Analysis could not load or generate. Check the connection and model settings, then retry.",
   analysisOutdated: "The source has changed. This saved analysis refers to an earlier version.", analysisSourceUnavailable: "The current source cannot be verified. The saved analysis remains available.",
   analysisEvidenceStage: "Evidence review", analysisFindingsStage: "Analysis", analysisSynthesisStage: "Overall assessment",
@@ -38,6 +41,9 @@ const en = {
   analysisRecords: "Recorded simulation", analysisAccepted: "Accepted analysis", analysisPending: "Not started", analysisFailed: "Unavailable",
 } as const
 const ko = {
+  analysisPreparing: "리포트 작성",
+  analysisPreparationDescription: "근거 정리, 관점별 분석, 종합 평가 순서로 작성합니다. 완료되면 결과 화면으로 이동합니다.",
+  analysisViewRecorded: "확보된 결과와 기록 보기",
   analysisExportJson: "분석 JSON", analysisExportMarkdown: "분석 Markdown",
   analysisExportRevision: "원본 버전", analysisExportStatus: "생성 상태",
   analysisExportFreshness: "원본 상태", analysisExportCalls: "분석 생성 호출",
@@ -48,9 +54,9 @@ const ko = {
   analysisCallCount: "호출", analysisObservedCalls: "확인된 호출 {count}회",
   analysisRecordedOnly: "기록된 호출 기준입니다. —는 확인할 수 없거나 적용되지 않는 값입니다.", analysisUsageUnavailable: "자원 사용량을 불러오지 못했습니다.",
   analysisContent: "분석 내용", analysisRunReference: "실행 {id}",
-  analysisBoard: "분석 보드", analysisGenerate: "분석 생성", analysisRetry: "미완료 분석 재시도", analysisNew: "변경된 자료로 분석 생성",
+  analysisBoard: "분석 보드", analysisRetry: "미완료 분석 재시도",
   analysisCancel: "생성 중지", analysisClose: "상세 닫기", analysisOpen: "상세 보기", analysisEmpty: "기록된 시나리오를 분석합니다",
-  analysisEmptyBody: "자료와 시뮬레이션을 바탕으로 강점과 약점, 기회와 위협, 앞으로의 전개를 분석합니다.",
+  analysisEmptyBody: "완성된 분석이 없습니다. 아래에서 기록된 관계와 대화를 확인할 수 있습니다.",
   analysisUnavailable: "분석을 불러오거나 생성하지 못했습니다. 연결과 모델 설정을 확인한 뒤 다시 시도하세요.",
   analysisOutdated: "원본이 변경되었습니다. 저장된 분석은 이전 버전을 기준으로 합니다.", analysisSourceUnavailable: "현재 원본을 확인할 수 없습니다. 저장된 분석은 계속 볼 수 있습니다.",
   analysisEvidenceStage: "근거 정리", analysisFindingsStage: "관점별 분석", analysisSynthesisStage: "종합 평가",

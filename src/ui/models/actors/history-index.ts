@@ -1,8 +1,8 @@
 /**
  * Purpose: Resolve virtual history rows from round offsets without allocating one row per message.
  * Pattern: Pure indexed view.
- * Usage: Built by WindowActorHistory when its round projection changes.
- * Related: src/ui/models/actors/actor-conversation.ts, src/ui/components/actors/history/window-history.tsx
+ * Usage: Built by LiveActorHistory when its round projection changes.
+ * Related: src/ui/models/actors/actor-conversation.ts, src/ui/components/actors/history/live-history.tsx
  */
 import type { ActorMessage, ActorRound } from "./actor-conversation"
 

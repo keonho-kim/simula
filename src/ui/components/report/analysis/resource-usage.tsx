@@ -2,7 +2,7 @@
  * Purpose: Show recorded model usage by shared, world, and final-analysis scope.
  * Pattern: Read-only report presentation.
  * Usage: Rendered for a terminal analytical report after accounting loads.
- * Related: src/shared/analytical-report.ts, src/ui/components/report/analysis/workspace.tsx
+ * Related: src/shared/analytical-report.ts, src/ui/components/report/analysis/results.tsx
  */
 import type { ResourceAccounting, ResourceUsage } from "@/shared/analytical-report"
 import type { UiTexts } from "@/ui/types/i18n"

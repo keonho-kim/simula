@@ -1,18 +1,20 @@
 /**
- * Purpose: Virtualize live actor messages against the browser page scroll.
- * Pattern: Lifecycle-owned window virtual list with reader-controlled following.
+ * Purpose: Virtualize live actor messages inside the bounded chat viewport.
+ * Pattern: Lifecycle-owned element virtual list with reader-controlled following.
  * Usage: Mounted by ActorRail on the simulation page.
  * Related: src/ui/models/actors/history-index.ts, src/ui/components/actors/history/message-card.tsx
  */
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
-import { defaultRangeExtractor, useWindowVirtualizer } from "@tanstack/react-virtual"
+import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual"
 import type { ActorRound } from "@/ui/models/actors/actor-conversation"
 import { buildHistoryIndex, historyRowAt } from "@/ui/models/actors/history-index"
 import type { UiTexts } from "@/ui/types/i18n"
 import { Separator } from "@/ui/components/ui/separator"
 import { ActorMessageCard } from "./message-card"
 
-export function WindowActorHistory({ rounds, t, onActorSelect, overlayOpen = false }: {
+const FOLLOW_THRESHOLD_PX = 1
+
+export function LiveActorHistory({ rounds, t, onActorSelect, overlayOpen = false }: {
   rounds: ActorRound[]; t: UiTexts; onActorSelect: (id: string) => void; overlayOpen?: boolean
 }) {
   "use no memo"
@@ -20,11 +22,12 @@ export function WindowActorHistory({ rounds, t, onActorSelect, overlayOpen = fal
   const following = useRef(true)
   const followingBeforeOverlay = useRef<boolean | undefined>(undefined)
   const [focusedIndex, setFocusedIndex] = useState<number>()
-  const [scrollMargin, setScrollMargin] = useState(0)
   const history = useMemo(() => buildHistoryIndex(rounds), [rounds])
   const getItemKey = useCallback((index: number) => historyRowAt(history, index)!.key, [history])
   // The virtualizer owns mutable measurements and is not passed to memoized children.
-  const virtualizer = useWindowVirtualizer({
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const virtualizer = useVirtualizer({
+    getScrollElement: () => root.current,
     count: history.count,
     getItemKey,
     rangeExtractor: range => {
@@ -33,28 +36,16 @@ export function WindowActorHistory({ rounds, t, onActorSelect, overlayOpen = fal
         ? [...visible, focusedIndex].sort((a, b) => a - b) : visible
     },
     estimateSize: index => historyRowAt(history, index)?.message ? 220 : 30,
-    scrollMargin,
     overscan: 8,
     gap: 16,
     paddingStart: 20,
     paddingEnd: 20,
     anchorTo: "end",
-    followOnAppend: true,
-    scrollEndThreshold: 1,
+    followOnAppend: !overlayOpen,
+    scrollEndThreshold: FOLLOW_THRESHOLD_PX,
     useAnimationFrameWithResizeObserver: true,
   })
 
-  useLayoutEffect(() => {
-    const element = root.current
-    if (!element) return
-    const update = () => setScrollMargin(element.getBoundingClientRect().top + window.scrollY)
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(element)
-    if (element.parentElement) observer.observe(element.parentElement)
-    window.addEventListener("resize", update)
-    return () => { observer.disconnect(); window.removeEventListener("resize", update) }
-  }, [])
   useLayoutEffect(() => { if (following.current && history.count && !overlayOpen) virtualizer.scrollToEnd() }, [overlayOpen, history.count, virtualizer])
   useLayoutEffect(() => {
     if (overlayOpen) { followingBeforeOverlay.current ??= following.current; return }
@@ -70,16 +61,16 @@ export function WindowActorHistory({ rounds, t, onActorSelect, overlayOpen = fal
     const element = root.current
     if (!element) return
     let width = element.clientWidth
-    let previousTop = window.scrollY
+    let previousTop = element.scrollTop
     const recordPosition = () => {
-      const top = window.scrollY
+      const top = element.scrollTop
       if (!overlayOpen) {
         if (top < previousTop - 1) following.current = false
-        else if (document.documentElement.scrollHeight - top - window.innerHeight <= 1) following.current = true
+        else if (element.scrollHeight - top - element.clientHeight <= FOLLOW_THRESHOLD_PX) following.current = true
       }
       previousTop = top
     }
-    window.addEventListener("scroll", recordPosition, { passive: true })
+    element.addEventListener("scroll", recordPosition, { passive: true })
     const observer = new ResizeObserver(() => {
       if (element.clientWidth !== width) { width = element.clientWidth; virtualizer.measure() }
       if (following.current && history.count && !overlayOpen) virtualizer.scrollToEnd()
@@ -87,10 +78,11 @@ export function WindowActorHistory({ rounds, t, onActorSelect, overlayOpen = fal
     observer.observe(element)
     const content = element.querySelector<HTMLElement>("[data-history-items]")
     if (content) observer.observe(content)
-    return () => { observer.disconnect(); window.removeEventListener("scroll", recordPosition) }
+    return () => { observer.disconnect(); element.removeEventListener("scroll", recordPosition) }
   }, [overlayOpen, history.count, virtualizer])
 
-  return <div ref={root} className="relative min-h-[560px] w-full"
+  return <div ref={root} data-slot="actor-history-viewport" role="log" aria-label={t.actorRailTitle} aria-live="off" tabIndex={0}
+    className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
     onFocusCapture={event => {
       const index = (event.target as HTMLElement).closest<HTMLElement>("[data-index]")?.dataset.index
       setFocusedIndex(index === undefined ? undefined : Number(index))
@@ -103,7 +95,7 @@ export function WindowActorHistory({ rounds, t, onActorSelect, overlayOpen = fal
       {virtualizer.getVirtualItems().map(item => {
         const row = historyRowAt(history, item.index)!
         return <div key={item.key} data-index={item.index} ref={virtualizer.measureElement}
-          className="absolute left-4 right-4 top-0 sm:left-5 sm:right-5" style={{ transform: `translateY(${item.start - scrollMargin}px)` }}>
+          className="absolute left-4 right-4 top-0 sm:left-5 sm:right-5" style={{ transform: `translateY(${item.start}px)` }}>
           {row.message ? <ActorMessageCard {...row.message} targets={row.message.targets.join(", ")} t={t} onActorSelect={onActorSelect} /> :
             <div className="flex items-center gap-3 py-2">
               <Separator className="flex-1" />

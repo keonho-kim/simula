@@ -7,6 +7,12 @@
   --animation-feedback-duration: 100ms;
 }
 
+/* Radix keeps Select items in a fragment when closed; its Presence owns these exits. */
+[data-slot="select-content"][data-state="open"] { animation: select-open 180ms cubic-bezier(.22, 1, .36, 1) both; }
+[data-slot="select-content"][data-state="closed"] { animation: select-close 100ms ease-out both; pointer-events: none; }
+@keyframes select-open { from { opacity: 0; scale: .98; } to { opacity: 1; scale: 1; } }
+@keyframes select-close { from { opacity: 1; scale: 1; } to { opacity: 0; scale: .98; } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;

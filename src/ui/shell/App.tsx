@@ -29,25 +29,17 @@ import { pathForView, viewFromPath, type ViewMode } from "@/ui/shell/browser-rou
 import { PageTransition } from "@/ui/animation/page-transition"
 import { useExitPresence } from "@/ui/animation/use-exit-presence"
 
+const SimulationPage = lazy(() => import("@/ui/pages/simulation-page").then(module => ({ default: module.SimulationPage })))
 const ScenarioBoardPage = lazy(() => import("@/ui/pages/scenario-board-page").then(module => ({ default: module.ScenarioBoardPage })))
 
-const ActorRail = lazy(() =>
-  import("@/ui/components/actors/actor-rail").then((module) => ({ default: module.ActorRail }))
-)
 const ActorDetailDialog = lazy(() =>
   import("@/ui/components/actors/actor-panel").then((module) => ({ default: module.ActorDetailDialog }))
 )
 const EdgeDetailDialog = lazy(() =>
   import("@/ui/components/graph/edge-detail-dialog").then((module) => ({ default: module.EdgeDetailDialog }))
 )
-const LlmMetricsPanel = lazy(() =>
-  import("@/ui/components/metrics/llm-metrics-panel").then((module) => ({ default: module.LlmMetricsPanel }))
-)
 const ReportPage = lazy(() =>
   import("@/ui/pages/report-page").then((module) => ({ default: module.ReportPage }))
-)
-const SimulationStage = lazy(() =>
-  import("@/ui/components/simulation/simulation-stage").then((module) => ({ default: module.SimulationStage }))
 )
 
 function App() {
@@ -257,9 +249,12 @@ function App() {
         />
       </Suspense>
   } else {
-    content = <main className="min-h-svh bg-background text-foreground">
-      <div className="mx-auto flex min-h-svh w-full flex-col px-4 py-3 lg:w-4/5 lg:px-0">
-        <TopCommandBar
+    content = <Suspense fallback={<main className="h-dvh bg-background" />}><SimulationPage t={t}
+      selectedActorId={selectedActorId} selectedEdgeId={selectedEdgeId}
+      onActorSelect={selectActor} onActorExpand={expandActor} onEdgeSelect={selectEdge}
+      overlayOpen={Boolean((reportConfirmRunId && reportConfirmRunId === selectedRunId) || roundDialogOpen)}
+      notice={managedByBatch ? <p className="pt-2 text-sm text-muted-foreground">{t.batchManagedNotice}</p> : null}
+      toolbar={<TopCommandBar
           selectedRunStatus={selectedRunStatus}
           autoContinue={autoContinue}
           onAutoContinueChange={managedByBatch ? undefined : setAutoContinue}
@@ -276,31 +271,8 @@ function App() {
             viewModeRef.current = "report"
             setViewMode("report")
           }}
-        />
-
-        {managedByBatch ? <p className="py-2 text-sm text-muted-foreground">{t.batchManagedNotice}</p> : null}
-        <div className="flex min-h-0 flex-1 flex-col gap-4 py-4">
-          <Suspense fallback={null}>
-            <LlmMetricsPanel t={t} />
-          </Suspense>
-          <section className="flex min-h-0 flex-col items-start gap-4 xl:min-h-[720px] xl:flex-row">
-            <Suspense fallback={null}>
-              <SimulationStage
-                className="min-h-[720px] w-full xl:flex-[3]"
-                t={t}
-                selectedActorId={selectedActorId}
-                onActorSelect={selectActor}
-                onActorExpand={expandActor}
-                selectedEdgeId={selectedEdgeId}
-                onEdgeSelect={selectEdge}
-                showActorPopover
-              />
-              <ActorRail t={t} onActorSelect={expandActor} className="w-full xl:flex-[2]"
-                overlayOpen={Boolean((reportConfirmRunId && reportConfirmRunId === selectedRunId) || (roundPromptIndex !== undefined && !skipRoundDelay))} />
-            </Suspense>
-          </section>
-        </div>
-
+        />}
+      >
         <Suspense fallback={null}>
           {actorDialogPresent ? (
             <ActorDetailDialog
@@ -329,8 +301,7 @@ function App() {
             onCancel={cancelCurrentRun}
           />
         ) : null}
-      </div>
-    </main>
+    </SimulationPage></Suspense>
   }
   return <PageTransition viewKey={viewMode}>{content}</PageTransition>
 }

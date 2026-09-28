@@ -1,6 +1,11 @@
+/**
+ * Purpose: Update provider connections and explicit role selections in a settings draft.
+ * Pattern: Immutable form transformations.
+ * Usage: Called by settings form controls.
+ * Related: src/ui/components/settings/role-settings-panel.tsx, src/ui/components/settings/model-field.tsx
+ */
 import type { Dispatch, SetStateAction } from "react"
 import type { LLMSettings, ModelProvider, ModelRole, ProviderSettings, RoleSettings } from "@/shared"
-import { roleProviderDefaults } from "@/ui/models/settings/settings-options"
 
 export function updateRole(
   role: ModelRole,
@@ -32,10 +37,10 @@ export function patchProvider(
   })
 }
 
-export function applyProviderDefaults(config: RoleSettings, provider: ModelProvider): RoleSettings {
+export function selectRoleProvider(config: RoleSettings, provider: ModelProvider): RoleSettings {
   return {
     ...config,
-    ...roleProviderDefaults[provider],
+    model: "",
     provider,
   }
 }

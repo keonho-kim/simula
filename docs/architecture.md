@@ -550,8 +550,10 @@ its own context-dependent thought, intent, target, and message.
 
 ### Report workspace
 
-The report page is a single-page analytical workspace. Its metric overview remains above
-explicit generation commands, the live stage/task/output surface, and the completed board.
+Report navigation separates preparation from accepted results. Missing or outdated analysis
+starts automatically in a preparation screen, with explicit recovery after failure. Completion
+opens the result screen, which contains metrics, the accepted board, and recorded simulation
+details without generation controls or live output.
 The selected run can switch to its parent Multiverse analysis when batch ownership exists.
 Reading a saved analysis never generates it. Subject discovery supplies version freshness;
 errors and unavailable source status remain visible without discarding persisted results.
@@ -562,8 +564,8 @@ lifecycle; `api/analytical-report` validates HTTP contracts. Common generation s
 and its reducer now live in `hooks/use-generation-stream.ts` and `models/generation`.
 Scenario-specific stage mapping stays under `models/scenario-builder`.
 
-At most three live task output columns mount per stage page. Only those columns receive
-detailed subscriptions. Named plain-text previews are provisional; completed Markdown is
+Only the selected task output mounts in the preparation screen and receives a detailed
+subscription. Named plain-text previews are provisional; completed Markdown is
 rendered through the existing sanitizer in an opened detail. Readers retain scroll control.
 Four accepted SWOT score tasks can reveal the chart before final prose completes; missing
 values remain unknown and never form a fabricated polygon. Chart loading fades locally
@@ -690,3 +692,14 @@ A partial report's accepted body remains readable during and after an unsuccessf
 Live task previews are separate from that body. Runtime replaces the accepted report only
 when a new assembly succeeds; failure changes execution status without erasing previously
 accepted prose. This preservation does not constitute durable mid-task graph recovery.
+
+### Simulation and report presentation stages
+
+`ui/pages/simulation-page.tsx` owns a viewport-sized workspace. Metrics use a compact row;
+its graph and live actor history share the remaining height. Live history uses its own
+virtualized scroll surface, preserving manual reading until the reader returns to the bottom.
+Report navigation first loads retained analysis. Missing or outdated analysis starts in
+`ui/pages/report-preparation-page.tsx`, which shows three stages and one selected task stream.
+A completed analysis switches to the read-only result; saved accepted reports cause no model
+calls. Failed work stays in preparation with an explicit retry or a path to recorded results.
+The result composition owns neither generation controls nor live task subscriptions.

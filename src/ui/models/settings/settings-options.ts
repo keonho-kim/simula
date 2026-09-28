@@ -1,4 +1,10 @@
-import type { ModelProvider, ModelRole, ProviderSettings, RoleSettings } from "@/shared"
+/**
+ * Purpose: Define provider choices and connection prerequisites for settings forms.
+ * Pattern: Pure presentation policy.
+ * Usage: Imported by provider and role settings components.
+ * Related: src/ui/components/settings/role-settings-panel.tsx, src/shared/settings.ts
+ */
+import type { ModelProvider, ModelRole, ProviderSettings } from "@/shared"
 
 export const roles: ModelRole[] = ["storyBuilder", "planner", "generator", "coordinator", "actor", "observer", "repair"]
 export const cspProviders: Array<{ value: ModelProvider; label: string }> = [
@@ -14,15 +20,6 @@ export const openAICompatibleProviders: Array<{ value: ModelProvider; label: str
 ]
 export const providers = [...cspProviders, ...openAICompatibleProviders]
 export const compatibleProviders: ModelProvider[] = ["ollama", "lmstudio", "vllm", "litellm"]
-export const roleProviderDefaults: Partial<Record<ModelProvider, Partial<RoleSettings>>> = {
-  openai: { model: "gpt-5.4-mini" },
-  anthropic: { model: "claude-sonnet-4-20250514" },
-  gemini: { model: "gemini-2.5-pro" },
-  ollama: { model: "llama3.1" },
-  lmstudio: { model: "local-model" },
-  vllm: { model: "local-model" },
-  litellm: { model: "openai/gpt-5.4-mini" },
-}
 export const providerDefaults: Partial<Record<ModelProvider, ProviderSettings>> = {
   ollama: { baseUrl: "http://localhost:11434/v1", apiKey: "ollama", streamUsage: true },
   lmstudio: { baseUrl: "http://localhost:1234/v1", apiKey: "lm-studio", streamUsage: true },
@@ -54,4 +51,8 @@ export function supportsReasoningEffort(provider: ModelProvider): boolean {
 
 export function providerLabel(provider: ModelProvider): string {
   return providers.find((item) => item.value === provider)?.label ?? provider
+}
+
+export function hasProviderConnection(provider: ModelProvider, connection: ProviderSettings): boolean {
+  return isOpenAICompatible(provider) ? Boolean(connection.baseUrl?.trim()) : Boolean(connection.apiKey?.trim())
 }

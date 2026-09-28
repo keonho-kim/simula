@@ -21,7 +21,7 @@ export function LlmMetricsPanelView({ data, t }: { data: MetricData; t: UiTexts 
   const series = useMemo(() => buildMetricSeries(data, t), [data, t])
 
   return (
-    <section className="flex flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_240px]" aria-label={t.llmMetrics}>
+    <section data-slot="live-metrics" className="flex gap-2 [&>*]:min-w-0 [&>*]:flex-1" aria-label={t.llmMetrics}>
       {series.map((item) => (
         <MetricPanel key={item.title} series={item} t={t} />
       ))}
