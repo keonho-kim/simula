@@ -23,3 +23,13 @@ test("byte cursors cannot cross runs or accept ambiguous and unsafe offsets", ()
     expect(() => parseRunCursor(invalid, "run")).toThrow("cursor")
   }
 })
+
+
+test("speech correlation accepts legacy events and validates new references", () => {
+  const event = { type: "actor.message", actorId: "actor-1", actorName: "Name", content: "Hello", runId: "run", timestamp: "now" } as const
+  expect(parseRunEventEnvelope(event, "run")).toBe(event)
+  expect(parseRunEventEnvelope({ ...event, interactionId: "round-1-actor-1", roundIndex: 1 }, "run").type).toBe("actor.message")
+  for (const reference of [{ interactionId: 1 }, { interactionId: "" }, { roundIndex: 0 }, { roundIndex: 1.5 }]) {
+    expect(() => parseRunEventEnvelope({ ...event, ...reference }, "run")).toThrow("reference")
+  }
+})

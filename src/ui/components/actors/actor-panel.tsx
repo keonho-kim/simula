@@ -5,7 +5,7 @@
  * Related: src/ui/components/actors/history/use-actor-details.ts, src/ui/styles/page-dialog.css
  */
 import { useMemo, useState } from "react"
-import { ArrowDownLeftIcon, ArrowUpRightIcon, BrainIcon, MessageSquareIcon } from "lucide-react"
+import { ArrowDownLeftIcon, ArrowUpRightIcon, BrainIcon, MessageSquareIcon, UserRoundIcon, PauseIcon } from "lucide-react"
 import { Badge } from "@/ui/components/ui/badge"
 import {
   Dialog,
@@ -17,7 +17,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/components/ui/tabs"
 import type { UiTexts } from "@/ui/types/i18n"
 import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
-import { buildHistoryStats, filterHistory, type HistoryFilter, type ActorHistoryItem, type ActorReasoningItem } from "@/ui/models/actors/actor-details"
+import { buildHistoryStats, filterHistory, type HistoryFilter, type ActorHistoryItem } from "@/ui/models/actors/actor-history"
+import type { ActorReasoningItem } from "@/ui/models/actors/actor-details"
 import { useActorPanelData } from "@/ui/components/actors/history/use-actor-details"
 
 export function ActorDetailDialog({
@@ -153,8 +154,9 @@ function ActorSummaryField({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ActorHistoryCard({ item, t }: { item: ActorHistoryItem; t: UiTexts }) {
-  const Icon = item.type === "outgoing" ? ArrowUpRightIcon : item.type === "incoming" ? ArrowDownLeftIcon : MessageSquareIcon
+export function ActorHistoryCard({ item, t }: { item: ActorHistoryItem; t: UiTexts }) {
+  const visibilityLabel = item.visibility ? { public: t.actorVisibilityPublic, "semi-public": t.actorVisibilityGroup, private: t.actorVisibilityPrivate, solitary: t.actorVisibilitySolitary }[item.visibility] : undefined
+  const Icon = item.activity === "held" ? PauseIcon : item.activity === "solitary" ? UserRoundIcon : item.type === "outgoing" ? ArrowUpRightIcon : item.type === "incoming" ? ArrowDownLeftIcon : MessageSquareIcon
   const roundLabel = item.roundIndex === undefined ? `${t.round} —` : `${t.round} ${item.roundIndex}`
   return (
     <div className="rounded-md bg-background/80 p-3">
@@ -164,9 +166,9 @@ function ActorHistoryCard({ item, t }: { item: ActorHistoryItem; t: UiTexts }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-semibold uppercase">{roundLabel} | <MarkdownContent generated inline content={item.counterpartName} /></span>
+            <span className="text-xs font-semibold uppercase">{roundLabel}{item.counterpartName ? <> · <MarkdownContent generated inline content={item.counterpartName} /></> : null}</span>
             {item.visibility ? (
-              <Badge variant="outline" className="h-4 rounded-sm bg-white px-1.5 text-[10px]">{item.visibility}</Badge>
+              <Badge variant="outline" className="h-4 rounded-sm bg-white px-1.5 text-[10px]">{visibilityLabel}</Badge>
             ) : null}
             {item.actionType ? (
               <Badge variant="outline" className="h-4 rounded-sm bg-white px-1.5 text-[10px]"><MarkdownContent generated inline content={item.actionType} /></Badge>

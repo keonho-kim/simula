@@ -1,18 +1,17 @@
+/**
+ * Purpose: Verify actor summaries and activity projections preserve meaning and remove duplicate speech.
+ * Pattern: Presentation contract tests.
+ * Usage: Executed by bun test.
+ * Related: src/ui/models/actors/actor-details.ts, src/ui/models/actors/actor-history.ts
+ */
 import { describe, expect, test } from "bun:test"
 import type { ActorState, Interaction, RunEvent } from "@/shared"
-import type { UiTexts } from "@/ui/types/i18n"
-import { buildActorHistory, buildActorReasoning, buildActorSummaries, filterHistory } from "@/ui/models/actors/actor-details"
+import { buildActorHistory, filterHistory } from "./actor-history"
+import { dictionary } from "@/ui/i18n/dictionary"
+import { buildActorReasoning, buildActorSummaries } from "@/ui/models/actors/actor-details"
 
 const timestamp = "2026-04-28T00:00:00.000Z"
-const t = {
-  actorMessage: "Actor message",
-  modelStep: "Model",
-  actionTaken: "Action taken",
-  receivedInteraction: "Received interaction",
-  to: "To",
-  from: "From",
-  self: "self",
-} as UiTexts
+const t = dictionary.en
 
 describe("actor panel view model", () => {
   test("builds actor info from actors ready events before final run state is available", () => {
@@ -64,7 +63,7 @@ describe("actor panel view model", () => {
     ], [], actorNames(), t, stateActors()).filter((item) => item.id.startsWith("actor-1:"))
 
     expect(history).toHaveLength(2)
-    expect(history.map((item) => item.title)).toEqual(["Action taken", "Actor message"])
+    expect(history.map((item) => item.title)).toEqual([t.actorHistoryConversation, t.actorHistoryConversation])
     expect(history.map((item) => item.content)).toEqual([
       "Public move 1 reached 지훈.",
       "지훈에게 Public move 1을 제안합니다.",
@@ -102,8 +101,8 @@ describe("actor panel view model", () => {
     ], [], actorNames(), t).filter((item) => item.id.startsWith("actor-1:"))
 
     expect(history.map((item) => [item.roundIndex, item.counterpartName])).toEqual([
-      [2, "SOLO"],
-      [1, "HELD"],
+      [2, ""],
+      [1, ""],
     ])
   })
 })
@@ -258,3 +257,23 @@ function actorReasoning(
     actorName,
   }
 }
+
+
+test("merges legacy speech with its interaction but preserves repeated speech in later rounds", () => {
+  const events = [
+    interactionRecorded("first", 1, "actor-1", ["actor-2"], "서연: 확인해 주세요."),
+    actorMessage("actor-1", "확인해 주세요."),
+    interactionRecorded("second", 2, "actor-1", ["actor-2"], "서연: 확인해 주세요."),
+    actorMessage("actor-1", "확인해 주세요."),
+  ]
+  const history = buildActorHistory(events, [], actorNames(), dictionary.ko).filter(item => item.id.startsWith("actor-1:"))
+  expect(history).toHaveLength(2)
+  expect(history.map(item => item.roundIndex)).toEqual([2, 1])
+  expect(filterHistory(history, "message")).toHaveLength(2)
+  expect(history.every(item => item.counterpartName === "지훈")).toBe(true)
+})
+
+test("standalone speech has no invented self recipient", () => {
+  const history = buildActorHistory([actorMessage("actor-1", "잠시만요.")], [], actorNames(), dictionary.ko)
+  expect(history[0]?.counterpartName).toBe("")
+})

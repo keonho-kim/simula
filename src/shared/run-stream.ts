@@ -35,6 +35,14 @@ export function parseRunEventEnvelope(value: unknown, runId: string): RunEvent {
     || !("runId" in value) || typeof value.runId !== "string"
     || !("timestamp" in value) || typeof value.timestamp !== "string") throw new Error("Invalid run event envelope.")
   if (value.runId !== runId) throw new Error("Run event scope does not match the requested run.")
+  if (value.type === "actor.message") {
+    if ("interactionId" in value && value.interactionId !== undefined && (typeof value.interactionId !== "string" || !value.interactionId.trim())) {
+      throw new Error("Invalid actor message interaction reference.")
+    }
+    if ("roundIndex" in value && value.roundIndex !== undefined && (typeof value.roundIndex !== "number" || !Number.isSafeInteger(value.roundIndex) || value.roundIndex < 1)) {
+      throw new Error("Invalid actor message round reference.")
+    }
+  }
   // This boundary checks transport identity, not the legacy event-specific domain payloads.
   return value as RunEvent
 }

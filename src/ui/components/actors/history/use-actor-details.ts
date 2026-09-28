@@ -1,7 +1,14 @@
+/**
+ * Purpose: Select and memoize actor profiles, accepted history, and reasoning for detail dialogs.
+ * Pattern: View projection hook.
+ * Usage: Called by ActorDetailDialog.
+ * Related: src/ui/models/actors/actor-history.ts, src/ui/models/actors/actor-details.ts
+ */
+import { buildActorHistory, type ActorHistoryItem } from "@/ui/models/actors/actor-history"
 import { useMemo } from "react"
 import { useRunStore } from "@/ui/stores/run-store"
 import type { UiTexts } from "@/ui/types/i18n"
-import { buildActorNameMap, buildActorHistory, buildActorReasoning, buildActorSummaries, type ActorSummary, type ActorHistoryItem, type ActorReasoningItem } from "@/ui/models/actors/actor-details"
+import { buildActorNameMap, buildActorReasoning, buildActorSummaries, type ActorSummary, type ActorReasoningItem } from "@/ui/models/actors/actor-details"
 
 export function useActorPanelData(t: UiTexts): { actors: ActorSummary[]; history: ActorHistoryItem[]; reasoning: ActorReasoningItem[] } {
   const timeline = useRunStore((state) => state.timeline)

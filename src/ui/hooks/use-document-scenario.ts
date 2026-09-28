@@ -163,7 +163,7 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
           setAttachments(current => current.filter(value => value.id !== attachment.id))
           await retainDocumentAttachment(attachment.id, setId)
         }
-        await api.controlDocument(setId, document.id, "extract", form.fastMode)
+        await api.controlDocument(setId, document.id, "extract", form.fastMode, language)
       }
       await client.invalidateQueries({ queryKey: ["document-set", setId] })
       setPendingGeneration(true)
@@ -192,7 +192,7 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
   async function controlFile(id: string, action: "extract" | "cancel") {
     if (!session.documentSetId || busy) return
     setBusy(true); setError(undefined)
-    try { await api.controlDocument(session.documentSetId, id, action, form.fastMode); await documentQuery.refetch() }
+    try { await api.controlDocument(session.documentSetId, id, action, form.fastMode, language); await documentQuery.refetch() }
     catch { setError("request") }
     finally { setBusy(false) }
   }

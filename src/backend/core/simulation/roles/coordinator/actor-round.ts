@@ -58,7 +58,7 @@ export async function runActorRound(
       const currentActor = nextActors.find((actor) => actor.id === result.actorId)
       if (!currentActor) continue
       nextActors = applyActorDecision(nextActors, result.decision)
-      const interaction = buildInteraction(roundIndex, event, currentActor, nextActors, result.decision)
+      const interaction = buildInteraction(roundIndex, event, currentActor, nextActors, result.decision, state.scenario.language)
       interactions.push(interaction)
       nextActors = applyInteractionContext(nextActors, interaction)
       await emitInteraction(state.runId, currentActor, result.decision, interaction, emit)
@@ -120,6 +120,8 @@ async function emitInteraction(
       actorId: actor.id,
       actorName: actor.name,
       content: decision.message,
+      interactionId: interaction.id,
+      roundIndex: interaction.roundIndex,
     })
   }
 }

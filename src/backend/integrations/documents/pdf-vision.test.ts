@@ -68,3 +68,15 @@ test("original workbook evidence overrides a recalculated rendered PDF value", a
   }, undefined, source)
   expect(extraction.blocks).toHaveLength(0)
 })
+
+
+test("page interpretation uses the requested language while keeping extracted source text", async () => {
+  const extraction = await interpretPdfPages("source", fixture("overview.pdf"), false, 1, async prompt => {
+    expect(prompt).toContain("Output language setting: ko")
+    expect(prompt).toContain("한국어로 작성")
+    expect(prompt).toContain("Costs")
+    return "출시 일정과 비용을 검토하는 자료입니다."
+  }, undefined, undefined, "ko")
+  expect(extraction.blocks.some(block => block.method === "pdfjs" && block.content.includes("Costs"))).toBe(true)
+  expect(extraction.blocks.some(block => block.method === "vlm" && block.content.includes("출시 일정"))).toBe(true)
+})

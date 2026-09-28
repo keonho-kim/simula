@@ -92,7 +92,7 @@ export type RunEvent =
   | { type: "actors.ready"; runId: string; timestamp: string; actors: ActorReadyView[] }
   | { type: "event.injected"; runId: string; timestamp: string; event: InjectedEvent }
   | { type: "interaction.recorded"; runId: string; timestamp: string; interaction: Interaction }
-  | { type: "actor.message"; runId: string; timestamp: string; actorId: string; actorName: string; content: string }
+  | { type: "actor.message"; runId: string; timestamp: string; actorId: string; actorName: string; content: string; interactionId?: string; roundIndex?: number }
   | { type: "round.completed"; runId: string; timestamp: string; roundIndex: number; awaitsContinuation?: boolean }
   | { type: "graph.delta"; runId: string; timestamp: string; frame: GraphTimelineFrame }
   | { type: "log"; runId: string; timestamp: string; level: "info" | "warn" | "error"; message: string }

@@ -4,7 +4,7 @@
  * Usage: Called by coordinator actor-round after a validated actor graph decision.
  * Related: src/backend/core/simulation/roles/coordinator/actor-round.ts, src/backend/core/simulation/events/injection.ts
  */
-import type { ActorDecision, ActorState, Interaction, PlannedEvent } from "@/shared"
+import type { ActorDecision, ActorState, Interaction, PlannedEvent, PromptLanguage } from "@/shared"
 import { sanitizeActorVisibleText } from "@/backend/core/simulation/actors/visible-text"
 import { projectEventForActor } from "@/backend/core/simulation/events/injection"
 
@@ -37,7 +37,8 @@ export function buildInteraction(
   event: PlannedEvent,
   actor: ActorState,
   actors: ActorState[],
-  decision: ActorDecision
+  decision: ActorDecision,
+  language: PromptLanguage = "en"
 ): Interaction {
   return {
     id: `round-${roundIndex}-${actor.id}`,
@@ -47,7 +48,7 @@ export function buildInteraction(
     targetActorIds: decision.targetActorIds,
     actionCode: decision.actionId,
     actionType: actionLabel(actor, decision.actionId) ?? decision.decisionType,
-    content: sanitizeActorVisibleText(interactionContent(actor, actors, projectEventForActor(event, actor.id).event, decision), actors),
+    content: sanitizeActorVisibleText(interactionContent(actor, actors, projectEventForActor(event, actor.id).event, decision, language), actors),
     eventId: event.id,
     visibility: decision.visibility,
     decisionType: decision.decisionType,
@@ -67,7 +68,8 @@ function interactionContent(
   actor: ActorState,
   actors: ActorState[],
   event: PlannedEvent,
-  decision: ActorDecision
+  decision: ActorDecision,
+  language: PromptLanguage
 ): string {
   if (decision.visibility === "solitary" && decision.actionDescription) {
     return decision.actionDescription
@@ -76,11 +78,16 @@ function interactionContent(
     return `${actor.name}: ${decision.message}`
   }
   if (decision.decisionType === "no_action") {
-    return `${actor.name} held back during "${event.title}".`
+    return language === "ko" ? `${actor.name}: 「${event.title}」에서 행동을 보류한다.` : `${actor.name} held back during "${event.title}".`
   }
   const targetNames = decision.targetActorIds
     .map((targetId) => actors.find((candidate) => candidate.id === targetId)?.name)
     .filter(Boolean)
+  const label = actionLabel(actor, decision.actionId)
+  if (language === "ko") {
+    const targetText = targetNames.length ? ` 대상: ${targetNames.join(", ")}.` : ""
+    return `${actor.name}: 「${event.title}」에서 ${label ? `‘${label}’ 행동을 수행한다.` : "행동을 수행한다."}${targetText}`
+  }
   const targetText = targetNames.length > 0 ? ` with ${targetNames.join(", ")}` : ""
-  return `${actor.name} advanced "${event.title}"${targetText} through a ${decision.visibility} action.`
+  return `${actor.name} performed ${label ? `"${label}"` : "an action"}${targetText} during "${event.title}".`
 }

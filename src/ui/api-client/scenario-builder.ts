@@ -5,6 +5,7 @@
  * Related: src/shared/documents-schema.ts, src/shared/scenario-builder-schema.ts
  */
 import { z } from "zod"
+import type { PromptLanguage } from "@/shared/scenario"
 import type { BuilderRequest } from "@/shared/scenario-builder"
 import { buildRecordSchema } from "@/shared/scenario-builder-schema"
 import { documentSchema, evidenceBlockSchema, setSchema } from "@/shared/documents-schema"
@@ -51,9 +52,9 @@ export async function uploadDocument(setId: string, file: File, signal: AbortSig
   }, UPLOAD_TIMEOUT_MS)).document
 }
 
-export async function controlDocument(setId: string, documentId: string, action: "extract" | "cancel", fastMode = false) {
+export async function controlDocument(setId: string, documentId: string, action: "extract" | "cancel", fastMode = false, language: PromptLanguage = "en") {
   await request(`/api/documents/${encodeURIComponent(setId)}/files/${encodeURIComponent(documentId)}/${action}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fastMode }),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fastMode, language }),
   })
 }
 

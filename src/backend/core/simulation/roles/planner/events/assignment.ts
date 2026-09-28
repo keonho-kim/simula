@@ -35,7 +35,7 @@ export async function assignEventAudiences(
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const choices = eventAudienceOptions(initial.actors.length)
       const instruction = eventAudiencePrompt(initial, event, feedback)
-      const prompt = choices ? instruction : withRolePromptGuide(instruction, {
+      const prompt = withRolePromptGuide(instruction, {
         language: initial.scenario.language, settings, role: "planner",
       })
       const options = { taskId: `event-audience-${event.id}` }

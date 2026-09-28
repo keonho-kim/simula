@@ -4,7 +4,7 @@
  * Usage: Executed by bun test using temporary local artifacts.
  * Related: src/backend/api/documents/document-controller.ts, src/backend/runtime/documents.ts
  */
-import { expect, test } from "bun:test"
+import { expect, spyOn, test } from "bun:test"
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -94,4 +94,25 @@ test("an exact source ID returns only its owning document block", async () => {
     await store.addFile(set.id, "later.txt", new TextEncoder().encode("Later source"))
     expect((await read(file.id)).status).toBe(200)
   } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+
+test("document extraction receives the selected output language and rejects invalid settings", async () => {
+  const root = await mkdtemp(join(tmpdir(), "simula-document-language-"))
+  const store = new DocumentStore(root)
+  const jobs = new DocumentJobs(store, "soffice", async () => defaultSettings(), new ModelAdmission({ concurrency: 1 }))
+  const start = spyOn(jobs, "start").mockReturnValue({ completion: Promise.resolve(), alreadyRunning: false })
+  try {
+    const set = await store.createSet()
+    const file = await store.addFile(set.id, "notes.txt", new TextEncoder().encode("English source"))
+    for (const language of ["ko", "en", "invalid"]) {
+      const request = new Request(`http://local/api/documents/${set.id}/files/${file.id}/extract`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fastMode: true, language }),
+      })
+      const response = await routeDocuments(store, jobs, request, new URL(request.url))
+      expect(response.status).toBe(language === "invalid" ? 400 : 202)
+      if (language !== "invalid") expect(start).toHaveBeenLastCalledWith(set.id, file.id, true, language)
+    }
+    expect(start).toHaveBeenCalledTimes(2)
+  } finally { start.mockRestore(); await rm(root, { recursive: true, force: true }) }
 })

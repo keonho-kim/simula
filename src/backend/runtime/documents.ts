@@ -15,6 +15,7 @@ import { assertCompleteModelOutput, invokeRoleInputWithMetrics } from "@/backend
 import { createVisionInput } from "@/backend/integrations/llm/vision-input"
 import type { DocumentStore } from "@/backend/storage/documents/document-store"
 import type { LLMSettings } from "@/shared/settings"
+import type { PromptLanguage } from "@/shared/scenario"
 import type { DocumentExtraction, DocumentFormat } from "@/shared/documents"
 
 interface ExtractionJob { controller: AbortController; completion: Promise<void> }
@@ -29,12 +30,12 @@ export class DocumentJobs {
   constructor(private readonly store: DocumentStore, private readonly officeConverter: string,
     private readonly getSettings: () => Promise<LLMSettings>, private readonly admission: ModelCallAdmission) {}
 
-  start(setId: string, documentId: string, fastMode = false): { completion: Promise<void>; alreadyRunning: boolean } {
+  start(setId: string, documentId: string, fastMode = false, language: PromptLanguage = "en"): { completion: Promise<void>; alreadyRunning: boolean } {
     const key = `${setId}:${documentId}`
     const previous = this.active.get(key)
     if (previous) return { completion: previous.completion, alreadyRunning: true }
     const controller = new AbortController()
-    const completion = this.extract(setId, documentId, fastMode, controller.signal).finally(() => this.active.delete(key))
+    const completion = this.extract(setId, documentId, fastMode, language, controller.signal).finally(() => this.active.delete(key))
     this.active.set(key, { controller, completion })
     return { completion, alreadyRunning: false }
   }
@@ -48,7 +49,7 @@ export class DocumentJobs {
 
   isActive(setId: string, documentId: string): boolean { return this.active.has(`${setId}:${documentId}`) }
 
-  private async extract(setId: string, documentId: string, fastMode: boolean, signal: AbortSignal): Promise<void> {
+  private async extract(setId: string, documentId: string, fastMode: boolean, language: PromptLanguage, signal: AbortSignal): Promise<void> {
     const document = await this.store.readDocument(setId, documentId)
     if (document.status === "ready") return
     let release: (() => void) | undefined
@@ -57,7 +58,7 @@ export class DocumentJobs {
       release = await this.acquire(signal, fastMode, settings.concurrency)
       signal.throwIfAborted()
       await this.store.updateStatus(setId, documentId, "processing")
-      const evidence = await this.extractEvidence(setId, documentId, document.format, fastMode, settings, signal)
+      const evidence = await this.extractEvidence(setId, documentId, document.format, fastMode, settings, signal, language)
       signal.throwIfAborted()
       await this.store.saveExtraction(setId, documentId, evidence)
     } catch (error) {
@@ -70,7 +71,7 @@ export class DocumentJobs {
   }
 
   private async extractEvidence(setId: string, documentId: string, format: DocumentFormat, fastMode: boolean,
-    settings: LLMSettings, signal: AbortSignal): Promise<DocumentExtraction> {
+    settings: LLMSettings, signal: AbortSignal, language: PromptLanguage): Promise<DocumentExtraction> {
     if (format === "csv") return extractCsvEvidence(documentId, await this.store.readOriginal(setId, documentId))
     if (format === "txt" || format === "md") return extractTextEvidence(documentId, await this.store.readOriginal(setId, documentId))
     const path = await this.store.originalPath(setId, documentId)
@@ -88,7 +89,7 @@ export class DocumentJobs {
         await this.store.appendMetrics(setId, documentId, page, result.metrics).catch(() => { throw usageFailure() })
         assertCompleteModelOutput(result)
         return result.text
-      }, signal, format === "xlsx" ? originalWorkbookText : undefined))
+      }, signal, format === "xlsx" ? originalWorkbookText : undefined, language))
     if (format === "pdf") return analyzePdf(path)
     return withOfficePdf(path, this.officeConverter, signal, async pdfPath => {
       const extraction = await analyzePdf(pdfPath)

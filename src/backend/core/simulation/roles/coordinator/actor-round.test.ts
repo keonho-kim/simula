@@ -5,7 +5,7 @@
  * Related: src/backend/core/simulation/roles/coordinator/actor-round.ts
  */
 import { expect, spyOn, test } from "bun:test"
-import type { ActorState } from "@/shared"
+import type { ActorState, RunEvent } from "@/shared"
 import { actorExecutionBatches, runActorRound } from "./actor-round"
 import { defaultSettings } from "@/backend/core/settings/defaults"
 import { initialSimulationState } from "../../workflow/state"
@@ -57,6 +57,7 @@ for (const fastMode of [false, true]) test(`later actors receive prior accepted 
     ...actor(`actor-${index}`), actions: [{ id: `action-${index}`, visibility: "public" as const, label: "Ask", intentHint: "When unclear", expectedOutcome: "Clarity" }],
   }))
   const thoughts: string[] = []
+  const events: RunEvent[] = []
   const text = spyOn(invocation, "invokeRoleTextWithMetrics").mockImplementation(async (_settings, _role, step, _attempt, prompt) => {
     if (step === "thought") thoughts.push(prompt)
     return response(step === "thought" ? "I need evidence." : step === "intent" ? "Request clarity." : "FIRST-ACTOR-SIGNAL")
@@ -65,7 +66,9 @@ for (const fastMode of [false, true]) test(`later actors receive prior accepted 
   try {
     const round = await runActorRound({ runId: simulation.runId, scenario, settings: defaultSettings(), simulation }, cast,
       { id: "event", title: "Review", summary: "Clarify next steps.", status: "active", participantIds: [] },
-      { roundIndex: 1, preRound: { elapsedTime: "0", content: "The review begins." } }, 1, emptyCoordinatorTrace(), async () => {})
+      { roundIndex: 1, preRound: { elapsedTime: "0", content: "The review begins." } }, 1, emptyCoordinatorTrace(), async event => { events.push(event) })
+    const speech = events.filter(event => event.type === "actor.message")
+    expect(speech.map(event => [event.interactionId, event.roundIndex])).toEqual(round.interactions.map(item => [item.id, item.roundIndex]))
     expect(thoughts).toHaveLength(2)
     expect(thoughts[0]).not.toContain("FIRST-ACTOR-SIGNAL")
     expect(thoughts[1]?.includes("FIRST-ACTOR-SIGNAL")).toBe(!fastMode)

@@ -71,7 +71,9 @@ export function buildActorDecision(state: ActorStepInput): ActorDecision {
       targetActorIds: [],
       intent,
       expectation: sanitizeActorVisibleText(
-        `Hold position while considering ${state.coordinatorTrace.outcomeDirection.toLowerCase()}.`,
+        state.scenario.language === "ko"
+          ? `${state.coordinatorTrace.outcomeDirection} 방향을 고려하며 상황을 지켜본다.`
+          : `Hold position while considering ${state.coordinatorTrace.outcomeDirection.toLowerCase()}.`,
         state.actors
       ),
       contextUsed: state.contextUsed,

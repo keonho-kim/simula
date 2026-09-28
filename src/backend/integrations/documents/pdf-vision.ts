@@ -12,6 +12,7 @@ import { DocumentError, parseExtraction } from "@/backend/core/documents/validat
 import { extractTextEvidence } from "@/backend/core/documents/text"
 import { unsupportedSourceNumbers } from "@/backend/core/documents/source-numbers"
 import { MAX_IMAGE_BYTES, type ModelImage } from "@/backend/integrations/llm/vision-input"
+import type { PromptLanguage } from "@/shared/scenario"
 import type { DocumentExtraction, EvidenceBlock } from "@/shared/documents"
 import { MAX_EVIDENCE_BLOCKS } from "@/shared/documents-schema"
 import { MAX_MODEL_CONCURRENCY } from "@/shared/settings"
@@ -25,7 +26,7 @@ export type InterpretPage = (prompt: string, image: ModelImage, page: number) =>
 
 export async function interpretPdfPages(
   documentId: string, path: string, fastMode: boolean, concurrency: number,
-  interpret: InterpretPage, signal?: AbortSignal, originalWorkbookText?: string,
+  interpret: InterpretPage, signal?: AbortSignal, originalWorkbookText?: string, language: PromptLanguage = "en",
 ): Promise<DocumentExtraction> {
   if (!Number.isSafeInteger(concurrency) || concurrency < 1 || concurrency > MAX_MODEL_CONCURRENCY) {
     throw new Error(`Document concurrency must be between 1 and ${MAX_MODEL_CONCURRENCY}.`)
@@ -62,7 +63,7 @@ export async function interpretPdfPages(
           const bytes = await canvas.encode("png")
           if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) throw new Error("Rendered page exceeds the image limit.")
           signal?.throwIfAborted()
-          const summary = (await interpret(pagePrompt(documentId, number, text.slice(0, MAX_PROMPT_TEXT_CHARS), originalWorkbookText !== undefined), { mimeType: "image/png", bytes }, number)).trim()
+          const summary = (await interpret(pagePrompt(documentId, number, text.slice(0, MAX_PROMPT_TEXT_CHARS), originalWorkbookText !== undefined, language), { mimeType: "image/png", bytes }, number)).trim()
           if (!summary) throw new Error("Visual interpretation is empty.")
           const acceptedSummary = text ? summary.split("\n").filter(line => !unsupportedSourceNumbers(line, text).length).join("\n").trim() : summary
           const unsupported = acceptedSummary !== summary

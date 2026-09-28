@@ -4,6 +4,7 @@
  * Usage: Dispatched for /api/documents by the API router.
  * Related: src/backend/runtime/documents.ts, src/backend/storage/documents/document-store.ts
  */
+import { z } from "zod"
 import { DocumentError } from "@/backend/core/documents/validation"
 import { MAX_DOCUMENT_BYTES } from "@/shared/documents-schema"
 import type { DocumentStore } from "@/backend/storage/documents/document-store"
@@ -12,6 +13,7 @@ import { json } from "../responses"
 
 const MAX_UPLOAD_BODY_BYTES = MAX_DOCUMENT_BYTES + 64 * 1024
 const EVIDENCE_PAGE_SIZE = 100
+const extractionRequest = z.object({ fastMode: z.boolean().default(false), language: z.enum(["ko", "en"]).default("en") })
 
 export async function routeDocuments(store: DocumentStore, jobs: DocumentJobs, request: Request, url: URL): Promise<Response> {
   const parts = url.pathname.split("/").filter(Boolean)
@@ -38,9 +40,10 @@ export async function routeDocuments(store: DocumentStore, jobs: DocumentJobs, r
     if (!documentId) return json({ error: "Not found" }, { status: 404 })
     if (parts.length === 6 && parts[5] === "extract" && request.method === "POST") {
       await store.readDocument(setId, documentId)
-      const fastMode = (await request.json().catch(() => ({})) as { fastMode?: unknown }).fastMode
-      if (fastMode !== undefined && typeof fastMode !== "boolean") throw new DocumentError("invalid_extraction_mode", "fastMode must be a boolean.")
-      const job = jobs.start(setId, documentId, fastMode === true)
+      const body: unknown = request.body ? await request.json().catch(() => null) : {}
+      const parsed = extractionRequest.safeParse(body)
+      if (!parsed.success) throw new DocumentError("invalid_extraction_mode", "fastMode must be a boolean and language must be ko or en.")
+      const job = jobs.start(setId, documentId, parsed.data.fastMode, parsed.data.language)
       void job.completion.catch(() => console.error("Document extraction persistence failed", { setId, documentId }))
       return json({ status: job.alreadyRunning ? "already_running" : "started" }, { status: 202 })
     }

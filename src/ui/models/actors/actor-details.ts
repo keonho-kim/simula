@@ -1,8 +1,12 @@
-import type { ActorState, GraphNodeView, Interaction, RunEvent } from "@/shared"
-import type { UiTexts } from "@/ui/types/i18n"
-import { createActorTextSanitizer, sanitizeActorVisibleText } from "@/ui/models/actors/actor-visible-text"
-
-export type HistoryFilter = "all" | "outgoing" | "incoming" | "message"
+/**
+ * Purpose: Project actor profiles, names, and reasoning separately from activity history.
+ * Pattern: Pure presentation transformations.
+ * Usage: Consumed by the actor detail hook.
+ * Related: src/ui/models/actors/actor-history.ts, src/ui/components/actors/history/use-actor-details.ts
+ */
+import type { ActorHistoryItem } from "./actor-history"
+import type { ActorState, GraphNodeView, RunEvent } from "@/shared"
+import { createActorTextSanitizer } from "@/ui/models/actors/actor-visible-text"
 
 export interface ActorSummary {
   id: string
@@ -17,19 +21,6 @@ export interface ActorSummary {
   interactionCount: number
   latestActivity: string
   messageCount: number
-}
-
-export interface ActorHistoryItem {
-  id: string
-  type: "outgoing" | "incoming" | "message"
-  roundIndex?: number
-  timestamp?: string
-  title: string
-  counterpart?: string
-  counterpartName: string
-  content: string
-  visibility?: Interaction["visibility"]
-  actionType?: string
 }
 
 export interface ActorReasoningItem {
@@ -110,7 +101,7 @@ export function buildActorSummaries(
     const actor = actorId ? summaries.get(actorId) : undefined
     if (actor) {
       actor.latestActivity ||= item.content
-      actor.messageCount += item.type === "message" ? 1 : 0
+      actor.messageCount += item.hasSpeech ? 1 : 0
     }
   }
   return [...summaries.values()]
@@ -141,34 +132,6 @@ export function buildActorNameMap(
   return names
 }
 
-export function buildActorHistory(
-  actorEvents: RunEvent[],
-  stateInteractions: Interaction[],
-  actorNames: Map<string, string>,
-  t: UiTexts,
-  actors: ActorState[] = []
-): ActorHistoryItem[] {
-  const items: ActorHistoryItem[] = []
-  const seen = new Set<string>()
-
-  let currentRoundIndex: number | undefined
-  for (const event of actorEvents) {
-    if (event.type === "interaction.recorded") {
-      currentRoundIndex = event.interaction.roundIndex
-      addInteractionHistory(items, seen, event.interaction, actorNames, t, actors, event.timestamp)
-    }
-    if (event.type === "actor.message") {
-      addMessageHistory(items, seen, event.actorId, event.timestamp, currentRoundIndex, t.actorMessage, t.self.toUpperCase(), sanitizeActorVisibleText(event.content, actorNames, actors))
-    }
-  }
-
-  for (const interaction of stateInteractions) {
-    addInteractionHistory(items, seen, interaction, actorNames, t, actors)
-  }
-
-  return items.sort(compareHistoryItems)
-}
-
 export function buildActorReasoning(actorEvents: RunEvent[]): ActorReasoningItem[] {
   return actorEvents
     .filter((event): event is Extract<RunEvent, { type: "model.reasoning" }> => event.type === "model.reasoning" && event.role === "actor" && Boolean(event.actorId))
@@ -181,115 +144,4 @@ export function buildActorReasoning(actorEvents: RunEvent[]): ActorReasoningItem
       content: event.content,
       reasoningTokens: event.reasoningTokens,
     }))
-}
-
-function addMessageHistory(
-  items: ActorHistoryItem[],
-  seen: Set<string>,
-  actorId: string,
-  timestamp: string,
-  roundIndex: number | undefined,
-  title: string,
-  counterpartName: string,
-  content: string
-): void {
-  const id = `${actorId}:message:${timestamp}:${title}:${content}`
-  if (seen.has(id)) {
-    return
-  }
-  seen.add(id)
-  items.push({ id, type: "message", roundIndex, timestamp, title, counterpartName, content })
-}
-
-function addInteractionHistory(
-  items: ActorHistoryItem[],
-  seen: Set<string>,
-  interaction: Interaction,
-  actorNames: Map<string, string>,
-  t: UiTexts,
-  actors: ActorState[],
-  timestamp?: string
-): void {
-  const targetNames = interaction.targetActorIds
-    .filter((targetId) => targetId !== interaction.sourceActorId)
-    .map((targetId) => actorNames.get(targetId) ?? targetId)
-  const sourceName = actorNames.get(interaction.sourceActorId) ?? interaction.sourceActorId
-  const sourceId = `${interaction.sourceActorId}:outgoing:${interaction.id}`
-  const counterpartName = interaction.decisionType === "no_action"
-    ? "HELD"
-    : targetNames.join(", ") || "SOLO"
-  if (!seen.has(sourceId)) {
-    seen.add(sourceId)
-    items.push({
-      id: sourceId,
-      type: "outgoing",
-      roundIndex: interaction.roundIndex,
-      timestamp,
-      title: t.actionTaken,
-      counterpart: counterpartName,
-      counterpartName,
-      content: sanitizeActorVisibleText(interaction.content, actorNames, actors),
-      visibility: interaction.visibility,
-      actionType: interaction.actionType,
-    })
-  }
-  for (const targetId of interaction.targetActorIds) {
-    if (targetId === interaction.sourceActorId) {
-      continue
-    }
-
-    const targetItemId = `${targetId}:incoming:${interaction.id}`
-    if (seen.has(targetItemId)) {
-      continue
-    }
-    seen.add(targetItemId)
-    items.push({
-      id: targetItemId,
-      type: "incoming",
-      roundIndex: interaction.roundIndex,
-      timestamp,
-      title: t.receivedInteraction,
-      counterpart: `${t.from} ${sourceName}`,
-      counterpartName: sourceName,
-      content: sanitizeActorVisibleText(interaction.content, actorNames, actors),
-      visibility: interaction.visibility,
-      actionType: interaction.actionType,
-    })
-  }
-}
-
-export function filterHistory(history: ActorHistoryItem[], filter: HistoryFilter): ActorHistoryItem[] {
-  return filter === "all" ? history : history.filter((item) => item.type === filter)
-}
-
-export function buildHistoryStats(history: ActorHistoryItem[]): {
-  total: number
-  outgoing: number
-  incoming: number
-  messages: number
-} {
-  return {
-    total: history.length,
-    outgoing: history.filter((item) => item.type === "outgoing").length,
-    incoming: history.filter((item) => item.type === "incoming").length,
-    messages: history.filter((item) => item.type === "message").length,
-  }
-}
-
-function compareHistoryItems(a: ActorHistoryItem, b: ActorHistoryItem): number {
-  const roundDelta = (b.roundIndex ?? -1) - (a.roundIndex ?? -1)
-  if (roundDelta !== 0) {
-    return roundDelta
-  }
-  return historySortValue(b) - historySortValue(a)
-}
-
-function historySortValue(item: ActorHistoryItem): number {
-  if (item.timestamp) {
-    const time = new Date(item.timestamp).getTime()
-    if (Number.isFinite(time)) {
-      return time
-    }
-  }
-  return item.roundIndex ?? 0
 }
