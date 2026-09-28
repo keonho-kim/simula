@@ -1,3 +1,9 @@
+/**
+ * Purpose: Verify conversation projection preserves ordering, privacy scope, and output content.
+ * Pattern: Pure presentation contract test.
+ * Usage: bun test src/ui/models/actors/actor-conversation.test.ts
+ * Related: src/ui/models/actors/actor-conversation.ts
+ */
 import { describe, expect, test } from "bun:test"
 import type { RunEvent } from "@/shared"
 import { buildActorRounds } from "@/ui/models/actors/actor-conversation"
@@ -40,4 +46,16 @@ describe("actor conversation", () => {
     expect(message.decisionType).toBe("no_action")
     expect(message.targets).toEqual([])
   })
+})
+
+test("preserves solitary content and scope without presenting a recipient", () => {
+  const event = recorded(1)
+  if (event.type !== "interaction.recorded") throw new Error("Expected interaction")
+  event.interaction.visibility = "solitary"
+  event.interaction.targetActorIds = []
+  event.interaction.content = "Separates confirmed facts from open questions."
+  const message = buildActorRounds([ready, event])[0]!.messages[0]!
+  expect(message.visibility).toBe("solitary")
+  expect(message.content).toBe(event.interaction.content)
+  expect(message.targets).toEqual([])
 })

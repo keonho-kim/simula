@@ -30,7 +30,8 @@ export function createActorStepNode(
   return async (graphState) => {
     const state: ActorStepInput = { ...context, ...graphState }
     const selectedAction = normalizeActorAction(state.trace.action, state)
-    if (step === "target" && (!selectedAction || selectedAction === "no_action")) {
+    const solitary = state.actor.actions.find(action => action.id === selectedAction)?.visibility === "solitary"
+    if (step === "target" && (!selectedAction || selectedAction === "no_action" || solitary)) {
       return {
         trace: applyActorTraceStep(state.trace, step, "None", 0),
       }

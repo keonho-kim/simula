@@ -39,7 +39,7 @@ ${compactLines([
 
 function textGuide(language: string | undefined): string {
   const korean = normalizePromptLanguage(language) === "ko"
-  const instruction = korean ? "현재 인물이 상황을 어떻게 해석하고 무엇을 원하거나 걱정하는지 짧은 내적 독백으로 작성하세요. 상대에게 직접 말하는 대사는 쓰지 마세요. 모르는 사실이나 숨은 동기를 지어내지 마세요." : "Write a short private reflection: how this actor interprets the situation and what they want or worry about. Do not address another actor with spoken dialogue. Do not invent unknown facts or hidden motives."
+  const instruction = korean ? "현재 인물이 상황을 어떻게 해석하고 무엇을 원하거나 걱정하는지 자신의 관점에서 짧은 1인칭 내적 독백으로 작성하세요. 자기 이름을 부르거나 제3자가 자신을 평가하는 문장은 쓰지 마세요. 상대에게 직접 말하는 대사는 쓰지 마세요. 모르는 사실이나 숨은 동기를 지어내지 마세요." : "Write a short first-person private reflection, not an external narrator’s description or an address to yourself by name: how this actor interprets the situation and what they want or worry about. Do not address another actor with spoken dialogue. Do not invent unknown facts or hidden motives."
   return `${instruction}\n${korean
     ? "현재 단계의 내용만 출력하세요. 생각·의도·발화를 함께 쓰거나 제목을 붙이지 마세요."
     : "Output only the current step. Do not include other steps or a heading."}`

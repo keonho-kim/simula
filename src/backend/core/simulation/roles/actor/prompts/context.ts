@@ -39,7 +39,7 @@ export function actionPromptOutputs(state: ActorStepInput): string {
     targetActors(state).length === 0
       ? state.actor.actions.filter((action) => action.visibility === "solitary")
       : state.actor.actions
-  return actions.map((action) => `- ${action.id} (${action.label}). Use when: ${action.intentHint} Effect: ${action.expectedOutcome}`).join("\n")
+  return actions.map((action) => `- ${action.id} (${action.label}; scope: ${action.visibility}). Use when: ${action.intentHint} Effect: ${action.expectedOutcome}`).join("\n")
 }
 
 export function targetPromptOutputs(state: ActorStepInput, actionId: string | undefined): string {

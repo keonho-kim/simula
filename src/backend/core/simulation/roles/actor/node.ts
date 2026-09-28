@@ -13,6 +13,7 @@ import { scalePromptLimit } from "@/backend/core/prompts/prompt"
 import { emitModelTelemetry } from "@/backend/core/simulation/events/telemetry"
 import { repairExactChoice } from "@/backend/core/simulation/roles/repair"
 import type { ActorPromptBuilder } from "@/backend/core/simulation/roles/actor/prompts"
+import { retryActionDescription } from "./prompts/retry-action-description"
 import { retryMessage } from "./prompts/retry-message"
 import { retrySection } from "./prompts/retry-section"
 import { normalizeActorMessage } from "@/backend/core/simulation/roles/actor/state"
@@ -56,7 +57,7 @@ export async function runActorTextNode(
     const rawResponse = validate ? result.text.trim() : normalizePlainText(result.text, state)
     const formatIssue = validate ? "" : roleSectionIssue(rawResponse, step, state)
     const response = formatIssue ? rawResponse : stripCurrentRoleLabel(rawResponse, step)
-    responseIssue = formatIssue || (step === "message" ? messageFeedback(response, partial, state) : "")
+    responseIssue = formatIssue || (step === "message" ? outputFeedback(response, partial, state) : "")
     if (response && !responseIssue && (!validate || validate(response, state))) {
       await emit({
         type: "model.message",
@@ -136,13 +137,15 @@ function timestamp(): string {
   return new Date().toISOString()
 }
 
-function messageFeedback(response: string, partial: Partial<Record<ActorTraceStep, string>>, state: ActorStepInput): string {
-  if (!response) return retryMessage({ kind: "empty" }, state.scenario.language)
+function outputFeedback(response: string, partial: Partial<Record<ActorTraceStep, string>>, state: ActorStepInput): string {
+  const solitary = state.actor.actions.find(action => action.id === partial.action)?.visibility === "solitary"
+  const feedback = solitary ? retryActionDescription : retryMessage
+  if (!response || (solitary && !normalizeActorMessage(response))) return feedback({ kind: "empty" }, state.scenario.language)
   if (!normalizeActorMessage(response)) return ""
   const normalize = (value: string) => value.normalize("NFKC").toLowerCase().replace(/[\s\p{P}]/gu, "")
-  const spoken = normalize(response)
+  const output = normalize(response)
   // Compare whole texts only: shared meaning or a shared phrase is not an error.
-  const source = (["thought", "intent"] as const).find(key => spoken && spoken === normalize(partial[key] ?? ""))
+  const source = (["thought", "intent"] as const).find(key => output && output === normalize(partial[key] ?? ""))
   if (!source) return ""
-  return retryMessage({ kind: "copied", source, excerpt: preview(response) }, state.scenario.language)
+  return feedback({ kind: "copied", source, excerpt: preview(response) }, state.scenario.language)
 }

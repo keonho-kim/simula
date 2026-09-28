@@ -77,6 +77,8 @@ export interface ActorDecision {
   targetActorIds: string[]
   intent: string
   message?: string
+  /** Concrete solitary action; never published as actor speech. */
+  actionDescription?: string
   expectation: string
   contextUsed: string[]
 }

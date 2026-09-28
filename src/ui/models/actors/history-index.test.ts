@@ -12,8 +12,8 @@ test("indexes headers and messages across empty and populated rounds", () => {
   const rounds: ActorRound[] = [
     { roundIndex: 1, messages: [] },
     { roundIndex: 2, messages: [
-      { id: "first", actorId: "a", actorName: "A", role: "", targets: [], thought: "", action: "", content: "One", decisionType: "action", timestamp: "" },
-      { id: "second", actorId: "b", actorName: "B", role: "", targets: [], thought: "", action: "", content: "Two", decisionType: "action", timestamp: "" },
+      { id: "first", actorId: "a", actorName: "A", role: "", targets: [], thought: "", action: "", content: "One", decisionType: "action", visibility: "private", timestamp: "" },
+      { id: "second", actorId: "b", actorName: "B", role: "", targets: [], thought: "", action: "", content: "Two", decisionType: "action", visibility: "private", timestamp: "" },
     ] },
   ]
   const index = buildHistoryIndex(rounds)

@@ -97,7 +97,8 @@ export function buildActorDecision(state: ActorStepInput): ActorDecision {
     visibility: action.visibility,
     targetActorIds,
     intent,
-    message,
+    message: action.visibility === "solitary" ? undefined : message,
+    actionDescription: action.visibility === "solitary" ? message : undefined,
     expectation: sanitizeActorVisibleText(action.expectedOutcome, state.actors),
     contextUsed: state.contextUsed,
   }

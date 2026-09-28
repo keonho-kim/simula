@@ -179,6 +179,16 @@ the per-turn context are explicit graph-construction dependencies, isolated per 
 The original histories remain with the simulation owner; this projection does not delete
 accepted memory or change the existing prompt truncation policy.
 
+Actor output uses the selected action scope: interpersonal actions request spoken
+lines, while solitary actions request a concrete action description with no recipient.
+The existing message graph step retains its trace/telemetry key, but accepted decisions
+store solitary output in `actionDescription`, never `message`. Interaction assembly
+stores it in the existing `content` field with `visibility: solitary`; no durable schema
+migration is required. Only actual speech emits `actor.message`. Solitary target
+selection is deterministic (`None`) and does not invoke a model. Retry instructions
+follow the same output distinction without adding semantic judge calls. Shared live
+and report history cards retain visibility and label solitary records as actions.
+
 Accepted interaction records keep thought, intent and expectation for the author and
 reporting. Actor memory projection grants recipients and public observers only the
 accepted visible content; private intent and expectation are appended only to the

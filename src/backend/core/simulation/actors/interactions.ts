@@ -69,7 +69,10 @@ function interactionContent(
   event: PlannedEvent,
   decision: ActorDecision
 ): string {
-  if (decision.message) {
+  if (decision.visibility === "solitary" && decision.actionDescription) {
+    return decision.actionDescription
+  }
+  if (decision.visibility !== "solitary" && decision.message) {
     return `${actor.name}: ${decision.message}`
   }
   if (decision.decisionType === "no_action") {

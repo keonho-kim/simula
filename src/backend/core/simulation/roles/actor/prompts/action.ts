@@ -15,6 +15,8 @@ Return exactly one allowed output.
 Use an action id when this actor should act this round.
 Compare the listed usage conditions with your current goal; choose a concrete mechanism rather than repeating the first option.
 Use no_action only when holding position is the best choice.
+A solitary action is done alone with no recipient: review, compare, regulate emotions, or plan. It is not a conversation with yourself.
+Choose a public, semi-public, or private action when communicating with another actor.
 Stay within channels this actor can realistically use from their role, relationships, workplace, public position, or current event context.
 Do not jump to private or semi-public contact with distant executives, officials, or field actors unless the scenario context makes that access plausible.
 No explanation, labels, markdown, or punctuation.

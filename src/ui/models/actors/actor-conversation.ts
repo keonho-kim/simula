@@ -1,3 +1,9 @@
+/**
+ * Purpose: Project accepted interactions into round-grouped thought, action, and speech history.
+ * Pattern: Pure presentation transformation.
+ * Usage: Consumed by live and report conversation projections.
+ * Related: src/ui/models/actors/conversation-data.ts, src/ui/components/actors/history/message-card.tsx
+ */
 import type { ActorState, Interaction, RunEvent } from "@/shared"
 import { createActorTextSanitizer } from "@/ui/models/actors/actor-visible-text"
 
@@ -11,6 +17,7 @@ export interface ActorMessage {
   thought: string
   action: string
   content: string
+  visibility: Interaction["visibility"]
   decisionType: Interaction["decisionType"]
 }
 
@@ -47,10 +54,11 @@ export function buildActorRounds(events: RunEvent[], actors: ActorState[] = [], 
       actorId: interaction.sourceActorId,
       actorName,
       role: roles.get(interaction.sourceActorId) ?? "",
-      targets: interaction.targetActorIds.map(id => names.get(id) ?? id),
+      targets: interaction.visibility === "solitary" ? [] : interaction.targetActorIds.map(id => names.get(id) ?? id),
       thought: clean(interaction.thought),
       action: clean(interaction.actionType),
       content: content.startsWith(`${actorName}: `) ? content.slice(actorName.length + 2) : content,
+      visibility: interaction.visibility,
       decisionType: interaction.decisionType,
     })
     rounds.set(round.roundIndex, round)

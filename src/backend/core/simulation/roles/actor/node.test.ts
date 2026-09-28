@@ -18,8 +18,9 @@ import { createActorStepNode } from "./nodes"
 function state(language: "ko" | "en" = "ko") {
   const actor = buildActor(1, { name: "민수", role: "담당자", backgroundHistory: "출시 준비", personality: "신중함", preference: "안전한 출시" }, "출시", {})
   const input = { ...createActorContext({ runId: "run", scenario: { ...parseScenarioDocument("---\nnum_cast: 2\n---\n출시를 논의하는 팀"), language }, plannerDigest: "출시 일정 협의", actor, actors: [actor], event: { id: "event", title: "출시 회의", summary: "일정을 결정한다", status: "pending", participantIds: [] }, roundIndex: 1, roundDigest: { roundIndex: 1, preRound: { elapsedTime: "1", content: "답변을 기다리는 상황" } }, coordinatorTrace: emptyCoordinatorTrace() }), ...createActorGraphState() }
-  input.actor.actions = [{ id: "SOL01", visibility: "solitary", label: "입장 정리", intentHint: "판단이 필요할 때", expectedOutcome: "판단을 준비한다" }]
-  input.trace = { ...input.trace, action: "SOL01", target: "None", thought: "거절하면 관계가 어색해질까 걱정된다.", intent: "답변할 시간을 확보한다." }
+  input.actor.actions = [{ id: "PRV01", visibility: "private", label: "답변 유예 요청", intentHint: "판단이 필요할 때", expectedOutcome: "판단을 준비한다" }]
+  input.actors.push({ ...input.actors[0]!, id: "actor-2", name: "지수" })
+  input.trace = { ...input.trace, action: "PRV01", target: "actor-2", thought: "거절하면 관계가 어색해질까 걱정된다.", intent: "답변할 시간을 확보한다." }
   return input
 }
 function result(text: string): invocation.RoleTextResult {

@@ -7,9 +7,9 @@
 import { normalizePromptLanguage } from "@/backend/core/prompts/language"
 import type { PromptLanguage } from "@/shared"
 
-type SpeechIssue = { kind: "empty" } | { kind: "copied"; source: "thought" | "intent"; excerpt: string }
+export type ActorOutputIssue = { kind: "empty" } | { kind: "copied"; source: "thought" | "intent"; excerpt: string }
 
-export function retryMessage(issue: SpeechIssue, language: PromptLanguage | undefined): string {
+export function retryMessage(issue: ActorOutputIssue, language: PromptLanguage | undefined): string {
   const korean = normalizePromptLanguage(language) === "ko"
   if (issue.kind === "empty") {
     return korean ? "발화가 비어 있습니다. 실제 대사 하나 또는 침묵을 뜻하는 None을 반환하세요." : "Speech was empty. Return one spoken line or None for silence."

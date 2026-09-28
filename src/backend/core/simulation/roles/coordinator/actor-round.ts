@@ -112,7 +112,7 @@ async function emitInteraction(
   emit: (event: RunEvent) => Promise<void>
 ): Promise<void> {
   await emit({ type: "interaction.recorded", runId, timestamp: timestamp(), interaction })
-  if (decision.message) {
+  if (decision.visibility !== "solitary" && decision.message) {
     await emit({
       type: "actor.message",
       runId,

@@ -27,7 +27,7 @@ Action: ${actorActionSummary(state, partial.action)}`)}`
 
 function textGuide(language: string | undefined): string {
   const korean = normalizePromptLanguage(language) === "ko"
-  const instruction = korean ? "앞선 생각과 현재 상황을 바탕으로, 선택한 행동으로 이번에 이루려는 목적 하나를 한 문장으로 작성하세요. 생각을 요약하거나 상대에게 할 대사를 쓰지 마세요." : "Using the preceding thought and current situation, state one purpose of the selected action this turn in one sentence. Do not summarize the thought or write dialogue."
+  const instruction = korean ? "앞선 생각과 현재 상황을 바탕으로, 선택한 행동으로 이번에 이루려는 목적 하나를 한 문장으로 작성하세요. 생각을 요약하거나 상대에게 할 대사를 쓰지 마세요. solitary 행동은 자신이 정리·비교·조절하려는 목적을 쓰고, 없는 상대나 상대의 반응을 만들지 마세요." : "Using the preceding thought and current situation, state one purpose of the selected action this turn in one sentence. Do not summarize the thought or write dialogue. For solitary actions, state what the actor intends to organize, compare, or regulate themselves; do not invent a recipient or their reaction."
   return `${instruction}\n${korean
     ? "현재 단계의 내용만 출력하세요. 생각·의도·발화를 함께 쓰거나 제목을 붙이지 마세요."
     : "Output only the current step. Do not include other steps or a heading."}`

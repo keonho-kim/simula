@@ -12,6 +12,7 @@ import type { UiTexts } from "@/ui/types/i18n"
 import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
 export const ActorMessageCard = memo(function ActorMessageCard({ t, onActorSelect, onMessageSelect, ...message }: Omit<ActorMessage, "targets"> & { targets: string; t: UiTexts; onActorSelect: (id: string) => void; onMessageSelect?: (id: string) => void }) {
+  const solitary = message.visibility === "solitary"
   return (
     <article aria-label={message.actorName} className="rounded-xl border border-border/70 bg-white px-4 py-3.5">
       <header className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -25,7 +26,12 @@ export const ActorMessageCard = memo(function ActorMessageCard({ t, onActorSelec
           <Badge variant="secondary" aria-label={t.actorRailAction} className="h-auto max-w-[45%] whitespace-normal break-words rounded-full px-2.5 py-0.5 text-xs leading-5">
             {message.decisionType === "no_action" ? t.actorRailNoAction : <MarkdownContent generated inline content={message.action} />}
           </Badge>
-          {message.decisionType !== "no_action" && message.content ? <MarkdownContent generated ariaLabel={t.actorRailSpeech} className="min-w-0 flex-1 text-black" content={message.content} /> : null}
+          {message.decisionType !== "no_action" && message.content ? (
+            <div className="min-w-0 flex-1 text-foreground">
+              {solitary ? <span className="block text-xs text-muted-foreground">{t.actorRailSolitaryAction}</span> : null}
+              <MarkdownContent generated ariaLabel={solitary ? t.actorRailSolitaryAction : t.actorRailSpeech} content={message.content} />
+            </div>
+          ) : null}
         </div>
       </div>
       {onMessageSelect ? <Button variant="ghost" size="sm" className="mt-2" onClick={() => onMessageSelect(message.id)}>{t.reportMessageDetails}</Button> : null}
