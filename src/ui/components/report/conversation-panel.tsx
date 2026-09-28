@@ -79,7 +79,7 @@ export function ReportConversationPanel({
               <SelectItem value="all">{t.allActors}</SelectItem>
               {state?.actors.map((actor) => (
                 <SelectItem key={actor.id} value={actor.id}>
-                  {actor.name}
+                  <MarkdownContent generated inline content={actor.name} />
                 </SelectItem>
               ))}
             </SelectGroup>
@@ -109,7 +109,7 @@ export function ReportConversationPanel({
           if (!open) setMessageId(undefined)
         }}
       >
-        <DialogContent className="page-scroll-dialog">
+        <DialogContent className="page-scroll-dialog page-scroll-dialog--compact" overlayClassName="bg-black/25 backdrop-blur-[2px]" closeLabel={t.modalClose}>
           <DialogHeader>
             <DialogTitle>{t.reportMessageDetails}</DialogTitle>
           </DialogHeader>
@@ -121,7 +121,7 @@ export function ReportConversationPanel({
               ].map(([label, content]) => (
                 <section key={label}>
                   <h3 className="mb-2 text-sm font-medium">{label}</h3>
-                  <MarkdownContent content={content ?? ""} fallback="—" />
+                  <MarkdownContent generated content={content ?? ""} fallback="—" />
                 </section>
               ))}
             </div>

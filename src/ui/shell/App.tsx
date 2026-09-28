@@ -29,7 +29,7 @@ import { pathForView, viewFromPath, type ViewMode } from "@/ui/shell/browser-rou
 import { PageTransition } from "@/ui/animation/page-transition"
 import { useExitPresence } from "@/ui/animation/use-exit-presence"
 
-const ScenarioBoard = lazy(() => import("@/ui/components/simulation/scenario-board").then(module => ({ default: module.ScenarioBoard })))
+const ScenarioBoardPage = lazy(() => import("@/ui/pages/scenario-board-page").then(module => ({ default: module.ScenarioBoardPage })))
 
 const ActorRail = lazy(() =>
   import("@/ui/components/actors/actor-rail").then((module) => ({ default: module.ActorRail }))
@@ -108,6 +108,7 @@ function App() {
         ? await (await import("@/ui/api-client/worlds")).createWorldRun(input.worldId)
         : await createRun(input)
       selectedRunIdRef.current = run.id
+      resetLiveState()
       setSelectedRunId(run.id)
       await queryClient.invalidateQueries({ queryKey: ["runs"] })
       setReportConfirmRunId(undefined)
@@ -115,7 +116,7 @@ function App() {
       setActorDetailOpen(false)
       setSelectedEdgeId(undefined)
       resetRoundProgression()
-      const destination = ["completed", "failed", "canceled"].includes(run.status) ? "report" : "simulation"
+      const destination = ["completed", "failed", "canceled"].includes(run.status) ? "report" : "board"
       viewModeRef.current = destination
       setViewMode(destination)
       if (run.status === "created") await startRun(run.id)
@@ -123,10 +124,12 @@ function App() {
     },
     onSuccess: async run => {
       if (run.status === "created") toast.success(t.simulationStartedToast)
-      setViewMode(["completed", "failed", "canceled"].includes(run.status) ? "report" : "simulation")
       await queryClient.invalidateQueries({ queryKey: ["runs"] })
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : t.runFailedToast),
+    onError: (error) => {
+      if (selectedRunIdRef.current) { viewModeRef.current = "simulation"; setViewMode("simulation") }
+      toast.error(error instanceof Error ? error.message : t.runFailedToast)
+    },
   })
 
   useEffect(() => {
@@ -230,6 +233,14 @@ function App() {
           }
         }}
       />
+  } else if (viewMode === "board") {
+    content = <Suspense fallback={<main className="min-h-svh bg-background" />}>
+      <ScenarioBoardPage key={selectedRunId} t={t} onPrepared={() => {
+        viewModeRef.current = "simulation"
+        setViewMode("simulation")
+        if (selectedRunCompleted) setReportConfirmRunId(selectedRunId)
+      }} />
+    </Suspense>
   } else if (viewMode === "report") {
     content = <Suspense fallback={null}>
         <ReportPage
@@ -291,7 +302,6 @@ function App() {
         </div>
 
         <Suspense fallback={null}>
-          <ScenarioBoard key={selectedRunId} t={t} />
           {actorDialogPresent ? (
             <ActorDetailDialog
               t={t}

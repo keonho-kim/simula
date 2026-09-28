@@ -13,6 +13,7 @@ import { documentSourceLocation } from "@/ui/models/documents/location"
 import { scenarioSourceName } from "@/ui/models/scenario-builder/source-name"
 import { Button } from "@/ui/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/components/ui/card"
+import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
 export function SourceEvidence({ setId, revision, ids, documents, t }: {
   setId: string; revision: number; ids: string[]; documents?: DocumentSet; t: UiTexts
@@ -59,6 +60,6 @@ function EvidenceContent({ block, t }: { block: EvidenceBlock; t: UiTexts }) {
       : block.method === "libreoffice" ? t.builderEvidenceConverted : t.builderEvidenceExtracted
   return <div className="flex min-w-0 flex-col gap-3">
     <p className="text-xs text-muted-foreground">{method} · {documentSourceLocation(block.locator, t)}</p>
-    <p className="whitespace-pre-wrap break-words text-sm leading-6">{block.content}</p>
+    {block.method === "vlm" ? <MarkdownContent generated content={block.content} /> : <p className="whitespace-pre-wrap break-words text-sm leading-6">{block.content}</p>}
   </div>
 }

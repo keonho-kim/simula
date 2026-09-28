@@ -99,11 +99,18 @@
 
 body {
   margin: 0;
+  user-select: none;
+  -webkit-user-select: none;
   background: var(--background);
   color: var(--foreground);
   font-family:
     "Geist Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+}
+
+:where(input, textarea, [contenteditable="true"], [data-llm-generated="true"], [data-llm-generated="true"] *) {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 ::selection {

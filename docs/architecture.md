@@ -333,7 +333,7 @@ active; it does not recover an interrupted round or countdown. Restartable check
 and cross-process model capacity accounting remain separate obligations.
 
 `runtime/multiverse/rounds.ts` owns per-world approval and countdown state. Automatic
-progression waits five seconds for its first three approvals, then proceeds immediately.
+progression waits five seconds for its first two approvals, then proceeds immediately.
 Disabling it cancels a pending countdown and resets the streak. Manual approval requires
 the exact waiting round. The server advances unselected worlds without mounting browser
 dialogs. Batch execution defers per-world long commentary to later aggregate analysis.
@@ -391,6 +391,9 @@ Next owns URL routes in `src/app`; the browser application and its OPFS startup 
 `src/ui/shell` behind a client component. Feature-specific components remain grouped under
 `src/ui/components`, including local graph renderer helpers. The API controllers are grouped by
 function while LangGraph modules retain their current owners in `src/backend/core`.
+`/scenario-board` is a browser page between landing and simulation, composed by
+`src/ui/pages/scenario-board-page.tsx`; it advances after preparation while an open detail
+remains readable until closed.
 Shared Motion features, timing, presence and interaction presets, reduced-motion handling, and
 native CSS feedback policy live in `src/ui/animation`. Components select those effects while
 owning their rendered content and accessibility. Graph canvas interpolation remains with its renderer.
@@ -471,14 +474,14 @@ releases that prefix without changing reconnect positions. After a terminal snap
 count confirmation, the server also clears the temporary JSONL log once its readers and writers
 have stopped. Later server reads expose only any new temporary suffix; the browser merges it with
 saved history. Browser storage also retains run state, graph frames, report text, and analysis records.
-The browser can export a ZIP backup of SQLite records and OPFS uploads for manual transfer.
+The app keeps SQLite records and OPFS uploads in the current browser profile without a built-in transfer path.
 Schema version 2 adds upload MIME type and modification time to the attachment catalog.
 Version 3 separates run state and reports from the run index, and adds foreign keys to run
 events and graph frames. The SQLite Worker applies versioned migrations transactionally.
 Browser repositories use Drizzle ORM through that Worker for ordinary reads and writes. Each
 query lives in an operation-named file under its data area's directory; a transaction that
 commits one domain change, such as a final run detail, remains one operation module.
-schema migration, portable backup import/export, and connection pragmas retain direct SQL
+Schema migration and connection pragmas retain direct SQL
 because they operate on database structure or dynamic table sets. An uploaded original
 remains in OPFS under its document-set owner after server submission. If the server loses
 that set or build, the browser can resubmit the retained source through a new set and build.

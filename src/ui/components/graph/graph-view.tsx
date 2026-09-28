@@ -1,3 +1,9 @@
+/**
+ * Purpose: Compose the relationship graph and its selected actor and edge previews.
+ * Pattern: Memoized graph presentation.
+ * Usage: Rendered by simulation and report relationship views.
+ * Related: src/ui/components/graph/overlays/edge-preview.tsx, src/ui/components/markdown/markdown-content.tsx
+ */
 import { memo } from "react"
 import { CrosshairIcon, Maximize2Icon } from "lucide-react"
 import { Button } from "@/ui/components/ui/button"
@@ -25,8 +31,8 @@ export const GraphView = memo(function GraphView(props: GraphViewProps) {
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">{selectedActor.label}</p>
-              <p className="mt-1 truncate text-xs text-muted-foreground">{selectedActor.role}</p>
+              <p className="truncate text-sm font-semibold text-foreground"><MarkdownContent generated inline content={selectedActor.label} /></p>
+              <p className="mt-1 truncate text-xs text-muted-foreground"><MarkdownContent generated inline content={selectedActor.role} /></p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
               <div className="rounded-sm bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
@@ -49,7 +55,7 @@ export const GraphView = memo(function GraphView(props: GraphViewProps) {
               ) : null}
             </div>
           </div>
-          <MarkdownContent compact className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground" content={selectedActorIntent} fallback={t.graphNoIntent} />
+          <MarkdownContent generated compact className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground" content={selectedActorIntent} fallback={t.graphNoIntent} />
         </div>
       ) : null}
 

@@ -1,3 +1,9 @@
+/**
+ * Purpose: Provide actor profile and conversation labels in English and Korean.
+ * Pattern: Localization dictionary.
+ * Usage: Merged by src/ui/i18n/messages/simulation.ts.
+ * Related: src/ui/components/actors/actor-panel.tsx
+ */
 export const simulationActorTexts = {
   en: {
     actors: "Actors",
@@ -60,9 +66,9 @@ export const simulationActorTexts = {
     actorIncomingShort: "받음",
     actorMessageShort: "메시지",
     noHistoryYet: "아직 기록이 없습니다",
-    noHistoryYetDescription: "이 인물은 아직 메시지를 보내거나 받지 않았고, 표시할 모델 단계도 없습니다.",
+    noHistoryYetDescription: "이 인물의 대화나 행동이 기록되면 여기에 표시됩니다.",
     actorMessage: "인물 메시지",
-    modelStep: "모델",
+    modelStep: "생각의 흐름",
     actionTaken: "수행한 행동",
     receivedInteraction: "받은 상호작용",
     to: "받는 인물",

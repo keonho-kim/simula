@@ -1,21 +1,26 @@
 /**
- * Purpose: Show all report rounds in a wrapping board with keyboard-friendly navigation.
- * Pattern: Controlled selection board.
+ * Purpose: Page through report rounds without scrolling the document from arrow controls.
+ * Pattern: Controlled carousel window.
  * Usage: Rendered by the report conversation panel.
  * Related: src/ui/components/report/conversation-panel.tsx
  */
 import { reportStatusLabel } from "@/ui/models/report/status-label"
 import { useRef, useState } from "react"
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import { AnimatePresence } from "motion/react"
 import * as m from "motion/react-m"
 import { Button } from "@/ui/components/ui/button"
 import { Badge } from "@/ui/components/ui/badge"
 import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
 import { roundCardMotion } from "@/ui/animation/interaction"
 import { motionTransition } from "@/ui/animation/timing"
+import { sequencePresence } from "@/ui/animation/presence"
 import type { ConversationRound } from "@/ui/models/report/conversation-board"
 import type { UiTexts } from "@/ui/types/i18n"
 import { cn } from "@/ui/lib/class-names"
+import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
+
+const VISIBLE_ROUNDS = 3
 
 export function RoundCarousel({
   rounds,
@@ -28,14 +33,17 @@ export function RoundCarousel({
   onSelect: (round: number) => void
   t: UiTexts
 }) {
-  const cards = useRef<Array<HTMLButtonElement | null>>([])
+  const focusAfterMove = useRef(false)
   const reducedMotion = useReducedMotionPreference()
   const [cursor, setCursor] = useState(0)
-  const move = (direction: number) => {
-    const next = Math.max(0, Math.min(rounds.length - 1, cursor + direction))
+  const [direction, setDirection] = useState<-1 | 1>(1)
+  const start = Math.min(cursor, Math.max(0, rounds.length - 1))
+  const move = (step: -1 | 1) => {
+    const next = Math.max(0, Math.min(rounds.length - 1, start + step))
+    if (next === start) return
+    focusAfterMove.current = true
+    setDirection(step)
     setCursor(next)
-    cards.current[next]?.focus()
-    cards.current[next]?.scrollIntoView({ block: "nearest", behavior: reducedMotion ? "instant" : "smooth" })
   }
   return (
     <section aria-label={t.reportRoundBoard} className="min-w-0">
@@ -46,7 +54,7 @@ export function RoundCarousel({
             variant="outline"
             size="icon"
             aria-label={t.reportPreviousRounds}
-            disabled={cursor === 0}
+            disabled={start === 0}
             onClick={() => move(-1)}
           >
             <ChevronLeftIcon />
@@ -55,26 +63,34 @@ export function RoundCarousel({
             variant="outline"
             size="icon"
             aria-label={t.reportNextRounds}
-            disabled={cursor >= rounds.length - 1}
+            disabled={start >= rounds.length - 1}
             onClick={() => move(1)}
           >
             <ChevronRightIcon />
           </Button>
         </div>
       </div>
-      <div className="flex flex-wrap gap-3 pb-3" aria-label={t.reportRoundBoard}>
-        {rounds.map((round, index) => (
+      <div className="min-w-0 overflow-hidden" aria-label={t.reportRoundBoard}>
+        <AnimatePresence mode="wait" initial={false}><m.div key={start}
+          className="flex min-w-0 gap-3 pb-3" {...sequencePresence(reducedMotion, direction)}>
+        {rounds.slice(start, start + VISIBLE_ROUNDS).map((round, index) => (
           <m.button
             key={round.roundIndex}
             initial={false}
             {...roundCardMotion(reducedMotion)}
-            ref={element => { cards.current[index] = element }}
+            ref={element => {
+              if (index === 0 && element && focusAfterMove.current) {
+                element.focus({ preventScroll: true })
+                focusAfterMove.current = false
+              }
+            }}
             type="button"
             aria-pressed={selected === round.roundIndex}
             aria-label={`${t.round} ${round.roundIndex}`}
-            onClick={() => { setCursor(index); onSelect(round.roundIndex) }}
+            onClick={() => onSelect(round.roundIndex)}
             className={cn(
-              "relative isolate flex min-w-0 max-w-[320px] flex-[1_1_230px] flex-col gap-3 rounded-md border bg-card p-4 text-left focus-visible:outline-2 focus-visible:outline-ring",
+              "relative isolate min-w-0 flex-1 flex-col gap-3 rounded-md border bg-card p-4 text-left focus-visible:outline-2 focus-visible:outline-ring",
+              index === 0 ? "flex" : index === 1 ? "hidden sm:flex" : "hidden xl:flex",
               selected === round.roundIndex ? "border-primary" : "border-border"
             )}
           >
@@ -84,11 +100,11 @@ export function RoundCarousel({
             <span className="text-xs font-medium text-muted-foreground">
               {t.round} {round.roundIndex}
             </span>
-            {round.title ? <span className="text-sm font-semibold">{round.title}</span> : null}
+            {round.title ? <span className="text-sm font-semibold"><MarkdownContent generated inline content={round.title} /></span> : null}
             <span className="flex flex-col gap-2">
               {round.events.map((event) => (
                 <span key={event.id} className="flex flex-wrap items-center gap-2 text-xs">
-                  <span>{event.title}</span>
+                  <MarkdownContent generated inline content={event.title} />
                   {event.status ? (
                     <Badge variant="secondary" title={t.reportLatestEventStatus}>
                       {reportStatusLabel(event.status, t)}
@@ -98,10 +114,11 @@ export function RoundCarousel({
               ))}
             </span>
             <span className="text-xs leading-5 text-muted-foreground">
-              {round.summary || t.waitingForActivity}
+              <MarkdownContent generated inline content={round.summary} fallback={t.waitingForActivity} />
             </span>
           </m.button>
         ))}
+        </m.div></AnimatePresence>
       </div>
     </section>
   )

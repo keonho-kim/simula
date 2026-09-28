@@ -12,6 +12,7 @@ import { projectGenerationFields } from "@/shared/generation-preview"
 import type { GenerationTaskView } from "@/ui/models/generation/progress"
 import type { UiTexts } from "@/ui/types/i18n"
 import { analysisLabel } from "@/ui/models/report/analytical-view"
+import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
 const FOLLOW_THRESHOLD_PX = 24
 export function AnalysisTaskOutput({ reportId, task, t }: { reportId: string; task: GenerationTaskView; t: UiTexts }) {
@@ -30,6 +31,6 @@ export function AnalysisTaskOutput({ reportId, task, t }: { reportId: string; ta
   }}>
     {active ? <p className="text-xs text-muted-foreground">{t.builderDraftNotice}</p> : null}
     {accepted.isError ? <p role="alert">{t.reportLoadError}</p> : null}
-    {fields.length ? fields.map((field, index) => <section key={`${field.key}-${index}`} className="flex flex-col gap-1"><h4 className="text-xs text-muted-foreground">{analysisLabel(field.key, t)}</h4><p className="whitespace-pre-wrap break-words text-sm leading-6">{field.text}</p></section>) : <p className="text-xs text-muted-foreground">{t.builderNoPreview}</p>}
+    {fields.length ? fields.map((field, index) => <section key={`${field.key}-${index}`} className="flex flex-col gap-1"><h4 className="text-xs text-muted-foreground">{analysisLabel(field.key, t)}</h4><MarkdownContent generated content={field.text} /></section>) : <p className="text-xs text-muted-foreground">{t.builderNoPreview}</p>}
   </div>
 }

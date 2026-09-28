@@ -2,7 +2,7 @@
  * Purpose: Hold a round for manual approval or a cancellable automatic countdown.
  * Pattern: Controlled modal workflow.
  * Usage: Mounted by src/ui/shell/App.tsx while a round awaits continuation.
- * Related: src/ui/components/ui/dialog.tsx, src/ui/animation/use-exit-presence.ts
+ * Related: src/ui/components/ui/dialog.tsx, src/shared/round-progression.ts
  */
 import { useEffect, useState } from "react"
 import { Button } from "@/ui/components/ui/button"
@@ -10,8 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/ui/components/ui/field"
 import { Switch } from "@/ui/components/ui/switch"
 import type { UiTexts } from "@/ui/types/i18n"
+import { AUTOMATIC_ROUND_DELAY_MS } from "@/shared/round-progression"
 
-const AUTO_CONTINUE_DELAY_MS = 5000
 
 interface RoundContinuationDialogProps {
   open: boolean
@@ -24,16 +24,16 @@ interface RoundContinuationDialogProps {
 }
 
 export function RoundContinuationDialog({ open, autoContinue, action, t, onAutoContinueChange, onContinue, onCancel }: RoundContinuationDialogProps) {
-  const [seconds, setSeconds] = useState(AUTO_CONTINUE_DELAY_MS / 1000)
+  const [seconds, setSeconds] = useState(AUTOMATIC_ROUND_DELAY_MS / 1000)
 
   useEffect(() => {
     if (!open || !autoContinue || action) return
-    const deadline = Date.now() + AUTO_CONTINUE_DELAY_MS
-    setSeconds(AUTO_CONTINUE_DELAY_MS / 1000)
+    const deadline = Date.now() + AUTOMATIC_ROUND_DELAY_MS
+    setSeconds(AUTOMATIC_ROUND_DELAY_MS / 1000)
     const interval = window.setInterval(() => {
       setSeconds(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)))
     }, 1000)
-    const timeout = window.setTimeout(() => { void onContinue() }, AUTO_CONTINUE_DELAY_MS)
+    const timeout = window.setTimeout(() => { void onContinue() }, AUTOMATIC_ROUND_DELAY_MS)
     return () => {
       window.clearInterval(interval)
       window.clearTimeout(timeout)

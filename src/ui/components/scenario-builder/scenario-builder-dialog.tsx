@@ -12,7 +12,7 @@ import type { PromptLanguage } from "@/shared/scenario"
 import type { UiTexts } from "@/ui/types/i18n"
 import { useDocumentScenario } from "@/ui/hooks/use-document-scenario"
 import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
-import { slidePresence } from "@/ui/animation/presence"
+import { sequencePresence } from "@/ui/animation/presence"
 import { Button } from "@/ui/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/ui/components/ui/alert"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/ui/components/ui/dialog"
@@ -46,6 +46,7 @@ export function ScenarioBuilderDialog({ active, language, t, onBack, onOpenSetti
   const [confirmClose, setConfirmClose] = useState(false)
   const [closing, setClosing] = useState(false)
   const [closeError, setCloseError] = useState<string>()
+  const [direction, setDirection] = useState<-1 | 1>(1)
   const stage = w.build?.status === "confirmed" ? "launch" : running ? "building"
     : w.build?.specification ? "review" : w.build ? "waiting" : "form"
   const requestClose = () => {
@@ -65,7 +66,7 @@ export function ScenarioBuilderDialog({ active, language, t, onBack, onOpenSetti
   }
 
   return <><Dialog open={active} onOpenChange={open => { if (!open) requestClose() }}>
-    <DialogContent className="scenario-builder-dialog" showCloseButton={false}>
+    <DialogContent className="scenario-builder-dialog" overlayClassName="bg-black/30 backdrop-blur-[2px]" showCloseButton={false}>
       <header className="flex items-start gap-4 border-b pb-5">
         <div className="flex min-w-0 flex-col gap-1">
           <DialogTitle className="text-xl font-semibold">{t.newScenario}</DialogTitle>
@@ -80,11 +81,11 @@ export function ScenarioBuilderDialog({ active, language, t, onBack, onOpenSetti
         </Alert> : null}
         {w.refreshing ? <p role="status" className="text-sm text-muted-foreground">{t.builderLoading}</p> : null}
         <AnimatePresence mode="wait" initial={false}>
-          <m.div key={stage} {...slidePresence(reducedMotion, "y", 6, -4)}>
+          <m.div key={stage} {...sequencePresence(reducedMotion, direction)}>
             {w.build?.status === "confirmed" ? <WorldLaunch key={w.build.id} scenarioId={w.build.id} fastMode={w.build.request.fastMode} open={active} starting={starting} autoContinue={autoContinue} onAutoContinueChange={onAutoContinueChange} onStart={onStartWorld} onOpenRun={onOpenRun} language={language} t={t} /> : null}
             {running && w.build ? <BuilderActivity key={w.build.id} buildId={w.build.id} open={active} documents={w.documents} t={t} /> : w.build?.specification && stage === "review"
               ? <ScenarioReview specification={w.build.specification} documents={w.documents} t={t} />
-              : !w.build ? <DocumentScenarioForm workflow={w} t={t} /> : null}
+              : !w.build ? <DocumentScenarioForm workflow={w} onExecute={() => setDirection(1)} t={t} /> : null}
           </m.div>
         </AnimatePresence>
         {w.build?.status === "failed" || w.build?.status === "canceled" ? <Alert><AlertDescription>{w.build.status === "failed" ? t.builderRequestError : t.builderStatusCanceled}</AlertDescription></Alert> : null}
@@ -92,7 +93,7 @@ export function ScenarioBuilderDialog({ active, language, t, onBack, onOpenSetti
         {w.build?.status === "confirmed" ? <Alert><AlertTitle>{t.builderConfirmed}</AlertTitle><AlertDescription>{t.builderConfirmedHelp}</AlertDescription></Alert> : null}
       </div>
       {showFooter ? <footer className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
-        {w.hasSession && !running ? <Button variant="ghost" disabled={w.busy || w.pendingGeneration || extracting} onClick={w.reset}>{t.builderNew}</Button> : null}
+        {w.hasSession && !running ? <Button variant="ghost" disabled={w.busy || w.pendingGeneration || extracting} onClick={() => { setDirection(-1); w.reset() }}>{t.builderNew}</Button> : null}
         {running ? <Button variant="outline" disabled={w.busy} onClick={() => void w.controlBuild("cancel")}>{t.builderCancel}</Button> : null}
         {w.build && ["failed", "canceled", "blocked"].includes(w.build.status) ? <Button disabled={w.busy} onClick={() => void w.controlBuild("retry")}>{t.builderRetry}</Button> : null}
         {w.build?.status === "review" ? <Button disabled={w.busy} onClick={() => void w.controlBuild("confirm")}>{t.builderConfirm}</Button> : null}

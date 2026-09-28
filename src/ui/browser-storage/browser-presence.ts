@@ -4,7 +4,7 @@
  * Usage: Started after SQLite opens in the browser composition root.
  * Related: src/backend/runtime/browser-sessions.ts, src/ui/shell/client-root.tsx
  */
-export function startBrowserPresence(onSessionReplaced: () => void): void {
+export function startBrowserPresence(onSessionReplaced: () => void): () => void {
   let socket: WebSocket | undefined
   let retry: ReturnType<typeof setTimeout> | undefined
   let suspended = false
@@ -15,13 +15,20 @@ export function startBrowserPresence(onSessionReplaced: () => void): void {
     socket.onmessage = event => { if (event.data === "replaced") onSessionReplaced() }
     socket.onclose = () => { if (!suspended) retry = setTimeout(connect, 1_000) }
   }
-  window.addEventListener("pagehide", () => {
+  const onPageHide = () => {
     suspended = true
     clearTimeout(retry)
     socket?.close()
-  })
-  window.addEventListener("pageshow", event => {
+  }
+  const onPageShow = (event: PageTransitionEvent) => {
     if (event.persisted && suspended) { suspended = false; connect() }
-  })
+  }
+  window.addEventListener("pagehide", onPageHide)
+  window.addEventListener("pageshow", onPageShow)
   connect()
+  return () => {
+    onPageHide()
+    window.removeEventListener("pagehide", onPageHide)
+    window.removeEventListener("pageshow", onPageShow)
+  }
 }

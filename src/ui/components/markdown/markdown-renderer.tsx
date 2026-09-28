@@ -11,6 +11,7 @@ import remarkGfm from "remark-gfm"
 
 interface MarkdownRendererProps {
   source: string
+  inline?: boolean
   remarkPlugins?: Options["remarkPlugins"]
   rehypePlugins?: Options["rehypePlugins"]
 }
@@ -36,9 +37,26 @@ const sanitizeSchema = {
   },
 }
 
-export function MarkdownRenderer({ source, remarkPlugins, rehypePlugins }: MarkdownRendererProps) {
+const inlineComponents: Options["components"] = {
+  p: ({ children }) => <>{children}</>,
+  h1: ({ children }) => <>{children}</>,
+  h2: ({ children }) => <>{children}</>,
+  h3: ({ children }) => <>{children}</>,
+  h4: ({ children }) => <>{children}</>,
+  h5: ({ children }) => <>{children}</>,
+  h6: ({ children }) => <>{children}</>,
+  a: ({ children }) => <span>{children}</span>,
+  ul: ({ children }) => <span>{children}</span>,
+  ol: ({ children }) => <span>{children}</span>,
+  li: ({ children }) => <span>{children}</span>,
+  blockquote: ({ children }) => <span>{children}</span>,
+  pre: ({ children }) => <span>{children}</span>,
+}
+
+export function MarkdownRenderer({ source, inline = false, remarkPlugins, rehypePlugins }: MarkdownRendererProps) {
   return (
     <ReactMarkdown
+      components={inline ? inlineComponents : undefined}
       remarkPlugins={[remarkGfm, ...(remarkPlugins ?? [])]}
       rehypePlugins={[rehypeRaw, [rehypeSanitize, sanitizeSchema], ...(rehypePlugins ?? [])]}
     >

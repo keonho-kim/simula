@@ -10,6 +10,14 @@ loads the unlocked values into the owning server session's memory for active wor
 write `settings.json` or `env.toml`. A masked API key value (`********`) retains the previous
 value within that session.
 
+After a saved vault is unlocked, the browser waits for server settings synchronization before
+opening the app. If the server replaces the session while the tab stays open, the browser
+resends unlocked settings and pauses the app until synchronization succeeds; a failed sync has
+an explicit retry action. Resetting the vault first clears active server credentials, then
+deletes the encrypted browser copy. The passphrase and browser vault format are unchanged.
+When no vault exists, including after a reset, saved non-secret settings are synchronized at
+startup without prompting for a passphrase.
+
 ## Server Environment Variables
 
 | Variable | Default | Meaning |

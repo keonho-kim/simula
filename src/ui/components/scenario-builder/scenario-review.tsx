@@ -12,13 +12,14 @@ import { Badge } from "@/ui/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/ui/components/ui/alert"
 import { builderLabel } from "@/ui/models/scenario-builder/labels"
 import { SourceEvidence } from "./source-evidence"
+import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
 export function ScenarioReview({ specification: value, documents, t }: { specification: ScenarioSpecification; documents?: DocumentSet; t: UiTexts }) {
   return <section className="flex flex-col gap-5" aria-label={t.builderReviewTitle}>
     <header className="flex flex-col gap-2">
-      <h2 className="text-lg font-semibold">{value.situation.title}</h2>
-      <p className="text-sm leading-6">{value.situation.purpose}</p>
-      <p className="text-sm leading-6">{value.situation.setting}</p>
+      <h2 className="text-lg font-semibold"><MarkdownContent generated inline content={value.situation.title} /></h2>
+      <MarkdownContent generated content={value.situation.purpose} />
+      <MarkdownContent generated content={value.situation.setting} />
     </header>
     {value.issues.length ? <Alert variant={value.status === "blocked" ? "destructive" : "default"}>
       <AlertTitle>{t.builderIssues}</AlertTitle><AlertDescription><ul className="flex list-disc flex-col gap-2 pl-4">
@@ -29,11 +30,11 @@ export function ScenarioReview({ specification: value, documents, t }: { specifi
       <ReviewCard title={t.builderDecision} paragraphs={[value.situation.decision]} />
       {Object.entries(value.facets).map(([key, facet]) => <ReviewCard key={key} title={builderLabel(key, t)} paragraphs={[facet.summary]} assumptions={facet.assumptions} t={t} />)}
       {value.participants.map(participant => <Card key={participant.id} size="sm">
-        <CardHeader><CardTitle><h3>{participant.name}</h3></CardTitle></CardHeader>
+        <CardHeader><CardTitle><h3><MarkdownContent generated={!participant.nameLocked} inline content={participant.name} /></h3></CardTitle></CardHeader>
         <CardContent className="flex flex-col gap-3">
           {participant.nameLocked ? <Badge variant="outline">{t.builderLocked}</Badge> : null}
           {[{ label: t.builderPersonality, text: participant.personality }, { label: t.builderAuthority, text: participant.authority }, { label: t.builderGoal, text: participant.goal }].map(field => <div key={field.label}>
-            <p className="text-xs text-muted-foreground">{field.label}</p><p className="mt-1 text-sm leading-6">{field.text}</p>
+            <p className="text-xs text-muted-foreground">{field.label}</p><MarkdownContent generated className="mt-1" content={field.text} />
           </div>)}
         </CardContent>
       </Card>)}
@@ -43,7 +44,7 @@ export function ScenarioReview({ specification: value, documents, t }: { specifi
         <CardContent>
           {value.sourceFacts.length ? <ul className="flex flex-col gap-3">
             {value.sourceFacts.map(fact => <li key={fact.id} className="flex flex-col gap-1">
-              <p className="text-sm leading-6">{fact.text}</p>
+              <MarkdownContent generated content={fact.text} />
               <p className="text-xs text-muted-foreground">{fact.audience.kind === "public" ? t.builderEveryone
                 : fact.audience.kind === "unresolved" ? t.builderUnresolvedAccess
                   : `${t.builderKnownBy}: ${fact.audience.participantIds.map(id => value.participants.find(participant => participant.id === id)?.name ?? id).join(", ")}`}</p>
@@ -61,8 +62,8 @@ export function ScenarioReview({ specification: value, documents, t }: { specifi
 function ReviewCard({ title, paragraphs, assumptions, t }: { title: string; paragraphs: string[]; assumptions?: string[]; t?: UiTexts }) {
   return <Card size="sm"><CardHeader><CardTitle><h3>{title}</h3></CardTitle></CardHeader>
     <CardContent className="flex flex-col gap-2">
-      {paragraphs.map((paragraph, index) => <p key={index} className="text-sm leading-6">{paragraph}</p>)}
-      {assumptions?.length && t ? <div className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground"><h4>{t.builderAssumptions}</h4>{assumptions.map((assumption, index) => <p key={index}>{assumption}</p>)}</div> : null}
+      {paragraphs.map((paragraph, index) => <MarkdownContent generated key={index} content={paragraph} />)}
+      {assumptions?.length && t ? <div className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground"><h4>{t.builderAssumptions}</h4>{assumptions.map((assumption, index) => <MarkdownContent generated key={index} content={assumption} />)}</div> : null}
     </CardContent>
   </Card>
 }

@@ -2,7 +2,7 @@
  * Purpose: Verify simulation navigation stays usable under throttling.
  * Pattern: End-to-end workflow test.
  * Usage: Executed by Playwright through bun run test:e2e.
- * Related: src/ui/components/simulation/scenario-board.tsx, src/ui/shell/home-view.tsx
+ * Related: src/ui/pages/scenario-board-page.tsx, src/ui/shell/home-view.tsx
  */
 import { expect, test, type Route } from "./fixtures"
 import { motionRange } from "./motion-range"
@@ -34,11 +34,13 @@ test("board navigation stays usable under CPU and network throttling", async ({ 
       { ...base, type: "board.updated", update: { kind: "events", events: Array.from({ length: 100 }, (_, i) => ({ id: "e" + i, title: "Event " + i, summary: "Long scenario detail. ".repeat(200), status: "pending", participantIds: [] })) } },
     ])
   })
-  const board = page.getByRole("dialog", { name: "Scenario Board", exact: true })
+  const board = page.getByRole("main")
   await expect(board).toBeVisible()
+  await expect(page).toHaveURL(/\/scenario-board$/)
   const originalColumn = await board.locator('section[aria-label="Expected events"]').elementHandle()
   await board.getByRole("button", { name: /Event 0$/, exact: false }).click()
-  expect(await originalColumn!.evaluate(element => element.isConnected)).toBe(true)
+  await expect.poll(() => originalColumn!.evaluate(element => element.isConnected)).toBe(false)
+  await expect(board.getByRole("complementary")).toBeVisible()
   await board.getByRole("button", { name: /All columns/ }).click()
   const cdp = await page.context().newCDPSession(page)
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 })
@@ -69,11 +71,12 @@ test("board navigation stays usable under CPU and network throttling", async ({ 
   })
   await expect(board.locator(".scenario-board-active")).toHaveCount(20)
   await expect(board.locator(".scenario-board-pulsing")).toHaveCount(1)
+  expect(await motionRange(board.locator(".scenario-progress-dot").nth(4), "top")).toBeGreaterThan(0.1)
   await page.evaluate(() => {
     Object.defineProperty(document, "hidden", { configurable: true, value: true })
     document.dispatchEvent(new Event("visibilitychange"))
   })
-  await expect.poll(() => motionRange(board.locator(".scenario-progress-dot").first(), "top")).toBeLessThan(0.1)
+  await expect.poll(() => motionRange(board.locator(".scenario-progress-dot").nth(4), "top")).toBeLessThan(0.1)
   await page.evaluate(() => {
     Reflect.deleteProperty(document, "hidden")
     document.dispatchEvent(new Event("visibilitychange"))
@@ -82,7 +85,7 @@ test("board navigation stays usable under CPU and network throttling", async ({ 
   await board.getByRole("button", { name: /Event 0$/ }).click()
   await expect(board.getByRole("complementary")).toBeVisible()
   expect(await board.locator('section[aria-label="Expected events"]').evaluate(element => getComputedStyle(element).transform)).toBe("none")
-  await expect.poll(() => motionRange(board.locator(".scenario-progress-dot").first(), "top")).toBeLessThan(0.1)
+  await expect.poll(() => motionRange(board.locator(".scenario-progress-dot").nth(4), "top")).toBeLessThan(0.1)
   await page.screenshot({ path: testInfo.outputPath("motion-detail.png") })
   await start!.abort()
 })

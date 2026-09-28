@@ -10,8 +10,6 @@ export const MAX_BATCH_WORLDS = 50
 export const DEFAULT_BATCH_WORLDS = 5
 export const DEFAULT_BATCH_MINUTES = 60
 export const MAX_BATCH_MINUTES = 1440
-export const AUTOMATIC_ROUND_DELAY_MS = 5000
-export const AUTOMATIC_ROUND_DELAY_COUNT = 3
 
 export interface MultiverseRequest {
   scenarioId: string

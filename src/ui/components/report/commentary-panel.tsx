@@ -1,3 +1,9 @@
+/**
+ * Purpose: Present generated report conclusions and supporting findings.
+ * Pattern: Read-only report composition.
+ * Usage: Rendered in the report commentary detail dialog.
+ * Related: src/ui/components/markdown/markdown-content.tsx, src/ui/pages/report-page.tsx
+ */
 import type { ReportCommentary, ReportCommentaryNode } from "@/shared"
 import type { UiTexts } from "@/ui/types/i18n"
 import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
@@ -47,7 +53,7 @@ export function ReportCommentaryPanel({ commentary, t }: { commentary?: ReportCo
                     <h3 className="text-sm font-medium">
                       {t.round} {node.id.replace("round-", "").replace("-part-", " · ")}
                     </h3>
-                    <MarkdownContent content={node.conclusion ?? ""} fallback="—" />
+                    <MarkdownContent generated content={node.conclusion ?? ""} fallback="—" />
                   </section>
                 ))}
         </div>
@@ -61,15 +67,15 @@ function CommentaryNode({ node, t }: { node: ReportCommentaryNode; t: UiTexts })
     return <p className="text-sm text-muted-foreground">{t.reportCommentaryUnavailable}</p>
   return (
     <article className="flex flex-col gap-2 text-sm leading-6">
-      <MarkdownContent content={node.summary ?? ""} fallback="—" />
+      <MarkdownContent generated content={node.summary ?? ""} fallback="—" />
       <ul className="list-disc pl-5">
         {node.findings?.map((finding, index) => (
           <li key={index}>
-            <MarkdownContent compact content={finding} fallback="—" />
+            <MarkdownContent generated compact content={finding} fallback="—" />
           </li>
         ))}
       </ul>
-      {node.level > 0 ? <MarkdownContent content={node.conclusion ?? ""} fallback="—" /> : null}
+      {node.level > 0 ? <MarkdownContent generated content={node.conclusion ?? ""} fallback="—" /> : null}
       <p className="text-xs text-muted-foreground">
         {t.reportEvidence}: {node.evidenceIds.join(", ")}
       </p>

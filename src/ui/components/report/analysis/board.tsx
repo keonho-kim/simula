@@ -10,6 +10,7 @@ import { analysisLabel } from "@/ui/models/report/analytical-view"
 import { ReportDetailDialog } from "./detail-dialog"
 import { AnalysisSectionDetail } from "./section-detail"
 import { SwotRadar } from "./radar"
+import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
 const GROUPS: Array<{ title: "analysisSwot" | "analysisTrajectories" | "analysisAssessments"; sections: AnalysisSectionId[] }> = [
   { title: "analysisSwot", sections: ["strengths", "weaknesses", "opportunities", "threats"] },
@@ -24,9 +25,9 @@ export function AnalysisBoard({ record, t }: { record: AnalysisRecord; t: UiText
   return <section className="flex min-w-0 flex-col gap-5" aria-label={t.analysisBoard}>
     <div className="report-conclusion-grid">
       <div className="flex flex-col gap-3"><h2 className="text-base font-semibold">{t.analysisConclusion}</h2>
-        <p className="text-sm leading-7">{conclusion?.summary || t.analysisFailed}</p>
+        <MarkdownContent generated content={conclusion?.summary} fallback={t.analysisFailed} />
         <p className="text-xs text-muted-foreground">{t.analysisSimulationScope}</p>
-        <p className="text-xs text-muted-foreground">{t.analysisPerspective}: {report.perspective.focus} · {report.perspective.objective}</p>
+        <p className="text-xs text-muted-foreground">{t.analysisPerspective}: <MarkdownContent generated inline content={report.perspective.focus} /> · <MarkdownContent generated inline content={report.perspective.objective} /></p>
         <p className="text-xs text-muted-foreground">{t.analysisCoverage.replace("{completed}", String(coverage.completed)).replace("{requested}", String(coverage.requested)).replace("{analyzed}", String(coverage.analyzed))}</p>
         <p className="text-xs text-muted-foreground">{t.analysisMissing.replace("{failed}", String(coverage.failed)).replace("{canceled}", String(coverage.canceled)).replace("{interrupted}", String(coverage.interrupted))}</p>
       </div><SwotRadar sections={report.sections} t={t} />
@@ -37,7 +38,7 @@ export function AnalysisBoard({ record, t }: { record: AnalysisRecord; t: UiText
         const section = report.sections.find(section => section.id === id)
         return section?.status === "ready" ? <ReportDetailDialog key={id} title={analysisLabel(id, t)} summary={section.summary} t={t}>
           <AnalysisSectionDetail reportId={record.id} section={section} t={t} />
-          {id === "trajectories" ? <div className="mt-6 flex flex-col gap-3">{report.trajectories.categories.map(category => <p key={category.id} className="text-sm">{category.label} — {t.analysisFrequency.replace("{count}", String(category.worldIds.length)).replace("{total}", String(coverage.analyzed))}</p>)}
+          {id === "trajectories" ? <div className="mt-6 flex flex-col gap-3">{report.trajectories.categories.map(category => <p key={category.id} className="text-sm"><MarkdownContent generated inline content={category.label} /> — {t.analysisFrequency.replace("{count}", String(category.worldIds.length)).replace("{total}", String(coverage.analyzed))}</p>)}
             <p className="text-xs text-muted-foreground">{t.analysisUnclassified.replace("{count}", String(report.trajectories.unclassifiedWorldIds.length))}</p></div> : null}
         </ReportDetailDialog> : <div key={id} className="rounded-md border border-dashed p-4"><h4 className="text-sm font-medium">{analysisLabel(id, t)}</h4><p className="text-xs text-muted-foreground">{t.analysisFailed}</p></div>
       })}

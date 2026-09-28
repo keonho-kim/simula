@@ -16,14 +16,18 @@ import { Button } from "@/ui/components/ui/button"
 import { XIcon } from "lucide-react"
 import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
 import { usePopupOpenState } from "@/ui/hooks/use-popup-open-state"
-import { fadePresence } from "@/ui/animation/presence"
+import { dialogPresence, fadePresence } from "@/ui/animation/presence"
 
 const DialogOpenContext = React.createContext(false)
 const MotionOverlay = m.create(DialogPrimitive.Overlay)
 const MotionContent = m.create(DialogPrimitive.Content)
 type DialogContentProps = Pick<React.ComponentProps<typeof DialogPrimitive.Content>,
   "className" | "children" | "aria-describedby" | "onEscapeKeyDown" | "onInteractOutside" |
-  "onPointerDownOutside" | "onFocusOutside" | "onOpenAutoFocus" | "onCloseAutoFocus"> & { showCloseButton?: boolean }
+  "onPointerDownOutside" | "onFocusOutside" | "onOpenAutoFocus" | "onCloseAutoFocus"> & {
+    showCloseButton?: boolean
+    overlayClassName?: string
+    closeLabel?: string
+  }
 
 function Dialog({
   open: controlledOpen,
@@ -59,6 +63,8 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  overlayClassName,
+  closeLabel = "Close",
   ...props
 }: DialogContentProps) {
   const open = React.useContext(DialogOpenContext)
@@ -68,10 +74,10 @@ function DialogContent({
       <AnimatePresence>{open ? [
       <MotionOverlay key="overlay" forceMount data-slot="dialog-overlay"
         {...fadePresence(reducedMotion, "popup")}
-        className="fixed inset-0 isolate z-50 bg-black/10" />,
+        className={cn("fixed inset-0 isolate z-50 bg-black/10", overlayClassName)} />,
       <MotionContent key="content" forceMount
         data-slot="dialog-content"
-        {...fadePresence(reducedMotion, "popup")}
+        {...dialogPresence(reducedMotion)}
         className={cn(
           "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 outline-none sm:max-w-sm",
           className
@@ -88,7 +94,7 @@ function DialogContent({
             >
               <XIcon
               />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">{closeLabel}</span>
             </Button>
           </DialogPrimitive.Close>
         )}

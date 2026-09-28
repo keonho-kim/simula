@@ -1,5 +1,5 @@
 /**
- * Purpose: Lay out the single-scroll scenario modal, live task detail, and review surfaces.
+ * Purpose: Bound the scenario modal and lay out its live task and review surfaces.
  * Pattern: Feature stylesheet.
  * Usage: Imported only by the lazy scenario-builder dialog.
  * Related: src/ui/components/scenario-builder/scenario-builder-dialog.tsx
@@ -8,9 +8,9 @@
   top: 50%;
   left: 50%;
   display: flex;
-  width: min(1120px, calc(100vw - 2rem));
+  width: min(920px, calc(100vw - 3rem));
   max-width: none;
-  max-height: calc(100svh - 2rem);
+  max-height: min(800px, calc(100svh - 3rem));
   min-height: 0;
   flex-direction: column;
   gap: 24px;

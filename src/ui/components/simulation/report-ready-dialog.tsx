@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 
 export function ReportReadyDialog({ open, t, onDismiss, onReport }: { open: boolean; t: UiTexts; onDismiss: () => void; onReport: () => void }) {
   return <Dialog open={open} onOpenChange={value => { if (!value) onDismiss() }}>
-    <DialogContent>
+    <DialogContent closeLabel={t.modalClose}>
       <DialogHeader><DialogTitle>{t.reportConfirmTitle}</DialogTitle><DialogDescription>{t.reportConfirmDescription}</DialogDescription></DialogHeader>
       <DialogFooter><Button variant="outline" onClick={onDismiss}>{t.reportConfirmStay}</Button><Button onClick={onReport}>{t.reportConfirmOpen}</Button></DialogFooter>
     </DialogContent>

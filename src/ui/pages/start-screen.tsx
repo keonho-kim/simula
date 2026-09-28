@@ -11,8 +11,6 @@ import {
   LanguagesIcon,
   SettingsIcon,
   SparklesIcon,
-  DownloadIcon,
-  UploadIcon,
 } from "lucide-react"
 import type React from "react"
 import * as m from "motion/react-m"
@@ -43,8 +41,6 @@ interface StartScreenProps {
   onExampleScenario: () => void
   onRunHistory: () => void
   onOpenSettings: () => void
-  onExportBackup: () => void
-  onImportBackup: () => void
   onLanguagePreferenceChange: (preference: LanguagePreference) => void
 }
 
@@ -59,8 +55,6 @@ export function StartScreen({
   onExampleScenario,
   onRunHistory,
   onOpenSettings,
-  onExportBackup,
-  onImportBackup,
   onLanguagePreferenceChange,
 }: StartScreenProps) {
   const reducedMotion = useReducedMotionPreference()
@@ -68,8 +62,6 @@ export function StartScreen({
     <main className="min-h-svh bg-background text-foreground">
       <div className="mx-auto flex min-h-svh w-full max-w-[980px] flex-col gap-8 px-5 py-5">
         <div className="flex justify-end gap-1">
-          <Button aria-label={t.backupExport} title={t.backupExport} variant="ghost" size="icon" onClick={onExportBackup}><DownloadIcon /></Button>
-          <Button aria-label={t.backupImport} title={t.backupImport} variant="ghost" size="icon" onClick={onImportBackup}><UploadIcon /></Button>
           <Button aria-label={t.settings} variant="ghost" size="icon" className="rounded-md" onClick={onOpenSettings}>
             <SettingsIcon />
           </Button>

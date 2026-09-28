@@ -10,8 +10,6 @@ import { StartScreen } from "@/ui/pages/start-screen"
 import type { LanguagePreference, UiTexts } from "@/ui/types/i18n"
 import type { ScenarioDraft } from "@/ui/types/scenario"
 import { readDraft } from "@/ui/browser-storage/database/drafts/read"
-import { exportBrowserBackup, importBrowserBackup } from "@/ui/browser-storage/backup"
-import { toast } from "sonner"
 import { useExitPresence } from "@/ui/animation/use-exit-presence"
 
 const RunHistoryDialog = lazy(() =>
@@ -70,7 +68,6 @@ export function HomeView({
   onStartWorld,
 }: HomeViewProps) {
   const uploadInputRef = useRef<HTMLInputElement>(null)
-  const backupInputRef = useRef<HTMLInputElement>(null)
   const [scenarioBuilder, setScenarioBuilder] = useState<"unused" | "open" | "closed">("unused")
   const [samplePickerOpen, setSamplePickerOpen] = useState(false)
   const [runHistoryOpen, setRunHistoryOpen] = useState(false)
@@ -103,34 +100,8 @@ export function HomeView({
     })
   }
 
-  const exportBackup = async () => {
-    try {
-      const blob = await exportBrowserBackup()
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement("a")
-      anchor.href = url
-      anchor.download = `simula-backup-${new Date().toISOString().slice(0, 10)}.zip`
-      anchor.click()
-      setTimeout(() => URL.revokeObjectURL(url), 60_000)
-    } catch (error) { toast.error(error instanceof Error ? error.message : t.backupFailed) }
-  }
-
-  const importBackup = async (file: File) => {
-    if (!window.confirm(t.backupImportConfirm)) return
-    try { await importBrowserBackup(file); window.location.reload() }
-    catch (error) { toast.error(error instanceof Error ? error.message : t.backupFailed) }
-  }
-
   return (
     <>
-      <input
-        ref={backupInputRef}
-        className="sr-only"
-        type="file"
-        aria-label={t.backupImport}
-        accept=".zip,application/zip"
-        onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void importBackup(file) }}
-      />
       <input
         ref={uploadInputRef}
         className="sr-only"
@@ -157,8 +128,6 @@ export function HomeView({
         onRunHistory={() => setRunHistoryOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         onLanguagePreferenceChange={onLanguagePreferenceChange}
-        onExportBackup={() => { void exportBackup() }}
-        onImportBackup={() => backupInputRef.current?.click()}
       /> : null}
       <Suspense fallback={null}>
         {scenarioBuilder !== "unused" ? (

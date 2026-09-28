@@ -1,8 +1,8 @@
 /**
- * Purpose: Compose accessible Radix selects with Motion-owned popup transitions.
- * Pattern: Controlled popup presence.
+ * Purpose: Compose accessible Radix selects while retaining closed items for value display.
+ * Pattern: Select presentation adapter.
  * Usage: Used by scenario options, settings, run selection, and report filters.
- * Related: src/ui/hooks/use-popup-open-state.ts, src/ui/animation/provider.tsx
+ * Related: src/ui/animation/presence.ts, src/ui/components/settings/provider-select.tsx
  */
 "use client"
 
@@ -13,9 +13,9 @@ import { Select as SelectPrimitive } from "radix-ui"
 
 import { cn } from "@/ui/lib/class-names"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
-import { usePopupOpenState } from "@/ui/hooks/use-popup-open-state"
 import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
-import { slidePresence } from "@/ui/animation/presence"
+import { popupPresence } from "@/ui/animation/presence"
+import { usePopupOpenState } from "@/ui/hooks/use-popup-open-state"
 
 const SelectOpenContext = React.createContext(false)
 const MotionSelectContent = m.create(SelectPrimitive.Content)
@@ -23,12 +23,8 @@ type SelectContentProps = Pick<React.ComponentProps<typeof SelectPrimitive.Conte
   "className" | "children" | "position" | "align" | "onCloseAutoFocus" | "onEscapeKeyDown" |
   "onPointerDownOutside">
 
-function Select({
-  open: controlledOpen,
-  defaultOpen,
-  onOpenChange,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Root>) {
+function Select({ open: controlledOpen, defaultOpen, onOpenChange, ...props }:
+  React.ComponentProps<typeof SelectPrimitive.Root>) {
   const [open, changeOpen] = usePopupOpenState(controlledOpen, defaultOpen, onOpenChange)
   return <SelectOpenContext.Provider value={open}>
     <SelectPrimitive.Root data-slot="select" open={open} onOpenChange={changeOpen} {...props} />
@@ -94,7 +90,7 @@ function SelectContent({
       <AnimatePresence>{open ? <MotionSelectContent key="select" forceMount
         data-slot="select-content"
         data-align-trigger={position === "item-aligned"}
-        {...slidePresence(reducedMotion, "y", -4, -4, "popup")}
+        {...popupPresence(reducedMotion)}
         className={cn("relative z-50 max-h-(--radix-select-content-available-height) min-w-36 origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10", position ==="popper"&&"data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1", className )}
         position={position}
         align={align}

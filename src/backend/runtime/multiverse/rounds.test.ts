@@ -7,14 +7,14 @@
 import { expect, test } from "bun:test"
 import { ServerRoundProgression } from "./rounds"
 
-test("automatic rounds wait five seconds three times, then advance without timers", async () => {
+test("automatic rounds wait five seconds twice, then advance without timers", async () => {
   const timers: Array<{ callback: () => void; delay: number; canceled: boolean }> = []
   const updates: Array<{ status: string }> = []
   const rounds = new ServerRoundProgression(true, new AbortController().signal, async update => { updates.push(update) }, {
     now: () => 0,
     schedule: (callback, delay) => { const timer = { callback, delay, canceled: false }; timers.push(timer); return () => { timer.canceled = true } },
   })
-  for (let round = 1; round <= 3; round++) {
+  for (let round = 1; round <= 2; round++) {
     const next = rounds.wait(round)
     await Promise.resolve()
     expect(timers.at(-1)?.delay).toBe(5000)
@@ -24,8 +24,8 @@ test("automatic rounds wait five seconds three times, then advance without timer
     timers.at(-1)?.callback()
     await next
   }
-  await rounds.wait(4)
-  expect(timers).toHaveLength(3)
+  await rounds.wait(3)
+  expect(timers).toHaveLength(2)
   expect(updates.at(-1)?.status).toBe("running")
   rounds.dispose()
 })

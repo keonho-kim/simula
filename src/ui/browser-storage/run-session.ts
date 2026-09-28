@@ -1,6 +1,12 @@
+/**
+ * Purpose: Retain the selected run and view within one browser tab.
+ * Pattern: Session storage adapter.
+ * Usage: Read by browser route restoration and round progression.
+ * Related: src/ui/shell/browser-route.ts, src/ui/hooks/use-round-progression.ts
+ */
 export interface RunSession {
   runId?: string
-  viewMode?: "home" | "simulation" | "report"
+  viewMode?: "home" | "board" | "simulation" | "report"
   autoContinue?: boolean
   handledRounds?: number[]
   automaticStreak?: number

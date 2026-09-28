@@ -10,19 +10,20 @@ popup accessibility behavior. Native CSS remains for static states and short col
 
 | Surface | Implementation and decision |
 | --- | --- |
-| Dialog and dropdown | Radix owns state; Motion now animates 100–120 ms opacity entrances/exits. No backdrop blur or zoom. |
-| Tooltip | Radix owns hover/focus state; Motion handles a 100 ms entrance/exit. |
+| Dialog and dropdown | Radix owns state and focus. Motion uses a short dialog fade/vertical entrance and trigger-origin scale for menus and selects. No new blur. |
+| Tooltip | Radix owns hover/focus state; Motion uses a brief opacity-only entrance/exit. |
 | Button, input, textarea, select, badge, slider, settings/actor choices | Keep native interactions and explicitly bounded 100 ms color feedback. |
-| Switch and tab indicator | Motion owns the thumb, indicator opacity, and tab content entrance. |
+| Switch and tab indicator | Motion owns the thumb and a shared selection indicator. Tab content changes without a generic vertical slide. |
 | Start cards | Motion now owns hover/focus/tap displacement; reduced-motion disables displacement. |
-| Scenario board layout | Lazy-loaded Motion with domMax/m, position-only layout interpolation at 240 ms. Only section containers participate; individual rows are not Motion elements. Preserve the selected column DOM instead of remounting the whole board. |
-| Scenario board detail | Motion owns 150 ms opacity entrance/exit. Live preview updates do not rerender the layout tree. |
+| Scenario board layout | The title has a reserved back-button slot. The selected column enters from the left while the detail enters from the right; an opaque view replacement prevents old columns showing through. |
+| Scenario board detail | The detail shell stays in place when switching items; only its text cross-fades. Live preview updates do not remount the page transition. |
 | Board activity | Motion pulses at most one active row; other parallel actors retain a static pastel highlight. |
-| Board percentage | Motion moves ten dots while visible and running. The percentage never moves or counts up. |
+| Board percentage | Ten dots remain for the requested notation, but only the two closest to the percentage move while visible and running. The percentage never counts up. |
 | Graph | Keep Sigma camera and Graphology interpolation: these are canvas data, not DOM layout. Existing 120 ms transitions and Worker layout remain. Identical layouts now schedule no frames or graph updates. Layout results received in a hidden document apply immediately. |
 | Graph active status | Existing single next-expiry timer; no perpetual per-edge animation. |
 | Actor history | Keep measured virtualization and follow-latest behavior; no entrance animation per message or smooth-scroll backlog. |
 | Metrics and report charts | Values/path data update immediately; Motion provides one short chart entrance without count-up, path drawing or particle loop. |
+| Report rounds | Arrow controls page a bounded three-card window instead of scrolling the document; the incoming window moves in the selected direction. |
 | Toasts and scrollbars | Retain the existing shadcn/Sonner/Radix behavior. No extra animation wrapper. |
 | Replay and round countdown | Keep 800 ms replay steps and the existing round timers: these express product timing, not decorative animation. |
 | General SSE | Keep requestAnimationFrame batching for event projection. Detail SSE remains immediate and scoped to the open item. |
@@ -48,7 +49,7 @@ browser work, not network-to-display latency in a real VDI installation.
 | Layout count | 24 | 48 |
 | Style recalculation count | 312 | 274 |
 
-These are illustrative local runs, not a statistically controlled FPS benchmark. The transition now settles in 240 ms rather than 400 ms and measured style work decreases, while Motion's real position measurement costs
+These are illustrative historical runs, not a measurement of the current page-based board. The earlier transition settled in 240 ms rather than 400 ms and measured style work decreased, while Motion's real position measurement cost
 more script/layout time than the old whole-panel fade. Do not claim an across-the-board CPU or
 FPS improvement. The initial 400 ms Motion trial cost 3.234 s task time, motivating the 240 ms
 limit. Real VDI transport, GPU availability, resolution and host contention remain unmeasured.
@@ -57,10 +58,10 @@ At the time of this earlier audit, the production board chunk grew from 2.99 kB 
 gzip, including Motion. The consolidation later placed Motion behind browser startup for landing
 and popup transitions; the earlier chunk comparison no longer describes the current bundle split.
 
-Other checks: 1,000-node Worker layout returned finite coordinates while browser animation frames
+Other historical checks: 1,000-node Worker layout returned finite coordinates while browser animation frames
 continued; 4,120 conversation messages retained only 13 mounted rows in the test viewport.
 Unchanged graph-layout tests assert zero scheduled frames and zero graph writes. Browser tests
-verify the original selected column stays connected, independent scrolling, 40:60 layout,
+verified the earlier selected-column DOM, scrolling, 40:60 layout,
 background animation pause, reduced-motion behavior, and normal simulation/report workflows.
 
 The first broad parallel test run had development-page navigation interruptions and contention
@@ -76,7 +77,9 @@ Earlier audit verification: 185 Bun tests, typecheck, lint, production build, an
 ## Motion consolidation
 
 The browser startup boundary loads shared `domAnimation` features only after storage opens.
-Scenario Board retains a nested `domMax` boundary for its position-only layout transition.
+Scenario Board uses a nested `domAnimation` boundary for horizontal presence transitions on its dedicated page.
+Only tab lists load `domMax` for a shared selection indicator; large page and board bodies do not
+use layout measurement for their transitions.
 `src/ui/animation` now owns the Motion provider, timing scale, reusable fade/slide presence,
 card/press interactions, bounded board activity effects, visibility and reduced-motion hooks,
 and native CSS feedback duration. Components retain their semantic state, keys, layout, and
@@ -95,3 +98,8 @@ The constrained Chromium workflow still completed six board detail/back cycles w
 throttling and 100 ms network latency. One illustrative run recorded 1.325 s task time,
 0.335 s script time, 0.103 s layout time, and 0.092 s style recalculation time. These numbers
 are not a controlled comparison to the earlier audit and are not a real VDI FPS measurement.
+
+The current motion pass replaced the board's wait-mode swap, corrected popup closing and
+tab-selection continuity, and made page navigation and report-round arrows reflect their
+destination. This pass has no browser timing or VDI measurement; the figures above remain
+historical and must not be used to claim a new performance improvement.

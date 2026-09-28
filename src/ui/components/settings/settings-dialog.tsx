@@ -37,7 +37,7 @@ import { ProviderSettingsPanel } from "@/ui/components/settings/provider-setting
 import { RoleSettingsPanel } from "@/ui/components/settings/role-settings-panel"
 import { SettingsSidebar } from "@/ui/components/settings/sidebar"
 import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
-import { slidePresence } from "@/ui/animation/presence"
+import { quietPresence } from "@/ui/animation/presence"
 import type { ProviderJsonDraft, RoleJsonDraft, SettingsPage } from "@/ui/types/settings"
 
 interface SettingsDialogProps {
@@ -157,7 +157,7 @@ export function SettingsDialog({ open, t, onOpenChange }: SettingsDialogProps) {
           <div className="flex min-w-0 flex-col gap-4 md:flex-row">
             <div className="shrink-0 md:w-[220px]"><SettingsSidebar page={page} t={t} onSelect={setPage} /></div>
             <div className="min-w-0 flex-1"><AnimatePresence mode="wait" initial={false}>
-              <m.div key={page} {...slidePresence(reducedMotion, "x", 6, -6, "quick")}>
+              <m.div key={page} {...quietPresence(reducedMotion)}>
               {page === "providers" ? (
                 <ProviderSettingsPanel
                   settings={draft}

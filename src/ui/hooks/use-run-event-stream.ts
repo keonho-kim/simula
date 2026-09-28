@@ -21,7 +21,7 @@ interface UseRunEventStreamInput {
   selectedRunStatus?: string
   streamErrorText: string
   selectedRunIdRef: MutableRefObject<string | undefined>
-  viewModeRef: MutableRefObject<"home" | "simulation" | "report">
+  viewModeRef: MutableRefObject<"home" | "board" | "simulation" | "report">
   queryClient: QueryClient
   resetLiveState: () => void
   pushEvents: (events: RunEvent[]) => void

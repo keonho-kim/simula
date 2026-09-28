@@ -14,10 +14,11 @@ import { BUILDER_STAGES, builderTaskStage } from "@/ui/models/scenario-builder/p
 import { projectGenerationFields } from "@/shared/generation-preview"
 import { builderLabel } from "@/ui/models/scenario-builder/labels"
 import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
-import { fadePresence, slidePresence } from "@/ui/animation/presence"
+import { quietPresence, sequencePresence } from "@/ui/animation/presence"
 import { scenarioSourceName } from "@/ui/models/scenario-builder/source-name"
 import { Button } from "@/ui/components/ui/button"
 import { Badge } from "@/ui/components/ui/badge"
+import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 import type { UiTexts } from "@/ui/types/i18n"
 import type { DocumentSet } from "@/shared/documents"
 
@@ -25,6 +26,7 @@ export function BuilderActivity({ buildId, open, documents, t, channel = "scenar
   const reducedMotion = useReducedMotionPreference()
   const [selected, setSelected] = useState<string>()
   const [stage, setStage] = useState<typeof BUILDER_STAGES[number]>()
+  const [direction, setDirection] = useState<-1 | 1>(1)
   const progress = useGenerationStream(buildId, selected, open, channel)
   const documentNames = useMemo(() => new Map(documents?.documents.map(document => [document.id, scenarioSourceName(document.name, t)])), [documents, t])
   const latest = progress.tasks.at(-1)
@@ -39,11 +41,14 @@ export function BuilderActivity({ buildId, open, documents, t, channel = "scenar
   const fields = activeDraft && activeDraft.taskId === selected ? activeDraft.fields : acceptedFields
   return <section className="document-builder-activity" aria-label={t.builderStatusRunning}>
     <nav className="document-builder-timeline" aria-label={t.builderReviewStage}>
-      {BUILDER_STAGES.filter(value => channel !== "worlds" || value !== "sources").map(value => <Button key={value} variant={value === currentStage ? "secondary" : "ghost"} aria-pressed={value === currentStage} onClick={() => setStage(value)}>{builderLabel(value, t)}</Button>)}
+      {BUILDER_STAGES.filter(value => channel !== "worlds" || value !== "sources").map(value => <Button key={value} variant={value === currentStage ? "secondary" : "ghost"} aria-pressed={value === currentStage} onClick={() => {
+        setDirection(BUILDER_STAGES.indexOf(value) >= BUILDER_STAGES.indexOf(currentStage) ? 1 : -1)
+        setStage(value)
+      }}>{builderLabel(value, t)}</Button>)}
     </nav>
     <p className="text-sm text-muted-foreground" role="status">{progress.disconnected ? t.builderReconnecting : t.builderSelectTask}</p>
     <AnimatePresence mode="wait" initial={false}><m.div key={currentStage} className="document-builder-task-grid"
-      {...slidePresence(reducedMotion, "x", 8, -8)}>
+      {...sequencePresence(reducedMotion, direction)}>
       <div className="document-builder-task-list">
         {tasks.map(task => <Button key={task.taskId} variant={selected === task.taskId ? "secondary" : "ghost"} className="document-builder-task" data-status={task.status} aria-pressed={selected === task.taskId}
           onClick={() => setSelected(task.taskId)}>
@@ -56,11 +61,11 @@ export function BuilderActivity({ buildId, open, documents, t, channel = "scenar
       </div>
       <div className="document-builder-task-detail" aria-label={t.builderSummary}>
         <AnimatePresence mode="wait" initial={false}><m.div key={selected ?? "none"} className="flex min-w-0 flex-col items-start gap-4"
-          {...fadePresence(reducedMotion, "quick")}>
+          {...quietPresence(reducedMotion)}>
           {selectedTask ? <Badge variant="outline">{builderLabel(selectedTask.status, t)}</Badge> : null}
           {activeDraft && activeDraft.taskId === selected ? <p className="text-xs text-muted-foreground">{t.builderDraftNotice}</p> : null}
           {fields.length ? fields.map((field, index) => <div key={`${field.key}-${index}`} className="flex flex-col gap-1">
-            <h3 className="text-xs font-medium text-muted-foreground">{builderLabel(field.key, t)}</h3><p className="whitespace-pre-wrap break-words text-sm leading-6">{field.text}</p>
+            <h3 className="text-xs font-medium text-muted-foreground">{builderLabel(field.key, t)}</h3><MarkdownContent generated content={field.text} />
           </div>) : <p className="text-sm text-muted-foreground">{t.builderNoPreview}</p>}
         </m.div></AnimatePresence>
       </div>

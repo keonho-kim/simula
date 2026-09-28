@@ -2,9 +2,10 @@
  * Purpose: Own a world's manual approvals and cancellable automatic round countdowns.
  * Pattern: Explicit round progression state machine.
  * Usage: One instance is held for each active batch simulation.
- * Related: src/backend/runtime/multiverse/jobs.ts, src/shared/multiverse.ts
+ * Related: src/backend/runtime/multiverse/jobs.ts, src/shared/round-progression.ts
  */
-import { AUTOMATIC_ROUND_DELAY_COUNT, AUTOMATIC_ROUND_DELAY_MS, type BatchWorld } from "@/shared/multiverse"
+import type { BatchWorld } from "@/shared/multiverse"
+import { AUTOMATIC_ROUND_DELAY_COUNT, AUTOMATIC_ROUND_DELAY_MS } from "@/shared/round-progression"
 
 interface RoundClock { now: () => number; schedule: (callback: () => void, delayMs: number) => () => void }
 type RoundUpdate = Pick<BatchWorld, "status" | "roundIndex" | "autoContinue" | "automaticStreak" | "continueAt">

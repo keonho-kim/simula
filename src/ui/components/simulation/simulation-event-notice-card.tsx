@@ -12,6 +12,7 @@ import type { UiTexts } from "@/ui/types/i18n"
 import type { SimulationEventNotice } from "@/ui/models/simulation/simulation-event-notice"
 import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
 import { slidePresence } from "@/ui/animation/presence"
+import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
 export function SimulationEventNoticeCard({
   notice,
@@ -40,8 +41,8 @@ export function SimulationEventNoticeCard({
         <p className="text-xs font-semibold uppercase text-amber-700">
           {t.eventInjectedRound.replace("{round}", String(notice.event.roundIndex))}
         </p>
-        <h3 className="mt-2 text-base font-semibold text-foreground">{notice.event.title}</h3>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">{notice.event.summary}</p>
+        <h3 className="mt-2 text-base font-semibold text-foreground"><MarkdownContent generated inline content={notice.event.title} /></h3>
+        <MarkdownContent generated className="mt-2 text-muted-foreground" content={notice.event.summary} />
       </article>
     </m.div>
   ) : null}</AnimatePresence>

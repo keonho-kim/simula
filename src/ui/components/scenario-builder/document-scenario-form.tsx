@@ -21,13 +21,15 @@ import { Alert, AlertDescription } from "@/ui/components/ui/alert"
 import { builderLabel } from "@/ui/models/scenario-builder/labels"
 import { scenarioSourceName } from "@/ui/models/scenario-builder/source-name"
 
-export function DocumentScenarioForm({ workflow: w, t }: { workflow: ReturnType<typeof useDocumentScenario>; t: UiTexts }) {
+export function DocumentScenarioForm({ workflow: w, onExecute, t }: {
+  workflow: ReturnType<typeof useDocumentScenario>; onExecute: () => void; t: UiTexts
+}) {
   const input = useRef<HTMLInputElement>(null)
   const presets: Record<SituationPreset, string> = { auto: t.builderPresetAuto, meeting: t.builderPresetMeeting, presentation: t.builderPresetPresentation, negotiation: t.builderPresetNegotiation, review: t.builderPresetReview }
   const locked = w.busy || w.pendingGeneration || !w.hydrated || w.error === "storage"
   const storedDocuments = w.documents?.documents ?? []
   const ready = (w.files.length > 0 || storedDocuments.length > 0 || !!w.form.context.trim()) && storedDocuments.every(document => document.status === "ready" || document.status === "partial")
-  return <form className="document-builder-form" onSubmit={event => { event.preventDefault(); void w.execute() }}>
+  return <form className="document-builder-form" onSubmit={event => { event.preventDefault(); onExecute(); void w.execute() }}>
     <FieldSet disabled={locked}>
       <FieldLegend>{t.builderFiles}</FieldLegend>
       <FieldDescription>{t.builderFileHint}</FieldDescription>

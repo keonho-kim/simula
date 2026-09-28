@@ -19,6 +19,21 @@ describe("MarkdownContent", () => {
     expect(html).not.toContain("<script")
   })
 
+  test("marks only nonempty generated content selectable", () => {
+    const generated = renderToStaticMarkup(<MarkdownContent generated content="**Result**" />)
+    const fallback = renderToStaticMarkup(<MarkdownContent generated fallback="Waiting" />)
+    expect(generated).toContain('data-llm-generated="true"')
+    expect(generated).toContain("<strong>Result</strong>")
+    expect(fallback).not.toContain("data-llm-generated")
+  })
+
+  test("renders short generated Markdown inside a noninteractive inline wrapper", () => {
+    const html = renderToStaticMarkup(<button><MarkdownContent generated inline content="**Title** [link](https://example.com)" /></button>)
+    expect(html).toContain("<strong>Title</strong>")
+    expect(html).not.toContain("<p>")
+    expect(html).not.toContain("<a ")
+  })
+
   test("detects math content and renders it through the deferred math renderer", () => {
     expect(hasMathSyntax("value: $x^2$")).toBe(true)
     expect(hasMathSyntax("price: $100")).toBe(false)

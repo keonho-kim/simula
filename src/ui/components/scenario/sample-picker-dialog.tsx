@@ -1,5 +1,5 @@
 /**
- * Purpose: Let users choose an example scenario on one full-viewport scroll surface.
+ * Purpose: Let users choose an example scenario in a bounded modal.
  * Pattern: Read-only selection workflow.
  * Usage: Opened from the landing page.
  * Related: src/ui/shell/home-view.tsx, src/ui/styles/page-dialog.css
@@ -51,7 +51,7 @@ export function SamplePickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="page-scroll-dialog">
+      <DialogContent className="landing-selection-dialog" overlayClassName="bg-black/30 backdrop-blur-[2px]" closeLabel={t.modalClose}>
         <DialogHeader>
           <DialogTitle>{t.samplePicker}</DialogTitle>
           <DialogDescription>{t.samplePickerDescription}</DialogDescription>

@@ -6,7 +6,7 @@
  */
 import { z } from "zod"
 import { worldControlsSchema } from "./world-preparation-schema"
-import { AUTOMATIC_ROUND_DELAY_COUNT, DEFAULT_BATCH_MINUTES, DEFAULT_BATCH_WORLDS, MAX_BATCH_MINUTES, MAX_BATCH_WORLDS } from "./multiverse"
+import { DEFAULT_BATCH_MINUTES, DEFAULT_BATCH_WORLDS, MAX_BATCH_MINUTES, MAX_BATCH_WORLDS } from "./multiverse"
 
 export const multiverseRequestSchema = z.object({
   scenarioId: z.uuid(), controls: worldControlsSchema,
@@ -19,7 +19,8 @@ export const batchWorldSchema = z.object({
   id: z.uuid(), index: z.number().int().min(1).max(MAX_BATCH_WORLDS),
   status: z.enum(["pending", "preparing", "running", "waiting", "completed", "failed", "canceled", "interrupted"]),
   autoContinue: z.boolean(), runId: z.string().optional(), roundIndex: z.number().int().positive().optional(),
-  automaticStreak: z.number().int().min(0).max(AUTOMATIC_ROUND_DELAY_COUNT), continueAt: z.iso.datetime().optional(), issue: z.string().max(1000).optional(),
+  // Existing saved worlds may still contain a streak of three from the previous countdown policy.
+  automaticStreak: z.number().int().min(0).max(3), continueAt: z.iso.datetime().optional(), issue: z.string().max(1000).optional(),
 }).strict().refine(world => !world.runId || world.runId === `world-${world.id}`, "World run must belong to its batch world.")
 
 export const multiverseRecordSchema = z.object({

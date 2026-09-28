@@ -1,5 +1,5 @@
 /**
- * Purpose: Show relationship interactions and actor names in one full-viewport reading surface.
+ * Purpose: Show relationship interactions and actor names in a bounded detail dialog.
  * Pattern: Read-only edge detail composition.
  * Usage: Opened from the live graph when a relationship is selected.
  * Related: src/ui/components/graph/edge-history.ts, src/ui/styles/page-dialog.css
@@ -49,7 +49,7 @@ export function EdgeDetailDialog({
 
   return (
     <Dialog open={Boolean(edge)} onOpenChange={onOpenChange}>
-      <DialogContent className="page-scroll-dialog">
+      <DialogContent className="page-scroll-dialog page-scroll-dialog--narrow" overlayClassName="bg-black/25 backdrop-blur-[2px]" closeLabel={t.modalClose}>
         {edge ? (
           <>
             <DialogHeader className="shrink-0">
@@ -59,9 +59,9 @@ export function EdgeDetailDialog({
 
             <div className="flex shrink-0 flex-col gap-3 rounded-md bg-muted/30 p-3">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <span className="truncate text-sm font-semibold">{sourceName}</span>
+                <span className="truncate text-sm font-semibold"><MarkdownContent generated inline content={sourceName} /></span>
                 <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground" />
-                <span className="truncate text-sm font-semibold">{targetName}</span>
+                <span className="truncate text-sm font-semibold"><MarkdownContent generated inline content={targetName} /></span>
               </div>
               <div className="flex flex-wrap gap-2 [&>*]:min-w-0 [&>*]:flex-[1_1_150px]">
                 <EdgeStat label={t.graphEdgeInteractions} value={history.length} />
@@ -70,7 +70,7 @@ export function EdgeDetailDialog({
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {countBadges(edge.actionTypes, names, runState?.actors ?? []).map((item) => (
-                  <Badge key={item} variant="secondary" className="rounded-sm">{item}</Badge>
+                  <Badge key={item} variant="secondary" className="rounded-sm"><MarkdownContent generated inline content={item} /></Badge>
                 ))}
                 {countBadges(edge.visibilityMix).map((item) => (
                   <Badge key={item} variant="outline" className="rounded-sm bg-background">{item}</Badge>
@@ -124,9 +124,9 @@ function EdgeHistoryCard({
         <span className="text-xs font-semibold">R{item.roundIndex}</span>
         <Badge variant="outline" className="h-4 rounded-sm bg-background px-1.5 text-[10px]">{item.visibility}</Badge>
         <Badge variant="outline" className="h-4 rounded-sm bg-background px-1.5 text-[10px]">{item.decisionType}</Badge>
-        <Badge variant="outline" className="h-4 rounded-sm bg-background px-1.5 text-[10px]">{actionType || item.actionType}</Badge>
+        <Badge variant="outline" className="h-4 rounded-sm bg-background px-1.5 text-[10px]"><MarkdownContent generated inline content={actionType || item.actionType} /></Badge>
       </div>
-      <p className="mt-2 break-words text-xs leading-5 text-muted-foreground">{item.content || "-"}</p>
+      <MarkdownContent generated compact className="mt-2 break-words text-xs leading-5 text-muted-foreground" content={item.content} fallback="-" />
       <div className="mt-3 flex flex-wrap gap-2 [&>*]:min-w-0 [&>*]:flex-[1_1_250px]">
         <MiniField label={t.intent} value={item.intent} />
         <MiniField label={t.expectation} value={item.expectation} />
@@ -140,7 +140,7 @@ function MiniField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-sm bg-muted/40 px-2 py-1.5">
       <div className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</div>
-      <MarkdownContent compact className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground" content={value} fallback="-" />
+      <MarkdownContent generated compact className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground" content={value} fallback="-" />
     </div>
   )
 }

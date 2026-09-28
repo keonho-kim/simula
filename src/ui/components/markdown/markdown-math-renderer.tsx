@@ -9,10 +9,11 @@ import remarkMath from "remark-math"
 import { MarkdownRenderer } from "@/ui/components/markdown/markdown-renderer"
 import "katex/dist/katex.min.css"
 
-export function MarkdownMathRenderer({ source }: { source: string }) {
+export function MarkdownMathRenderer({ source, inline = false }: { source: string; inline?: boolean }) {
   return (
     <MarkdownRenderer
       source={source}
+      inline={inline}
       remarkPlugins={[remarkMath]}
       rehypePlugins={[rehypeKatex]}
     />

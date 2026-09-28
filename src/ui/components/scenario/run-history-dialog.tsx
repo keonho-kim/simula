@@ -1,5 +1,5 @@
 /**
- * Purpose: Show stored runs on a full-viewport scrolling selection surface.
+ * Purpose: Show stored runs in a bounded selection modal.
  * Pattern: Read-only selection workflow.
  * Usage: Opened from the landing page.
  * Related: src/ui/shell/home-view.tsx, src/ui/models/report/status-label.ts
@@ -34,7 +34,7 @@ export function RunHistoryDialog({
 }: RunHistoryDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="page-scroll-dialog">
+      <DialogContent className="landing-selection-dialog" overlayClassName="bg-black/30 backdrop-blur-[2px]" closeLabel={t.modalClose}>
         <DialogHeader>
           <DialogTitle>{t.historyPicker}</DialogTitle>
           <DialogDescription>{t.historyPickerDescription}</DialogDescription>

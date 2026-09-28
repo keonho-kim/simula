@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/components/ui/tool
 import type { UiTexts } from "@/ui/types/i18n"
 import type { ReportAnalysisViewModel } from "@/ui/models/report/report-analysis-view-model"
 import { EmptyPanel } from "./presentation"
+import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
 export function RelationshipHeatmap({ model, t }: { model: ReportAnalysisViewModel; t: UiTexts }) {
   const columnCount = model.heatmapActors.length + 1
@@ -31,7 +32,7 @@ export function RelationshipHeatmap({ model, t }: { model: ReportAnalysisViewMod
             <div className="border-r border-b border-border/60 bg-muted/40 px-2 py-1 text-muted-foreground">{t.actor}</div>
             {model.heatmapActors.map((actor) => (
               <div key={actor.actorId} title={actor.actorName} className="min-w-0 break-all border-b border-border/60 bg-muted/40 px-1 py-1 text-center text-muted-foreground">
-                {actor.actorName}
+                <MarkdownContent generated inline content={actor.actorName} />
               </div>
             ))}
             {model.heatmapRows.map((row) => (
@@ -49,7 +50,7 @@ export function RelationshipHeatmap({ model, t }: { model: ReportAnalysisViewMod
 function HeatmapRow({ row, max }: { row: ReportAnalysisViewModel["heatmapRows"][number]; max: number }) {
   return (
     <>
-      <div title={row.actorName} className="min-w-0 break-all border-r border-border/60 bg-muted/30 px-1 py-1.5 text-muted-foreground">{row.actorName}</div>
+      <div title={row.actorName} className="min-w-0 break-all border-r border-border/60 bg-muted/30 px-1 py-1.5 text-muted-foreground"><MarkdownContent generated inline content={row.actorName} /></div>
       {row.cells.map((value, index) => {
         const intensity = max > 0 ? value / max : 0
         return (
@@ -102,7 +103,7 @@ export function BehaviorRanking({ model, t }: { model: ReportAnalysisViewModel; 
             <article key={actor.actorId} className="rounded-md bg-muted/25 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <h4 className="truncate text-xs font-semibold">{actor.actorName}</h4>
+                  <h4 className="truncate text-xs font-semibold"><MarkdownContent generated inline content={actor.actorName} /></h4>
                   <p className="mt-1 text-[10px] text-muted-foreground">
                     {actor.actionCount} {t.actions} · {actor.uniqueActionTypes} {t.actionTypes}
                   </p>

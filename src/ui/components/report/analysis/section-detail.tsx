@@ -20,12 +20,12 @@ export function AnalysisSectionDetail({ reportId, section, t }: { reportId: stri
     queryFn: ({ signal }) => fetchAnalysisReference(reportId, referenceId ?? "", signal) })
   const ids = [...new Set([...section.evidenceIds, ...section.findings.flatMap(finding => finding.evidenceIds), ...(section.score?.evidenceIds ?? [])])]
   return <div className="flex flex-col gap-6">
-    <p className="text-sm font-medium leading-6">{section.summary}</p>
-    {section.score ? <section className="rounded-md border p-3"><p>{section.score.value ?? t.analysisUnknown}</p><p className="text-sm text-muted-foreground">{section.score.rationale}</p></section> : null}
-    <MarkdownContent content={section.content} />
+    <MarkdownContent generated className="font-medium" content={section.summary} />
+    {section.score ? <section className="rounded-md border p-3"><p>{section.score.value ?? t.analysisUnknown}</p><MarkdownContent generated className="text-muted-foreground" content={section.score.rationale} /></section> : null}
+    <MarkdownContent generated content={section.content} />
     {section.findings.length ? <section><h3 className="mb-3 text-sm font-semibold">{t.reportDetailedItems}</h3><ul className="flex list-disc flex-col gap-2 pl-5">{section.findings.map((finding, index) => <li key={index}>
       {finding.provenance?.length ? <span className="mr-2 text-xs text-muted-foreground">{finding.provenance.map(category => analysisLabel(category, t)).join(" · ")}</span> : null}
-      {finding.text}
+      <MarkdownContent generated content={finding.text} />
     </li>)}</ul></section> : null}
     <section className="flex flex-col gap-3 border-t pt-4">
       <h3 className="text-sm font-semibold">{t.reportEvidence}</h3>

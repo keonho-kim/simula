@@ -1,11 +1,10 @@
 /**
- * Purpose: Unlock browser-held provider credentials once before opening the app.
+ * Purpose: Unlock browser credentials and confirm server synchronization before opening the app.
  * Pattern: Session entry gate.
  * Usage: Mounted by src/ui/shell/client-root.tsx when the encrypted credential vault exists.
  * Related: src/ui/browser-storage/database/credential-vault.ts, src/ui/api-client/client.ts
  */
 import { useState, type ReactNode } from "react"
-import { toast } from "sonner"
 import { Button } from "@/ui/components/ui/button"
 import { Input } from "@/ui/components/ui/input"
 import { useLocaleText } from "@/ui/hooks/use-locale-text"
@@ -26,15 +25,21 @@ export function CredentialGate({ children }: { children: ReactNode }) {
     setBusy(true); setError(undefined)
     try {
       await unlockCredentialVault(passphrase)
+      try { await syncActiveSettings() }
+      catch { setError(t.settingsSyncFailed); return }
       setPassphrase("")
-      await syncActiveSettings().catch(() => toast.error(t.settingsSyncFailed))
       setUnlocked(true)
     } catch (failure) { setError(failure instanceof Error ? failure.message : t.vaultUnlockFailed) }
     finally { setBusy(false) }
   }
   const reset = async () => {
     setBusy(true); setError(undefined)
-    try { await clearCredentialVault(); await clearActiveSettings().catch(() => toast.error(t.settingsSyncFailed)); setConfirmReset(false); setUnlocked(true) }
+    try {
+      try { await clearActiveSettings() }
+      catch { setError(t.settingsSyncFailed); return }
+      await clearCredentialVault()
+      setConfirmReset(false); setUnlocked(true)
+    }
     catch (failure) { setError(failure instanceof Error ? failure.message : t.browserStorageUnavailable) }
     finally { setBusy(false) }
   }
@@ -52,6 +57,7 @@ export function CredentialGate({ children }: { children: ReactNode }) {
       <DialogContent showCloseButton={false} className="sm:max-w-[420px]">
         <DialogTitle>{t.vaultReset}</DialogTitle>
         <DialogDescription>{t.vaultResetHelp}</DialogDescription>
+        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <div className="flex justify-end gap-2">
           <Button variant="outline" disabled={busy} onClick={() => setConfirmReset(false)}>{t.continueEditing}</Button>
           <Button variant="destructive" disabled={busy} onClick={() => void reset()}>{t.vaultReset}</Button>

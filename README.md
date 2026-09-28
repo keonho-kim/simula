@@ -155,8 +155,8 @@ Sample scenario seeds live in [`senario.samples/`](./senario.samples/README.md).
 Run history is stored in the current browser profile's SQLite WASM database. Uploaded source
 files are stored in OPFS. The server uses a temporary directory while the owning tab is connected;
 it does not create new durable `runs/` history. Closing the tab cancels active work after a
-30-second reconnection grace period. Use the landing page's backup actions to move data between
-browser profiles or machines. Older server `runs/` files remain untouched and are not listed in
+30-second reconnection grace period. History stays in the browser profile and is not transferred
+between profiles or machines by the app. Older server `runs/` files remain untouched and are not listed in
 the new browser history.
 Uploaded originals remain in OPFS after submission so an interrupted scenario build can submit
 the same source through a new temporary document set.

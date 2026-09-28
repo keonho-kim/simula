@@ -8,7 +8,7 @@ import { useEffect, useState } from "react"
 import { useReducedMotionPreference } from "./use-reduced-motion-preference"
 import { MOTION_SECONDS } from "./timing"
 
-const DIALOG_EXIT_RETENTION_MS = MOTION_SECONDS.content * 1000
+const DIALOG_EXIT_RETENTION_MS = MOTION_SECONDS.popup * 1000
 
 export function useExitPresence(open: boolean): boolean {
   const reducedMotion = useReducedMotionPreference()

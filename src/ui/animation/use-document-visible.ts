@@ -2,7 +2,7 @@
  * Purpose: Stop repeating Motion effects when the browser document is hidden.
  * Pattern: External browser-state subscription.
  * Usage: Read by visible simulation activity components.
- * Related: src/ui/hooks/use-page-visibility.ts, src/ui/components/simulation/scenario-board.tsx
+ * Related: src/ui/hooks/use-page-visibility.ts, src/ui/pages/scenario-board-page.tsx
  */
 import { useSyncExternalStore } from "react"
 

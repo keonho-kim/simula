@@ -71,8 +71,8 @@ export function ReportRelationshipPanel({ state, t }: { state?: SimulationState;
             {actor ? (
               <div className="flex flex-col gap-4">
                 <div>
-                  <h2 className="text-base font-semibold">{actor.name}</h2>
-                  <p className="text-xs text-muted-foreground">{actor.role}</p>
+                  <h2 className="text-base font-semibold"><MarkdownContent generated inline content={actor.name} /></h2>
+                  <p className="text-xs text-muted-foreground"><MarkdownContent generated inline content={actor.role} /></p>
                 </div>
                 {[
                   [t.reportPersonality, actor.personality],
@@ -81,7 +81,7 @@ export function ReportRelationshipPanel({ state, t }: { state?: SimulationState;
                 ].map(([label, content]) => (
                   <section key={label}>
                     <h3 className="mb-2 text-xs font-medium text-muted-foreground">{label}</h3>
-                    <MarkdownContent compact content={content ?? ""} fallback="—" />
+                    <MarkdownContent generated compact content={content ?? ""} fallback="—" />
                   </section>
                 ))}
               </div>

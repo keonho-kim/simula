@@ -1,5 +1,5 @@
 /**
- * Purpose: Present one actor's profile and activity on a full-viewport reading surface.
+ * Purpose: Present one actor's profile and activity in a bounded reading dialog.
  * Pattern: Read-only actor detail composition.
  * Usage: Opened from the live actor history and report conversations.
  * Related: src/ui/components/actors/history/use-actor-details.ts, src/ui/styles/page-dialog.css
@@ -47,12 +47,12 @@ export function ActorDetailDialog({
 
   return (
     <Dialog open={dialogOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="page-scroll-dialog">
+      <DialogContent className="page-scroll-dialog" overlayClassName="bg-black/25 backdrop-blur-[2px]" closeLabel={t.modalClose}>
         {actor ? (
           <>
             <DialogHeader className="shrink-0">
-              <DialogTitle>{actor.name}</DialogTitle>
-              <DialogDescription>{actor.role}</DialogDescription>
+              <DialogTitle><MarkdownContent generated inline content={actor.name} /></DialogTitle>
+              <DialogDescription><MarkdownContent generated inline content={actor.role} /></DialogDescription>
             </DialogHeader>
 
             <Tabs defaultValue="actor-info" className="gap-3">
@@ -105,7 +105,7 @@ export function ActorDetailDialog({
                   <div className="p-3">
                     {actorHistory.length ? (
                       <div className="flex flex-col gap-2 pr-3">
-                        {actorHistory.map((item) => <ActorHistoryCard key={item.id} item={item} />)}
+                        {actorHistory.map((item) => <ActorHistoryCard key={item.id} item={item} t={t} />)}
                       </div>
                     ) : (
                       <div className="rounded-md border border-dashed border-border/80 bg-background/60 p-4 text-sm">
@@ -130,7 +130,7 @@ function ActorField({ label, value }: { label: string; value: string }) {
   return (
     <div className="mt-4">
       <div className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</div>
-      <MarkdownContent className="mt-1" content={value} fallback="-" />
+      <MarkdownContent generated className="mt-1" content={value} fallback="-" />
     </div>
   )
 }
@@ -148,14 +148,14 @@ function ActorSummaryField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-md bg-background/70 p-3">
       <div className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</div>
-      <MarkdownContent compact className="mt-1 text-xs leading-5" content={value} fallback="-" />
+      <MarkdownContent generated compact className="mt-1 text-xs leading-5" content={value} fallback="-" />
     </div>
   )
 }
 
-function ActorHistoryCard({ item }: { item: ActorHistoryItem }) {
+function ActorHistoryCard({ item, t }: { item: ActorHistoryItem; t: UiTexts }) {
   const Icon = item.type === "outgoing" ? ArrowUpRightIcon : item.type === "incoming" ? ArrowDownLeftIcon : MessageSquareIcon
-  const roundLabel = item.roundIndex === undefined ? "ROUND -" : `ROUND ${item.roundIndex}`
+  const roundLabel = item.roundIndex === undefined ? `${t.round} —` : `${t.round} ${item.roundIndex}`
   return (
     <div className="rounded-md bg-background/80 p-3">
       <div className="flex items-start gap-2">
@@ -164,16 +164,16 @@ function ActorHistoryCard({ item }: { item: ActorHistoryItem }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs font-semibold uppercase">{roundLabel} | {item.counterpartName}</span>
+            <span className="text-xs font-semibold uppercase">{roundLabel} | <MarkdownContent generated inline content={item.counterpartName} /></span>
             {item.visibility ? (
               <Badge variant="outline" className="h-4 rounded-sm bg-white px-1.5 text-[10px]">{item.visibility}</Badge>
             ) : null}
             {item.actionType ? (
-              <Badge variant="outline" className="h-4 rounded-sm bg-white px-1.5 text-[10px]">{item.actionType}</Badge>
+              <Badge variant="outline" className="h-4 rounded-sm bg-white px-1.5 text-[10px]"><MarkdownContent generated inline content={item.actionType} /></Badge>
             ) : null}
           </div>
-          <p className="mt-1 break-words text-[11px] text-muted-foreground">{item.title}</p>
-          <MarkdownContent compact className="mt-2" content={item.content} fallback="-" />
+          <p className="mt-1 break-words text-[11px] text-muted-foreground"><MarkdownContent generated inline content={item.title} /></p>
+          <MarkdownContent generated compact className="mt-2" content={item.content} fallback="-" />
           {item.timestamp ? <time className="mt-2 block font-mono text-[10px] text-muted-foreground">{timeLabel(item.timestamp)}</time> : null}
         </div>
       </div>
@@ -194,9 +194,9 @@ function ActorReasoningStream({ items, t }: { items: ActorReasoningItem[]; t: Ui
         {items.map((item) => (
           <section key={item.id} className="rounded-md bg-muted/30 p-3">
             <h3 className="text-xs font-medium text-muted-foreground">
-              {item.step} · attempt {item.attempt} · {timeLabel(item.timestamp)} · {item.reasoningTokens.toLocaleString()} tokens
+              <MarkdownContent generated inline content={item.step} /> · {t.metricAttempt} {item.attempt} · {timeLabel(item.timestamp)} · {item.reasoningTokens.toLocaleString()} {t.metricReasoningTokens}
             </h3>
-            <MarkdownContent compact className="mt-2" content={item.content} fallback="-" />
+            <MarkdownContent generated compact className="mt-2" content={item.content} fallback="-" />
           </section>
         ))}
       </div>

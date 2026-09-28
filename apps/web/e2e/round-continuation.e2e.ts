@@ -114,7 +114,7 @@ test("reload keeps the active simulation and automatic round progression", async
   expect(continuations).toBe(2)
 })
 
-test("three automatic approvals remove later waits and disabling resets the streak", async ({ page }) => {
+test("two automatic approvals remove later waits and disabling resets the streak", async ({ page }) => {
   test.setTimeout(45000)
   await page.addInitScript(() => localStorage.setItem("simula.language", "en"))
   const { settings } = await (await page.request.get("/api/settings")).json()
@@ -158,13 +158,13 @@ test("three automatic approvals remove later waits and disabling resets the stre
   await page.getByRole("switch", { name: "Auto continue" }).check()
   await page.getByRole("button", { name: "Start", exact: true }).click()
   const prompt = page.getByRole("dialog", { name: "Round complete" })
-  for (const round of [1, 2, 3]) {
+  for (const round of [1, 2]) {
     await expect(prompt).toBeVisible()
     await expect(prompt.getByRole("status")).toHaveText("Next round in 5s")
     expect(approvals).toHaveLength(round - 1)
     await expect.poll(() => approvals.includes(round), { timeout: 8000 }).toBe(true)
   }
-  // Round four must send its approval before another five-second delay could elapse.
+  // Rounds three and four must send approvals without another countdown.
   await expect.poll(() => approvals, { timeout: 3000 }).toEqual([1, 2, 3, 4])
   await expect(prompt).toHaveCount(0)
   await fourth!.fulfill({ json: { ok: true } })

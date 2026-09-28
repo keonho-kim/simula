@@ -6,7 +6,6 @@
  */
 const modules: Record<string, () => Promise<unknown>> = {
   "/src/ui/api-client/client.ts": () => import("@/ui/api-client/client"),
-  "/src/ui/browser-storage/backup.ts": () => import("@/ui/browser-storage/backup"),
   "/src/ui/shell/e2e-queries/artifacts.ts": () => import("@/ui/shell/e2e-queries/artifacts"),
   "/src/ui/shell/e2e-queries/attachments.ts": () => import("@/ui/shell/e2e-queries/attachments"),
   "/src/ui/browser-storage/database/connection.ts": () => import("@/ui/browser-storage/database/connection"),

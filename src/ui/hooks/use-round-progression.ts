@@ -11,6 +11,7 @@ import { cancelRun, continueRun } from "@/ui/api-client/client"
 import { useRunStore } from "@/ui/stores/run-store"
 import { selectCompletedRound, selectTerminalEvent } from "@/ui/stores/run/selectors"
 import type { UiTexts } from "@/ui/types/i18n"
+import { AUTOMATIC_ROUND_DELAY_COUNT } from "@/shared/round-progression"
 
 export function useRoundProgression(selectedRunId: string | undefined, t: UiTexts, serverManaged = false) {
   const completedRound = useRunStore(selectCompletedRound)
@@ -19,7 +20,7 @@ export function useRoundProgression(selectedRunId: string | undefined, t: UiText
   const [automaticStreak, setAutomaticStreak] = useState(() => readRunSession().automaticStreak ?? 0)
   const autoContinueRef = useRef(autoContinue)
   const inFlight = useRef(false)
-  const skipRoundDelay = autoContinue && automaticStreak >= 3
+  const skipRoundDelay = autoContinue && automaticStreak >= AUTOMATIC_ROUND_DELAY_COUNT
   const setAutoContinue = useCallback((enabled: boolean) => {
     autoContinueRef.current = enabled
     setAutoContinueState(enabled)
@@ -60,7 +61,7 @@ export function useRoundProgression(selectedRunId: string | undefined, t: UiText
       setRoundPromptIndex(undefined)
       await continueRun(selectedRunId, roundIndex)
       const countAutomatic = automatic && autoContinueRef.current
-      setAutomaticStreak(current => countAutomatic ? Math.min(3, current + 1) : 0)
+      setAutomaticStreak(current => countAutomatic ? Math.min(AUTOMATIC_ROUND_DELAY_COUNT, current + 1) : 0)
     } catch (error) {
       setHandledRounds(current => {
         const next = new Set(current)

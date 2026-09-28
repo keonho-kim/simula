@@ -17,7 +17,7 @@ and replay behavior. This change targets repeated computation and unrelated subs
 | `src/ui/components/graph/overlays/` | Node/pointer positioning and edge preview presentation. |
 | `src/ui/models/actors/actor-details.ts` | Actor detail, history, and reasoning projections without React rendering. |
 | `src/ui/components/actors/history/` | Memoized message cards, detail subscriptions, and measured virtual scrolling. |
-| `src/ui/components/simulation/scenario-board.tsx` | Scenario artifact board and on-demand detail rendering. |
+| `src/ui/pages/scenario-board-page.tsx` | Scenario preparation page and on-demand detail rendering. |
 
 Graph, actor rail, stage, and metric panel boundaries are memoized. Message cards receive stable
 primitive props, so an appended interaction does not re-render unchanged cards. Graph camera
@@ -222,8 +222,9 @@ The default interface now favors short, functional transitions. Graph layouts an
 120 ms transitions; reduced-motion preference makes those updates immediate. Layout interpolation
 emits one bulk Graphology position update per animation frame. Edge width/color changes apply
 immediately, eliminating their separate decoration loop. Numeric metrics show their final value
-without count-up animation. Repeating pulses/spinners, hover lifts, zoom/slide entrances, and
-backdrop filters are removed; dialogs retain a short opacity fade. The report chart also computes
+without count-up animation. Navigation, dialogs and selected content use short transform/opacity
+transitions while only two progress dots and one active board row repeat during preparation.
+No heavy backdrop blur is added. The report chart also computes
 its vertical scale once per series instead of rescanning every sample for every point.
 
 `storage/run-session.ts` keeps only the active run id, view, auto-continue preference, and handled
@@ -240,11 +241,11 @@ The previous Vite build used dependency-aware chunking after a forced vendor par
 an initialization-order error. The current Next.js build uses Webpack and verifies worker loading
 and browser workflows against the same server that hosts the API.
 
-The Scenario Board uses an incremental artifact projection in `models/simulation/scenario-board.ts`. Telemetry-only batches preserve its reference. Only the selected artifact mounts Markdown detail content; the four board columns display titles and status markers. The board fills the viewport and wraps columns; the whole surface scrolls, while columns and selected details grow with their content. Its completion percentage sits between two five-dot waves. Motion moves only the dots while preparation is visible and running. At most one active row animates a pastel background using opacity; other parallel actors retain a static highlight. Reduced-motion users receive a static highlight. Phase indicators use gray for waiting, green for active, and blue for complete. Reading an artifact delays automatic closure after the first event until the reader closes details or selects View simulation; terminal events always close the board.
+The Scenario Board is a separate `/scenario-board` page between landing and simulation. It uses an incremental artifact projection in `models/simulation/scenario-board.ts`. Telemetry-only batches preserve its reference. Only the selected artifact mounts Markdown detail content; the four board columns display titles and status markers. The page scrolls as one surface, while columns and details grow with their content. Its completion percentage sits between two five-dot waves. Motion moves only the dots while preparation is visible and running. At most one active row animates a pastel background using opacity; other parallel actors retain a static highlight. Reduced-motion users receive a static highlight. Phase indicators use gray for waiting, green for active, and blue for complete. The page advances to simulation when the first event or interaction is accepted and the reader has closed any open detail. Terminal runs always advance.
 
 Board draft output is delivered immediately through an item-specific SSE subscription only while an unfinished detail is open. The runtime retains the current draft in memory and sends a snapshot before subsequent live deltas; token deltas are neither persisted nor sent through the general run stream. Stream identifiers and sequence numbers prevent repeated chunks after reconnects; retries reset the affected draft. Accepted results replace drafts, and board events are excluded from graph stage subscriptions.
 
-Selecting an item switches to its column at 40% width and detail at 60% on desktop. Other columns are unmounted until All columns is selected. Motion animates the selected column position over 240 ms without remounting it; the detail fades in over 150 ms. Streamed text updates only the memoized detail renderer, outside the Motion layout tree. Reduced-motion users get an immediate switch, including when the preference changes while the page is open. See [the full animation audit](animation-audit.md) for frontend-wide decisions, measurements, and limitations.
+Selecting an item switches to its column at 40% width and detail at 60% on desktop. Other columns unmount until the icon-only back button is selected. A reserved header slot keeps the title fixed. The new opaque view replaces the old one without a wait interval; its selected column and detail enter together from opposite horizontal directions. Switching detail items changes only the detail text. Streamed text updates only the memoized detail renderer, outside the page transition. Reduced-motion users get an immediate switch. See [the full animation audit](animation-audit.md) for frontend-wide decisions, historical measurements, and limitations.
 
 ## Current startup, history, and report pass
 

@@ -15,7 +15,7 @@ import { saveRunReport } from "@/ui/browser-storage/database/runs/save-report"
 import { readLocalSettings } from "@/ui/browser-storage/database/settings/read"
 import { saveOrdinarySettings } from "@/ui/browser-storage/database/settings/save"
 import { restoreProviderSecrets, separateProviderSecrets } from "@/ui/browser-storage/database/settings/secrets"
-import { readUnlockedSecrets, updateCredentialVault } from "@/ui/browser-storage/database/credential-vault"
+import { hasCredentialVault, readUnlockedSecrets, updateCredentialVault } from "@/ui/browser-storage/database/credential-vault"
 import { listSavedSamples } from "@/ui/browser-storage/database/samples/list"
 import { markSampleSeedCurrent } from "@/ui/browser-storage/database/samples/mark-seed-current"
 import { readSample } from "@/ui/browser-storage/database/samples/read"
@@ -45,6 +45,8 @@ export interface RunDetailResponse {
   timeline: GraphTimelineFrame[]
   events: RunEvent[]
 }
+
+const SETTINGS_REQUEST_TIMEOUT_MS = 10_000
 
 export async function fetchRuns(): Promise<RunManifest[]> {
   const local = await listBrowserRuns()
@@ -166,7 +168,7 @@ export async function cancelRun(runId: string): Promise<void> {
 export async function fetchSettings(): Promise<LLMSettings> {
   const local = await readLocalSettings()
   if (local) return restoreProviderSecrets(local, readUnlockedSecrets() ?? {})
-  const defaults = await request<SettingsResponse>("/api/settings/defaults", { signal: AbortSignal.timeout(10_000) })
+  const defaults = await request<SettingsResponse>("/api/settings/defaults", { signal: AbortSignal.timeout(SETTINGS_REQUEST_TIMEOUT_MS) })
   return defaults.settings
 }
 
@@ -182,11 +184,12 @@ export async function syncActiveSettings(): Promise<void> {
   const ordinary = await readLocalSettings()
   if (!ordinary) return
   const secrets = readUnlockedSecrets()
-  if (!secrets) throw new Error("Unlock provider credentials before starting model work.")
-  const settings = restoreProviderSecrets(ordinary, secrets)
+  if (!secrets && await hasCredentialVault()) throw new Error("Unlock provider credentials before starting model work.")
+  const settings = secrets ? restoreProviderSecrets(ordinary, secrets) : ordinary
   await request<SettingsResponse>("/api/settings", {
     method: "PUT",
     body: JSON.stringify({ settings }),
+    signal: AbortSignal.timeout(SETTINGS_REQUEST_TIMEOUT_MS),
   })
 }
 

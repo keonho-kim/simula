@@ -1,8 +1,8 @@
 /**
  * Purpose: Render selected preparation content and live previews without nested scrolling.
  * Pattern: Memoized selected-detail presentation.
- * Usage: Rendered inside the full-viewport scenario board.
- * Related: src/ui/components/simulation/scenario-board.tsx, src/ui/hooks/use-board-preview.ts
+ * Usage: Rendered inside the scenario board page's detail region.
+ * Related: src/ui/pages/scenario-board-page.tsx, src/ui/hooks/use-board-preview.ts
  */
 import { memo } from "react"
 import { X } from "lucide-react"
@@ -23,7 +23,7 @@ export const ScenarioBoardDetails = memo(function ScenarioBoardDetails({ item, r
     coreSituation: t.boardCore, actorPressures: t.boardPressures, conflictDynamics: t.boardConflict, simulationDirection: t.boardDirection, majorEvents: t.boardEvents }
   return <>
     <header className="flex shrink-0 items-center justify-between gap-2 border-b px-5 py-3">
-      <h3 className="text-sm font-semibold">{item.title}</h3>
+      <h3 className="text-sm font-semibold"><MarkdownContent generated={item.generatedTitle} inline content={item.title} /></h3>
       <Button variant="ghost" size="icon-sm" aria-label={t.boardClose} onClick={onClose}><X /></Button>
     </header>
     <div className="flex min-w-0 flex-col gap-5 p-5">
@@ -31,14 +31,14 @@ export const ScenarioBoardDetails = memo(function ScenarioBoardDetails({ item, r
         <p className="text-xs text-muted-foreground">{t.boardDraft}</p>
         {selectedDraft && Object.values(selectedDraft).some(Boolean) ? Object.entries(selectedDraft).map(([field, content]) => (
           <section key={field}><h4 className="mb-2 text-xs font-medium text-muted-foreground">{fieldLabels[field] ?? t.boardWorking}</h4>
-            <p className="whitespace-pre-wrap break-words text-sm leading-6">{content}</p>
+            <MarkdownContent generated content={content} />
           </section>
         )) : <p role="status" className="text-sm text-muted-foreground">{preview.disconnected ? t.boardReconnecting : t.boardAwaiting}</p>}
       </> : null}
       {item.fields?.map((field, index) => (
         <section key={index}>
           {field.label ? <h4 className="mb-2 text-xs font-medium text-muted-foreground">{field.label}</h4> : null}
-          <MarkdownContent compact content={field.content} fallback="" />
+          <MarkdownContent generated={field.generated} compact content={field.content} fallback="" />
         </section>
       ))}
     </div>

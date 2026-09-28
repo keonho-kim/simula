@@ -1,7 +1,7 @@
 /**
- * Purpose: Virtualize archived actor messages against the report's full-viewport scroll surface.
+ * Purpose: Virtualize archived actor messages against the report's bounded dialog scroll surface.
  * Pattern: Lifecycle-owned virtual list.
- * Usage: Mounted by the report conversation panel inside a page-scroll dialog.
+ * Usage: Mounted by the report conversation panel inside its scrolling detail dialog.
  * Related: src/ui/components/report/conversation-panel.tsx, src/ui/components/actors/history/message-card.tsx
  */
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"

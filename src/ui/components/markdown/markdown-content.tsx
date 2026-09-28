@@ -14,6 +14,9 @@ interface MarkdownContentProps {
   fallback?: string
   className?: string
   compact?: boolean
+  generated?: boolean
+  inline?: boolean
+  ariaLabel?: string
 }
 
 const MarkdownMathRenderer = lazy(() =>
@@ -22,18 +25,20 @@ const MarkdownMathRenderer = lazy(() =>
   }))
 )
 
-export function MarkdownContent({ content, fallback = "-", className, compact = false }: MarkdownContentProps) {
+export function MarkdownContent({ content, fallback = "-", className, compact = false, generated = false, inline = false, ariaLabel }: MarkdownContentProps) {
   const source = normalizeMarkdownSource(content?.trim() || fallback)
+  const Element = inline ? "span" : "div"
+  const selectable = generated && Boolean(content?.trim())
   return (
-    <div className={cn("simula-markdown", compact && "simula-markdown-compact", className)}>
+    <Element aria-label={ariaLabel} data-llm-generated={selectable ? "true" : undefined} className={cn("simula-markdown", compact && "simula-markdown-compact", inline && "simula-markdown-inline", className)}>
       {hasMathSyntax(source) ? (
-        <Suspense fallback={<MarkdownRenderer source={source} />}>
-          <MarkdownMathRenderer source={source} />
+        <Suspense fallback={<MarkdownRenderer source={source} inline={inline} />}>
+          <MarkdownMathRenderer source={source} inline={inline} />
         </Suspense>
       ) : (
-        <MarkdownRenderer source={source} />
+        <MarkdownRenderer source={source} inline={inline} />
       )}
-    </div>
+    </Element>
   )
 }
 

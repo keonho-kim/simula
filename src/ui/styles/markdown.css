@@ -16,6 +16,8 @@
   .simula-markdown > :first-child { margin-top: 0; }
   .simula-markdown > :last-child { margin-bottom: 0; }
 
+  .simula-markdown-inline { display: inline; }
+
   .simula-markdown p,
   .simula-markdown ul,
   .simula-markdown ol,

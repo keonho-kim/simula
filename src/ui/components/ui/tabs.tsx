@@ -5,6 +5,7 @@
  * Related: src/ui/animation/provider.tsx, src/ui/animation/use-reduced-motion-preference.ts
  */
 import * as React from "react"
+import { LayoutGroup, LazyMotion, domMax } from "motion/react"
 import * as m from "motion/react-m"
 import { cva, type VariantProps } from "class-variance-authority"
 import { Tabs as TabsPrimitive } from "radix-ui"
@@ -12,8 +13,7 @@ import { Tabs as TabsPrimitive } from "radix-ui"
 import { cn } from "@/ui/lib/class-names"
 import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
 import { tabPressMotion } from "@/ui/animation/interaction"
-import { slidePresence } from "@/ui/animation/presence"
-import { motionTransition } from "@/ui/animation/timing"
+import { selectionTransition } from "@/ui/animation/timing"
 
 const TabsValueContext = React.createContext<string | undefined>(undefined)
 const TabsVariantContext = React.createContext<"default" | "line">("default")
@@ -66,14 +66,17 @@ function TabsList({
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.List> &
   VariantProps<typeof tabsListVariants>) {
+  const groupId = React.useId()
   return (
     <TabsVariantContext.Provider value={variant ?? "default"}>
+    <LazyMotion features={domMax} strict><LayoutGroup id={groupId}>
     <TabsPrimitive.List
       data-slot="tabs-list"
       data-variant={variant}
       className={cn(tabsListVariants({ variant }), className)}
       {...props}
     />
+    </LayoutGroup></LazyMotion>
     </TabsVariantContext.Provider>
   )
 }
@@ -90,17 +93,19 @@ function TabsTrigger({
     <TabsPrimitive.Trigger asChild
       data-slot="tabs-trigger"
       className={cn(
-        "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-colors duration-[var(--animation-feedback-duration)] group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 dark:text-muted-foreground dark:hover:text-foreground group-data-[variant=default]/tabs-list:data-active:shadow-sm group-data-[variant=line]/tabs-list:data-active:shadow-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-colors duration-[var(--animation-feedback-duration)] group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 has-data-[icon=inline-end]:pr-1 has-data-[icon=inline-start]:pl-1 dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-active:bg-transparent dark:group-data-[variant=line]/tabs-list:data-active:border-transparent dark:group-data-[variant=line]/tabs-list:data-active:bg-transparent",
-        "data-active:bg-background data-active:text-foreground dark:data-active:border-input dark:data-active:bg-input/30 dark:data-active:text-foreground",
+        "data-active:text-foreground dark:data-active:border-input dark:data-active:text-foreground",
         className
       )}
       {...props}
     >
       <m.button type="button" initial={false} {...tabPressMotion(reducedMotion)}>
-        {children}
-        {variant === "line" ? <m.span aria-hidden="true" className="pointer-events-none absolute inset-x-0 -bottom-[5px] h-0.5 bg-foreground"
-          initial={false} animate={{ opacity: selected ? 1 : 0 }} transition={motionTransition(reducedMotion, "feedback")} /> : null}
+        {selected ? <m.span aria-hidden="true" layoutId="selected-tab" transition={selectionTransition(reducedMotion)}
+          className={cn("pointer-events-none absolute z-0", variant === "line"
+            ? "inset-x-0 -bottom-[5px] h-0.5 bg-foreground"
+            : "inset-0 rounded-md bg-background shadow-sm dark:bg-input/30")} /> : null}
+        <span className="relative z-10">{children}</span>
       </m.button>
     </TabsPrimitive.Trigger>
   )
@@ -111,13 +116,12 @@ function TabsContent({
   children,
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Content>) {
-  const reducedMotion = useReducedMotionPreference()
   return (
     <TabsPrimitive.Content asChild
       data-slot="tabs-content"
       className={cn("flex-1 text-sm outline-none", className)}
       {...props}
-    ><m.div {...slidePresence(reducedMotion, "y", 4, 0, "quick")}>{children}</m.div>
+    ><div>{children}</div>
     </TabsPrimitive.Content>
   )
 }

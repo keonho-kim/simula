@@ -126,8 +126,8 @@ Temporary server output while the browser session is active:
   graph.timeline.json
 ```
 
-The durable copy is in the browser profile's SQLite WASM database. Use the landing page backup
-controls to move it between profiles or computers. Existing `runs/` directories remain untouched
+The durable copy is in the browser profile's SQLite WASM database. The app does not offer
+cross-profile export or import. Existing `runs/` directories remain untouched
 but are not imported automatically.
 
 | File | Purpose |
@@ -193,8 +193,8 @@ packages as newer upstream releases; this does not mean their current integratio
 
 ## Automatic round progression
 
-The first three consecutive successful automatic round approvals each show the five-second
-countdown. Subsequent rounds in that streak continue immediately without opening the round
+The first two consecutive successful automatic round approvals each show the five-second
+countdown. From round three, automatic progression continues without opening the round
 modal. The simulation header retains an auto-continue switch so this mode can be stopped.
 Turning auto-continue off, a failed continuation, or selecting/creating another run resets the
 streak. The tab session retains the confirmed streak across reloads, together with acknowledged
@@ -371,7 +371,7 @@ before idempotency comparison. Reusing the key with different input returns a co
 | Change one world's automatic progression | `POST /api/multiverse/:id/worlds/:worldId/automatic`, body `{ "enabled": true }` |
 | Approve one exact waiting round | `POST /api/multiverse/:id/worlds/:worldId/continue`, body `{ "roundIndex": 1 }` |
 
-Automatic rounds continue while the browser tab stays connected. The first three automatic
+Automatic rounds continue while the browser tab stays connected. The first two automatic
 approvals wait five seconds; later approvals have no countdown until automatic progression
 is disabled. A manual command affects only the selected world. Use the Multiverse panel
 to control a batch world rather than the individual run's browser-owned approval dialog.

@@ -1,28 +1,25 @@
 /**
- * Purpose: Give long modal workflows one full-viewport scroll surface without nested content scrollbars.
+ * Purpose: Bound long reading dialogs while keeping one scroll surface per modal.
  * Pattern: Shared presentation contract.
- * Usage: Applied to content-heavy DialogContent instances.
- * Related: src/ui/components/ui/dialog.tsx, src/ui/components/settings/settings-dialog.tsx
+ * Usage: Applied to content-heavy dialogs and bounded landing selections.
+ * Related: src/ui/components/ui/dialog.tsx, src/ui/components/report/analysis/detail-dialog.tsx
  */
 .page-scroll-dialog[data-slot="dialog-content"] {
   position: fixed;
-  inset: 0;
-  top: 0;
-  left: 0;
-  /* The shared Dialog uses translate utilities; a full-page panel must cancel them. */
-  translate: 0 0 !important;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50% !important;
   transform: none;
   display: flex;
-  width: 100vw;
+  width: min(var(--page-dialog-width, 960px), calc(100vw - 3rem));
   max-width: none;
-  height: 100svh;
-  max-height: none;
+  max-height: min(88svh, 900px);
   min-height: 0;
   flex-direction: column;
   gap: 1rem;
   overflow-x: hidden;
   overflow-y: auto;
-  border-radius: 0;
+  border-radius: var(--radius-xl);
   padding: clamp(1rem, 3vw, 2rem);
 }
 .page-scroll-dialog[data-slot="dialog-content"] > * {
@@ -32,4 +29,26 @@
   margin-inline: auto;
 }
 .page-scroll-dialog[data-slot="dialog-content"] > [data-slot="dialog-close"] { width: auto; }
-.page-scroll-dialog--wide { --page-dialog-content-width: 1600px; }
+.page-scroll-dialog--narrow { --page-dialog-width: 760px; }
+.page-scroll-dialog--compact { --page-dialog-width: 640px; }
+.page-scroll-dialog--report[data-slot="dialog-content"] { width: min(1440px, 80vw); max-height: calc(100svh - 3rem); }
+@media (max-width: 768px) {
+  .page-scroll-dialog--report[data-slot="dialog-content"] { width: calc(100vw - 2rem); }
+}
+
+.landing-selection-dialog[data-slot="dialog-content"] {
+  top: 50%;
+  left: 50%;
+  display: flex;
+  width: min(760px, calc(100vw - 3rem));
+  max-width: none;
+  max-height: min(720px, calc(100svh - 3rem));
+  min-height: 0;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+  translate: -50% -50%;
+  transform: none;
+}

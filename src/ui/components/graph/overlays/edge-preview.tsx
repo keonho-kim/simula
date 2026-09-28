@@ -1,6 +1,13 @@
+/**
+ * Purpose: Present the latest generated interaction on a relationship preview.
+ * Pattern: Read-only overlay component.
+ * Usage: Rendered by GraphView for the focused edge.
+ * Related: src/ui/components/graph/graph-view.tsx, src/ui/components/markdown/markdown-content.tsx
+ */
 import type { ActorState, GraphTimelineFrame } from "@/shared"
 import type { UiTexts } from "@/ui/types/i18n"
 import { sanitizeActorVisibleText } from "@/ui/models/actors/actor-visible-text"
+import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
 export function EdgePreview({
   edge,
@@ -23,12 +30,12 @@ export function EdgePreview({
         <span className="font-mono text-[11px] text-muted-foreground">{edge.weight}</span>
       </div>
       <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">
-        {actionSummary || latestActionType || "-"}
+        <MarkdownContent generated inline content={actionSummary || latestActionType} fallback="-" />
       </p>
       <div className="flex flex-wrap gap-1.5">
         {latestActionType ? (
           <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-            {latestActionType}
+            <MarkdownContent generated inline content={latestActionType} />
           </span>
         ) : null}
         <span className="rounded-sm bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
@@ -36,7 +43,7 @@ export function EdgePreview({
         </span>
       </div>
       {edge.latestContent ? (
-        <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{edge.latestContent}</p>
+        <MarkdownContent generated compact className="line-clamp-2 text-xs leading-5 text-muted-foreground" content={edge.latestContent} />
       ) : null}
     </div>
   )
