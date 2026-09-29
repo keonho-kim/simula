@@ -1,5 +1,5 @@
 /**
- * Purpose: Retain only document/build identifiers for reopening a scenario workflow.
+ * Purpose: Retain document/build identifiers, active generation intent, and its language within the tab.
  * Pattern: Browser persistence adapter.
  * Usage: Called by the document scenario lifecycle hook.
  * Related: src/ui/hooks/use-document-scenario.ts
@@ -7,7 +7,7 @@
 import { z } from "zod"
 
 const KEY = "simula.document-scenario"
-const schema = z.object({ documentSetId: z.uuid().optional(), buildId: z.uuid().optional() })
+const schema = z.object({ documentSetId: z.uuid().optional(), buildId: z.uuid().optional(), pendingGeneration: z.boolean().optional(), language: z.enum(["ko", "en"]).optional() })
 export type DocumentScenarioSession = z.infer<typeof schema>
 
 export function readDocumentScenarioSession(): DocumentScenarioSession {

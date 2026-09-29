@@ -38,3 +38,8 @@ test("report preparation has its own reloadable URL", () => {
   expect(pathForView("report-preparation", "new-run")).toBe("/reports/new-run/prepare")
   expect(pathForView("report-preparation", undefined)).toBeUndefined()
 })
+
+test("document analysis has a page before a simulation run exists", () => {
+  expect(viewFromPath("/document-analysis", {})).toEqual({ viewMode: "document-analysis" })
+  expect(pathForView("document-analysis", undefined)).toBe("/document-analysis")
+})

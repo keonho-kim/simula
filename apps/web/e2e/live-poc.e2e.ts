@@ -31,7 +31,7 @@ test("Ornith completes a tiny document scenario, two actor rounds and an analysi
     temperature: 0, maxTokens: 4096, timeoutSeconds: 120, extraBody: { reasoning_effort: "none" } }
   expect((await page.request.put("/api/settings", { data: { settings } })).ok()).toBe(true)
   await page.getByRole("button", { name: /New Scenario/ }).click()
-  const dialog = page.getByRole("main", { name: "New Scenario" })
+  let dialog = page.getByRole("dialog", { name: "New Scenario" })
   await dialog.getByLabel("Choose files").setInputFiles(inputFile)
   await dialog.getByRole("button", { name: "Add participant" }).click()
   await dialog.getByLabel("Name or role title").first().fill("CTO")
@@ -39,6 +39,8 @@ test("Ornith completes a tiny document scenario, two actor rounds and an analysi
   await dialog.getByLabel("Name or role title").nth(1).fill("Finance")
   const buildStarted = page.waitForResponse(response => response.url().endsWith("/api/scenario-builder") && response.request().method() === "POST")
   await dialog.getByRole("button", { name: "Run", exact: true }).click()
+  await expect(page).toHaveURL("/document-analysis")
+  dialog = page.getByRole("main")
   const { build } = await (await buildStarted).json()
   const reviewed = await terminalStatus(page.request, `/api/scenario-builder/${build.id}`, ["review", "blocked", "failed"])
   expect(reviewed.status, JSON.stringify(reviewed.specification?.issues ?? reviewed.issue)).toBe("review")

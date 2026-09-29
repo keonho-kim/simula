@@ -737,3 +737,20 @@ Report navigation first loads retained analysis. Missing or outdated analysis st
 A completed analysis switches to the read-only result; saved accepted reports cause no model
 calls. Failed work without an accepted report stays in preparation with an explicit retry.
 The result composition owns neither generation controls nor live task subscriptions.
+
+
+### Document analysis navigation
+
+`ui/shell/scenario-creation-flow.tsx` owns one `useDocumentScenario` instance across
+home/setup and `/document-analysis`. The setup dialog only collects files and options;
+validated execution saves its working draft before changing routes. HomeView remains
+mounted across this transition so closing the input dialog does not abort its upload.
+The document page owns extraction status, retry/cancel controls, shared scenario and
+participant generation, review/confirmation, and world preparation. Launching the
+prepared world follows the existing scenario-board and simulation routes.
+
+Tab session state retains document/build IDs, the selected generation language, and
+pending generation intent; files and form drafts remain in browser storage. Reloading
+a running extraction reattaches and continues building after sources are ready. An
+interrupted upload exposes Continue analysis rather than silently starting duplicate
+uploads. Settings still open as a dialog above the analysis page.

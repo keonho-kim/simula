@@ -9,6 +9,7 @@ import type { RunSession } from "@/ui/browser-storage/run-session"
 export type ViewMode = NonNullable<RunSession["viewMode"]>
 
 export function viewFromPath(pathname: string, session: RunSession): { viewMode: ViewMode; runId?: string } {
+  if (pathname === "/document-analysis") return { viewMode: "document-analysis" }
   if (pathname === "/scenario-board") return session.runId ? { viewMode: "board", runId: session.runId } : { viewMode: "home" }
   if (pathname === "/simulation") return { viewMode: "simulation", runId: session.runId }
   const match = /^\/reports\/([a-zA-Z0-9][a-zA-Z0-9._-]{0,199})(\/prepare)?$/.exec(pathname)
@@ -17,6 +18,7 @@ export function viewFromPath(pathname: string, session: RunSession): { viewMode:
 }
 
 export function pathForView(viewMode: ViewMode, runId: string | undefined): string | undefined {
+  if (viewMode === "document-analysis") return "/document-analysis"
   if (viewMode === "home") return "/"
   if (viewMode === "board") return runId ? "/scenario-board" : undefined
   if (viewMode === "simulation") return "/simulation"

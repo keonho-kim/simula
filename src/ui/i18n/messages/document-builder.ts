@@ -5,6 +5,9 @@
  * Related: src/ui/components/scenario-builder/scenario-builder-dialog.tsx
  */
 const en = {
+  documentAnalysisTitle: "Document analysis",
+  documentAnalysisDescription: "Read the materials, build the scenario and participants, then prepare the simulation.",
+  documentUploadPending: "Waiting for upload", documentAnalysisResume: "Continue analysis",
   worldPrepareTitle: "Develop the story",
   worldPrepareDescription: "Build this world's starting situation with the confirmed participants and constraints.",
   worldPrepareAction: "Develop story",
@@ -121,6 +124,9 @@ const en = {
 } as const
 
 const ko = {
+  documentAnalysisTitle: "문서 분석",
+  documentAnalysisDescription: "자료를 분석하고 시나리오와 등장인물을 구성한 뒤 시뮬레이션을 준비합니다.",
+  documentUploadPending: "업로드 대기", documentAnalysisResume: "분석 계속",
   worldPrepareTitle: "스토리 구체화",
   worldPrepareDescription: "확정한 인물과 조건을 유지하며 이 세계의 시작 상황을 구성합니다.",
   worldPrepareAction: "스토리 구체화",

@@ -1,7 +1,7 @@
 /**
  * Purpose: Start document extraction and scenario generation from one user action.
  * Pattern: Browser workflow hook.
- * Usage: Used by the lazy-loaded document scenario dialog.
+ * Usage: Owned by the scenario creation flow across setup modal and document analysis page.
  * Related: src/ui/api-client/scenario-builder.ts, src/ui/browser-storage/scenario-builder-session.ts
  */
 import { useEffect, useRef, useState } from "react"
@@ -43,7 +43,7 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
   const [hydrated, setHydrated] = useState(false)
   const [error, setError] = useState<"request" | "files" | "participants" | "extraction" | "storage">()
   const [busy, setBusy] = useState(false)
-  const [pendingGeneration, setPendingGeneration] = useState(false)
+  const [pendingGeneration, setPendingGeneration] = useState(session.pendingGeneration ?? false)
   const uploadAbort = useRef<AbortController | undefined>(undefined)
   const loadedBuild = useRef<string | undefined>(undefined)
   const nextBuildId = useRef<string | undefined>(session.buildId)
@@ -59,7 +59,7 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
     queryFn: ({ signal }) => api.fetchScenarioBuild(session.buildId ?? "", signal), retry: false,
     refetchInterval: query => query.state.data?.status === "running" ? POLL_MS : false,
   })
-  useEffect(() => { writeDocumentScenarioSession(session) }, [session])
+  useEffect(() => { writeDocumentScenarioSession({ ...session, pendingGeneration }) }, [session, pendingGeneration])
   useEffect(() => () => uploadAbort.current?.abort(), [])
   useEffect(() => {
     if (initialBuildId.current) { setHydrated(true); return }
@@ -87,7 +87,7 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
   }, [buildQuery.data])
   useEffect(() => {
     const documents = documentQuery.data
-    if (!pendingGeneration || busy || files.length || !documents || documents.id !== session.documentSetId) return
+    if (!hydrated || !pendingGeneration || busy || files.length || !documents || documents.id !== session.documentSetId) return
     if (documents.documents.some(document => document.status === "failed" || document.status === "canceled")) {
       setPendingGeneration(false)
       setError("extraction")
@@ -99,17 +99,17 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
     nextBuildId.current ??= crypto.randomUUID()
     const buildId = nextBuildId.current
     const participants = form.participants.map(value => ({ name: value.name.trim(), personality: value.personality?.trim() })).filter(value => value.name)
-    const pendingSession = { documentSetId: documents.id, buildId }
+    const pendingSession = { documentSetId: documents.id, buildId, language: session.language ?? language }
     writeDocumentScenarioSession(pendingSession)
     setSession(pendingSession)
-    void api.startScenarioBuild({ ...form, participants, language, documentSetId: documents.id, documentRevision: documents.revision }, buildId)
+    void api.startScenarioBuild({ ...form, participants, language: session.language ?? language, documentSetId: documents.id, documentRevision: documents.revision }, buildId)
       .then(build => {
         client.setQueryData(["scenario-build", build.id], build)
         setSession(current => ({ ...current, buildId: build.id }))
       })
       .catch(() => setError("request"))
       .finally(() => setBusy(false))
-  }, [busy, client, documentQuery.data, files.length, form, language, pendingGeneration, session.documentSetId])
+  }, [busy, client, documentQuery.data, files.length, form, hydrated, language, pendingGeneration, session.documentSetId, session.language])
 
   async function chooseFiles(selected: File[]) {
     const valid = selected.every(file => file.size > 0 && file.size <= MAX_DOCUMENT_BYTES && DOCUMENT_FORMATS.some(format => file.name.toLowerCase().endsWith(`.${format}`)))
@@ -134,26 +134,30 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
     if (attachment) void deleteAttachment(attachment.id).catch(() => setError("storage"))
   }
 
-  async function execute() {
-    if (busy || pendingGeneration || !hydrated || error === "storage" || (!files.length && !session.documentSetId && !form.context.trim())) return
+  async function execute(onStarted?: () => void) {
+    if (busy || (pendingGeneration && !files.length && Boolean(documentQuery.data?.documents.length)) || !hydrated || error === "storage" || (!files.length && !session.documentSetId && !form.context.trim())) return
     const participants = form.participants.map(value => ({ name: value.name.trim(), personality: value.personality?.trim() })).filter(value => value.name || value.personality)
     if (participants.some(value => !value.name)) { setError("participants"); return }
     setBusy(true); setError(undefined)
     const controller = new AbortController()
     uploadAbort.current = controller
     try {
+      await writeWorkingDraft(DRAFT_ID, "new-scenario", { form, attachments })
+      setPendingGeneration(true)
+      setSession(current => ({ ...current, language: current.language ?? language }))
+      onStarted?.()
       const oldSetId = session.documentSetId
       const activeSet = oldSetId ? await api.hasActiveDocumentSet(oldSetId, controller.signal) : false
       const recovered = oldSetId && !activeSet ? await listDocumentAttachments(oldSetId) : []
       const recoveredFiles = await Promise.all(recovered.map(readAttachment))
       const selectedFiles = [...files, ...recoveredFiles]
-      if (!selectedFiles.length && (!oldSetId || !activeSet) && form.context.trim()) {
+      if (!selectedFiles.length && (!oldSetId || !activeSet || !documentQuery.data?.documents.length) && form.context.trim()) {
         selectedFiles.push(new File([form.context.trim()], USER_SITUATION_SOURCE_NAME, { type: "text/plain" }))
       }
-      if (!selectedFiles.length && oldSetId && !activeSet) { setError("files"); return }
+      if (!selectedFiles.length && oldSetId && !activeSet) { setPendingGeneration(false); setError("files"); return }
       const setId = activeSet && oldSetId ? oldSetId : (await api.createDocumentSet()).id
       if (setId !== oldSetId) nextBuildId.current = undefined
-      setSession(current => ({ ...current, documentSetId: setId, buildId: undefined }))
+      setSession(current => ({ ...current, documentSetId: setId, buildId: undefined, language: current.language ?? language }))
       for (const file of selectedFiles) {
         controller.signal.throwIfAborted()
         const document = await api.uploadDocument(setId, file, controller.signal)
@@ -163,11 +167,11 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
           setAttachments(current => current.filter(value => value.id !== attachment.id))
           await retainDocumentAttachment(attachment.id, setId)
         }
-        await api.controlDocument(setId, document.id, "extract", form.fastMode, language)
+        await api.controlDocument(setId, document.id, "extract", form.fastMode, session.language ?? language)
       }
       await client.invalidateQueries({ queryKey: ["document-set", setId] })
       setPendingGeneration(true)
-    } catch { if (!controller.signal.aborted) setError("request") }
+    } catch { setPendingGeneration(false); if (!controller.signal.aborted) setError("request") }
     finally { setBusy(false); uploadAbort.current = undefined }
   }
 
@@ -192,7 +196,7 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
   async function controlFile(id: string, action: "extract" | "cancel") {
     if (!session.documentSetId || busy) return
     setBusy(true); setError(undefined)
-    try { await api.controlDocument(session.documentSetId, id, action, form.fastMode, language); await documentQuery.refetch() }
+    try { await api.controlDocument(session.documentSetId, id, action, form.fastMode, session.language ?? language); await documentQuery.refetch(); if (action === "extract") setPendingGeneration(true); else setPendingGeneration(false) }
     catch { setError("request") }
     finally { setBusy(false) }
   }

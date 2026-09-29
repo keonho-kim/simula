@@ -24,7 +24,7 @@ const ScenarioPreviewDialog = lazy(() =>
 const SettingsDialog = lazy(() =>
   import("@/ui/components/settings/settings-dialog").then((module) => ({ default: module.SettingsDialog }))
 )
-const ScenarioBuilderDialog = lazy(() => import("@/ui/components/scenario-builder/scenario-builder-dialog").then(module => ({ default: module.ScenarioBuilderDialog })))
+const ScenarioCreationFlow = lazy(() => import("@/ui/shell/scenario-creation-flow").then(module => ({ default: module.ScenarioCreationFlow })))
 
 const DEFAULT_SCENARIO_DRAFT: ScenarioDraft = {
   sourceName: "pasted-scenario.md",
@@ -41,6 +41,8 @@ const DEFAULT_SCENARIO_DRAFT: ScenarioDraft = {
 }
 
 interface HomeViewProps {
+  documentAnalysis: boolean
+  onDocumentAnalysisChange: (active: boolean) => void
   t: UiTexts
   languagePreference: LanguagePreference
   promptLanguage: PromptLanguage
@@ -55,6 +57,8 @@ interface HomeViewProps {
 }
 
 export function HomeView({
+  documentAnalysis,
+  onDocumentAnalysisChange,
   t,
   languagePreference,
   promptLanguage,
@@ -115,7 +119,7 @@ export function HomeView({
           if (file) loadScenarioFile(file)
         }}
       />
-      {scenarioBuilder !== "open" ? <StartScreen
+      {!documentAnalysis ? <StartScreen
         t={t}
         languagePreference={languagePreference}
         promptLanguage={promptLanguage}
@@ -130,12 +134,16 @@ export function HomeView({
         onLanguagePreferenceChange={onLanguagePreferenceChange}
       /> : null}
       <Suspense fallback={null}>
-        {scenarioBuilder !== "unused" ? (
-          <ScenarioBuilderDialog
+        {scenarioBuilder !== "unused" || documentAnalysis ? (
+          <ScenarioCreationFlow
             active={scenarioBuilder === "open"}
+            analysis={documentAnalysis}
+            onAnalyze={() => { setScenarioBuilder("closed"); onDocumentAnalysisChange(true) }}
+            onHome={() => { setScenarioBuilder("closed"); onDocumentAnalysisChange(false) }}
+            onEdit={() => { setScenarioBuilder("open"); onDocumentAnalysisChange(false) }}
             language={promptLanguage}
             t={t}
-            onBack={() => setScenarioBuilder("closed")}
+            onClose={() => setScenarioBuilder("closed")}
             onOpenSettings={() => setSettingsOpen(true)}
             starting={isStarting}
             autoContinue={autoContinue}

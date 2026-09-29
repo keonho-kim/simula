@@ -87,7 +87,7 @@ function App() {
   const selectedRunQuery = useQuery({
     queryKey: ["runs", selectedRunId],
     queryFn: () => fetchRun(selectedRunId ?? ""),
-    enabled: viewMode !== "home" && Boolean(selectedRunId),
+    enabled: viewMode !== "home" && viewMode !== "document-analysis" && Boolean(selectedRunId),
   })
   const managedByBatch = Boolean(selectedRunQuery.data?.run.batchId ?? runsQuery.data?.find(run => run.id === selectedRunId)?.batchId)
   const { autoContinue, setAutoContinue, skipRoundDelay, roundPromptIndex, roundAction, continueRound, cancelCurrentRun,
@@ -133,7 +133,7 @@ function App() {
   }, [selectedRunId])
 
   useEffect(() => {
-    if (viewMode === "home" || !runsQuery.data?.length || selectedRunId) {
+    if (viewMode === "home" || viewMode === "document-analysis" || !runsQuery.data?.length || selectedRunId) {
       return
     }
     setSelectedRunId(runsQuery.data[0]?.id)
@@ -211,8 +211,14 @@ function App() {
   }, [selectedRunId])
 
   let content: ReactNode
-  if (viewMode === "home") {
+  if (viewMode === "home" || viewMode === "document-analysis") {
     content = <HomeView
+        documentAnalysis={viewMode === "document-analysis"}
+        onDocumentAnalysisChange={active => {
+          const mode = active ? "document-analysis" : "home"
+          viewModeRef.current = mode
+          setViewMode(mode)
+        }}
         t={t}
         languagePreference={languagePreference}
         promptLanguage={promptLanguage}
@@ -310,7 +316,7 @@ function App() {
         ) : null}
     </SimulationPage></Suspense>
   }
-  return <PageTransition viewKey={viewMode === "report-preparation" ? "report" : viewMode}>{content}</PageTransition>
+  return <PageTransition viewKey={viewMode === "document-analysis" ? "home" : viewMode === "report-preparation" ? "report" : viewMode}>{content}</PageTransition>
 }
 
 export default App

@@ -29,7 +29,7 @@ export function DocumentScenarioForm({ workflow: w, onExecute, t }: {
   const locked = w.busy || w.pendingGeneration || !w.hydrated || w.error === "storage"
   const storedDocuments = w.documents?.documents ?? []
   const ready = (w.files.length > 0 || storedDocuments.length > 0 || !!w.form.context.trim()) && storedDocuments.every(document => document.status === "ready" || document.status === "partial")
-  return <form className="document-builder-form" onSubmit={event => { event.preventDefault(); onExecute(); void w.execute() }}>
+  return <form className="document-builder-form" onSubmit={event => { event.preventDefault(); void w.execute(onExecute) }}>
     <FieldSet disabled={locked}>
       <FieldLegend>{t.builderFiles}</FieldLegend>
       <FieldDescription>{t.builderFileHint}</FieldDescription>
