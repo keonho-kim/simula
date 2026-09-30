@@ -4,7 +4,7 @@
  * Usage: Rendered by ReportFlow while analysis is absent, running, or awaiting recovery.
  * Related: src/ui/hooks/use-analytical-report.ts, src/ui/components/report/analysis/activity.tsx
  */
-import { HomeIcon } from "lucide-react"
+import { RunNavigation } from "@/ui/components/navigation/run-navigation"
 import type { RunEvent } from "@/shared/run"
 import type { UiTexts } from "@/ui/types/i18n"
 import type { useAnalyticalReport } from "@/ui/hooks/use-analytical-report"
@@ -13,7 +13,9 @@ import { Alert, AlertDescription } from "@/ui/components/ui/alert"
 import { ReportMetricOverview } from "@/ui/components/report/metric-overview"
 import { AnalysisActivity } from "@/ui/components/report/analysis/activity"
 
-export function ReportPreparationPage({ title, analysis, events, t, onHome, batch, onToggleScope, runError }: {
+export function ReportPreparationPage({ selectedRunId, onBackToWorlds, title, analysis, events, t, onHome, batch, onToggleScope, runError }: {
+  selectedRunId?: string
+  onBackToWorlds?: () => void
   runError?: string
   title: string
   analysis: ReturnType<typeof useAnalyticalReport>
@@ -29,7 +31,7 @@ export function ReportPreparationPage({ title, analysis, events, t, onHome, batc
   return <main className="min-h-svh bg-background text-foreground">
     <div className="mx-auto flex w-[94vw] max-w-[1600px] flex-col gap-5 py-5">
       <header className="flex items-center gap-3 border-b pb-4">
-        <Button aria-label={t.home} variant="ghost" size="icon" onClick={onHome}><HomeIcon /></Button>
+        <RunNavigation runId={selectedRunId} onHome={onHome} onBackToWorlds={onBackToWorlds} t={t} />
         <div><h1 className="text-lg font-semibold">{t.analysisPreparing}</h1><p className="text-xs text-muted-foreground">{title}</p></div>
         {onToggleScope ? <Button className="ml-auto" variant="outline" onClick={onToggleScope}>{batch ? t.analysisSingle : t.analysisBatch}</Button> : null}
       </header>

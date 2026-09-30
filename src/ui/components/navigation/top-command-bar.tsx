@@ -1,13 +1,13 @@
 /**
  * Purpose: Show simulation navigation, execution status, and playback controls.
  * Pattern: Presentation component.
- * Usage: Rendered by App above the current simulation or report view.
- * Related: src/ui/shell/App.tsx, src/ui/models/report/status-label.ts
+ * Usage: Rendered by App in the simulation page toolbar.
+ * Related: src/ui/shell/App.tsx, src/ui/components/navigation/run-navigation.tsx
  */
+import { RunNavigation } from "./run-navigation"
 import { Switch } from "@/ui/components/ui/switch"
 import {
   ArrowRightIcon,
-  HomeIcon,
 } from "lucide-react"
 import { Badge } from "@/ui/components/ui/badge"
 import { Button } from "@/ui/components/ui/button"
@@ -15,6 +15,8 @@ import type { UiTexts } from "@/ui/types/i18n"
 import { reportStatusLabel } from "@/ui/models/report/status-label"
 
 interface TopCommandBarProps {
+  selectedRunId?: string
+  onBackToWorlds?: () => void
   autoContinue?: boolean
   onAutoContinueChange?: (enabled: boolean) => void
   autoContinueDisabled?: boolean
@@ -26,6 +28,8 @@ interface TopCommandBarProps {
 }
 
 export function TopCommandBar({
+  selectedRunId,
+  onBackToWorlds,
   autoContinue,
   onAutoContinueChange,
   autoContinueDisabled,
@@ -39,10 +43,7 @@ export function TopCommandBar({
     <header className="sticky top-0 z-30 -mx-4 border-b border-border/60 bg-background/92 px-4 py-3  lg:-mx-6 lg:px-6">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <Button aria-label={t.home} variant="ghost" size="icon" className="rounded-md" onClick={onHome}>
-            <HomeIcon />
-            <span className="sr-only">{t.home}</span>
-          </Button>
+          <RunNavigation runId={selectedRunId} onHome={onHome} onBackToWorlds={onBackToWorlds} t={t} />
 
           <div className="min-w-0">
             <div className="flex items-center gap-2">

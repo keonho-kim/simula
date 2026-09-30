@@ -17,6 +17,7 @@ const en = {
   batchAutomaticHelp: "Progression runs on the server even when this page is closed. Rounds 1 and 2 wait five seconds; round 3 continues immediately.",
   batchCountdown: "The server will continue this world after its countdown.", batchDeadline: "The execution time limit was reached. Completed worlds are preserved.",
   batchInterruptedHelp: "Accepted preparation can be resumed. Interrupted simulation histories are preserved; mid-round recovery is not available yet.",
+  batchBackToWorlds: "Back to worlds",
   batchManagedNotice: "This world's round controls are in its Multiverse list.",
 } as const
 const ko = {
@@ -32,6 +33,7 @@ const ko = {
   batchAutomaticHelp: "화면을 닫아도 서버에서 진행합니다. 1·2라운드 뒤에는 5초 대기하고, 3라운드부터는 바로 진행합니다.",
   batchCountdown: "서버에서 대기 시간이 끝나면 이 세계를 계속 진행합니다.", batchDeadline: "실행 시간 한도에 도달했습니다. 완료된 세계의 결과는 보존됩니다.",
   batchInterruptedHelp: "완료된 준비 작업을 재사용해 다시 시도할 수 있습니다. 중단된 시뮬레이션 기록은 보존되며, 라운드 중간 복구는 아직 지원하지 않습니다.",
+  batchBackToWorlds: "세계 목록으로",
   batchManagedNotice: "이 세계의 라운드 진행은 Multiverse 목록에서 조정합니다.",
 } as const satisfies Record<keyof typeof en, string>
 export const multiverseTexts = { en, ko } as const

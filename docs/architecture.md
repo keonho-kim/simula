@@ -772,3 +772,15 @@ source attachment and enters the shared document/scenario preparation flow once.
 scenario then feeds the existing batch workflow, with separate StoryBuilder and simulation
 state per world. Preparing a local draft performs no model calls; the following workflow owns
 execution and errors. The persisted options survive refreshing that workflow.
+
+### Returning from an individual world
+
+Opening a world from the Multiverse list records only scenario, batch, world, and run IDs
+in tab-scoped `browser-storage/world-navigation.ts`. The run/world pair must match. Simulation,
+report preparation, and result headers share `components/navigation/run-navigation.tsx`: a
+matching origin offers “Back to worlds”; standalone runs retain Home. Return restores the owning
+scenario/batch session and navigates to `/document-analysis`, without canceling a run, changing
+round controls, or creating another batch. The list selects the recorded world and restores focus
+to its panel after the parent page's initial focus. Browser Back also recovers that selection when
+returning to the list; reload retains the origin. This is navigation metadata, not another copy
+of world progress or simulation state. Browser workflow tests remain user-run.

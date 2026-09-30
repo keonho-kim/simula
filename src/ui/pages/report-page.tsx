@@ -5,7 +5,7 @@
  * Related: src/ui/pages/report-preparation-page.tsx, src/ui/components/report/analysis/results.tsx
  */
 import { lazy, Suspense, useEffect, useRef } from "react"
-import { HomeIcon } from "lucide-react"
+import { RunNavigation } from "@/ui/components/navigation/run-navigation"
 import { Badge } from "@/ui/components/ui/badge"
 import { Button } from "@/ui/components/ui/button"
 import type { UiTexts } from "@/ui/types/i18n"
@@ -38,10 +38,11 @@ interface ReportPageProps {
   language: "en" | "ko"
   t: UiTexts
   onHome: () => void
+  onBackToWorlds?: () => void
   onExport: (kind: "json" | "jsonl" | "md") => void
 }
 export function ReportPage({ selectedRunId, title, status, state, events, subject, analysis, batch, onToggleScope,
-  loadError, runError, onRetryLoad, language, t, onHome, onExport }: ReportPageProps) {
+  loadError, runError, onRetryLoad, language, t, onHome, onBackToWorlds, onExport }: ReportPageProps) {
   const resultHeading = useRef<HTMLHeadingElement>(null)
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "instant" })
@@ -49,7 +50,7 @@ export function ReportPage({ selectedRunId, title, status, state, events, subjec
   }, [subject.id, subject.kind])
   return <main className="min-h-svh bg-card text-foreground"><div className="mx-auto flex w-[94vw] max-w-[1600px] flex-col gap-5 py-5">
     <header className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
-      <div className="flex min-w-0 items-center gap-3"><Button aria-label={t.home} variant="ghost" size="icon" onClick={onHome}><HomeIcon /></Button>
+      <div className="flex min-w-0 items-center gap-3"><RunNavigation runId={selectedRunId} onHome={onHome} onBackToWorlds={onBackToWorlds} t={t} />
         <div className="min-w-0"><h1 ref={resultHeading} tabIndex={-1} className="truncate text-lg font-semibold outline-none">{title}</h1><p className="text-xs text-muted-foreground">{t.report}</p></div>
         {status ? <Badge variant={status === "failed" ? "destructive" : "secondary"}>{reportStatusLabel(status, t)}</Badge> : null}
       </div>

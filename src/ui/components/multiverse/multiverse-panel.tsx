@@ -5,7 +5,8 @@
  * Related: src/ui/hooks/use-multiverse.ts, src/ui/components/scenario-builder/builder-activity.tsx
  */
 import type { ScenarioLaunchOptions } from "@/ui/models/scenario-builder/launch-options"
-import { useState } from "react"
+import { readWorldVisit, rememberWorldVisit } from "@/ui/browser-storage/world-navigation"
+import { useEffect, useRef, useState } from "react"
 import { MAX_BATCH_MINUTES, MAX_BATCH_WORLDS, type BatchWorldStatus } from "@/shared/multiverse"
 import type { UiTexts } from "@/ui/types/i18n"
 import { useMultiverse } from "@/ui/hooks/use-multiverse"
@@ -24,7 +25,26 @@ export function MultiversePanel({ initialOptions, autoContinue, scenarioId, fast
 }) {
   const w = useMultiverse(scenarioId, fastMode, open, initialOptions, autoContinue)
   const [selectedId, setSelectedId] = useState<string>()
-  const selected = w.batch?.worlds.find(world => world.id === selectedId) ?? w.batch?.worlds[0]
+  const [origin] = useState(readWorldVisit)
+  const panel = useRef<HTMLDivElement>(null)
+  const restored = useRef(false)
+  const returnId = origin?.batchId === w.batch?.id ? origin?.worldId : undefined
+  const selected = w.batch?.worlds.find(world => world.id === (selectedId ?? returnId)) ?? w.batch?.worlds[0]
+  useEffect(() => {
+    if (restored.current || !returnId || selected?.id !== returnId) return
+    // Restore after the parent page's initial heading focus and scroll reset.
+    const frame = requestAnimationFrame(() => {
+      restored.current = true
+      panel.current?.scrollIntoView({ block: "start", behavior: "instant" })
+      panel.current?.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [returnId, selected?.id])
+  const openSelectedWorld = () => {
+    if (!selected?.runId || !w.batch) return
+    rememberWorldVisit({ scenarioId, batchId: w.batch.id, worldId: selected.id, runId: selected.runId })
+    onOpenRun(selected.runId, ["completed", "failed", "canceled", "interrupted"].includes(selected.status) ? "report" : "simulation")
+  }
   const active = w.batch?.status === "running"
   const number = new Intl.NumberFormat(language)
   const name = (index: number) => t.batchWorld.replace("{index}", number.format(index))
@@ -33,7 +53,7 @@ export function MultiversePanel({ initialOptions, autoContinue, scenarioId, fast
     counts[world.status] = (counts[world.status] ?? 0) + 1
     return counts
   }, {})
-  return <div className="flex min-w-0 flex-col gap-4" data-testid="multiverse-panel">
+  return <div ref={panel} role="region" tabIndex={-1} aria-label={t.batchTitle} className="flex min-w-0 flex-col gap-4" data-testid="multiverse-panel">
     <p className="text-sm text-muted-foreground">{t.batchDescription}</p>
     {w.failed ? <Alert variant="destructive"><AlertDescription>{t.builderRequestError}</AlertDescription><Button variant="outline" size="sm" onClick={w.refresh}>{t.builderRefresh}</Button></Alert> : null}
     {!w.batch ? <form onSubmit={event => { event.preventDefault(); void w.create() }}>
@@ -64,7 +84,7 @@ export function MultiversePanel({ initialOptions, autoContinue, scenarioId, fast
         {selected.status === "waiting" && selected.continueAt ? <p className="text-xs text-muted-foreground">{t.batchCountdown}</p> : null}
         <div className="flex flex-wrap gap-2">
           {active && selected.status === "waiting" && !selected.autoContinue && selected.roundIndex ? <Button disabled={w.busy} onClick={() => { if (selected.roundIndex) void w.controlWorld(selected.id, { kind: "continue", roundIndex: selected.roundIndex }) }}>{t.batchContinue}</Button> : null}
-          {selected.runId ? <Button variant="outline" onClick={() => { if (selected.runId) onOpenRun(selected.runId, ["completed", "failed", "canceled", "interrupted"].includes(selected.status) ? "report" : "simulation") }}>{selected.status === "completed" || selected.status === "failed" ? t.batchOpenResult : t.batchOpenWorld}</Button> : null}
+          {selected.runId ? <Button variant="outline" onClick={openSelectedWorld}>{selected.status === "completed" || selected.status === "failed" ? t.batchOpenResult : t.batchOpenWorld}</Button> : null}
           {active && worldActive ? <Button variant="outline" disabled={w.busy} onClick={() => void w.controlWorld(selected.id, { kind: "cancel" })}>{t.batchCancelWorld}</Button> : null}
         </div>
       </section> : null}

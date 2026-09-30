@@ -4,7 +4,7 @@
  * Usage: Lazy-loaded by App for the simulation view.
  * Related: src/ui/components/simulation/simulation-stage.tsx, src/ui/components/actors/actor-rail.tsx
  */
-import type { ReactNode } from "react"
+import { useEffect, useRef, type ReactNode } from "react"
 import { ActorRail } from "@/ui/components/actors/actor-rail"
 import { LlmMetricsPanel } from "@/ui/components/metrics/llm-metrics-panel"
 import { SimulationStage } from "@/ui/components/simulation/simulation-stage"
@@ -24,7 +24,12 @@ export function SimulationPage({ toolbar, notice, children, t, selectedActorId, 
   onEdgeSelect: (id: string | undefined) => void
   overlayOpen: boolean
 }) {
-  return <main className="simulation-page h-dvh overflow-hidden bg-background text-foreground">
+  const page = useRef<HTMLElement>(null)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" })
+    page.current?.focus({ preventScroll: true })
+  }, [])
+  return <main ref={page} tabIndex={-1} className="simulation-page h-dvh overflow-hidden bg-background text-foreground outline-none">
     <div className="mx-auto flex h-full min-h-0 w-full flex-col gap-3 px-4 py-3 lg:w-4/5 lg:px-0">
       <div className="shrink-0">{toolbar}{notice}</div>
       <div className="shrink-0"><LlmMetricsPanel t={t} /></div>

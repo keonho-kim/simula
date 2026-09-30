@@ -210,6 +210,14 @@ function App() {
     setViewMode(mode)
   }, [selectedRunId])
 
+  const returnToWorlds = () => {
+    setReportConfirmRunId(undefined)
+    setActorDetailOpen(false)
+    setSelectedEdgeId(undefined)
+    viewModeRef.current = "document-analysis"
+    setViewMode("document-analysis")
+  }
+
   let content: ReactNode
   if (viewMode === "home" || viewMode === "document-analysis") {
     content = <HomeView
@@ -248,7 +256,7 @@ function App() {
     </Suspense>
   } else if (viewMode === "report" || viewMode === "report-preparation") {
     content = <Suspense fallback={null}>
-        <ReportFlow key={selectedRunId} mode={viewMode} onNavigate={navigateReport}
+        <ReportFlow onBackToWorlds={returnToWorlds} key={selectedRunId} mode={viewMode} onNavigate={navigateReport}
           selectedRunId={selectedRunId}
           selectedRunStatus={selectedRunStatus}
           language={promptLanguage}
@@ -267,7 +275,7 @@ function App() {
       onActorSelect={selectActor} onActorExpand={expandActor} onEdgeSelect={selectEdge}
       overlayOpen={Boolean((reportConfirmRunId && reportConfirmRunId === selectedRunId) || roundDialogOpen)}
       notice={managedByBatch ? <p className="pt-2 text-sm text-muted-foreground">{t.batchManagedNotice}</p> : null}
-      toolbar={<TopCommandBar
+      toolbar={<TopCommandBar selectedRunId={selectedRunId} onBackToWorlds={returnToWorlds}
           selectedRunStatus={selectedRunStatus}
           autoContinue={autoContinue}
           onAutoContinueChange={managedByBatch ? undefined : setAutoContinue}
