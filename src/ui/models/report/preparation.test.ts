@@ -6,7 +6,7 @@
  */
 import { expect, test } from "bun:test"
 import type { AnalysisRecord } from "@/shared/analytical-report"
-import { hasReportResult, shouldPrepareReport } from "./preparation"
+import { analysisSubjectForRun, hasReportResult, shouldPrepareReport } from "./preparation"
 
 const record: AnalysisRecord = { id: "report", subject: { kind: "run", id: "run" }, inputRevision: "one",
   language: "en", fastMode: false, createdAt: "2026-09-28", deadlineAt: "2026-09-28", maxCalls: 100, status: "ready",
@@ -33,4 +33,10 @@ test("missing and outdated reports prepare, while running and failed work do not
     expect(hasReportResult(lookup)).toBe(false)
     expect(shouldPrepareReport(lookup)).toBe(false)
   }
+})
+
+test("scope remains unresolved until the run is known and always resolves batch worlds to their parent", () => {
+  expect(analysisSubjectForRun()).toBeUndefined()
+  expect(analysisSubjectForRun({ id: "solo" })).toEqual({ kind: "run", id: "solo" })
+  expect(analysisSubjectForRun({ id: "world-1", batchId: "batch-1" })).toEqual({ kind: "batch", id: "batch-1" })
 })

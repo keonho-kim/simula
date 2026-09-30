@@ -37,7 +37,7 @@ const artifact: AnalyticalExport = {
 
 test("partial Markdown export preserves scope, source location, and unavailable usage without rendering source instructions", () => {
   const markdown = renderAnalyticalMarkdown(artifact, dictionary.ko)
-  expect(markdown).toContain("# 분석 보드")
+  expect(markdown).toContain("# 분석 리포트")
   expect(markdown.indexOf("## 종합 결론")).toBeLessThan(markdown.indexOf("## 강점"))
   expect(markdown).toContain("전체 5개 세계 중 완료 3개 · 분석 3개")
   expect(markdown).toContain("## 일부 분석 또는 원본 자료가 부족합니다")

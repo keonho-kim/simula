@@ -2,7 +2,7 @@
  * Purpose: Bound long reading dialogs while keeping one scroll surface per modal.
  * Pattern: Shared presentation contract.
  * Usage: Applied to content-heavy dialogs and bounded landing selections.
- * Related: src/ui/components/ui/dialog.tsx, src/ui/components/report/analysis/detail-dialog.tsx
+ * Related: src/ui/components/ui/dialog.tsx, src/ui/components/scenario-builder/scenario-builder-dialog.tsx
  */
 .page-scroll-dialog[data-slot="dialog-content"] {
   position: fixed;
@@ -31,11 +31,6 @@
 .page-scroll-dialog[data-slot="dialog-content"] > [data-slot="dialog-close"] { width: auto; }
 .page-scroll-dialog--narrow { --page-dialog-width: 760px; }
 .page-scroll-dialog--compact { --page-dialog-width: 640px; }
-.page-scroll-dialog--report[data-slot="dialog-content"] { width: min(1440px, 80vw); max-height: calc(100svh - 3rem); }
-@media (max-width: 768px) {
-  .page-scroll-dialog--report[data-slot="dialog-content"] { width: calc(100vw - 2rem); }
-}
-
 .landing-selection-dialog[data-slot="dialog-content"] {
   top: 50%;
   left: 50%;

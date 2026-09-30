@@ -580,12 +580,15 @@ starts automatically at `/reports/:runId/prepare`, with explicit recovery after 
 `ui/shell/report-flow.tsx` owns discovery, generation, and route replacement. Completion
 opens `/reports/:runId`, which contains metrics, the accepted board, and recorded simulation
 details without generation controls or live output.
-The selected run can switch to its parent Multiverse analysis when batch ownership exists.
+Run metadata resolves report ownership before any analysis request. A run with batch ownership
+always opens its parent Multiverse report; there is no single-world analysis switch. If sibling
+worlds are still active or awaiting approval, the page polls batch status and waits instead of
+creating a per-world or premature aggregate report. The world-list return control remains available.
 Reading a saved analysis never generates it. Subject discovery supplies version freshness;
 errors and unavailable source status remain visible without discarding persisted results.
 
-`components/report/analysis` owns reading dialogs, source excerpts,
-board layout, and live output composition. `use-analytical-report` owns query/mutation
+`components/report/analysis` owns full-page reading tabs, source excerpts,
+report layout, and live output composition. `use-analytical-report` owns query/mutation
 lifecycle; `api/analytical-report` validates HTTP contracts. Common generation streaming
 and its reducer now live in `hooks/use-generation-stream.ts` and `models/generation`.
 Scenario-specific stage mapping stays under `models/scenario-builder`.
@@ -607,19 +610,22 @@ development paths; single-run reports omit distribution generation. No SWOT scor
 polygons are generated. Saved nine-section reports remain readable under their original
 section identities; the UI never renames their prose to imply a new analysis.
 
-Read-only dialogs occupy 86vw by 86svh on desktop and 96vw by 94svh on mobile. Radix owns
-focus trapping, Escape handling, and return focus. Heavy relationship and conversation
-modules are lazy-loaded and mounted only when their record entry is opened. Existing
-commentary remains readable as a stored record; the analytical generation button uses the
-new report API. Consolidation of legacy automatic commentary production remains pending.
+Accepted analysis uses Radix tabs with the complete conclusion selected initially. Each tab
+presents one document with its heading, summary, full prose, findings, and inline evidence.
+Labels wrap on narrow screens; reading uses page scrolling. Inactive panes are not mounted.
+Standalone runs expose lazy relationship, conversation, and retained-commentary tabs in the
+same reading surface. Aggregate reports omit those selected-world panels and their exports.
+Model metric cards remain above the tabs; detailed resource accounting has its own Usage tab.
+Consolidation of legacy automatic commentary production remains pending.
 
 Relationship inspection retains the heatmap above the network, replay cursor, and
 on-demand WebGL renderer. Conversation inspection retains the round carousel, message
 cards, archive-mode virtual history, and actor/message detail. Actor search, edge selection,
-collapsible filters, and top-level report tabs are absent.
+and collapsible filters are absent. Report sections use the shared accessible tabs.
 
-The four on-screen metric cards combine the selected run's calls and the selected
-analytical report's calls, with that scope displayed explicitly. After completion,
+For standalone runs, the four on-screen metric cards combine the selected run's calls and the
+report's calls. For Multiverse they show only aggregate report generation calls, explicitly labeled,
+so one selected world's usage cannot masquerade as the whole batch. After completion,
 a separate bounded card reads recorded shared preparation, each world's work, final
 analysis, and overall usage without counting shared calls per world. Portable analysis
 export version 2 contains the same projection. Provider usage
@@ -655,8 +661,7 @@ simulation results. Cancellation aborts active model calls and waits for the cur
 batch to settle before releasing ownership. The existing run lock prevents overlapping
 execution or commentary jobs.
 
-Stored commentary is available from a read-only record dialog. Relationship and conversation
-inspection have separate record entry points without top-level tabs.
+Stored commentary, relationships, and conversations are read inline in standalone report tabs.
 All report disclosures are expanded sections. Heatmap precedes the network and replay; the report
 has no edge selector. Actor search is removed from the shared graph renderer in all views.
 
@@ -678,8 +683,14 @@ Evidence reduction uses short text units; code retains their source or observati
 Empty internal findings lists are omitted from the next model packet so they cannot be
 mistaken for an absence of recorded observations. `analysis/conclusion.ts` independently
 writes source and simulated-world summaries and paragraphs, then writes implications from
-their accepted results and bounded section abstracts. The model emits six plain-text
-fields with a shared 2,048-token completion allowance. Code supplies references and
+their accepted results and bounded section abstracts. The model emits six plain-text fields with the existing 2,048-token per-call completion allowance.
+Each source, observations, and implications part retains a short summary and requests 2–3
+substantive paragraphs (roughly 6–9 sentences), allowing up to 3,200 characters per part.
+Code adds localized section headings and assembles the complete conclusion. The final synthesis
+also receives bounded detail excerpts, full path labels with observed counts, provenance,
+and a total missing-input count. Context projections and the accepted-summary excerpt keep
+large inputs below the existing prompt cap with repair headroom. There is no extra model call,
+minimum-length retry, or request for model-authored JSON. Code supplies references and
 uses the implications summary as the integrated takeaway, without asking a model to
 rewrite the entire conclusion. Failed units preserve accepted siblings for retry.
 Unresolved scope issues leave a partial report instead of a validated overall conclusion.

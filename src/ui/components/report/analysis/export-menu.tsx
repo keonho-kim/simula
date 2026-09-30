@@ -38,9 +38,9 @@ export function ReportExportMenu({ runId, subject, onRunExport, t }: {
     <DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" disabled={!runId || busy}>
       <DownloadIcon data-icon="inline-start" />{t.reportExport}
     </Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuGroup>
-      <DropdownMenuItem onSelect={() => onRunExport("json")}>{t.exportJson}</DropdownMenuItem>
+      {subject.kind === "run" ? <><DropdownMenuItem onSelect={() => onRunExport("json")}>{t.exportJson}</DropdownMenuItem>
       <DropdownMenuItem onSelect={() => onRunExport("jsonl")}>{t.exportJsonl}</DropdownMenuItem>
-      <DropdownMenuItem onSelect={() => onRunExport("md")}>{t.exportMarkdown}</DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => onRunExport("md")}>{t.exportMarkdown}</DropdownMenuItem></> : null}
       <DropdownMenuItem disabled={!available} onSelect={() => void save("json")}>{t.analysisExportJson}</DropdownMenuItem>
       <DropdownMenuItem disabled={!available} onSelect={() => void save("md")}>{t.analysisExportMarkdown}</DropdownMenuItem>
     </DropdownMenuGroup></DropdownMenuContent></DropdownMenu>

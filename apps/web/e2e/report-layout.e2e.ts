@@ -5,6 +5,7 @@
  * Related: src/ui/pages/report-page.tsx, src/ui/styles/report.css
  */
 import { expect, test, type Page } from "./fixtures"
+import { ANALYSIS_SECTIONS } from "@/shared/analytical-report"
 import type { RunManifest } from "@/shared"
 import type { BrowserRunDetail } from "@/ui/shell/e2e-queries/runs"
 
@@ -15,7 +16,7 @@ async function seedRun(page: Page, detail: BrowserRunDetail, accepted = true): P
       deadlineAt: detail.run.createdAt, maxCalls: 1, status: accepted ? "ready" : "failed",
       report: accepted ? { perspective: { focus: "검토", objective: "판단", horizon: "현재", boundary: "일정", evidenceIds: [] },
         coverage: { requested: 1, completed: 1, analyzed: 1, failed: 0, canceled: 0, interrupted: 0 },
-        trajectories: { categories: [], unclassifiedWorldIds: [] }, sections: [], evidenceIds: [], unavailableInputs: [] } : undefined }, freshness: "current",
+        trajectories: { categories: [], unclassifiedWorldIds: [] }, sections: ANALYSIS_SECTIONS.filter(id => id !== "trajectories").map(id => ({ id, status: "ready", summary: "요약", content: "상세 결론입니다.", findings: [], evidenceIds: [] })), evidenceIds: [], unavailableInputs: [] } : undefined }, freshness: "current",
   } }))
   await page.goto("/")
   await page.waitForFunction(() => Boolean(window.__simulaE2E))
@@ -57,9 +58,9 @@ test("report round carousel selects messages independently from browsing and sup
   await expect(metrics).toContainText("200 ms")
   await expect(metrics).toContainText("150")
   await expect(metrics).toContainText("1 샘플")
-  await expect(page.getByRole("tab")).toHaveCount(0)
-  await expect(page.getByRole("heading", { name: "분석 보드", exact: true })).toBeVisible()
-  await page.getByRole("button", { name: "관계 분석", exact: true }).click()
+  await expect(page.getByRole("tab", { name: "종합 결론", exact: true })).toBeVisible()
+  await expect(page.getByRole("region", { name: "분석 리포트", exact: true })).toBeVisible()
+  await page.getByRole("tab", { name: "관계 분석", exact: true }).click()
   await expect(page.getByPlaceholder("인물 찾기")).toHaveCount(0)
   await expect(page.getByRole("combobox", { name: "연결선 선택" })).toHaveCount(0)
   await expect(page.getByRole("tab", { name: "관계 히트맵", exact: true })).toHaveCount(0)
@@ -69,13 +70,13 @@ test("report round carousel selects messages independently from browsing and sup
   expect(heatmap!.y).toBeLessThan(graph!.y)
   expect(await page.locator("details").count()).toBe(0)
   await page.screenshot({ path: testInfo.outputPath("01-relationships.png"), fullPage: true })
-  await page.getByRole("button", { name: "상세 닫기" }).click()
+  await page.getByRole("tab", { name: "종합 결론", exact: true }).click()
   await expect(metrics).toBeVisible()
-  await page.getByRole("button", { name: "대화 기록", exact: true }).click()
-  const conversationDialog = page.getByRole("dialog", { name: "대화 기록" })
-  await expect(conversationDialog.locator('[data-slot="scroll-area-viewport"]')).toHaveCount(0)
-  expect(await conversationDialog.evaluate(element => getComputedStyle(element).overflowY)).toBe("auto")
-  expect((await conversationDialog.boundingBox())!.height).toBe(900)
+  await page.getByRole("tab", { name: "대화 기록", exact: true }).click()
+  const conversationPanel = page.getByRole("tabpanel", { name: "대화 기록" })
+  await expect(conversationPanel.locator('[data-slot="scroll-area-viewport"]')).toHaveCount(0)
+  expect(await conversationPanel.evaluate(element => getComputedStyle(element).overflowY)).toBe("visible")
+  await expect(page.getByRole("dialog")).toHaveCount(0)
   const previous = page.getByRole("button", { name: "이전 라운드 보기" })
   const next = page.getByRole("button", { name: "다음 라운드 보기" })
   await expect(page.getByText("발화 1", { exact: true })).toBeVisible()
@@ -85,10 +86,10 @@ test("report round carousel selects messages independently from browsing and sup
   await expect(previous).toBeDisabled()
   await expect(next).toBeEnabled()
   await next.scrollIntoViewIfNeeded()
-  const scrollBeforeBrowsing = await conversationDialog.evaluate(element => element.scrollTop)
+  const scrollBeforeBrowsing = await page.evaluate(() => window.scrollY)
   await next.click()
   await expect(page.getByText("발화 1", { exact: true })).toBeVisible()
-  expect(await conversationDialog.evaluate(element => element.scrollTop)).toBe(scrollBeforeBrowsing)
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollBeforeBrowsing)
   await expect(previous).toBeEnabled()
   await next.click()
   await next.click()
@@ -100,7 +101,7 @@ test("report round carousel selects messages independently from browsing and sup
   await expect(page.getByRole("dialog", { name: "메시지 상세" })).toContainText("의도 5")
   await page.keyboard.press("Escape")
   await page.screenshot({ path: testInfo.outputPath("02-conversations.png"), fullPage: true })
-  await page.getByRole("button", { name: "상세 닫기" }).click()
+  await page.getByRole("tab", { name: "종합 결론", exact: true }).click()
   await page.route("**/api/runs/report-fixture/export?kind=*", route => route.fulfill({ body: "test export", headers: { "content-type": "text/plain", "content-disposition": "attachment; filename=report.txt" } }))
   for (const label of ["JSON 내보내기", "JSONL 내보내기", "Markdown 내보내기"]) {
     await page.getByRole("button", { name: "내보내기", exact: true }).click()
@@ -113,11 +114,11 @@ test("report round carousel selects messages independently from browsing and sup
     error.includes("/api/runs/report-fixture due to access control checks.")))
   expect(unexpectedErrors).toEqual([])
   for (const label of ["관계 분석", "대화 기록"]) {
-    await page.getByRole("button", { name: label, exact: true }).click()
+    await page.getByRole("tab", { name: label, exact: true }).click()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-    const dialog = await page.getByRole("dialog").boundingBox()
-    expect(dialog!.width).toBeLessThanOrEqual(390)
-    await page.getByRole("button", { name: "상세 닫기" }).click()
+    const panel = await page.getByRole("tabpanel", { name: label }).boundingBox()
+    expect(panel!.width).toBeLessThanOrEqual(390)
+    await page.getByRole("tab", { name: "종합 결론", exact: true }).click()
   }
 
 })

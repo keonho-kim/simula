@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/ui/components/ui/alert"
 import { ReportMetricOverview } from "@/ui/components/report/metric-overview"
 import { AnalysisActivity } from "@/ui/components/report/analysis/activity"
 
-export function ReportPreparationPage({ selectedRunId, onBackToWorlds, title, analysis, events, t, onHome, batch, onToggleScope, runError }: {
+export function ReportPreparationPage({ selectedRunId, onBackToWorlds, title, analysis, events, t, onHome, batch, runError }: {
   selectedRunId?: string
   onBackToWorlds?: () => void
   runError?: string
@@ -23,7 +23,6 @@ export function ReportPreparationPage({ selectedRunId, onBackToWorlds, title, an
   t: UiTexts
   onHome: () => void
   batch: boolean
-  onToggleScope?: () => void
 }) {
   const { query, command, record, running } = analysis
   const unavailable = query.data?.freshness === "unavailable"
@@ -33,8 +32,8 @@ export function ReportPreparationPage({ selectedRunId, onBackToWorlds, title, an
       <header className="flex items-center gap-3 border-b pb-4">
         <RunNavigation runId={selectedRunId} onHome={onHome} onBackToWorlds={onBackToWorlds} t={t} />
         <div><h1 className="text-lg font-semibold">{t.analysisPreparing}</h1><p className="text-xs text-muted-foreground">{title}</p></div>
-        {onToggleScope ? <Button className="ml-auto" variant="outline" onClick={onToggleScope}>{batch ? t.analysisSingle : t.analysisBatch}</Button> : null}
       </header>
+      <p className="text-xs text-muted-foreground">{batch ? t.analysisBatchMetricScope : t.analysisScope}</p>
       <ReportMetricOverview events={events} additionalMetrics={analysis.metrics.data} scopeId={record?.id} t={t} />
       <p className="text-sm text-muted-foreground">{t.analysisPreparationDescription}</p>
       {query.isError || command.isError ? <Alert variant="destructive"><AlertDescription>{t.analysisUnavailable}</AlertDescription></Alert> : null}

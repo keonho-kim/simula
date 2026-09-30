@@ -78,11 +78,21 @@ interpretation branches under the existing model admission limit. LangGraph reta
 references and accepted fields; models return bounded prose and finite choices, while code
 assembles the report. No new JSON output requirement or scoring call is introduced.
 
-The result board groups cards as developments/results, responses/conditions, and next checks.
-Only opening a card mounts its detailed content. Metrics, source citations, and the recorded
-simulation remain available. Existing stored SWOT reports still open with their original
+The result page opens a full conclusion document by default. Each analytical section has a tab;
+its full prose, findings, and source excerpts are read inline, without a report modal. Tab labels
+wrap on compact screens and only the active body mounts. Standalone runs retain relationship,
+conversation, and archived-commentary tabs. Batch runs always resolve to their aggregate report
+and omit single-world result panels. Active sibling worlds block generation with an explicit
+waiting screen and a return to world controls. Metrics remain above tabs and detailed accounting
+is in Usage; aggregate charts are labeled as report-generation usage, not all-world usage. Existing stored SWOT reports still open with their original
 section identities and exported score metadata; new reports generate no SWOT/radar scores.
 
 Deterministic tests cover single and batch section layouts, local retry, accepted evidence
 provenance, exported reports, archived schemas, and board rendering. Browser test sources
 cover card navigation and setup world-count retention; browser execution remains user-run.
+
+Conclusion generation retains six bounded text calls. Source interpretation and observed
+development can proceed independently in Fast Mode; integrated judgment waits for both and
+uses bounded section-detail excerpts. Each final part requests multiple substantive paragraphs
+without inventing facts to meet a length target. Stored reports show their existing full text
+immediately and are not silently regenerated. Prompt improvements apply to subsequent generation.

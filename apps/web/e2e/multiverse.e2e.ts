@@ -7,6 +7,10 @@
 import { expect, test } from "./fixtures"
 
 test("two worlds retain independent approvals and finish in the background after reopening", async ({ page }, testInfo) => {
+  const analysisScopes: string[] = []
+  page.on("request", request => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/analysis") analysisScopes.push(request.postDataJSON().subject.kind)
+  })
   const { settings } = await (await page.request.get("/api/settings")).json()
   settings.providers.openai.apiKey = "unit-test-api-key"
   settings.roles.storyBuilder.provider = "openai"
@@ -37,6 +41,10 @@ test("two worlds retain independent approvals and finish in the background after
   await expect(panel.getByRole("button", { name: "Continue this world", exact: true })).toBeVisible()
   await panel.getByRole("button", { name: "Continue this world", exact: true }).click()
   await expect.poll(async () => (await readBatch()).worlds.map((world: { status: string }) => world.status)).toEqual(["completed", "waiting"])
+  await panel.getByRole("button", { name: "Open Multiverse report", exact: true }).click()
+  await expect(page.getByRole("status")).toContainText("Other worlds are still running or awaiting approval")
+  expect(analysisScopes).toEqual([])
+  await page.getByRole("button", { name: "Back to worlds", exact: true }).click()
   await panel.getByRole("combobox", { name: "Select a world" }).click()
   await page.getByRole("option", { name: /World 2/ }).click()
   await panel.getByRole("button", { name: "Open simulation", exact: true }).click()
@@ -70,8 +78,10 @@ test("two worlds retain independent approvals and finish in the background after
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   expect(await dialog.evaluate(node => node.scrollWidth <= node.clientWidth + 1)).toBe(true)
   await page.screenshot({ path: testInfo.outputPath("multiverse-mobile.png"), fullPage: true })
-  await panel.getByRole("button", { name: "Open this world's result", exact: true }).click()
-  await expect(page.getByRole("region", { name: "Analysis board", exact: true })).toBeVisible()
+  await panel.getByRole("button", { name: "Open Multiverse report", exact: true }).click()
+  await expect(page.getByRole("region", { name: "Analysis report", exact: true })).toBeVisible()
+  expect(analysisScopes.length).toBeGreaterThan(0)
+  expect(analysisScopes.every(scope => scope === "batch")).toBe(true)
   await page.getByRole("button", { name: "Back to worlds", exact: true }).click()
   await expect(page).toHaveURL("/document-analysis")
   await expect(panel.getByRole("combobox", { name: "Select a world" })).toContainText("World 2")

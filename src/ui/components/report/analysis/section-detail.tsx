@@ -1,7 +1,7 @@
 /**
  * Purpose: Read accepted analytical prose and inspect its scoped source excerpts.
  * Pattern: Detail presentation with on-demand reference retrieval.
- * Usage: Mounted only inside an open report section dialog.
+ * Usage: Mounted only in the selected report tab.
  * Related: src/ui/api-client/analytical-report.ts, src/ui/components/markdown/markdown-content.tsx
  */
 import { useState } from "react"
@@ -20,7 +20,7 @@ export function AnalysisSectionDetail({ reportId, section, t }: { reportId: stri
     queryFn: ({ signal }) => fetchAnalysisReference(reportId, referenceId ?? "", signal) })
   const ids = [...new Set([...section.evidenceIds, ...section.findings.flatMap(finding => finding.evidenceIds), ...(section.score?.evidenceIds ?? [])])]
   return <div className="flex flex-col gap-6">
-    <MarkdownContent generated className="font-medium" content={section.summary} />
+    <MarkdownContent generated className="report-reading-lead" content={section.summary} />
     <MarkdownContent generated content={section.content} />
     {section.findings.length ? <section><h3 className="mb-3 text-sm font-semibold">{t.reportDetailedItems}</h3><ul className="flex list-disc flex-col gap-2 pl-5">{section.findings.map((finding, index) => <li key={index}>
       {finding.provenance?.length ? <span className="mr-2 text-xs text-muted-foreground">{finding.provenance.map(category => analysisLabel(category, t)).join(" · ")}</span> : null}
