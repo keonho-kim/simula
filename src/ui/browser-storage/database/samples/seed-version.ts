@@ -4,4 +4,4 @@
  * Usage: Imported by sample queries and seed marker queries.
  * Related: src/ui/browser-storage/database/samples/save.ts, src/ui/browser-storage/database/samples/seed-is-current.ts
  */
-export const SAMPLE_SEED_VERSION = "1"
+export const SAMPLE_SEED_VERSION = "2"
