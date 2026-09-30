@@ -6,6 +6,7 @@
  */
 const en = {
   batchTitle: "Multiverse", batchDescription: "Run independent worlds from this confirmed scenario. Each world develops its own story and decisions.",
+  batchSetupHelp: "Run several worlds from one shared scenario. Each world develops its own interactions; concurrent model calls follow the settings limit.",
   batchWorldCount: "Number of worlds", batchWorldCountHelp: "Choose 1–{maximum} worlds. All worlds share the confirmed scenario; model capacity controls request queueing.",
   batchDuration: "Execution time limit · minutes", batchDurationHelp: "The limit includes preparation and approval waits. Unfinished worlds stop when the budget expires.",
   batchStart: "Start worlds", batchCancel: "Stop all unfinished worlds", batchResume: "Retry unfinished preparation", batchNew: "New batch",
@@ -20,6 +21,7 @@ const en = {
 } as const
 const ko = {
   batchTitle: "Multiverse", batchDescription: "확정한 시나리오에서 독립된 세계들을 실행합니다. 각 세계는 스토리와 의사결정을 따로 구성합니다.",
+  batchSetupHelp: "하나의 시나리오에서 여러 세계를 실행합니다. 세계마다 상호작용이 달라지며, 모델 호출 동시성은 설정의 한도를 따릅니다.",
   batchWorldCount: "세계 수", batchWorldCountHelp: "1~{maximum}개를 선택합니다. 확정한 시나리오는 공유하며, 모델 호출 한도에 따라 요청이 대기할 수 있습니다.",
   batchDuration: "실행 시간 한도 · 분", batchDurationHelp: "준비와 라운드 승인 대기 시간이 포함됩니다. 한도에 도달하면 진행 중인 세계를 중단합니다.",
   batchStart: "세계 실행", batchCancel: "진행 중인 세계 모두 중단", batchResume: "미완료 준비 다시 시도", batchNew: "새 묶음 실행",

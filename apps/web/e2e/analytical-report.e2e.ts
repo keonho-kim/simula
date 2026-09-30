@@ -25,8 +25,7 @@ function analysisFixture(): AnalysisRecord {
       perspective: { focus: "투자위원회", objective: "근거를 확인한 투자 판단", horizon: "분기", boundary: "내부 예산과 외부 비용", evidenceIds: ["source"] },
       coverage: { requested: 5, completed: 3, analyzed: 3, failed: 1, canceled: 1, interrupted: 0 },
       trajectories: { categories: [{ id: "path-one", label: "추가 검토 후 보류", description: "근거를 요청하고 결정을 보류했습니다.", worldIds: ["one", "two"] }], unclassifiedWorldIds: ["three"] },
-      sections: ANALYSIS_SECTIONS.map(id => ({ id, status: "ready", summary: "비용 근거를 검토한 뒤 결정이 보류되었습니다.", content: "## 판단 근거\n\n추가 자료가 필요합니다.\n\n자료의 주장과 관찰 결과를 구분합니다.", findings: [{ text: "근거 확인이 의사결정에 선행했습니다.", evidenceIds: ["source"], provenance: ["source_claim"] }], evidenceIds: ["source"],
-        ...(["strengths", "weaknesses", "opportunities", "threats"].includes(id) ? { score: { value: id === "threats" ? null : 2, rationale: "관찰된 영향도입니다.", evidenceIds: ["source"] } } : {}) })),
+      sections: ANALYSIS_SECTIONS.map(id => ({ id, status: "ready", summary: "비용 근거를 검토한 뒤 결정이 보류되었습니다.", content: "## 판단 근거\n\n추가 자료가 필요합니다.\n\n자료의 주장과 관찰 결과를 구분합니다.", findings: [{ text: "근거 확인이 의사결정에 선행했습니다.", evidenceIds: ["source"], provenance: ["source_claim"] }], evidenceIds: ["source"] })),
       evidenceIds: ["source"], unavailableInputs: [],
     } }
 }
@@ -79,7 +78,7 @@ test("missing analysis prepares once, then opens a read-only result", async ({ p
   expect(requests).toBe(1)
 })
 
-test("saved analysis opens without generation and exposes evidence, unknown scores, and accessible detail", async ({ page }, testInfo) => {
+test("saved analysis opens without generation and exposes evidence and accessible outcome detail", async ({ page }, testInfo) => {
   const record = analysisFixture()
   let modelRequests = 0
   await page.route(url => url.pathname.startsWith("/api/analysis"), route => {
@@ -106,7 +105,7 @@ test("saved analysis opens without generation and exposes evidence, unknown scor
   await expect(page.getByRole("heading", { name: "종합 결론", exact: true })).toBeVisible()
   await expect(page.getByText("이 리포트의 사건과 전개는 시뮬레이션에서 관찰한 결과이며, 실제 발생 사실이나 확률을 뜻하지 않습니다.")).toBeVisible()
   await expect(page.locator(".report-radar svg")).toHaveCount(0)
-  await expect(page.getByText("판단 근거 부족", { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole("button", { name: "주요 전개와 전환점", exact: true })).toBeVisible()
   for (const [label, extension] of [["분석 JSON", "json"], ["분석 Markdown", "md"]] as const) {
     await page.getByRole("button", { name: "내보내기", exact: true }).click()
     const downloaded = page.waitForEvent("download")
@@ -119,16 +118,17 @@ test("saved analysis opens without generation and exposes evidence, unknown scor
     else expect(body).toContain("# 분석 보드")
   }
   await page.screenshot({ path: testInfo.outputPath("analysis-board.png"), fullPage: true })
-  const trigger = page.getByRole("button", { name: "강점", exact: true })
+  const trigger = page.getByRole("button", { name: "핵심 결과", exact: true })
   await trigger.click()
-  const dialog = page.getByRole("dialog", { name: "강점", exact: true })
+  const dialog = page.getByRole("dialog", { name: "핵심 결과", exact: true })
   await expect(dialog.getByRole("heading", { name: "판단 근거" })).toBeVisible()
   await expect(dialog.getByRole("listitem").filter({ hasText: "근거 확인이 의사결정에 선행했습니다." })).toContainText("자료의 주장")
   await dialog.getByRole("button", { name: "근거 1", exact: true }).click()
   await expect(dialog).toContainText("승인 예산은 1억 2천만 원입니다.")
   await expect(dialog).toContainText("2페이지")
   const box = await dialog.boundingBox()
-  expect(box!.width).toBeGreaterThan(1200)
+  expect(box!.width).toBeLessThan(1440)
+  expect(box!.width).toBeGreaterThan(1000)
   expect(box!.height).toBeGreaterThan(800)
   await page.screenshot({ path: testInfo.outputPath("analysis-detail.png"), fullPage: true })
   await page.keyboard.press("Escape")
@@ -136,7 +136,7 @@ test("saved analysis opens without generation and exposes evidence, unknown scor
   await page.setViewportSize({ width: 390, height: 844 })
   await trigger.click()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-  expect((await dialog.boundingBox())!.width).toBe(390)
+  expect((await dialog.boundingBox())!.width).toBeLessThan(390)
   await page.screenshot({ path: testInfo.outputPath("analysis-mobile.png"), fullPage: true })
   expect(modelRequests).toBe(0)
 })
@@ -219,25 +219,4 @@ data: ${JSON.stringify(event)}
   await page.getByRole("button", { name: "하위 작업 목록으로" }).click()
   await page.getByRole("button", { name: "전체 보드" }).click()
   await expect(page.locator(".report-task-output")).toHaveCount(0)
-})
-
-test("a fully assessed radar appears once and honors reduced motion", async ({ page }, testInfo) => {
-  const record = analysisFixture()
-  const threat = record.report?.sections.find(section => section.id === "threats")
-  if (!threat?.score) throw new Error("Missing test score")
-  threat.score.value = 3
-  await page.route(url => url.pathname.startsWith("/api/analysis"), route => {
-    const pathname = new URL(route.request().url()).pathname
-    return route.fulfill({ json: pathname.endsWith("/metrics") ? { calls: [] }
-      : pathname.endsWith("/accounting") ? { accounting: accountingFixture } : { analysis: record, freshness: "current" } })
-  })
-  await page.emulateMedia({ reducedMotion: "reduce" })
-  await openRun(page)
-  const chart = page.locator(".report-chart-entry")
-  await expect(chart.locator("svg")).toBeVisible()
-  expect(await chart.evaluate(element => getComputedStyle(element).animationName)).toBe("none")
-  await page.screenshot({ path: testInfo.outputPath("analysis-radar.png"), fullPage: true })
-  await page.getByRole("button", { name: "강점", exact: true }).click()
-  await page.getByRole("button", { name: "상세 닫기" }).click()
-  await expect(chart).toHaveCount(1)
 })

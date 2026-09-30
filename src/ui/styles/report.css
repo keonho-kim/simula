@@ -29,18 +29,8 @@
   padding-block: 1.5rem;
 }
 .report-conclusion-grid > * { flex: 1 1 360px; min-width: 0; }
-.report-radar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-}
-.report-radar > * { flex: 1 1 300px; min-width: 0; }
-.report-radar svg { width: 100%; max-height: 240px; }
 .report-task-output { display: flex; flex-direction: column; gap: 1rem; padding: 1rem; }
 
-.report-chart-wait { display: flex; align-items: center; gap: 0.75rem; min-height: 4rem; color: var(--muted-foreground); font-size: 0.75rem; }
-.report-chart-wait-mark { width: 1.2rem; height: 1.2rem; border: 1px solid var(--border); transform: rotate(45deg); }
 
 .report-preparation-layout, .report-preparation-columns { display: flex; min-width: 0; gap: 1.25rem; }
 .report-preparation-layout { align-items: flex-start; min-height: 55svh; }

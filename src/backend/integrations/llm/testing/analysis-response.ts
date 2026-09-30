@@ -6,7 +6,7 @@
  */
 export function testAnalyticalReportResponse(prompt: string): string | undefined {
   const id = prompt.match(/Task ID: (.+)/)?.[1] ?? ""
-  if (!prompt.includes("Analytical report") && !/^(scenario-context-|document-|material-summary|world-|worlds-summary|perspective-|trajectory-|strengths-|weaknesses-|opportunities-|threats-|trajectories-|actors-|materials-|scenario-|conclusion-)/.test(id)) return undefined
+  if (!prompt.includes("Analytical report") && !/^(scenario-context-|document-|material-summary|world-|worlds-summary|perspective-|trajectory-|outcomes-|turning-points-|conditions-|implications-|trajectories-|actors-|conclusion-)/.test(id)) return undefined
   const korean = prompt.includes("Write Korean prose")
   const summary = korean ? "주어진 조건과 근거가 의사결정의 범위를 제한합니다." : "The supplied conditions and evidence constrain the decision."
   if (prompt.includes("Allowed answer: one concise evidence summary")) return summary
@@ -21,7 +21,6 @@ export function testAnalyticalReportResponse(prompt: string): string | undefined
   if (id.startsWith("conclusion-") && id.endsWith("-content")) return korean
     ? "자료에 기재된 조건과 시뮬레이션 관찰의 범위를 구분합니다. 추가 근거가 필요한 부분은 아직 확인되지 않았습니다. 실제 의사결정에는 별도 검증이 필요합니다."
     : "The recorded conditions and simulated observations have distinct scopes. Missing evidence remains unverified. Real-world decisions require additional checks."
-  if (id.endsWith("-score")) return "2"
   if (id.startsWith("trajectory-world-")) return "1"
   if ((id.startsWith("trajectory-proposal-") || id.startsWith("trajectory-vocabulary-")) && id.endsWith("-count")) return "1"
   if ((id.startsWith("trajectory-proposal-") || id.startsWith("trajectory-vocabulary-")) && /-label-\d+$/.test(id))

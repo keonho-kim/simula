@@ -11,49 +11,24 @@ import { generateAnalyticalReport } from "./graph"
 import { aggregateTrajectories } from "./trajectories"
 import { analysisFixture } from "./test-fixtures"
 
-test("material detail can finish before an unrelated world summary; report counts worlds and retains common rubric", async () => {
+test("independent outcome branches retain grounded evidence without SWOT scoring", async () => {
   const f = analysisFixture()
-  const hold = Promise.withResolvers<void>()
-  const materialReady = Promise.withResolvers<void>()
-  const read = f.dependencies.readWorld
-  const invoke = f.dependencies.invoke
-  f.dependencies.readWorld = async id => { if (id === "run-second") await hold.promise; return read(id) }
-  f.dependencies.invoke = async call => { if (call.id === "materials-detail") materialReady.resolve(); return invoke(call) }
-  const work = generateAnalyticalReport("report-one", f.input, f.dependencies)
-  try {
-    await materialReady.promise
-    expect(f.calls.some(call => call.id === "strengths-detail")).toBe(false)
-    hold.resolve()
-    const report = analyticalReportSchema.parse(await work)
-    expect(report.sections.every(section => section.status === "ready")).toBe(true)
-    expect(report.coverage).toEqual({ requested: 5, completed: 2, failed: 1, canceled: 1, interrupted: 1, analyzed: 2 })
-    expect(report.trajectories.categories[0]?.worldIds).toEqual(["first", "second"])
-    for (const call of f.calls.filter(call => call.id.startsWith("trajectory-world-"))) {
-      expect(call.prompt).toContain("Allowed answer: one category index")
-      expect(call.prompt).not.toContain('"rationale"')
-    }
-    expect(report.sections.filter(section => section.score).map(section => section.score?.value)).toEqual([2, 2, 2, 2])
-    expect(report.evidenceIds.every(id => f.references.has(id))).toBe(true)
-    expect(f.calls.every(call => call.maxOutputTokens === 2_048)).toBe(true)
-    for (const id of ["strengths-score", "strengths-detail"]) {
-      const packet = testPromptInput(f.calls.find(call => call.id === id)?.prompt ?? "")
-      expect(packet.perspective).not.toHaveProperty("evidenceIds")
-    }
-    const strengthsPacket = testPromptInput(f.calls.find(call => call.id === "strengths-findings-summary")?.prompt ?? "")
-    expect(strengthsPacket.observations).toHaveProperty("summary")
-    expect(strengthsPacket.observations).not.toHaveProperty("findings")
-    const detailPrompt = f.calls.find(call => call.id === "scenario-detail")?.prompt ?? ""
-    expect(detailPrompt).toContain("Return one complete section in connected paragraphs")
-    expect(detailPrompt).not.toContain("Required JSON shape")
-    const worldMergePrompt = f.calls.find(call => call.id === "worlds-summary-0-0")?.prompt ?? ""
-    expect(worldMergePrompt).toContain("2 accepted child summaries")
-    const worldMerge = testPromptInput(worldMergePrompt)
-    expect(JSON.stringify(worldMerge)).toContain("World first:")
-    expect(JSON.stringify(worldMerge)).toContain("World second:")
-    const conclusionPacket = testPromptInput(f.calls.find(call => call.id === "conclusion-implications-content")?.prompt ?? "")
-    const sections = conclusionPacket.sections as Array<{ id: string; findings: Array<{ provenance: string[] }> }>
-    expect(sections.find(section => section.id === "materials")?.findings[0]?.provenance).toContain("source_claim")
-  } finally { hold.resolve(); await work }
+  const report = analyticalReportSchema.parse(await generateAnalyticalReport("report-one", f.input, f.dependencies))
+  expect(report.sections.every(section => section.status === "ready")).toBe(true)
+  expect(report.coverage).toEqual({ requested: 5, completed: 2, failed: 1, canceled: 1, interrupted: 1, analyzed: 2 })
+  expect(report.trajectories.categories[0]?.worldIds).toEqual(["first", "second"])
+  expect(report.sections.every(section => !section.score)).toBe(true)
+  expect(f.calls.some(call => call.id.endsWith("-score") || call.kind === "swot")).toBe(false)
+  expect(report.evidenceIds.every(id => f.references.has(id))).toBe(true)
+  expect(f.calls.every(call => call.maxOutputTokens === 2_048)).toBe(true)
+  const packet = testPromptInput(f.calls.find(call => call.id === "outcomes-findings-summary")?.prompt ?? "")
+  expect(packet.observations).toHaveProperty("summary")
+  const detail = f.calls.find(call => call.id === "conditions-detail")?.prompt ?? ""
+  expect(detail).toContain("Return one complete section in connected paragraphs")
+  expect(detail).not.toContain("Required JSON shape")
+  const worldMerge = testPromptInput(f.calls.find(call => call.id === "worlds-summary-0-0")?.prompt ?? "")
+  expect(JSON.stringify(worldMerge)).toContain("World first:")
+  expect(JSON.stringify(worldMerge)).toContain("World second:")
 })
 
 test("headline trajectories reject repeated world assignments and retain unclassified worlds", () => {

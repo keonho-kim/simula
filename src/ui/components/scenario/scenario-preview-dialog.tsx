@@ -4,6 +4,8 @@
  * Usage: Lazy-loaded by src/ui/shell/App.tsx before run creation.
  * Related: src/ui/shell/home-view.tsx, src/ui/browser-storage/database/drafts/save.ts
  */
+import { MultiverseOptions } from "@/ui/components/multiverse/multiverse-options"
+import { validMultiverse } from "@/ui/models/scenario-builder/launch-options"
 import { useState } from "react"
 import { XIcon } from "lucide-react"
 import type { PromptOutputLength } from "@/shared"
@@ -40,6 +42,7 @@ import type { UiTexts } from "@/ui/types/i18n"
 import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
 interface ScenarioPreviewDialogProps {
+  startError?: boolean
   open: boolean
   draft: ScenarioDraft
   isStarting: boolean
@@ -54,6 +57,7 @@ interface ScenarioPreviewDialogProps {
 }
 
 export function ScenarioPreviewDialog({
+  startError,
   open,
   draft,
   isStarting,
@@ -66,14 +70,14 @@ export function ScenarioPreviewDialog({
   onStart,
   onDraftSaved,
 }: ScenarioPreviewDialogProps) {
-  const canStart = draft.text.trim().length > 0 && draft.controls.numCast > 0
+  const canStart = draft.text.trim().length > 0 && draft.controls.numCast > 0 && validMultiverse(draft.multiverse)
   const [initial] = useState(() => ({ draft, autoContinue }))
   const [confirmClose, setConfirmClose] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string>()
   const dirty = JSON.stringify([draft, autoContinue]) !== JSON.stringify([initial.draft, initial.autoContinue])
   const requestClose = () => {
-    if (saving) return
+    if (saving || isStarting) return
     if (dirty) { setConfirmClose(true); setSaveError(undefined); return }
     onOpenChange(false)
   }
@@ -255,6 +259,8 @@ export function ScenarioPreviewDialog({
                     </FieldContent>
                   </Field>
                 </FieldGroup>
+                <MultiverseOptions value={draft.multiverse} onChange={multiverse => onDraftChange({ ...draft, multiverse })} disabled={isStarting} t={t} />
+                {startError ? <p role="alert" className="text-sm text-destructive">{t.builderRequestError}</p> : null}
               </FieldGroup>
             </div>
           </div>

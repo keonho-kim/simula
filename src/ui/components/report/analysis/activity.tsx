@@ -15,7 +15,6 @@ import type { GenerationTaskView } from "@/ui/models/generation/progress"
 import { useDocumentVisible } from "@/ui/animation/use-document-visible"
 import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
 import { fadePresence, slidePresence } from "@/ui/animation/presence"
-import { LiveSwotRadar } from "./live-radar"
 import { AnalysisTaskOutput } from "./task-output"
 import { groupPreparationTasks } from "@/ui/models/report/preparation-groups"
 import { PreparationTaskList } from "./preparation-task-list"
@@ -80,7 +79,6 @@ export function ReportPreparationBoard({ reportId, tasks, running, t }: {
               <h3 className="text-sm font-semibold">{selected.subtitle}</h3></header>
             <AnalysisTaskOutput reportId={reportId} task={selected.task} live={running} t={t} />
           </m.div>
-          {group.stage === "analysis" ? <div className="p-4"><LiveSwotRadar reportId={reportId} tasks={tasks} t={t} /></div> : null}
         </> : <p className="p-5 text-sm text-muted-foreground">{t.analysisSelectTask}</p>}
       </m.aside> : null}
     </div>

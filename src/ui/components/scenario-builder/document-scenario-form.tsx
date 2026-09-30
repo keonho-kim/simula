@@ -4,6 +4,8 @@
  * Usage: Rendered before shared scenario generation starts.
  * Related: src/ui/hooks/use-document-scenario.ts, src/ui/components/scenario-builder/scenario-builder-dialog.tsx
  */
+import { MultiverseOptions } from "@/ui/components/multiverse/multiverse-options"
+import { validMultiverse } from "@/ui/models/scenario-builder/launch-options"
 import { useRef } from "react"
 import { PlusIcon, XIcon, UploadIcon } from "lucide-react"
 import { DOCUMENT_FORMATS, type DocumentRecord } from "@/shared/documents"
@@ -94,8 +96,9 @@ export function DocumentScenarioForm({ workflow: w, onExecute, t }: {
         </FieldGroup>)}
         <Button type="button" variant="outline" disabled={w.form.participants.length >= 12} onClick={() => w.setForm(current => ({ ...current, participants: [...current.participants, { name: "" }] }))}><PlusIcon data-icon="inline-start" />{t.builderAddParticipant}</Button>
       </FieldSet>
+      <MultiverseOptions value={w.form.multiverse} onChange={multiverse => w.setForm(current => ({ ...current, multiverse }))} disabled={locked} t={t} />
       {w.documents?.documents.some(document => document.status === "partial") ? <Alert><AlertDescription>{t.builderPartialHelp}</AlertDescription></Alert> : null}
-      <Button type="submit" disabled={!ready || locked || w.refreshing}>{t.builderExecute}</Button>
+      <Button type="submit" disabled={!ready || locked || w.refreshing || !validMultiverse(w.form.multiverse)}>{t.builderExecute}</Button>
       {locked ? <p role="status" className="text-sm text-muted-foreground">{t.builderPreparing}</p> : null}
     </FieldGroup>
   </form>

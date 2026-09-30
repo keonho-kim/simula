@@ -7,7 +7,10 @@
 import type { EvidenceBlock, SourceLocator } from "./documents"
 import type { ModelMetrics } from "./run"
 
-export const ANALYSIS_SECTIONS = ["strengths", "weaknesses", "opportunities", "threats", "trajectories", "actors", "materials", "scenario", "conclusion"] as const
+export const ANALYSIS_SECTIONS = ["outcomes", "turning-points", "actors", "conditions", "implications", "trajectories", "conclusion"] as const
+// Retained only for reading reports already saved in browser storage.
+export const LEGACY_ANALYSIS_SECTIONS = ["strengths", "weaknesses", "opportunities", "threats", "trajectories", "actors", "materials", "scenario", "conclusion"] as const
+export type StoredAnalysisSectionId = typeof ANALYSIS_SECTIONS[number] | typeof LEGACY_ANALYSIS_SECTIONS[number]
 export type AnalysisSectionId = typeof ANALYSIS_SECTIONS[number]
 export type AnalysisSubject = { kind: "run" | "batch"; id: string }
 export interface AnalysisReference {
@@ -25,7 +28,7 @@ export interface AnalysisReference {
 export interface AnalysisPerspective { focus: string; objective: string; horizon: string; boundary: string; evidenceIds: string[] }
 export interface AnalysisFinding { text: string; evidenceIds: string[]; provenance?: AnalysisReference["category"][] }
 export interface AnalysisSection {
-  id: AnalysisSectionId
+  id: StoredAnalysisSectionId
   status: "ready" | "failed"
   summary: string
   content: string

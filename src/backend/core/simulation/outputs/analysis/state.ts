@@ -7,4 +7,4 @@
 import { Annotation } from "@langchain/langgraph"
 
 export const AnalysisState = Annotation.Root({ reportId: Annotation<string>(), perspectiveRef: Annotation<string>(), sectionRefs: Annotation<string[]>() })
-export const AnalysisBranchState = Annotation.Root({ sectionId: Annotation<string>(), findingsRef: Annotation<string>(), scoreRef: Annotation<string>(), detailRef: Annotation<string>() })
+export const AnalysisBranchState = Annotation.Root({ sectionId: Annotation<string>(), findingsRef: Annotation<string>(), detailRef: Annotation<string>() })

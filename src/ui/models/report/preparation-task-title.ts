@@ -16,7 +16,6 @@ export function preparationTaskTitle(task: GenerationTaskView, t: UiTexts, sourc
   if (finding) return { subtitle: (finding[2] === "source" ? t.analysisFindingSourceTask : t.analysisFindingTextTask).replace("{index}", finding[1]!), order: 10 + Number(finding[1]) * 2 + (finding[2] === "text" ? 1 : 0) }
   if (id.endsWith("-finding-count")) return { subtitle: t.analysisFindingCountTask, order: 1 }
   if (id.endsWith("-finding-gap")) return { subtitle: t.analysisGapTask, order: 30 }
-  if (id.endsWith("-score")) return { subtitle: t.analysisScoreTask, order: 40 }
   if (id.endsWith("-summary")) return { subtitle: t.analysisSummaryTask, order: 0 }
   if (id.endsWith("-detail") || id.endsWith("-content")) return { subtitle: t.analysisDetailTask, order: 50 }
   const sourceLabel = id.startsWith("scenario-") ? t.analysisScenarioSourceTask : id.startsWith("document-") || id.startsWith("material-") ? t.analysisMaterialSourceTask : t.analysisWorldSourceTask

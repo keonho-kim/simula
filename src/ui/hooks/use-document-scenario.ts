@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import type { PromptLanguage } from "@/shared/scenario"
-import type { BuilderRequest } from "@/shared/scenario-builder"
+import { builderRequestFields, validMultiverse, type ScenarioBuilderForm } from "@/ui/models/scenario-builder/launch-options"
 import { DOCUMENT_FORMATS } from "@/shared/documents"
 import { MAX_DOCUMENT_BYTES, MAX_DOCUMENTS_PER_SET } from "@/shared/documents-schema"
 import * as api from "@/ui/api-client/scenario-builder"
@@ -28,7 +28,7 @@ import type { StoredAttachment } from "@/ui/browser-storage/database/attachments
 
 const POLL_MS = 1000
 const DRAFT_ID = "new-scenario"
-type BuilderForm = Pick<BuilderRequest, "context" | "situation" | "fastMode" | "participants">
+type BuilderForm = ScenarioBuilderForm
 const emptyForm = (): BuilderForm => ({ context: "", situation: "auto", fastMode: false, participants: [] })
 interface LocalScenarioDraft { form: BuilderForm; attachments: StoredAttachment[] }
 const emptyDraft = (): LocalScenarioDraft => ({ form: emptyForm(), attachments: [] })
@@ -62,11 +62,10 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
   useEffect(() => { writeDocumentScenarioSession({ ...session, pendingGeneration }) }, [session, pendingGeneration])
   useEffect(() => () => uploadAbort.current?.abort(), [])
   useEffect(() => {
-    if (initialBuildId.current) { setHydrated(true); return }
     void readDraft<LocalScenarioDraft>(DRAFT_ID).then(async stored => {
       const working = stored?.working ?? emptyDraft()
-      const restored = await Promise.all(working.attachments.map(readAttachment))
-      setForm(working.form)
+      const restored = initialBuildId.current ? [] : await Promise.all(working.attachments.map(readAttachment))
+      setForm(current => initialBuildId.current ? { ...current, multiverse: working.form.multiverse, controls: working.form.controls } : working.form)
       setFiles(restored)
       setAttachments(working.attachments)
       setSavedDraft(stored?.saved ?? emptyDraft())
@@ -82,7 +81,7 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
     const build = buildQuery.data
     if (build && loadedBuild.current !== build.id) {
       loadedBuild.current = build.id
-      setForm({ context: build.request.context, situation: build.request.situation, fastMode: build.request.fastMode, participants: build.request.participants })
+      setForm(current => ({ ...current, context: build.request.context, situation: build.request.situation, fastMode: build.request.fastMode, participants: build.request.participants }))
     }
   }, [buildQuery.data])
   useEffect(() => {
@@ -102,7 +101,7 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
     const pendingSession = { documentSetId: documents.id, buildId, language: session.language ?? language }
     writeDocumentScenarioSession(pendingSession)
     setSession(pendingSession)
-    void api.startScenarioBuild({ ...form, participants, language: session.language ?? language, documentSetId: documents.id, documentRevision: documents.revision }, buildId)
+    void api.startScenarioBuild({ ...builderRequestFields(form), participants, language: session.language ?? language, documentSetId: documents.id, documentRevision: documents.revision }, buildId)
       .then(build => {
         client.setQueryData(["scenario-build", build.id], build)
         setSession(current => ({ ...current, buildId: build.id }))
@@ -135,6 +134,7 @@ export function useDocumentScenario(open: boolean, language: PromptLanguage) {
   }
 
   async function execute(onStarted?: () => void) {
+    if (!validMultiverse(form.multiverse)) return
     if (busy || (pendingGeneration && !files.length && Boolean(documentQuery.data?.documents.length)) || !hydrated || error === "storage" || (!files.length && !session.documentSetId && !form.context.trim())) return
     const participants = form.participants.map(value => ({ name: value.name.trim(), personality: value.personality?.trim() })).filter(value => value.name || value.personality)
     if (participants.some(value => !value.name)) { setError("participants"); return }

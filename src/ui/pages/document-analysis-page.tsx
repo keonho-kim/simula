@@ -64,8 +64,8 @@ export function DocumentAnalysisPage({ workflow: w, t, language, onHome, onOpenS
         </section> : null}
         {running && w.build ? <BuilderActivity key={w.build.id} buildId={w.build.id} open documents={w.documents} t={t} /> : null}
         {stage === "review" && w.build?.specification ? <ScenarioReview specification={w.build.specification} documents={w.documents} t={t} /> : null}
-        {w.build?.status === "confirmed" ? <WorldLaunch key={w.build.id} scenarioId={w.build.id} fastMode={w.build.request.fastMode}
-          open starting={starting} autoContinue={autoContinue} onAutoContinueChange={onAutoContinueChange}
+        {w.hydrated && w.build?.status === "confirmed" ? <WorldLaunch key={w.build.id} scenarioId={w.build.id} fastMode={w.build.request.fastMode}
+          initialOptions={w.form} open starting={starting} autoContinue={autoContinue} onAutoContinueChange={onAutoContinueChange}
           onStart={onStartWorld} onOpenRun={onOpenRun} language={language} t={t} /> : null}
       </m.div>
       {w.build && ["failed", "canceled", "blocked"].includes(w.build.status) ? <Alert><AlertDescription>{w.build.status === "blocked" ? t.builderBlockedHelp : w.build.status === "canceled" ? t.builderStatusCanceled : t.builderRequestError}</AlertDescription></Alert> : null}

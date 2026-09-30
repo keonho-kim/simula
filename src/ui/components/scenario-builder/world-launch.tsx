@@ -4,6 +4,7 @@
  * Usage: Displayed after the shared scenario is confirmed.
  * Related: src/ui/hooks/use-world-preparation.ts, src/ui/components/scenario-builder/builder-activity.tsx
  */
+import type { ScenarioLaunchOptions } from "@/ui/models/scenario-builder/launch-options"
 import { useEffect, useRef, useState } from "react"
 import { AnimatePresence } from "motion/react"
 import * as m from "motion/react-m"
@@ -21,23 +22,23 @@ import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-pr
 import { quietPresence, sequencePresence } from "@/ui/animation/presence"
 import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
-export function WorldLaunch({ scenarioId, fastMode, open, starting, autoContinue, onAutoContinueChange, onStart, onOpenRun, language, t }: {
-  scenarioId: string; fastMode: boolean; open: boolean; starting: boolean; autoContinue: boolean;
+export function WorldLaunch({ initialOptions, scenarioId, fastMode, open, starting, autoContinue, onAutoContinueChange, onStart, onOpenRun, language, t }: {
+  initialOptions?: ScenarioLaunchOptions; scenarioId: string; fastMode: boolean; open: boolean; starting: boolean; autoContinue: boolean;
   onOpenRun: (runId: string, view?: "simulation" | "report") => void; language: "en" | "ko";
   onAutoContinueChange: (value: boolean) => void; onStart: (worldId: string) => void; t: UiTexts
 }) {
-  const [multiple, setMultiple] = useState(() => !!readMultiverseSession(scenarioId))
+  const [multiple, setMultiple] = useState(() => !!readMultiverseSession(scenarioId) || initialOptions?.multiverse?.enabled === true)
   const [direction, setDirection] = useState<-1 | 1>(1)
   const reducedMotion = useReducedMotionPreference()
-  const w = useWorldPreparation(scenarioId, fastMode, open && !multiple)
+  const w = useWorldPreparation(scenarioId, fastMode, open && !multiple, initialOptions?.controls)
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => { heading.current?.focus() }, [])
   const preparing = w.world?.status === "preparing"
   const phase = !w.world ? "setup" : preparing ? "preparing" : w.world.status === "ready" ? "ready" : "other"
   return <section className="flex flex-col gap-4 rounded-lg border p-4" aria-label={t.worldPrepareTitle}>
     <header><h2 ref={heading} tabIndex={-1} className="text-base font-semibold">{t.worldPrepareTitle}</h2><p className="mt-1 text-sm text-muted-foreground">{t.worldPrepareDescription}</p></header>
-    <Field orientation="horizontal"><FieldLabel htmlFor="multiverse-enabled">{t.batchTitle}</FieldLabel><Switch id="multiverse-enabled" checked={multiple} disabled={preparing} onCheckedChange={setMultiple} /></Field>
-    <AnimatePresence mode="wait" initial={false}>{multiple ? <m.div key="multiverse" {...quietPresence(reducedMotion)}><MultiversePanel scenarioId={scenarioId} fastMode={fastMode} open={open} language={language} t={t} onOpenRun={onOpenRun} /></m.div> :
+    <Field orientation="horizontal"><FieldLabel htmlFor="multiverse-enabled">{t.batchTitle}</FieldLabel><input type="checkbox" className="size-4 accent-primary" id="multiverse-enabled" checked={multiple} disabled={preparing} onChange={event => setMultiple(event.target.checked)} /></Field>
+    <AnimatePresence mode="wait" initial={false}>{multiple ? <m.div key="multiverse" {...quietPresence(reducedMotion)}><MultiversePanel initialOptions={initialOptions} autoContinue={autoContinue} scenarioId={scenarioId} fastMode={fastMode} open={open} language={language} t={t} onOpenRun={onOpenRun} /></m.div> :
     <m.div key="single" className="flex flex-col gap-4" {...quietPresence(reducedMotion)}>
     <AnimatePresence mode="wait" initial={false}><m.div key={phase} {...sequencePresence(reducedMotion, direction)}>
     {!w.world ? <form onSubmit={event => { event.preventDefault(); setDirection(1); void w.prepare() }}>

@@ -14,7 +14,7 @@ import type { GenerationTaskView } from "@/ui/models/generation/progress"
 
 const tasks: GenerationTaskView[] = [
   { type: "task", taskId: "perspective", kind: "perspective", attempt: 1, status: "completed" },
-  { type: "task", taskId: "strengths-summary", kind: "swot", attempt: 1, status: "running" },
+  { type: "task", taskId: "outcomes-summary", kind: "assessment", attempt: 1, status: "running" },
   { type: "task", taskId: "conclusion-source", kind: "conclusion", attempt: 1, status: "waiting" },
 ]
 for (const locale of ["en", "ko"] as const) test(`overview shows all stages and clickable task status without streaming bodies (${locale})`, () => {
@@ -26,7 +26,7 @@ for (const locale of ["en", "ko"] as const) test(`overview shows all stages and 
   expect(html).toContain(t.analysisSynthesisStage)
   expect(html).toContain('data-status="completed"')
   expect(html).toContain('data-status="running"')
-  expect(html).toContain('data-group-id="analysis:strengths"')
+  expect(html).toContain('data-group-id="analysis:outcomes"')
   expect(html).not.toContain('data-task-id=')
   expect(html).not.toContain('report-task-output')
   expect(html).not.toContain('report-chart-wait')

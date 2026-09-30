@@ -5,7 +5,7 @@
  * Related: src/shared/analytical-report.ts, src/shared/documents-schema.ts
  */
 import { z } from "zod"
-import { ANALYSIS_SECTIONS } from "./analytical-report"
+import { ANALYSIS_SECTIONS, LEGACY_ANALYSIS_SECTIONS } from "./analytical-report"
 import { EVIDENCE_METHODS } from "./documents"
 import { runPathSegmentSchema } from "./run-schema"
 import { extractionSchema } from "./documents-schema"
@@ -37,15 +37,19 @@ export const analysisScoreSchema = z.object({ value: z.number().int().min(0).max
   .refine(value => value.value === null || value.evidenceIds.length > 0, "An assessed score requires supporting references; use null for unknown.")
 export const analysisDetailSchema = z.object({ summary: prose.max(MAX_ANALYTICAL_SUMMARY_CHARS), content: prose.max(MAX_ANALYSIS_DETAIL_CHARS), evidenceIds: refs }).strict()
 const reportFindingSchema = analysisFindingsSchema.shape.findings.element.extend({ provenance: z.array(analysisReferenceSchema.shape.category).min(1).optional() })
-const section = z.object({ id: z.enum(ANALYSIS_SECTIONS), status: z.enum(["ready", "failed"]), summary: z.string().max(MAX_ANALYTICAL_SUMMARY_CHARS), content: z.string().max(MAX_ANALYSIS_DETAIL_CHARS),
+const section = z.object({ id: z.enum([...ANALYSIS_SECTIONS, ...LEGACY_ANALYSIS_SECTIONS]), status: z.enum(["ready", "failed"]), summary: z.string().max(MAX_ANALYTICAL_SUMMARY_CHARS), content: z.string().max(MAX_ANALYSIS_DETAIL_CHARS),
   findings: z.array(reportFindingSchema).max(3), evidenceIds: refs, score: analysisScoreSchema.optional() }).strict()
 export const analyticalReportSchema = z.object({
   perspective: analysisPerspectiveSchema,
   coverage: z.object({ requested: count, completed: count, failed: count, canceled: count, interrupted: count, analyzed: count }).strict(),
   trajectories: z.object({ categories: z.array(z.object({ id: prose.max(80), label: prose.max(100), description: prose.max(300), worldIds: z.array(z.string()).max(50) })).max(6), unclassifiedWorldIds: z.array(z.string()).max(50) }).strict(),
-  sections: z.array(section).length(ANALYSIS_SECTIONS.length), evidenceIds: z.array(z.string().max(240)).max(400),
+  sections: z.array(section).min(ANALYSIS_SECTIONS.length - 1).max(LEGACY_ANALYSIS_SECTIONS.length), evidenceIds: z.array(z.string().max(240)).max(400),
   unavailableInputs: z.array(z.string().max(240)).max(1000),
-}).strict().refine(value => new Set(value.sections.map(section => section.id)).size === ANALYSIS_SECTIONS.length, "Report sections must be unique.")
+}).strict().refine(value => {
+  const ids = new Set(value.sections.map(section => section.id))
+  return ids.size === value.sections.length && [ANALYSIS_SECTIONS, ANALYSIS_SECTIONS.filter(id => id !== "trajectories"), LEGACY_ANALYSIS_SECTIONS]
+    .some(expected => expected.length === ids.size && expected.every(id => ids.has(id)))
+}, "Report sections must form one complete, unique report layout.")
 export const analysisRecordSchema = z.object({
   id: z.uuid(), subject: analysisSubjectSchema, inputRevision: prose.max(128), language: z.enum(["en", "ko"]), fastMode: z.boolean(),
   usageAccountingVersion: z.literal(1).optional(),

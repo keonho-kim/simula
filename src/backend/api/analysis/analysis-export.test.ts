@@ -22,7 +22,7 @@ import { analysisFixture } from "@/backend/core/simulation/outputs/analysis/test
 import { generateAnalyticalReport } from "@/backend/core/simulation/outputs/analysis/graph"
 import { routeAnalysis } from "./analysis-controller"
 
-test("accepted export includes bounded report, referenced evidence, rubric, and available metrics without a model call", async () => {
+test("accepted export includes bounded report, referenced evidence, and available metrics without a model call", async () => {
   const root = await mkdtemp(join(tmpdir(), "simula-analysis-export-"))
   const reports = new AnalysisStore(join(root, "reports"))
   const runs = new RunStore({ rootDir: join(root, "runs") })
@@ -45,7 +45,7 @@ test("accepted export includes bounded report, referenced evidence, rubric, and 
     expect((await get(record.id)).status).toBe(409)
     const fixture = analysisFixture()
     const report = await generateAnalyticalReport(record.id, fixture.input, fixture.dependencies)
-    report.sections[0] = { id: "strengths", status: "failed", summary: "", content: "", findings: [], evidenceIds: [] }
+    report.sections[0] = { id: "outcomes", status: "failed", summary: "", content: "", findings: [], evidenceIds: [] }
     const lease = reports.execution(record.id).claim()
     if (!lease) throw new Error("Missing fixture ownership")
     try {
@@ -70,8 +70,8 @@ test("accepted export includes bounded report, referenced evidence, rubric, and 
       usage: { calls: 0, totalTokens: 0 } }], analysisGeneration: { calls: 1, totalTokens: 60 }, overall: { calls: 1, totalTokens: 60 } })
     expect((await (await accounting(record.id)).json()).accounting).toEqual(artifact.accounting)
     expect(artifact.acceptedDigest).toMatch(/^[a-f0-9]{64}$/)
-    expect(artifact.report.sections.find((section: { id: string }) => section.id === "strengths").status).toBe("failed")
-    expect(artifact.report.sections.find((section: { id: string }) => section.id === "threats").score.value).toBe(2)
+    expect(artifact.report.sections.find((section: { id: string }) => section.id === "outcomes").status).toBe("failed")
+    expect(artifact.report.sections.every((section: { score?: unknown }) => section.score === undefined)).toBe(true)
     expect(artifact.references.map((reference: { id: string }) => reference.id)).toEqual(report.evidenceIds)
     expect(artifact.references.some((reference: { category: string }) => reference.category === "simulation_observation")).toBe(true)
     expect(artifact.metrics).toHaveLength(1)

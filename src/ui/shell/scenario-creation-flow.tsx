@@ -4,20 +4,27 @@
  * Usage: Mounted by HomeView across home and document-analysis routes.
  * Related: src/ui/hooks/use-document-scenario.ts, src/ui/pages/document-analysis-page.tsx
  */
-import { useEffect } from "react"
+import { useEffect, useRef } from "react"
 import type { ComponentProps } from "react"
 import { useDocumentScenario } from "@/ui/hooks/use-document-scenario"
 import { ScenarioBuilderDialog } from "@/ui/components/scenario-builder/scenario-builder-dialog"
 import { DocumentAnalysisPage } from "@/ui/pages/document-analysis-page"
 
 type ScenarioCreationFlowProps = Omit<ComponentProps<typeof DocumentAnalysisPage>, "workflow"> & {
+  autoExecute?: boolean
   active: boolean
   analysis: boolean
   onClose: () => void
   onAnalyze: () => void
 }
-export function ScenarioCreationFlow({ active, analysis, onClose, onAnalyze, ...props }: ScenarioCreationFlowProps) {
+export function ScenarioCreationFlow({ autoExecute, active, analysis, onClose, onAnalyze, ...props }: ScenarioCreationFlowProps) {
   const workflow = useDocumentScenario(active || analysis, props.language)
+  const executed = useRef(false)
+  useEffect(() => {
+    if (!autoExecute || executed.current || !workflow.hydrated || workflow.busy || workflow.error) return
+    executed.current = true
+    void workflow.execute(onAnalyze)
+  }, [autoExecute, workflow, onAnalyze])
   useEffect(() => {
     if (active && !analysis && (workflow.build || workflow.pendingGeneration)) onAnalyze()
   }, [active, analysis, workflow.build, workflow.pendingGeneration, onAnalyze])

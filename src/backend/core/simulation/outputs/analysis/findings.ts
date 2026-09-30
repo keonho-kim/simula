@@ -23,15 +23,12 @@ export async function buildSectionFindings(tasks: AnalysisTasks, id: AnalysisSec
     if (!reference || reference.id !== referenceId) throw new Error(`Report reference ${referenceId} is unavailable.`)
     return reference
   }))
-  const references = id === "actors" || id === "trajectories"
-    ? available.filter(reference => reference.category === "simulation_observation")
-    : id === "materials" ? available.filter(reference => reference.category === "source_claim" || reference.category === "user_constraint")
-      : available
+  const references = ["outcomes", "turning-points", "actors", "trajectories"].includes(id)
+    ? available.filter(reference => reference.category === "simulation_observation") : available
   const acceptedIds = references.map(reference => reference.id)
   const choices = references.map((reference, index) => ({ index: index + 1,
     category: reference.category, text: reference.text.slice(0, 180) }))
-  const kind = ["strengths", "weaknesses", "opportunities", "threats"].includes(id) ? "swot" as const : "assessment" as const
-  const common = { kind, evidenceIds: acceptedIds }
+  const common = { kind: "assessment" as const, evidenceIds: acceptedIds }
   const summary = await tasks.run({ ...common, id: `${id}-findings-summary`, schema: analysisFindingsSchema.shape.summary,
     output: "text", parse: (text: string) => text.trim(), instruction: findingSummaryInstructions(id),
     shape: "one short grounded overview sentence", input: packet })

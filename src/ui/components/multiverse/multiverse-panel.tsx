@@ -4,6 +4,7 @@
  * Usage: Displayed from the confirmed scenario launch panel when Multiverse is enabled.
  * Related: src/ui/hooks/use-multiverse.ts, src/ui/components/scenario-builder/builder-activity.tsx
  */
+import type { ScenarioLaunchOptions } from "@/ui/models/scenario-builder/launch-options"
 import { useState } from "react"
 import { MAX_BATCH_MINUTES, MAX_BATCH_WORLDS, type BatchWorldStatus } from "@/shared/multiverse"
 import type { UiTexts } from "@/ui/types/i18n"
@@ -18,10 +19,10 @@ import { Alert, AlertDescription } from "@/ui/components/ui/alert"
 import { WorldControlsFields } from "@/ui/components/scenario-builder/world-controls-fields"
 import { BuilderActivity } from "@/ui/components/scenario-builder/builder-activity"
 
-export function MultiversePanel({ scenarioId, fastMode, open, language, t, onOpenRun }: {
-  scenarioId: string; fastMode: boolean; open: boolean; language: "en" | "ko"; t: UiTexts; onOpenRun: (runId: string, view?: "simulation" | "report") => void
+export function MultiversePanel({ initialOptions, autoContinue, scenarioId, fastMode, open, language, t, onOpenRun }: {
+  initialOptions?: ScenarioLaunchOptions; autoContinue?: boolean; scenarioId: string; fastMode: boolean; open: boolean; language: "en" | "ko"; t: UiTexts; onOpenRun: (runId: string, view?: "simulation" | "report") => void
 }) {
-  const w = useMultiverse(scenarioId, fastMode, open)
+  const w = useMultiverse(scenarioId, fastMode, open, initialOptions, autoContinue)
   const [selectedId, setSelectedId] = useState<string>()
   const selected = w.batch?.worlds.find(world => world.id === selectedId) ?? w.batch?.worlds[0]
   const active = w.batch?.status === "running"

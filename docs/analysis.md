@@ -1,6 +1,6 @@
 # Analysis and Inspection
 
-The browser profile owns durable run history in SQLite WASM and OPFS. The Bun server writes
+The browser profile owns durable run history in SQLite WASM and OPFS. The Next.js/Node server writes
 temporary artifacts only while the owning browser session is active. The older integrated
 analysis bundle is not written for new runs.
 
@@ -63,3 +63,26 @@ new runs in the current server.
 - operations: [`operations.md`](./operations.md)
 - contracts: [`contracts.md`](./contracts.md)
 - architecture: [`architecture.md`](./architecture.md)
+
+## Outcome-focused analytical reports
+
+New reports contain key outcomes, turning points, actor reactions and interests, influential
+conditions, material improvements and checks, and an integrated conclusion. Batch reports
+add recurring and rare development paths, with observed world counts and unclassified worlds.
+A single run does not generate a distribution. Counts are observations, not estimated real-world
+probabilities. Prompt instructions separate requested, promised, and performed actions, distinguish
+temporal succession from causation, and avoid asserting untested alternatives as effective.
+
+Evidence reduction precedes interpretation. Fast Mode permits independent reductions and
+interpretation branches under the existing model admission limit. LangGraph retains compact
+references and accepted fields; models return bounded prose and finite choices, while code
+assembles the report. No new JSON output requirement or scoring call is introduced.
+
+The result board groups cards as developments/results, responses/conditions, and next checks.
+Only opening a card mounts its detailed content. Metrics, source citations, and the recorded
+simulation remain available. Existing stored SWOT reports still open with their original
+section identities and exported score metadata; new reports generate no SWOT/radar scores.
+
+Deterministic tests cover single and batch section layouts, local retry, accepted evidence
+provenance, exported reports, archived schemas, and board rendering. Browser test sources
+cover card navigation and setup world-count retention; browser execution remains user-run.

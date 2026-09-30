@@ -27,7 +27,7 @@ test("parallel evidence and perspective tasks become two groups with distinct or
 })
 
 test("retry replaces the prior attempt without changing the group or inflating progress", () => {
-  const groups = groupPreparationTasks([task("strengths-score", "swot"), task("strengths-score", "swot", "retrying", 2)], true, dictionary.en)
+  const groups = groupPreparationTasks([task("outcomes-findings-summary", "assessment"), task("outcomes-findings-summary", "assessment", "retrying", 2)], true, dictionary.en)
   expect(groups).toHaveLength(1)
   expect(groups[0]?.tasks).toHaveLength(1)
   expect(groups[0]?.completed).toBe(0)
@@ -36,7 +36,7 @@ test("retry replaces the prior attempt without changing the group or inflating p
 
 test("finding source and text, summaries and detailed conclusions have distinct subtitles", () => {
   const groups = groupPreparationTasks([
-    task("strengths-finding-1-source", "swot"), task("strengths-finding-1-text", "swot"),
+    task("outcomes-finding-1-source", "assessment"), task("outcomes-finding-1-text", "assessment"),
     task("conclusion-source-summary", "conclusion"), task("conclusion-source-content", "conclusion"),
   ], true, dictionary.ko)
   for (const group of groups) expect(new Set(group.tasks.map(item => item.subtitle)).size).toBe(group.tasks.length)

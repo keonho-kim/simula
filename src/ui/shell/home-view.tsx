@@ -4,6 +4,8 @@
  * Usage: Rendered by App while the active view is home.
  * Related: src/ui/pages/start-screen.tsx, src/ui/shell/App.tsx
  */
+import { prepareScenarioDraft } from "@/ui/browser-storage/prepare-scenario-draft"
+import { validMultiverse } from "@/ui/models/scenario-builder/launch-options"
 import { Suspense, lazy, useEffect, useRef, useState } from "react"
 import type { PromptLanguage, RunManifest, ScenarioInput } from "@/shared"
 import { StartScreen } from "@/ui/pages/start-screen"
@@ -78,6 +80,9 @@ export function HomeView({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [scenarioPreviewOpen, setScenarioPreviewOpen] = useState(false)
   const [scenarioDraft, setScenarioDraft] = useState<ScenarioDraft>(DEFAULT_SCENARIO_DRAFT)
+  const [launchSeed, setLaunchSeed] = useState<string>()
+  const [preparingBatch, setPreparingBatch] = useState(false)
+  const [startError, setStartError] = useState(false)
   const [hasSavedPreview, setHasSavedPreview] = useState(false)
   const samplePickerPresent = useExitPresence(samplePickerOpen)
   const runHistoryPresent = useExitPresence(runHistoryOpen)
@@ -94,8 +99,20 @@ export function HomeView({
     })
   }
 
-  const startScenario = () => {
-    if (!scenarioDraft.text.trim()) return
+  const startScenario = async () => {
+    if (!scenarioDraft.text.trim() || !validMultiverse(scenarioDraft.multiverse) || preparingBatch) return
+    if (scenarioDraft.multiverse?.enabled) {
+      setPreparingBatch(true); setStartError(false)
+      try {
+        await prepareScenarioDraft(scenarioDraft)
+        setLaunchSeed(crypto.randomUUID())
+        setScenarioPreviewOpen(false)
+        setScenarioBuilder("closed")
+        onDocumentAnalysisChange(true)
+      } catch { setStartError(true) }
+      finally { setPreparingBatch(false) }
+      return
+    }
     onStartScenario({
       sourceName: scenarioDraft.sourceName,
       text: scenarioDraft.text,
@@ -135,7 +152,8 @@ export function HomeView({
       /> : null}
       <Suspense fallback={null}>
         {scenarioBuilder !== "unused" || documentAnalysis ? (
-          <ScenarioCreationFlow
+          <ScenarioCreationFlow key={launchSeed ?? "new-scenario"}
+            autoExecute={Boolean(launchSeed)}
             active={scenarioBuilder === "open"}
             analysis={documentAnalysis}
             onAnalyze={() => { setScenarioBuilder("closed"); onDocumentAnalysisChange(true) }}
@@ -170,7 +188,8 @@ export function HomeView({
           <ScenarioPreviewDialog
             open={scenarioPreviewOpen}
             draft={scenarioDraft}
-            isStarting={isStarting}
+            startError={startError}
+            isStarting={isStarting || preparingBatch}
             autoContinue={autoContinue}
             t={t}
             onOpenChange={setScenarioPreviewOpen}

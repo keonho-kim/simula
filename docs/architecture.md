@@ -584,7 +584,7 @@ The selected run can switch to its parent Multiverse analysis when batch ownersh
 Reading a saved analysis never generates it. Subject discovery supplies version freshness;
 errors and unavailable source status remain visible without discarding persisted results.
 
-`components/report/analysis` owns reading dialogs, source excerpts, accepted SWOT geometry,
+`components/report/analysis` owns reading dialogs, source excerpts,
 board layout, and live output composition. `use-analytical-report` owns query/mutation
 lifecycle; `api/analytical-report` validates HTTP contracts. Common generation streaming
 and its reducer now live in `hooks/use-generation-stream.ts` and `models/generation`.
@@ -594,16 +594,18 @@ Preparation initially shows three kanban columns: evidence, analysis, and synthe
 Each column contains semantic group cards, not one repeated heading per model call.
 `models/report/preparation-groups.ts` folds retries into one task identity, groups evidence,
 perspective, and section work, and derives received-task completion counts. Task subtitles
-identify the actual field, evidence selection, interpretation, score, or detail operation.
+identify the actual field, evidence selection, interpretation, or detail operation.
 Opening a group shows its subtasks at 40% width and a selection prompt at 60%. Only an
 explicit subtask click mounts its live/accepted output with shared Motion presets. Counts
 refer to the bounded received task window, not a predicted total for the entire workflow.
 Back/Escape returns from content to subtasks, then to the full board, restoring keyboard focus. Only the selected task output
 receives a detailed subscription. Named plain-text previews are provisional; completed Markdown is
 rendered through the existing sanitizer in an opened detail. Readers retain scroll control.
-Four accepted SWOT score tasks can reveal the chart before final prose completes; missing
-values remain unknown and never form a fabricated polygon. Chart loading fades locally
-only while visible, and reduced-motion/hidden-page preferences suppress recurring work.
+New reports explain outcomes, turning points, actor reactions/interests, influential conditions,
+and material improvements or checks, then synthesize a conclusion. Multiverse adds observed
+development paths; single-run reports omit distribution generation. No SWOT scores or radar
+polygons are generated. Saved nine-section reports remain readable under their original
+section identities; the UI never renames their prose to imply a new analysis.
 
 Read-only dialogs occupy 86vw by 86svh on desktop and 96vw by 94svh on mobile. Radix owns
 focus trapping, Escape handling, and return focus. Heavy relationship and conversation
@@ -664,8 +666,9 @@ has no edge selector. Actor search is removed from the shared graph renderer in 
 independent analytical branch graphs, world trajectory classification, and final synthesis.
 The common perspective accepts focus, objective, horizon and boundary as separate
 short text tasks; code assembles it with scenario references before branches begin.
-Material assessment can progress independently of slower world summaries. Each branch
-accepts bounded findings, optionally selects a SWOT score, and writes its detail as
+Source and world evidence reductions can progress independently. Interpretation branches
+wait for both accepted evidence sets and the common perspective. Each branch
+accepts bounded findings and writes its detail as
 plain text before the root assembles the conclusion. Code attaches the accepted
 findings summary and reference IDs to that detail. Shared graph state contains task references; evidence bodies
 and final sections remain in accepted artifacts. The single-page report consumes this API;
@@ -684,7 +687,7 @@ The workflow checks completion, references and access boundaries; it does not us
 model re-review as proof of factual accuracy.
 Accepted findings derive their provenance categories from persisted evidence references,
 not model-supplied category labels. Those categories accompany bounded findings into
-score/detail and final synthesis inputs and appear beside findings in the report and
+detail and final synthesis inputs and appear beside findings in the report and
 portable Markdown. Older saved findings without this optional field remain readable;
 absence of a label does not imply a source claim.
 World references explicitly identify simulated interactions and event pressures rather
@@ -754,3 +757,18 @@ pending generation intent; files and form drafts remain in browser storage. Relo
 a running extraction reattaches and continues building after sources are ready. An
 interrupted upload exposes Continue analysis rather than silently starting duplicate
 uploads. Settings still open as a dialog above the analysis page.
+
+### Multiverse choices before preparation
+
+New scenario setup and completed/sample scenario previews share a native checkbox and bounded
+world-count field (1–50, default 5 when enabled). Local launch options are saved with the
+SQLite draft; they are excluded from the strict ScenarioBuilder request. After confirmation,
+world launch receives the saved count, selected controls, and automatic progression preference.
+The chosen count is the number of worlds, not simultaneous provider requests; model admission
+continues to enforce configured concurrency.
+
+A single sample retains its existing direct run path. A multiverse sample is retained as a
+source attachment and enters the shared document/scenario preparation flow once. The confirmed
+scenario then feeds the existing batch workflow, with separate StoryBuilder and simulation
+state per world. Preparing a local draft performs no model calls; the following workflow owns
+execution and errors. The persisted options survive refreshing that workflow.

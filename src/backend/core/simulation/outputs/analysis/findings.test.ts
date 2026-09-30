@@ -30,7 +30,7 @@ test("actor behavior selects observations and material findings select documents
   const actorRef = await buildSectionFindings(tasks, "actors", perspective, packet, [source.id, observed.id], readReference)
   const actor = await tasks.read(actorRef, analysisFindingsSchema)
   expect(actor.findings[0]?.evidenceIds).toEqual([observed.id])
-  const materialRef = await buildSectionFindings(tasks, "materials", perspective, packet, [observed.id, source.id], readReference)
+  const materialRef = await buildSectionFindings(tasks, "implications", perspective, packet, [source.id, observed.id], readReference)
   const materials = await tasks.read(materialRef, analysisFindingsSchema)
   expect(materials.findings[0]?.evidenceIds).toEqual([source.id])
 })

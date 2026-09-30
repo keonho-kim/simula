@@ -63,7 +63,7 @@ test("a terminal run generates bounded Korean analysis through the configured ob
       sections: record.report?.sections.map(section => ({ id: section.id, status: section.status })),
       unavailable: record.report?.unavailableInputs }))
     expect(record.status).toBe("ready")
-    expect(record.report?.sections).toHaveLength(9)
+    expect(record.report?.sections).toHaveLength(6)
     expect(record.report?.sections.every(section => /[가-힣]/.test(section.content))).toBe(true)
     const metrics = await reports.readMetrics(id)
     expect(metrics.length).toBeGreaterThan(0)

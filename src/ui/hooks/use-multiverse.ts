@@ -4,6 +4,7 @@
  * Usage: Used by the Multiverse panel for one confirmed scenario.
  * Related: src/ui/api-client/multiverse.ts, src/ui/browser-storage/multiverse-session.ts
  */
+import { validMultiverse, type ScenarioLaunchOptions } from "@/ui/models/scenario-builder/launch-options"
 import { useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { multiverseRequestSchema } from "@/shared/multiverse-schema"
@@ -13,9 +14,9 @@ import { readMultiverseSession, writeMultiverseSession } from "@/ui/browser-stor
 
 const BATCH_POLL_MS = 1000
 
-export function useMultiverse(scenarioId: string, fastMode: boolean, open: boolean) {
+export function useMultiverse(scenarioId: string, fastMode: boolean, open: boolean, initialOptions?: ScenarioLaunchOptions, autoContinue?: boolean) {
   const [batchId, setBatchId] = useState(() => readMultiverseSession(scenarioId))
-  const [request, setRequest] = useState(() => multiverseRequestSchema.parse({ scenarioId, controls: { fastMode } }))
+  const [request, setRequest] = useState(() => multiverseRequestSchema.parse({ scenarioId, controls: { ...initialOptions?.controls, fastMode }, worldCount: initialOptions?.multiverse && validMultiverse({ ...initialOptions.multiverse, enabled: true }) ? initialOptions.multiverse.worldCount : undefined, autoContinue }))
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
   const [pendingAutomatic, setPendingAutomatic] = useState<{ worldId: string; enabled: boolean }>()

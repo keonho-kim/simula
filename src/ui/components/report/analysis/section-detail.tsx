@@ -21,7 +21,6 @@ export function AnalysisSectionDetail({ reportId, section, t }: { reportId: stri
   const ids = [...new Set([...section.evidenceIds, ...section.findings.flatMap(finding => finding.evidenceIds), ...(section.score?.evidenceIds ?? [])])]
   return <div className="flex flex-col gap-6">
     <MarkdownContent generated className="font-medium" content={section.summary} />
-    {section.score ? <section className="rounded-md border p-3"><p>{section.score.value ?? t.analysisUnknown}</p><MarkdownContent generated className="text-muted-foreground" content={section.score.rationale} /></section> : null}
     <MarkdownContent generated content={section.content} />
     {section.findings.length ? <section><h3 className="mb-3 text-sm font-semibold">{t.reportDetailedItems}</h3><ul className="flex list-disc flex-col gap-2 pl-5">{section.findings.map((finding, index) => <li key={index}>
       {finding.provenance?.length ? <span className="mr-2 text-xs text-muted-foreground">{finding.provenance.map(category => analysisLabel(category, t)).join(" · ")}</span> : null}

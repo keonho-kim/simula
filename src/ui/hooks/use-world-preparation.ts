@@ -4,6 +4,7 @@
  * Usage: Used by the confirmed scenario's world launch panel.
  * Related: src/ui/api-client/worlds.ts, src/ui/browser-storage/world-session.ts
  */
+import type { WorldControls } from "@/shared/world-preparation"
 import { useEffect, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { worldControlsSchema } from "@/shared/world-preparation-schema"
@@ -12,9 +13,9 @@ import { readWorldSession, writeWorldSession } from "@/ui/browser-storage/world-
 
 const WORLD_POLL_MS = 1000
 
-export function useWorldPreparation(scenarioId: string, fastMode: boolean, open: boolean) {
+export function useWorldPreparation(scenarioId: string, fastMode: boolean, open: boolean, initialControls?: WorldControls) {
   const [worldId, setWorldId] = useState(() => readWorldSession(scenarioId))
-  const [controls, setControls] = useState(() => worldControlsSchema.parse({ fastMode }))
+  const [controls, setControls] = useState(() => worldControlsSchema.parse({ ...initialControls, fastMode }))
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
   const loaded = useRef<string | undefined>(undefined)

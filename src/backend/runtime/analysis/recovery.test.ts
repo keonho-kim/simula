@@ -40,7 +40,7 @@ test("prior accepted sections stay readable during and after a failed retry", as
     const record = await jobs.create(crypto.randomUUID(), { kind: "run", id: run.id })
     const fixture = analysisFixture()
     const report = await generateAnalyticalReport(record.id, fixture.input, fixture.dependencies)
-    report.sections[0] = { id: "strengths", status: "failed", content: "", summary: "", findings: [], evidenceIds: [] }
+    report.sections[0] = { id: "outcomes", status: "failed", content: "", summary: "", findings: [], evidenceIds: [] }
     const seedLease = store.execution(record.id).claim()
     if (!seedLease) throw new Error("Missing fixture ownership")
     try { await store.write({ ...record, status: "partial", report }, seedLease) }

@@ -59,10 +59,6 @@ export async function generateAnalyticalReport(reportId: string, input: Analysis
       const outcomes = Promise.all([worldSummary, materialSummary])
       const branch = async (id: Exclude<AnalysisSectionId, "conclusion">): Promise<AnalysisSection> => {
         try {
-          if (id === "materials") {
-            const source = await materialSummary
-            return await generateAnalysisSection(tasks, id, acceptedPerspective, { sources: source, providedDocuments: input.documentIds.length, unavailableInputs }, source.evidenceIds, dependencies.readReference)
-          }
           const [observed, source] = await outcomes
           const evidenceIds = [...new Set([...observed.evidenceIds, ...source.evidenceIds, ...acceptedPerspective.evidenceIds])]
           if (id === "trajectories") trajectories = await classifyTrajectories(tasks, await worldSummaries)
@@ -70,7 +66,7 @@ export async function generateAnalyticalReport(reportId: string, input: Analysis
             { observations: observed, sources: source, coverage, unavailableInputs: [...unavailableInputs], ...(id === "trajectories" ? { trajectories } : {}) }, evidenceIds, dependencies.readReference)
         } catch { dependencies.signal.throwIfAborted(); return failedAnalysisSection(id) }
       }
-      const ids = ANALYSIS_SECTIONS.filter((id): id is Exclude<AnalysisSectionId, "conclusion"> => id !== "conclusion")
+      const ids = ANALYSIS_SECTIONS.filter((id): id is Exclude<AnalysisSectionId, "conclusion"> => id !== "conclusion" && (id !== "trajectories" || input.subject.kind === "batch"))
       if (input.fastMode) sections = await Promise.all(ids.map(branch))
       else for (const id of ids) sections.push(await branch(id))
       return { sectionRefs: sections.filter(section => section.status === "ready").map(section => `${section.id}-detail`) }
@@ -90,5 +86,5 @@ export async function generateAnalyticalReport(reportId: string, input: Analysis
   dependencies.signal.throwIfAborted()
   if (!perspective) throw new Error("Report perspective could not be established.")
   return { perspective, coverage, trajectories, sections, unavailableInputs,
-    evidenceIds: [...new Set([...perspective.evidenceIds, ...sections.flatMap(section => [...section.evidenceIds, ...section.findings.flatMap(finding => finding.evidenceIds), ...(section.score?.evidenceIds ?? [])])])] }
+    evidenceIds: [...new Set([...perspective.evidenceIds, ...sections.flatMap(section => [...section.evidenceIds, ...section.findings.flatMap(finding => finding.evidenceIds)])])] }
 }
