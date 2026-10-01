@@ -4,6 +4,7 @@
  * Usage: Imported by locale selection and UI text types.
  * Related: src/ui/i18n/messages/document-builder.ts, src/ui/types/i18n.ts
  */
+import { workspaceTexts } from "./messages/workspace"
 import { analyticalReportTexts } from "@/ui/i18n/messages/analytical-report"
 import { commonTexts } from "@/ui/i18n/messages/common"
 import { documentBuilderTexts } from "@/ui/i18n/messages/document-builder"
@@ -12,6 +13,7 @@ import { multiverseTexts } from "@/ui/i18n/messages/multiverse"
 import { simulationTexts } from "@/ui/i18n/messages/simulation"
 
 const en = {
+  ...workspaceTexts.en,
   ...commonTexts.en,
   ...analyticalReportTexts.en,
   ...documentBuilderTexts.en,
@@ -21,6 +23,7 @@ const en = {
 } as const
 
 const ko = {
+  ...workspaceTexts.ko,
   ...commonTexts.ko,
   ...analyticalReportTexts.ko,
   ...documentBuilderTexts.ko,

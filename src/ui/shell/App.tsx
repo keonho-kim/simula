@@ -5,7 +5,8 @@
  * Related: src/ui/animation/page-transition.tsx, src/ui/hooks/use-run-event-stream.ts
  */
 import { usePageVisibility } from "@/ui/hooks/use-page-visibility"
-import { readRunSession, updateRunSession } from "@/ui/browser-storage/run-session"
+import { useWorkspaceNavigation } from "./workspace-navigation"
+import { NavigationGuardContext } from "@/ui/hooks/editor-navigation-context"
 import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -25,7 +26,7 @@ import { downloadExport } from "@/ui/api-client/download-export"
 import { useRoundProgression } from "@/ui/hooks/use-round-progression"
 import { useRunEventStream } from "@/ui/hooks/use-run-event-stream"
 import { HomeView } from "@/ui/shell/home-view"
-import { pathForView, viewFromPath, type ViewMode } from "@/ui/shell/browser-route"
+import { pathForView, isWorkspaceView } from "@/ui/shell/browser-route"
 import { PageTransition } from "@/ui/animation/page-transition"
 import { useExitPresence } from "@/ui/animation/use-exit-presence"
 
@@ -51,10 +52,7 @@ function App() {
   const resetLiveState = useRunStore((state) => state.resetLiveState)
   const pushEvents = useRunStore((state) => state.pushEvents)
   const syncRunDetail = useRunStore((state) => state.syncRunDetail)
-  const [initialSession] = useState(() => ({ ...readRunSession(),
-    ...viewFromPath(window.location.pathname, readRunSession()) }))
-  const [viewMode, setViewMode] = useState<ViewMode>(initialSession.viewMode ?? "home")
-  const viewModeRef = useRef<ViewMode>(initialSession.viewMode ?? "home")
+  const { initialSession, viewMode, setViewMode, viewModeRef, registerGuard } = useWorkspaceNavigation(selectedRunId, setSelectedRunId)
   const selectedRunIdRef = useRef<string | undefined>(undefined)
   const [selectedActorId, setSelectedActorId] = useState<string>()
   const [actorDetailOpen, setActorDetailOpen] = useState(false)
@@ -65,29 +63,11 @@ function App() {
   useEffect(() => {
     if (initialSession.runId) setSelectedRunId(initialSession.runId)
   }, [initialSession, setSelectedRunId])
-  useEffect(() => {
-    if (selectedRunId) updateRunSession({ runId: selectedRunId, viewMode })
-  }, [selectedRunId, viewMode])
-  useEffect(() => {
-    const path = pathForView(viewMode, selectedRunId)
-    if (path && window.location.pathname !== path) window.history.pushState(null, "", path)
-  }, [viewMode, selectedRunId])
-  useEffect(() => {
-    const restore = () => {
-      const route = viewFromPath(window.location.pathname, readRunSession())
-      if (route.runId) setSelectedRunId(route.runId)
-      viewModeRef.current = route.viewMode
-      setViewMode(route.viewMode)
-    }
-    window.addEventListener("popstate", restore)
-    return () => window.removeEventListener("popstate", restore)
-  }, [setSelectedRunId])
-
   const runsQuery = useQuery({ queryKey: ["runs"], queryFn: fetchRuns })
   const selectedRunQuery = useQuery({
     queryKey: ["runs", selectedRunId],
     queryFn: () => fetchRun(selectedRunId ?? ""),
-    enabled: viewMode !== "home" && viewMode !== "document-analysis" && Boolean(selectedRunId),
+    enabled: !isWorkspaceView(viewMode) && Boolean(selectedRunId),
   })
   const managedByBatch = Boolean(selectedRunQuery.data?.run.batchId ?? runsQuery.data?.find(run => run.id === selectedRunId)?.batchId)
   const { autoContinue, setAutoContinue, skipRoundDelay, roundPromptIndex, roundAction, continueRound, cancelCurrentRun,
@@ -126,14 +106,14 @@ function App() {
 
   useEffect(() => {
     viewModeRef.current = viewMode
-  }, [viewMode])
+  }, [viewMode, viewModeRef])
 
   useEffect(() => {
     selectedRunIdRef.current = selectedRunId
   }, [selectedRunId])
 
   useEffect(() => {
-    if (viewMode === "home" || viewMode === "document-analysis" || !runsQuery.data?.length || selectedRunId) {
+    if (isWorkspaceView(viewMode) || !runsQuery.data?.length || selectedRunId) {
       return
     }
     setSelectedRunId(runsQuery.data[0]?.id)
@@ -205,10 +185,10 @@ function App() {
 
   const navigateReport = useCallback((mode: "report" | "report-preparation") => {
     const path = pathForView(mode, selectedRunId)
-    if (path) window.history.replaceState(null, "", path)
+    if (path) window.history.replaceState(window.history.state, "", path)
     viewModeRef.current = mode
     setViewMode(mode)
-  }, [selectedRunId])
+  }, [selectedRunId, setViewMode, viewModeRef])
 
   const returnToWorlds = () => {
     setReportConfirmRunId(undefined)
@@ -219,8 +199,10 @@ function App() {
   }
 
   let content: ReactNode
-  if (viewMode === "home" || viewMode === "document-analysis") {
+  if (isWorkspaceView(viewMode)) {
     content = <HomeView
+        viewMode={viewMode}
+        onNavigate={setViewMode}
         documentAnalysis={viewMode === "document-analysis"}
         onDocumentAnalysisChange={active => {
           const mode = active ? "document-analysis" : "home"
@@ -275,7 +257,7 @@ function App() {
       onActorSelect={selectActor} onActorExpand={expandActor} onEdgeSelect={selectEdge}
       overlayOpen={Boolean((reportConfirmRunId && reportConfirmRunId === selectedRunId) || roundDialogOpen)}
       notice={managedByBatch ? <p className="pt-2 text-sm text-muted-foreground">{t.batchManagedNotice}</p> : null}
-      toolbar={<TopCommandBar selectedRunId={selectedRunId} onBackToWorlds={returnToWorlds}
+      toolbar={<TopCommandBar title={selectedRunQuery.data?.run.scenarioName ?? selectedRun?.scenarioName} selectedRunId={selectedRunId} onBackToWorlds={returnToWorlds}
           selectedRunStatus={selectedRunStatus}
           autoContinue={autoContinue}
           onAutoContinueChange={managedByBatch ? undefined : setAutoContinue}
@@ -324,7 +306,7 @@ function App() {
         ) : null}
     </SimulationPage></Suspense>
   }
-  return <PageTransition viewKey={viewMode === "document-analysis" ? "home" : viewMode === "report-preparation" ? "report" : viewMode}>{content}</PageTransition>
+  return <NavigationGuardContext.Provider value={registerGuard}><PageTransition viewKey={isWorkspaceView(viewMode) ? "workspace" : viewMode === "report-preparation" ? "report" : viewMode}>{content}</PageTransition></NavigationGuardContext.Provider>
 }
 
 export default App

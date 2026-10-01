@@ -2,7 +2,7 @@
  * Purpose: Collect source files and options before starting scenario creation.
  * Pattern: Controlled form composition.
  * Usage: Rendered before shared scenario generation starts.
- * Related: src/ui/hooks/use-document-scenario.ts, src/ui/components/scenario-builder/scenario-builder-dialog.tsx
+ * Related: src/ui/hooks/use-document-scenario.ts, src/ui/pages/scenario-input-page.tsx
  */
 import { MultiverseOptions } from "@/ui/components/multiverse/multiverse-options"
 import { validMultiverse } from "@/ui/models/scenario-builder/launch-options"
@@ -32,7 +32,7 @@ export function DocumentScenarioForm({ workflow: w, onExecute, t }: {
   const storedDocuments = w.documents?.documents ?? []
   const ready = (w.files.length > 0 || storedDocuments.length > 0 || !!w.form.context.trim()) && storedDocuments.every(document => document.status === "ready" || document.status === "partial")
   return <form className="document-builder-form" onSubmit={event => { event.preventDefault(); void w.execute(onExecute) }}>
-    <FieldSet disabled={locked}>
+    <div className="workspace-panel document-input-source"><FieldSet disabled={locked}>
       <FieldLegend>{t.builderFiles}</FieldLegend>
       <FieldDescription>{t.builderFileHint}</FieldDescription>
       <input ref={input} type="file" multiple accept={DOCUMENT_FORMATS.map(format => `.${format}`).join(",")} className="sr-only" aria-label={t.builderChooseFiles}
@@ -59,7 +59,9 @@ export function DocumentScenarioForm({ workflow: w, onExecute, t }: {
         <Textarea id="document-context" value={w.form.context} maxLength={1600} disabled={locked} placeholder={t.builderContextPlaceholder}
           onChange={event => w.setForm(current => ({ ...current, context: event.target.value }))} />
       </Field>
-      <div className="flex min-w-0 flex-col gap-5 md:flex-row">
+    </FieldGroup></div>
+    <FieldGroup className="workspace-panel document-input-options">
+      <div className="flex min-w-0 flex-col gap-5">
         <Field className="min-w-0 md:flex-1">
           <FieldLabel htmlFor="document-situation">{t.builderSituation}</FieldLabel>
           <Select value={w.form.situation} disabled={locked} onValueChange={value => { const preset = SITUATION_PRESETS.find(preset => preset === value); if (preset) w.setForm(current => ({ ...current, situation: preset })) }}>

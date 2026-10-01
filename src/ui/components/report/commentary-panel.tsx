@@ -71,7 +71,7 @@ function CommentaryNode({ node, t }: { node: ReportCommentaryNode; t: UiTexts })
       <ul className="list-disc pl-5">
         {node.findings?.map((finding, index) => (
           <li key={index}>
-            <MarkdownContent generated compact content={finding} fallback="—" />
+            <MarkdownContent generated density="compact" content={finding} fallback="—" />
           </li>
         ))}
       </ul>

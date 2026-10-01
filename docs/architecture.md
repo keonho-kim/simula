@@ -795,3 +795,28 @@ round controls, or creating another batch. The list selects the recorded world a
 to its panel after the parent page's initial focus. Browser Back also recovers that selection when
 returning to the list; reload retains the origin. This is navigation metadata, not another copy
 of world progress or simulation state. Browser workflow tests remain user-run.
+
+
+## Workspace presentation and live previews
+
+The workspace uses an 80% page frame across dashboard, source entry, preparation, simulation, and
+reports. `/scenario/new`, `/scenario/preview`, and `/settings` are page entries using the existing
+client root. Shell navigation owns browser history; editor hooks register explicit leave guards.
+Creation state remains above page content during settings visits. Existing draft repositories own
+reload recovery. Extended editors no longer depend on stacked dialogs.
+
+UI components own the page grid, tactical graph appearance, and editorial chapter composition.
+Graph palettes update Sigma settings and reducers without replacing its instance or layout Worker.
+The report mounts a single chapter and defers reference and execution-detail requests to their views.
+
+Transient actor progress crosses four explicit boundaries: core emits validated display progress;
+runtime owns current-round retention and subscriptions; the API serves a scoped SSE channel;
+UI hooks and pure live-conversation projections merge previews with confirmed messages. This path
+has no persistence authority. The existing ordered interaction path owns actor memory, timeline,
+accepted history, and reports. See `contracts.md` for the separate ephemeral stream contract.
+
+The page transition keeps exiting content inert and hidden from the accessibility tree. Only the
+incoming workspace remains a navigation target while the short visual exit finishes.
+
+The tab session also retains the workspace to return to from settings, so reloading settings does
+not discard navigation context. Form drafts and provider secrets keep their existing storage owners.

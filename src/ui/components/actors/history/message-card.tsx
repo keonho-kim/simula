@@ -14,7 +14,8 @@ import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 export const ActorMessageCard = memo(function ActorMessageCard({ t, onActorSelect, onMessageSelect, ...message }: Omit<ActorMessage, "targets"> & { targets: string; t: UiTexts; onActorSelect: (id: string) => void; onMessageSelect?: (id: string) => void }) {
   const solitary = message.visibility === "solitary"
   return (
-    <article aria-label={message.actorName} className="rounded-xl border border-border/70 bg-white px-4 py-3.5">
+    <article data-interaction-id={message.id} data-delivery={message.delivery} aria-label={message.actorName} className="actor-message-card rounded-lg border border-border bg-card px-4 py-3.5">
+      {message.delivery ? <p className="mb-2 text-xs font-medium text-muted-foreground">{message.delivery === "pending" ? t.workspacePending : t.workspaceUnapplied}</p> : null}
       <header className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
         <Button variant="link" className="h-auto border-0 p-0 shadow-none" aria-label={t.actorRailInspect.replace("{name}", message.actorName)} onClick={() => onActorSelect(message.actorId)}><MarkdownContent generated inline content={message.actorName} /></Button>
         {message.role ? <MarkdownContent generated inline className="text-xs text-muted-foreground" content={message.role} /> : null}

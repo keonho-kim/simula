@@ -1,5 +1,5 @@
 /**
- * Purpose: Keep scenario work alive while transitioning between the input modal and document analysis page.
+ * Purpose: Keep scenario work alive while transitioning between the input page and document analysis page.
  * Pattern: Workflow composition root.
  * Usage: Mounted by HomeView across home and document-analysis routes.
  * Related: src/ui/hooks/use-document-scenario.ts, src/ui/pages/document-analysis-page.tsx
@@ -7,7 +7,7 @@
 import { useEffect, useRef } from "react"
 import type { ComponentProps } from "react"
 import { useDocumentScenario } from "@/ui/hooks/use-document-scenario"
-import { ScenarioBuilderDialog } from "@/ui/components/scenario-builder/scenario-builder-dialog"
+import { ScenarioInputPage } from "@/ui/pages/scenario-input-page"
 import { DocumentAnalysisPage } from "@/ui/pages/document-analysis-page"
 
 type ScenarioCreationFlowProps = Omit<ComponentProps<typeof DocumentAnalysisPage>, "workflow"> & {
@@ -29,6 +29,6 @@ export function ScenarioCreationFlow({ autoExecute, active, analysis, onClose, o
     if (active && !analysis && (workflow.build || workflow.pendingGeneration)) onAnalyze()
   }, [active, analysis, workflow.build, workflow.pendingGeneration, onAnalyze])
   if (analysis) return <DocumentAnalysisPage {...props} workflow={workflow} />
-  return <ScenarioBuilderDialog active={active} workflow={workflow} t={props.t} onOpenSettings={props.onOpenSettings}
+  return <ScenarioInputPage active={active} workflow={workflow} t={props.t} onOpenSettings={props.onOpenSettings}
     onBack={onClose} onExecute={onAnalyze} />
 }

@@ -7,7 +7,7 @@
 import { useRef } from "react"
 import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type { AnalysisSubject } from "@/shared/analytical-report"
-import { controlAnalysis, createAnalysis, fetchAnalysisAccounting, fetchAnalysisMetrics, lookupAnalysis } from "@/ui/api-client/analytical-report"
+import { controlAnalysis, createAnalysis, lookupAnalysis } from "@/ui/api-client/analytical-report"
 
 const REPORT_POLL_MS = 1000
 export function useAnalyticalReport(subject: AnalysisSubject) {
@@ -32,12 +32,5 @@ export function useAnalyticalReport(subject: AnalysisSubject) {
       client.setQueryData(key, { analysis: created, freshness: "current" })
     }
   }, onSuccess: () => client.invalidateQueries({ queryKey: key }) })
-  const metrics = useQuery({ queryKey: ["analysis-metrics", record?.id, record?.status], enabled: !!record,
-    queryFn: ({ signal }) => fetchAnalysisMetrics(record?.id ?? "", signal), retry: false,
-    refetchInterval: running ? REPORT_POLL_MS : false,
-  })
-  const accounting = useQuery({ queryKey: ["analysis-accounting", record?.id, record?.status],
-    enabled: !!record?.report && !running, queryFn: ({ signal }) => fetchAnalysisAccounting(record?.id ?? "", signal), retry: false,
-  })
-  return { query, record, running, command, commandPending, metrics, accounting }
+  return { query, record, running, command, commandPending }
 }

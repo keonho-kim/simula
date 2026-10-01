@@ -1,11 +1,29 @@
 /**
- * Purpose: Reserve viewport height for the graph and chat on compact simulation screens.
- * Pattern: Responsive page layout policy.
- * Usage: Imported only by the simulation page.
- * Related: src/ui/pages/simulation-page.tsx, src/ui/components/metrics/llm-metrics-panel.tsx
+ * Purpose: Arrange the tactical graph and live conversation without continuous decorative work.
+ * Pattern: Scoped responsive presentation.
+ * Usage: Imported by SimulationPage.
+ * Related: src/ui/components/graph/palette.ts, src/ui/components/actors/actor-rail.tsx
  */
-@media (max-height: 740px), (max-width: 767px) {
-  .simulation-page [data-slot="live-metrics"] article > div { min-height: 0; padding: .5rem; }
-  .simulation-page [data-slot="metric-chart"] { display: none; }
-  .simulation-page [data-slot="live-metrics"] article h2 { font-size: .65rem; }
+.simulation-page { height: 100dvh; overflow: hidden; }
+.simulation-workspace { width: 80%; margin-inline: auto; display: flex; height: 100%; min-height: 0; flex-direction: column; gap: 16px; padding-block: 20px; }
+.simulation-panels { display: flex; min-height: 0; flex: 1; align-items: stretch; gap: 20px; }
+.live-metric-summary { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+.live-metric-summary dl { display: flex; flex: 1; flex-wrap: wrap; gap: 16px 28px; }
+.live-metric-summary dl > div { display: flex; align-items: baseline; gap: 10px; }
+.live-metric-summary dt { color: var(--muted-foreground); font-size: 12px; }
+.live-metric-summary dd { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.live-metric-summary details { font-size: 12px; }
+.live-metric-summary details[open] { width: 100%; }
+.live-metric-summary summary { cursor: pointer; color: var(--primary); padding-block: 4px; }
+.actor-progress-status { display: flex; flex-direction: column; gap: 5px; padding: 12px 20px; color: var(--observation-ink); background: var(--observation-surface); font-size: 12px; }
+.actor-message-card[data-delivery="pending"] { border-left: 3px solid var(--observation-ink); }
+.actor-message-card[data-delivery="unapplied"] { border-left: 3px solid var(--attention-ink); }
+@media (max-width: 1023px) {
+  .simulation-page { height: auto; min-height: 100dvh; overflow: visible; }
+  .simulation-workspace { height: auto; }
+  .simulation-panels { flex-direction: column; }
+  .simulation-panels > section { flex: none; height: clamp(320px, 50svh, 420px); }
+  .simulation-panels > aside { flex: none; height: 65svh; min-height: 320px; }
+  .live-metric-summary dl { gap: 12px; }
+  .live-metric-summary dl > div { width: calc(50% - 6px); flex-direction: column; gap: 3px; }
 }

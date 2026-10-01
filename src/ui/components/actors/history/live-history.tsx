@@ -9,15 +9,20 @@ import { defaultRangeExtractor, useVirtualizer } from "@tanstack/react-virtual"
 import type { ActorRound } from "@/ui/models/actors/actor-conversation"
 import { buildHistoryIndex, historyRowAt } from "@/ui/models/actors/history-index"
 import type { UiTexts } from "@/ui/types/i18n"
+import { Button } from "@/ui/components/ui/button"
+import { useMessageEntry } from "@/ui/animation/use-message-entry"
 import { Separator } from "@/ui/components/ui/separator"
 import { ActorMessageCard } from "./message-card"
 
 const FOLLOW_THRESHOLD_PX = 1
 
-export function LiveActorHistory({ rounds, t, onActorSelect, overlayOpen = false }: {
-  rounds: ActorRound[]; t: UiTexts; onActorSelect: (id: string) => void; overlayOpen?: boolean
+export function LiveActorHistory({ rounds, t, onActorSelect, overlayOpen = false, animateNew = false }: {
+  rounds: ActorRound[]; t: UiTexts; onActorSelect: (id: string) => void; overlayOpen?: boolean; animateNew?: boolean
 }) {
   "use no memo"
+  const animateEntry = useMessageEntry()
+  const [unread, setUnread] = useState(0)
+  const lastRead = useRef(0)
   const root = useRef<HTMLDivElement>(null)
   const following = useRef(true)
   const followingBeforeOverlay = useRef<boolean | undefined>(undefined)
@@ -46,7 +51,10 @@ export function LiveActorHistory({ rounds, t, onActorSelect, overlayOpen = false
     useAnimationFrameWithResizeObserver: true,
   })
 
-  useLayoutEffect(() => { if (following.current && history.count && !overlayOpen) virtualizer.scrollToEnd() }, [overlayOpen, history.count, virtualizer])
+  useLayoutEffect(() => {
+    if (following.current && !overlayOpen) { lastRead.current = history.count; setUnread(0); if (history.count) virtualizer.scrollToEnd() }
+    else setUnread(Math.max(0, history.count - lastRead.current))
+  }, [overlayOpen, history.count, virtualizer])
   useLayoutEffect(() => {
     if (overlayOpen) { followingBeforeOverlay.current ??= following.current; return }
     if (!followingBeforeOverlay.current) { followingBeforeOverlay.current = undefined; return }
@@ -66,7 +74,7 @@ export function LiveActorHistory({ rounds, t, onActorSelect, overlayOpen = false
       const top = element.scrollTop
       if (!overlayOpen) {
         if (top < previousTop - 1) following.current = false
-        else if (element.scrollHeight - top - element.clientHeight <= FOLLOW_THRESHOLD_PX) following.current = true
+        else if (element.scrollHeight - top - element.clientHeight <= FOLLOW_THRESHOLD_PX) { following.current = true; lastRead.current = history.count; setUnread(0) }
       }
       previousTop = top
     }
@@ -81,7 +89,7 @@ export function LiveActorHistory({ rounds, t, onActorSelect, overlayOpen = false
     return () => { observer.disconnect(); element.removeEventListener("scroll", recordPosition) }
   }, [overlayOpen, history.count, virtualizer])
 
-  return <div ref={root} data-slot="actor-history-viewport" role="log" aria-label={t.actorRailTitle} aria-live="off" tabIndex={0}
+  return <><div ref={root} data-slot="actor-history-viewport" role="log" aria-label={t.actorRailTitle} aria-live="off" tabIndex={0}
     className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
     onFocusCapture={event => {
       const index = (event.target as HTMLElement).closest<HTMLElement>("[data-index]")?.dataset.index
@@ -94,9 +102,10 @@ export function LiveActorHistory({ rounds, t, onActorSelect, overlayOpen = false
     <div data-history-items={history.count} className="relative w-full" style={{ height: virtualizer.getTotalSize(), overflowAnchor: "none" }}>
       {virtualizer.getVirtualItems().map(item => {
         const row = historyRowAt(history, item.index)!
+        const message = row.message
         return <div key={item.key} data-index={item.index} ref={virtualizer.measureElement}
           className="absolute left-4 right-4 top-0 sm:left-5 sm:right-5" style={{ transform: `translateY(${item.start}px)` }}>
-          {row.message ? <ActorMessageCard {...row.message} targets={row.message.targets.join(", ")} t={t} onActorSelect={onActorSelect} /> :
+          {message ? <div ref={node => animateEntry(node, message, animateNew && message.delivery === "pending")}><ActorMessageCard {...message} targets={message.targets.join(", ")} t={t} onActorSelect={onActorSelect} /></div> :
             <div className="flex items-center gap-3 py-2">
               <Separator className="flex-1" />
               <h3 id={`actor-round-${row.roundIndex}`} className="shrink-0 text-[11px] font-medium tracking-[0.16em] text-muted-foreground">ROUND {row.roundIndex}</h3>
@@ -105,5 +114,7 @@ export function LiveActorHistory({ rounds, t, onActorSelect, overlayOpen = false
         </div>
       })}
     </div>
-  </div>
+  </div>{unread > 0 ? <div className="flex shrink-0 justify-center border-t p-2"><Button size="sm" onClick={() => {
+    following.current = true; lastRead.current = history.count; setUnread(0); virtualizer.scrollToEnd()
+  }}>{t.workspaceNewMessages}</Button></div> : null}</>
 }

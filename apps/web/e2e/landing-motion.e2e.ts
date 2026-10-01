@@ -6,26 +6,26 @@
  */
 import { expect, test } from "./fixtures"
 
-test("new scenario opens one modal and finished imports are the second landing action", async ({ page }) => {
+test("new scenario opens a dedicated page and finished imports are the second landing action", async ({ page }) => {
   await page.goto("/")
-  const tiles = page.locator(".start-menu-tile")
-  await expect(tiles).toHaveCount(4)
+  const tiles = page.locator(".dashboard-tile")
+  await expect(tiles).toHaveCount(3)
   await expect(tiles.nth(1)).toContainText("Import finished scenario")
   await expect(page.getByRole("button", { name: /Create from documents|Upload My Scenario/ })).toHaveCount(0)
   await page.getByRole("button", { name: /New Scenario/ }).click()
-  const builder = page.getByRole("dialog", { name: "New Scenario" })
+  const builder = page.getByRole("main", { name: "New Scenario" })
   await expect(builder.getByLabel("Choose files")).toBeAttached()
   await expect(builder.getByLabel("Situation to simulate · optional")).toBeVisible()
   await expect(builder.getByRole("button", { name: "Import finished scenario" })).toHaveCount(0)
 })
 
-test("landing menu uses lightweight transform motion", async ({ page }) => {
+test("landing menu uses bounded color feedback", async ({ page }) => {
   await page.goto("/")
   const tile = page.getByRole("button", { name: /New Scenario/ })
   await expect(tile).toBeVisible()
   await tile.hover()
-  await expect.poll(() => tile.evaluate((element) => getComputedStyle(element).transform)).not.toBe("none")
-  await expect(tile.locator(".start-menu-icon")).toHaveCSS("transform", /matrix/)
+  await expect(tile).toHaveCSS("transform", "none")
+  await expect(tile).toHaveCSS("transition-property", "border-color, background-color")
 })
 
 test("landing menu honors reduced motion", async ({ page }) => {

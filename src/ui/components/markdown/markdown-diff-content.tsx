@@ -1,3 +1,9 @@
+/**
+ * Purpose: Render sanitized changes between two Markdown versions.
+ * Pattern: Pure diff projection and presentation.
+ * Usage: Imported by document and actor detail views.
+ * Related: src/ui/components/markdown/markdown-content.tsx
+ */
 import { cn } from "@/ui/lib/class-names"
 import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
@@ -20,7 +26,7 @@ export function MarkdownDiffContent({
   if (!previous?.trim() || !content) {
     return (
       <MarkdownContent
-        compact={compact}
+        density={compact ? "compact" : "normal"}
         content={current}
         fallback={fallback}
         className={className}
@@ -30,7 +36,7 @@ export function MarkdownDiffContent({
 
   return (
     <MarkdownContent
-      compact={compact}
+      density={compact ? "compact" : "normal"}
       content={buildMarkdownDiff(previous, content)}
       fallback={fallback}
       className={cn("markdown-diff-content", className)}

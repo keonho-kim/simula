@@ -4,6 +4,7 @@
  * Usage: Consumed by backend persistence and browser event projections.
  * Related: src/shared/run-schema.ts, src/backend/integrations/llm/invoke.ts
  */
+import type { ActorProgressUpdate } from "./actor-progress"
 import type { ReportCommentary } from "./report-commentary"
 import type { ModelCallFailure } from "./model-failure"
 import type { ScenarioBoardUpdate } from "./scenario-board"
@@ -68,6 +69,7 @@ export interface ModelMetrics {
 }
 
 export type RunEvent =
+  | { type: "actor.progress"; runId: string; timestamp: string; update: ActorProgressUpdate }
   | { type: "report.commentary"; runId: string; timestamp: string; update: ReportCommentary }
   | { type: "board.updated"; runId: string; timestamp: string; update: ScenarioBoardUpdate }
   | { type: "run.started"; runId: string; timestamp: string }

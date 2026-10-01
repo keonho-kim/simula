@@ -15,6 +15,7 @@ import type { UiTexts } from "@/ui/types/i18n"
 import { reportStatusLabel } from "@/ui/models/report/status-label"
 
 interface TopCommandBarProps {
+  title?: string
   selectedRunId?: string
   onBackToWorlds?: () => void
   autoContinue?: boolean
@@ -28,6 +29,7 @@ interface TopCommandBarProps {
 }
 
 export function TopCommandBar({
+  title,
   selectedRunId,
   onBackToWorlds,
   autoContinue,
@@ -40,14 +42,14 @@ export function TopCommandBar({
   onReport,
 }: TopCommandBarProps) {
   return (
-    <header className="sticky top-0 z-30 -mx-4 border-b border-border/60 bg-background/92 px-4 py-3  lg:-mx-6 lg:px-6">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
+    <header className="border-b border-border bg-background py-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
           <RunNavigation runId={selectedRunId} onHome={onHome} onBackToWorlds={onBackToWorlds} t={t} />
 
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate font-heading text-lg font-semibold tracking-normal">Simula</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="break-words font-heading text-xl font-semibold leading-snug">{title ?? "Simula"}</h1>
               {selectedRunStatus ? (
                 <Badge variant="secondary" className="rounded-md px-2 py-0.5 text-[11px] uppercase tracking-normal">
                   {reportStatusLabel(selectedRunStatus, t)}
@@ -61,7 +63,7 @@ export function TopCommandBar({
         </div>
         <div className="flex items-center gap-3">
         {onAutoContinueChange && !showReportShortcut ? (
-          <label className="flex items-center gap-2 text-xs">
+          <label className="flex flex-wrap items-center gap-2 text-xs">
             <Switch checked={autoContinue} disabled={autoContinueDisabled} onCheckedChange={onAutoContinueChange} />
             {t.autoContinue}
           </label>

@@ -78,14 +78,17 @@ interpretation branches under the existing model admission limit. LangGraph reta
 references and accepted fields; models return bounded prose and finite choices, while code
 assembles the report. No new JSON output requirement or scoring call is introduced.
 
-The result page opens a full conclusion document by default. Each analytical section has a tab;
-its full prose, findings, and source excerpts are read inline, without a report modal. Tab labels
-wrap on compact screens and only the active body mounts. Standalone runs retain relationship,
-conversation, and archived-commentary tabs. Batch runs always resolve to their aggregate report
-and omit single-world result panels. Active sibling worlds block generation with an explicit
-waiting screen and a return to world controls. Metrics remain above tabs and detailed accounting
-is in Usage; aggregate charts are labeled as report-generation usage, not all-world usage. Existing stored SWOT reports still open with their original
-section identities and exported score metadata; new reports generate no SWOT/radar scores.
+The result page opens the full conclusion in an editorial reading workspace. Analysis, records,
+and execution details are separate views. A contents rail selects one chapter; only that chapter
+mounts. On compact screens the contents collapse above the prose. Scope and on-demand source
+excerpts share an adjacent column on wide screens. Opening evidence preserves the reading position,
+and closing it restores focus to the source control.
+
+Standalone runs retain relationship, conversation, and archived-commentary views under Records.
+Batch runs resolve to their aggregate report and omit single-world result panels. Active sibling
+worlds block generation with an explicit waiting screen. Model charts and accounting load only in
+Execution details; preparation offers a separate disclosure. Existing stored SWOT reports retain
+their original section identities and exported score metadata.
 
 Deterministic tests cover single and batch section layouts, local retry, accepted evidence
 provenance, exported reports, archived schemas, and board rendering. Browser test sources

@@ -38,7 +38,7 @@ export const ScenarioBoardDetails = memo(function ScenarioBoardDetails({ item, r
       {item.fields?.map((field, index) => (
         <section key={index}>
           {field.label ? <h4 className="mb-2 text-xs font-medium text-muted-foreground">{field.label}</h4> : null}
-          <MarkdownContent generated={field.generated} compact content={field.content} fallback="" />
+          <MarkdownContent generated={field.generated} density="compact" content={field.content} fallback="" />
         </section>
       ))}
     </div>

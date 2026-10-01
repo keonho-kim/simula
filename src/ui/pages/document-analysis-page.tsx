@@ -39,10 +39,10 @@ export function DocumentAnalysisPage({ workflow: w, t, language, onHome, onOpenS
   const stage = w.build?.status === "confirmed" ? "launch" : running ? "building" : w.build?.specification ? "review" : "documents"
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); heading.current?.focus({ preventScroll: true }) }, [])
   return <main className="min-h-svh bg-background text-foreground">
-    <div className="mx-auto flex w-[94vw] max-w-[1600px] flex-col gap-5 py-5">
+    <div className="workspace-frame">
       <header className="flex items-center gap-3 border-b pb-4">
         <Button variant="ghost" size="icon" aria-label={t.home} onClick={onHome}><HomeIcon /></Button>
-        <div className="min-w-0 flex-1"><h1 ref={heading} tabIndex={-1} className="text-lg font-semibold outline-none">{t.documentAnalysisTitle}</h1>
+        <div className="min-w-0 flex-1"><h1 ref={heading} tabIndex={-1} className="text-3xl font-semibold outline-none">{t.documentAnalysisTitle}</h1>
           <p className="text-sm text-muted-foreground">{t.documentAnalysisDescription}</p></div>
         <Button variant="ghost" size="icon" aria-label={t.settings} onClick={onOpenSettings}><SettingsIcon /></Button>
       </header>

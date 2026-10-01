@@ -8,6 +8,7 @@ import type { ActorState, Interaction, RunEvent } from "@/shared"
 import { createActorTextSanitizer } from "@/ui/models/actors/actor-visible-text"
 
 export interface ActorMessage {
+  delivery?: "pending" | "unapplied"
   timestamp: string
   id: string
   actorId: string

@@ -1,7 +1,7 @@
 /**
- * Purpose: Virtualize archived actor messages against the report's bounded dialog scroll surface.
+ * Purpose: Virtualize archived actor messages against the report's bounded conversation viewport.
  * Pattern: Lifecycle-owned virtual list.
- * Usage: Mounted by the report conversation panel inside its scrolling detail dialog.
+ * Usage: Mounted by the report conversation panel inside the records page.
  * Related: src/ui/components/report/conversation-panel.tsx, src/ui/components/actors/history/message-card.tsx
  */
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
@@ -17,12 +17,11 @@ export function VirtualActorHistory({ rounds, t, onActorSelect, onMessageSelect 
   "use no memo"
   const root = useRef<HTMLDivElement>(null)
   const [focusedIndex, setFocusedIndex] = useState<number>()
-  const [scrollMargin, setScrollMargin] = useState(0)
   const rows = useMemo(() => rounds.flatMap(round => [
     { key: `round:${round.roundIndex}`, roundIndex: round.roundIndex, message: undefined },
     ...round.messages.map(message => ({ key: `message:${message.id}`, roundIndex: round.roundIndex, message })),
   ]), [rounds])
-  const getScrollElement = useCallback(() => root.current?.closest<HTMLElement>(".page-scroll-dialog") ?? null, [])
+  const getScrollElement = useCallback(() => root.current, [])
   const getItemKey = useCallback((index: number) => rows[index]!.key, [rows])
   // Measurements belong to this list and never cross into memoized message cards.
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -36,7 +35,6 @@ export function VirtualActorHistory({ rounds, t, onActorSelect, onMessageSelect 
         ? [...visible, focusedIndex].sort((a, b) => a - b) : visible
     },
     estimateSize: index => rows[index]?.message ? 220 : 30,
-    scrollMargin,
     overscan: 8,
     gap: 16,
     paddingStart: 20,
@@ -44,18 +42,6 @@ export function VirtualActorHistory({ rounds, t, onActorSelect, onMessageSelect 
     useAnimationFrameWithResizeObserver: true,
   })
 
-  useLayoutEffect(() => {
-    const element = root.current
-    const scroll = getScrollElement()
-    if (!element || !scroll) return
-    const update = () => setScrollMargin(element.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop)
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(element)
-    if (element.parentElement) observer.observe(element.parentElement)
-    window.addEventListener("resize", update)
-    return () => { observer.disconnect(); window.removeEventListener("resize", update) }
-  }, [getScrollElement])
   useLayoutEffect(() => {
     const element = root.current
     if (!element) return
@@ -67,7 +53,7 @@ export function VirtualActorHistory({ rounds, t, onActorSelect, onMessageSelect 
     return () => observer.disconnect()
   }, [virtualizer])
 
-  return <div ref={root} className="relative min-w-0"
+  return <div ref={root} className="relative min-w-0 overflow-y-auto overscroll-contain" style={{ height: "65svh" }}
     onFocusCapture={event => {
       const index = (event.target as HTMLElement).closest<HTMLElement>("[data-index]")?.dataset.index
       setFocusedIndex(index === undefined ? undefined : Number(index))
@@ -80,7 +66,7 @@ export function VirtualActorHistory({ rounds, t, onActorSelect, onMessageSelect 
       {virtualizer.getVirtualItems().map(item => {
         const row = rows[item.index]!
         return <div key={item.key} data-index={item.index} ref={virtualizer.measureElement}
-          className="absolute left-4 right-4 top-0 sm:left-5 sm:right-5" style={{ transform: `translateY(${item.start - scrollMargin}px)` }}>
+          className="absolute left-4 right-4 top-0 sm:left-5 sm:right-5" style={{ transform: `translateY(${item.start}px)` }}>
           {row.message ? <ActorMessageCard {...row.message} targets={row.message.targets.join(", ")} t={t} onActorSelect={onActorSelect} onMessageSelect={onMessageSelect} /> :
             <div className="flex items-center gap-3 py-2">
               <Separator className="flex-1" />

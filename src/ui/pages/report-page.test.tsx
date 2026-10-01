@@ -29,7 +29,7 @@ function render(client: QueryClient, id = "saved-run", mode: "report" | "report-
 function manifest(client: QueryClient, batchId?: string) {
   client.setQueryData(["runs", "saved-run"], { run: { id: "saved-run", status: "completed", batchId }, events: [], timeline: [] })
 }
-test("a saved standalone report exposes full conclusion and deferred record tabs, with permanent metrics", () => {
+test("a saved standalone report exposes full conclusion and deferred record tabs, with deferred execution metrics", () => {
   const client = new QueryClient()
   manifest(client)
   saved(client, "run", "saved-run", "Detailed judgment.\n\nEvidence explains the outcome.\n\nNext checks remain explicit.")
@@ -37,10 +37,9 @@ test("a saved standalone report exposes full conclusion and deferred record tabs
   expect(html).toContain("Detailed judgment.")
   expect(html).toContain("Next checks remain explicit.")
   expect(html).toContain('role="tab"')
-  expect(html).toContain("Relationships")
-  expect(html).toContain("Conversations")
-  expect(html).toContain('aria-label="LLM metrics"')
-  expect(html.indexOf('aria-label="LLM metrics"')).toBeLessThan(html.indexOf('role="tablist"'))
+  expect(html).toContain("Records")
+  expect(html).toContain("Execution details")
+  expect(html).not.toContain('aria-label="LLM metrics"')
   expect(html).not.toContain('aria-haspopup="dialog"')
   expect(html).not.toContain("Preparing report")
   expect(html).not.toContain("report-task-output")

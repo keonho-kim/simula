@@ -9,6 +9,9 @@ import type { RunSession } from "@/ui/browser-storage/run-session"
 export type ViewMode = NonNullable<RunSession["viewMode"]>
 
 export function viewFromPath(pathname: string, session: RunSession): { viewMode: ViewMode; runId?: string } {
+  if (pathname === "/scenario/new") return { viewMode: "scenario-new" }
+  if (pathname === "/scenario/preview") return { viewMode: "scenario-preview" }
+  if (pathname === "/settings") return { viewMode: "settings" }
   if (pathname === "/document-analysis") return { viewMode: "document-analysis" }
   if (pathname === "/scenario-board") return session.runId ? { viewMode: "board", runId: session.runId } : { viewMode: "home" }
   if (pathname === "/simulation") return { viewMode: "simulation", runId: session.runId }
@@ -18,9 +21,16 @@ export function viewFromPath(pathname: string, session: RunSession): { viewMode:
 }
 
 export function pathForView(viewMode: ViewMode, runId: string | undefined): string | undefined {
+  if (viewMode === "scenario-new") return "/scenario/new"
+  if (viewMode === "scenario-preview") return "/scenario/preview"
+  if (viewMode === "settings") return "/settings"
   if (viewMode === "document-analysis") return "/document-analysis"
   if (viewMode === "home") return "/"
   if (viewMode === "board") return runId ? "/scenario-board" : undefined
   if (viewMode === "simulation") return "/simulation"
   return runId ? `/reports/${encodeURIComponent(runId)}${viewMode === "report-preparation" ? "/prepare" : ""}` : undefined
+}
+
+export function isWorkspaceView(view: ViewMode): boolean {
+  return ["home", "document-analysis", "scenario-new", "scenario-preview", "settings"].includes(view)
 }

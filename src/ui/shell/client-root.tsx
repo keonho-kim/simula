@@ -86,13 +86,13 @@ export default function ClientRoot() {
     if (state?.ownership !== "owner" || state.storageError) return
     return startBrowserPresence(() => { void restoreServerSettings() })
   }, [state?.ownership, state?.storageError, restoreServerSettings])
-  if (!state) return <main className="mx-auto flex min-h-svh max-w-[980px] flex-col justify-center px-5 text-center">
+  if (!state) return <main className="mx-auto flex min-h-svh w-4/5 flex-col justify-center text-center">
     <h1 className="font-heading text-4xl font-semibold sm:text-5xl">Simula</h1>
     <p role="status" className="mt-4 text-sm text-muted-foreground">{t.browserStorageOpening}</p>
   </main>
   const ownedContent = sessionSync === "ready" ? <AnimationProvider>
     {state.lockedVault ? <CredentialGate><App /></CredentialGate> : <App />}
-  </AnimationProvider> : <main className="mx-auto flex min-h-svh max-w-lg flex-col justify-center gap-4 px-6">
+  </AnimationProvider> : <main className="mx-auto flex min-h-svh w-4/5 flex-col justify-center gap-4">
     <p role={sessionSync === "failed" ? "alert" : "status"} className="text-sm text-foreground">
       {sessionSync === "failed" ? t.settingsSyncFailed : t.settingsLoading}
     </p>

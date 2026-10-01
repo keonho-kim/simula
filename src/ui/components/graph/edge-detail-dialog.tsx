@@ -126,7 +126,7 @@ function EdgeHistoryCard({
         <Badge variant="outline" className="h-4 rounded-sm bg-background px-1.5 text-[10px]">{item.decisionType}</Badge>
         <Badge variant="outline" className="h-4 rounded-sm bg-background px-1.5 text-[10px]"><MarkdownContent generated inline content={actionType || item.actionType} /></Badge>
       </div>
-      <MarkdownContent generated compact className="mt-2 break-words text-xs leading-5 text-muted-foreground" content={item.content} fallback="-" />
+      <MarkdownContent generated density="compact" className="mt-2 break-words text-xs leading-5 text-muted-foreground" content={item.content} fallback="-" />
       <div className="mt-3 flex flex-wrap gap-2 [&>*]:min-w-0 [&>*]:flex-[1_1_250px]">
         <MiniField label={t.intent} value={item.intent} />
         <MiniField label={t.expectation} value={item.expectation} />
@@ -140,7 +140,7 @@ function MiniField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-sm bg-muted/40 px-2 py-1.5">
       <div className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</div>
-      <MarkdownContent generated compact className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground" content={value} fallback="-" />
+      <MarkdownContent generated density="compact" className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground" content={value} fallback="-" />
     </div>
   )
 }

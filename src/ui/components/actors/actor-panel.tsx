@@ -149,7 +149,7 @@ function ActorSummaryField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-md bg-background/70 p-3">
       <div className="text-[10px] font-semibold uppercase text-muted-foreground">{label}</div>
-      <MarkdownContent generated compact className="mt-1 text-xs leading-5" content={value} fallback="-" />
+      <MarkdownContent generated density="compact" className="mt-1 text-xs leading-5" content={value} fallback="-" />
     </div>
   )
 }
@@ -175,7 +175,7 @@ export function ActorHistoryCard({ item, t }: { item: ActorHistoryItem; t: UiTex
             ) : null}
           </div>
           <p className="mt-1 break-words text-[11px] text-muted-foreground"><MarkdownContent generated inline content={item.title} /></p>
-          <MarkdownContent generated compact className="mt-2" content={item.content} fallback="-" />
+          <MarkdownContent generated density="compact" className="mt-2" content={item.content} fallback="-" />
           {item.timestamp ? <time className="mt-2 block font-mono text-[10px] text-muted-foreground">{timeLabel(item.timestamp)}</time> : null}
         </div>
       </div>
@@ -198,7 +198,7 @@ function ActorReasoningStream({ items, t }: { items: ActorReasoningItem[]; t: Ui
             <h3 className="text-xs font-medium text-muted-foreground">
               <MarkdownContent generated inline content={item.step} /> · {t.metricAttempt} {item.attempt} · {timeLabel(item.timestamp)} · {item.reasoningTokens.toLocaleString()} {t.metricReasoningTokens}
             </h3>
-            <MarkdownContent generated compact className="mt-2" content={item.content} fallback="-" />
+            <MarkdownContent generated density="compact" className="mt-2" content={item.content} fallback="-" />
           </section>
         ))}
       </div>

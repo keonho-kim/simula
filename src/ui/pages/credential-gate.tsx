@@ -44,7 +44,7 @@ export function CredentialGate({ children }: { children: ReactNode }) {
     finally { setBusy(false) }
   }
 
-  return <main className="mx-auto flex min-h-svh max-w-lg flex-col justify-center gap-5 px-6">
+  return <main className="mx-auto flex min-h-svh w-4/5 flex-col justify-center gap-5">
     <h1 className="text-xl font-semibold">{t.vaultUnlock}</h1>
     <p className="text-sm text-muted-foreground">{t.vaultUnlockHelp}</p>
     <form className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); void unlock() }}>

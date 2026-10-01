@@ -275,3 +275,96 @@ the temporary timeline file is flushed at state and terminal boundaries. A local
 projection fixture took 22.3 ms with full round replay and 2.4 ms with the projector, with equal
 final frames. Browser-acknowledged event pruning retains active projection state. Server restart
 does not resume an active run from a partial event log.
+
+## Editorial workspace and immediate actor messages (2026-10-01)
+
+The shared workspace occupies 80% of the viewport at every breakpoint. Source input,
+scenario review, and settings are pages. Reports mount one chapter; recorded relationships,
+conversation history, and execution metrics mount only when selected. The report conversation
+list owns a bounded scroll viewport instead of looking for the former dialog ancestor.
+
+Actor completion uses a separate, run-scoped SSE snapshot. React applies incoming snapshots
+once per animation frame. The presentation projection reuses unchanged historical rounds and
+message references, retains arrival order through confirmation, and tolerates a newer round
+arriving before an earlier canonical event. Previews never enter durable browser projections.
+Cancellation and visibility changes release the subscription; short entry animations also stop
+when hidden. The renderer changes its palette without recreating Sigma, its camera, or its Worker.
+
+### Measurement method
+
+Baseline: the preceding Git HEAD, built in an isolated temporary checkout with the same installed
+packages. Candidate: the working tree. Both used a production Next build, the E2E entry enabled,
+Chromium at 1440 × 1000, reduced motion, local HTTP, and fresh browser contexts. No real model was
+contacted. `apps/web/benchmarks/browser-workspace.ts` alternates baseline and candidate, warms up
+once, then reports five-run medians. Each run opens and closes settings five times. This compares
+the same user task across the former dialog and the new page, rather than equal DOM structures.
+The script records CDP task, script, layout, and style-recalculation durations. Resource size is
+encoded JavaScript response bytes; it is not the size of every lazy route combined.
+
+Three independent browser batches gave consistent results (final batch shown):
+
+| Measure | Baseline | Candidate |
+| --- | ---: | ---: |
+| Dashboard ready | 883.38 ms | 881.29 ms |
+| First contentful paint | 334.91 ms | 335.18 ms |
+| Initial JavaScript | 344,524 bytes | 345,510 bytes |
+| Settings click to visible controls | 40.37 ms | 36.05 ms |
+| CPU task time, five settings round trips | 217.60 ms | 153.66 ms |
+| Script time, same task | 77.73 ms | 56.97 ms |
+| Layout time, same task | 4.41 ms | 7.27 ms |
+| Style recalculation, same task | 39.97 ms | 10.60 ms |
+
+The page transition adds 2.86 ms of layout across five round trips while removing about 30 ms of
+style recalculation. Combined layout and style cost falls from 44.38 ms to 17.87 ms. Overall task CPU
+falls about 30%; startup is unchanged within the observed variation. The extra initial script
+payload is 986 bytes (0.29%). The first batch showed the same direction: 216.04 → 155.36 ms task
+CPU, 4.62 → 7.39 ms layout, and 40.03 → 10.94 ms style recalculation. Settings response includes Playwright click dispatch and waiting for visible controls. This is
+local synthetic measurement, not a claim about field INP or provider latency.
+
+The three existing CPU benchmarks retain their warmup and five-sample median method:
+
+| Workload | Baseline | Candidate |
+| --- | ---: | ---: |
+| Render chart, 4,000 metrics | 1.31 ms | 1.30 ms |
+| Ingest 4,000 metrics in batches of 20 | 11.62 ms | 11.81 ms |
+| Incremental metrics projection | 0.69 ms | 0.69 ms |
+| Incremental conversation projection | 1.65 ms | 1.99 ms |
+| Bounded line geometry, 20,000 samples | 0.12 ms | 0.12 ms |
+| Chunked append, 20,000 samples | 1.52 ms | 1.52 ms |
+
+Conversation projection showed short-run variation: the preceding paired measurement was
+2.08 → 2.02 ms. Its implementation is unchanged; the added live preview projection has a separate
+reference-reuse test. Metric-only batches still produce zero round-control, conversation, and
+stage subscriber updates. The chart fixture displays 158 points within the existing 258-point
+limit and retains 6,158 path characters. Timeline sharing remains 2,148 graph records for the
+1,000-frame fixture with equal final output.
+
+The deterministic live browser fixture delivers actor B while actor A is still pending, then
+commits A before B. It verifies B appears first and stays in that slot after confirmation. Twelve
+message arrivals measured 6.63 ms p95 in Chromium and 13.26 ms in WebKit from receipt to card DOM
+mutation in the active tab (preceding Chromium runs ranged from 6.21 to 6.59 ms). This excludes model generation and display scanout. The long-history
+browser fixture contains 4,120 messages and mounts 14 cards at its measured position, below 40.
+
+Viewport screenshots cover 1920, 1440, 1024, 768, 390, and 320 CSS pixels. Browser tests verify
+workspace gutters, overflow, chapter unmounting, evidence focus restoration, draft restoration,
+settings round trips, browser-back confirmation, and reduced motion. Transport tests verify
+reconnect snapshots, terminal closure, abort cleanup, late completion rejection, and exclusion
+from saved events. Raw benchmark output and final screenshots are retained with the task artifacts.
+
+### Final checks and limits
+
+- Bun: 570 passed, one existing skipped test; type checking, lint, and production build passed.
+  A final normal production build also passed with the E2E entry disabled.
+- Chromium: all 67 exercised regression cases passed across the full run and focused reruns; one
+  browser test was skipped by its existing condition. Outdated modal/tab expectations were updated
+  to the new user workflows. The final workspace/arrival suite passed all four cases.
+- WebKit: the four workspace/arrival cases passed, including all six widths, enlarged text, source
+  draft restoration after reloading settings, and three simulation visits. Actor SSE counts returned
+  to zero and Worker counts returned to their initial level after each exit. Hidden-tab SSE cleanup
+  also passed. Browser WebGL allocations are not directly counted by this fixture; the existing
+  Sigma teardown still owns renderer disposal.
+- Firefox: the installed Playwright Firefox 155 failed before opening a page with
+  `Could not find profile folder`. Retrying with a dedicated temporary directory produced the same
+  host launch error. Firefox rendering and behavior therefore remain unverified in this environment.
+- Real model generation, remote network jitter, field INP, and GPU memory usage were not measured.
+  All execution used fixed fixtures, intercepted APIs, or the deterministic test model.

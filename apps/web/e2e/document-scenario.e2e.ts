@@ -19,14 +19,14 @@ test("new-scenario input opens document analysis before building from a situatio
   await page.goto("/")
   await page.waitForFunction(() => Boolean(window.__simulaE2E))
   await page.getByRole("button", { name: /New Scenario/ }).click()
-  let builder = page.getByRole("dialog", { name: "New Scenario" })
+  let builder = page.getByRole("main", { name: "New Scenario" })
   await expect(builder.getByLabel("Choose files")).toBeAttached()
   await builder.getByLabel("Situation to simulate · optional").fill("The CTO and Finance decide whether to approve an investment at a meeting.")
   await expect(builder.getByRole("button", { name: "Run", exact: true })).toBeEnabled()
   const buildStarted = page.waitForResponse(response => response.url().endsWith("/api/scenario-builder") && response.request().method() === "POST")
   await builder.getByRole("button", { name: "Run", exact: true }).click()
   await expect(page).toHaveURL("/document-analysis")
-  await expect(page.getByRole("dialog", { name: "New Scenario" })).toHaveCount(0)
+  await expect(page.getByRole("main", { name: "New Scenario" })).toHaveCount(0)
   builder = page.getByRole("main")
   await expect(builder.getByRole("heading", { name: "Document analysis", exact: true })).toBeVisible()
   const { build } = await (await buildStarted).json()
@@ -49,7 +49,7 @@ test("files wait for Run before extraction and fast processing reaches both stag
   await page.goto("/")
   await page.waitForFunction(() => Boolean(window.__simulaE2E))
   await page.getByRole("button", { name: /New Scenario/ }).click()
-  let dialog = page.getByRole("dialog", { name: "New Scenario" })
+  let dialog = page.getByRole("main", { name: "New Scenario" })
   await dialog.getByLabel("Choose files").setInputFiles({
     name: "proposal.md", mimeType: "text/markdown", buffer: Buffer.from("# Proposal\nCTO and Finance review the investment."),
   })
@@ -107,7 +107,7 @@ test("a failed extraction stops before scenario building", async ({ page }) => {
   await page.goto("/")
   await page.waitForFunction(() => Boolean(window.__simulaE2E))
   await page.getByRole("button", { name: /New Scenario/ }).click()
-  let dialog = page.getByRole("dialog", { name: "New Scenario" })
+  let dialog = page.getByRole("main", { name: "New Scenario" })
   await dialog.getByLabel("Choose files").setInputFiles({
     name: "broken.pdf", mimeType: "application/pdf", buffer: Buffer.from("not a PDF"),
   })
@@ -128,7 +128,7 @@ test("returning home from document analysis does not stop queued scenario work",
   await page.goto("/")
   await page.waitForFunction(() => Boolean(window.__simulaE2E))
   await page.getByRole("button", { name: /New Scenario/ }).click()
-  const dialog = page.getByRole("dialog", { name: "New Scenario" })
+  const dialog = page.getByRole("main", { name: "New Scenario" })
   await dialog.getByLabel("Choose files").setInputFiles({
     name: "brief.md", mimeType: "text/markdown", buffer: Buffer.from("# Brief\nCTO and Finance discuss the proposal."),
   })
@@ -146,7 +146,7 @@ test("uploads multiple documents, preserves cast constraints, confirms, and reop
   await page.goto("/")
   await page.waitForFunction(() => Boolean(window.__simulaE2E))
   await page.getByRole("button", { name: /New Scenario/ }).click()
-  let dialog = page.getByRole("dialog", { name: "New Scenario" })
+  let dialog = page.getByRole("main", { name: "New Scenario" })
   await dialog.getByLabel("Choose files").setInputFiles([
     { name: "budget.txt", mimeType: "text/plain", buffer: Buffer.from("The approved investment budget is 120 million won. The decision is whether to proceed.") },
     { name: "agenda.md", mimeType: "text/markdown", buffer: Buffer.from("# Review\nThe CTO and Finance must agree on an implementation date.") },
@@ -227,7 +227,7 @@ test("reviewed source excerpts remain readable after newer materials are added",
   await page.goto("/")
   await page.waitForFunction(() => Boolean(window.__simulaE2E))
   await page.getByRole("button", { name: /New Scenario/ }).click()
-  let dialog = page.getByRole("dialog", { name: "New Scenario" })
+  let dialog = page.getByRole("main", { name: "New Scenario" })
   await dialog.getByLabel("Choose files").setInputFiles({ name: "budget.txt", mimeType: "text/plain", buffer: Buffer.from("The investment budget is 120 million won.") })
   await dialog.getByLabel("Situation type · optional").click()
   await page.getByRole("option", { name: "Meeting" }).click()
@@ -253,7 +253,7 @@ test("a failed file upload stays selectable for retry", async ({ page }) => {
   await page.goto("/")
   await page.waitForFunction(() => Boolean(window.__simulaE2E))
   await page.getByRole("button", { name: /New Scenario/ }).click()
-  let dialog = page.getByRole("dialog", { name: "New Scenario" })
+  let dialog = page.getByRole("main", { name: "New Scenario" })
   await dialog.getByLabel("Choose files").setInputFiles({ name: "retry.txt", mimeType: "text/plain", buffer: Buffer.from("Review the budget.") })
   await page.route("**/api/documents/*/files", route => route.fulfill({ status: 503, contentType: "application/json", body: '{}' }))
   await dialog.getByRole("button", { name: "Run", exact: true }).click()
@@ -262,7 +262,7 @@ test("a failed file upload stays selectable for retry", async ({ page }) => {
   await expect(dialog.getByRole("alert")).toContainText("The request failed")
   await expect(dialog.getByText("retry.txt", { exact: true })).toBeVisible()
   await page.unroute("**/api/documents/*/files")
-  await dialog.getByRole("button", { name: "Run", exact: true }).click()
+  await dialog.getByRole("button", { name: "Continue analysis", exact: true }).click()
   await expect(page).toHaveURL("/document-analysis")
   dialog = page.getByRole("main")
   await expect(dialog.getByRole("button", { name: "Confirm scenario", exact: true })).toBeVisible({ timeout: 15_000 })
@@ -302,7 +302,7 @@ data: ${JSON.stringify(event)}
   await page.goto("/")
   await page.waitForFunction(() => Boolean(window.__simulaE2E))
   await page.getByRole("button", { name: /New Scenario/ }).click()
-  let dialog = page.getByRole("dialog", { name: "New Scenario" })
+  let dialog = page.getByRole("main", { name: "New Scenario" })
   await dialog.getByLabel("Choose files").setInputFiles({ name: "live.txt", mimeType: "text/plain", buffer: Buffer.from("Review the investment budget.") })
   const generate = dialog.getByRole("button", { name: "Run", exact: true })
   await expect(generate).toBeEnabled()

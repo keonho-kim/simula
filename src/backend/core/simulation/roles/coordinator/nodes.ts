@@ -108,6 +108,9 @@ export async function coordinatorNode(
   }
   for (let roundIndex = 1; autonomous || roundIndex <= maxRound; roundIndex += 1) {
     throwIfCanceled(isCanceled)
+    await emit({ type: "actor.progress", runId: state.runId, timestamp: new Date().toISOString(), update: {
+      kind: "round", roundIndex, parallel: state.scenario.controls.fastMode, actors: actors.map(actor => ({ id: actor.id, name: actor.name })),
+    } })
     const injectionResult = await resolveEventInjection(snapshot(), events, emit)
     coordinatorTrace = updateCoordinatorTrace(coordinatorTrace, "eventInjection", injectionResult.text, injectionResult.retries)
     const selectedEvent = eventForInjection(injectionResult.text, events)

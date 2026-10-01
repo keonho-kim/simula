@@ -198,3 +198,25 @@ endpoint for checkpointed status; a stored running flag without an active owner 
 partial so the user can retry after a server restart. The existing cancel endpoint cancels an
 active commentary job as well. `report.commentary` events carry an `update` containing newly
 processed or invalidated nodes (a delta), status, and root ID rather than repeated whole-tree snapshots.
+
+
+## Transient actor progress
+
+`GET /api/runs/:runId/actor-progress` is a browser-session-scoped SSE channel. It sends `snapshot`
+events with `runId`, `streamId`, monotonic `revision`, `roundIndex`, `parallel`, terminal status,
+and the current round's actor turns. A turn is waiting, working, ready, or committed. Ready turns
+contain a sanitized display message, interaction identity, completion order, and timestamp.
+No reasoning, prompts, or unvalidated model text is included. Terminal runs return HTTP 204.
+
+The coordinator emits internal `actor.progress` updates when preparation starts, actor work starts,
+and a validated actor decision is ready. Runtime intercepts these updates before event persistence.
+They are not part of the durable run SSE cursor, SQLite run history, graph timeline, or analytical
+inputs. Accepted `interaction.recorded` events remain authoritative and retain causal/deterministic
+ordering. Fast-mode actors still read the same pre-round snapshot.
+
+Runtime retains only the current round and coalesces slow readers to its latest snapshot. Reconnects
+receive that snapshot; terminal events release it. The browser validates run/actor/interaction scope,
+revision, message size, and finite states, and overlays previews only in the live conversation.
+Confirmation replaces a matching card; cancellation/failure marks remaining previews as unapplied.
+Saved reports and reloads use confirmed history. Visibility changes and leaving the view dispose the
+subscription. Stream errors preserve the last received update and fall back to confirmed messages.

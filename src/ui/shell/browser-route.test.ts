@@ -43,3 +43,10 @@ test("document analysis has a page before a simulation run exists", () => {
   expect(viewFromPath("/document-analysis", {})).toEqual({ viewMode: "document-analysis" })
   expect(pathForView("document-analysis", undefined)).toBe("/document-analysis")
 })
+
+test("workspace editors have reloadable paths without requiring a run", () => {
+  for (const [path, viewMode] of [["/scenario/new", "scenario-new"], ["/scenario/preview", "scenario-preview"], ["/settings", "settings"]] as const) {
+    expect(viewFromPath(path, {})).toEqual({ viewMode })
+    expect(pathForView(viewMode, undefined)).toBe(path)
+  }
+})

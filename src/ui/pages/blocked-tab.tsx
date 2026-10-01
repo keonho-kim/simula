@@ -12,7 +12,7 @@ import { requestOwnerFocus } from "@/ui/browser-storage/tab-ownership"
 export function BlockedTab({ unsupported = false, detail }: { unsupported?: boolean; detail?: string }) {
   const { t } = useLocaleText()
   const [requested, setRequested] = useState(false)
-  return <main className="mx-auto flex min-h-svh max-w-lg flex-col justify-center gap-4 px-6">
+  return <main className="mx-auto flex min-h-svh w-4/5 flex-col justify-center gap-4">
     <h1 className="text-xl font-semibold">{unsupported ? t.browserStorageUnavailable : t.tabAlreadyOpen}</h1>
     <p className="text-sm text-muted-foreground">{unsupported ? t.browserStorageUnavailableHelp : t.tabAlreadyOpenHelp}</p>
     {detail ? <p role="alert" className="break-words text-sm text-destructive">{detail}</p> : null}

@@ -2,37 +2,41 @@
  * Purpose: Define global design tokens and base element styling.
  * Pattern: Global stylesheet.
  * Usage: Imported once by src/app/layout.tsx.
- * Related: src/ui/animation/styles.css, src/ui/styles/editing-popup.css, src/ui/styles/page-dialog.css
+ * Related: src/ui/animation/styles.css, src/ui/styles/page-dialog.css
  */
 @import "tailwindcss";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 @import "./styles/page-dialog.css";
-@import "./styles/editing-popup.css";
+@import "./styles/workspace.css";
 @import "./animation/styles.css";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #f7f9fc;
-  --foreground: #182230;
+  --source-ink: #1e40af; --source-surface: #eff6ff;
+  --scenario-ink: #6d28d9; --scenario-surface: #f5f3ff;
+  --observation-ink: #0f766e; --observation-surface: #f0fdfa;
+  --attention-ink: #92400e; --attention-surface: #fffbeb;
+  --background: #f3f6fa;
+  --foreground: #172033;
   --card: #ffffff;
-  --card-foreground: #182230;
+  --card-foreground: #172033;
   --popover: #ffffff;
-  --popover-foreground: #182230;
+  --popover-foreground: #172033;
   --primary: #254e70;
   --primary-foreground: #ffffff;
   --secondary: #edf4f7;
   --secondary-foreground: #254e70;
   --muted: #eef2f6;
-  --muted-foreground: #64748b;
+  --muted-foreground: #526176;
   --accent: #e8f2f4;
   --accent-foreground: #21445f;
   --destructive: #d92d20;
   --destructive-foreground: #ffffff;
-  --border: #dce4ec;
-  --input: #cfd9e3;
-  --ring: #5c8fb1;
+  --border: #cbd5e1;
+  --input: #74859b;
+  --ring: #1d4ed8;
   --radius: 0.5rem;
   --chart-1: #2f6f8f;
   --chart-2: #4b9c8f;
@@ -40,13 +44,13 @@
   --chart-4: #748094;
   --chart-5: #b77966;
   --sidebar: #f1f5f9;
-  --sidebar-foreground: #182230;
+  --sidebar-foreground: #172033;
   --sidebar-primary: #254e70;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #e8f2f4;
   --sidebar-accent-foreground: #21445f;
-  --sidebar-border: #dce4ec;
-  --sidebar-ring: #5c8fb1;
+  --sidebar-border: #cbd5e1;
+  --sidebar-ring: #1d4ed8;
 }
 
 @theme inline {
@@ -99,8 +103,8 @@
 
 body {
   margin: 0;
-  user-select: none;
-  -webkit-user-select: none;
+  user-select: text;
+  -webkit-user-select: text;
   background: var(--background);
   color: var(--foreground);
   font-family:
@@ -126,6 +130,10 @@ select {
 }
 
 .dark {
+  --source-ink: #bfdbfe; --source-surface: #172b47;
+  --scenario-ink: #ddd6fe; --scenario-surface: #302346;
+  --observation-ink: #99f6e4; --observation-surface: #123c3b;
+  --attention-ink: #fde68a; --attention-surface: #3c301c;
   --background: #111827;
   --foreground: #e5edf5;
   --card: #182231;

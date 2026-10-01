@@ -4,6 +4,8 @@
  * Usage: Rendered by App while the active view is home.
  * Related: src/ui/pages/start-screen.tsx, src/ui/shell/App.tsx
  */
+import { isWorkspaceView, type ViewMode } from "./browser-route"
+import { readRunSession, updateRunSession } from "@/ui/browser-storage/run-session"
 import { prepareScenarioDraft } from "@/ui/browser-storage/prepare-scenario-draft"
 import { validMultiverse } from "@/ui/models/scenario-builder/launch-options"
 import { Suspense, lazy, useEffect, useRef, useState } from "react"
@@ -20,11 +22,11 @@ const RunHistoryDialog = lazy(() =>
 const SamplePickerDialog = lazy(() =>
   import("@/ui/components/scenario/sample-picker-dialog").then((module) => ({ default: module.SamplePickerDialog }))
 )
-const ScenarioPreviewDialog = lazy(() =>
-  import("@/ui/components/scenario/scenario-preview-dialog").then((module) => ({ default: module.ScenarioPreviewDialog }))
+const ScenarioPreviewPage = lazy(() =>
+  import("@/ui/pages/scenario-preview-page").then((module) => ({ default: module.ScenarioPreviewPage }))
 )
-const SettingsDialog = lazy(() =>
-  import("@/ui/components/settings/settings-dialog").then((module) => ({ default: module.SettingsDialog }))
+const SettingsPage = lazy(() =>
+  import("@/ui/pages/settings-page").then((module) => ({ default: module.SettingsPage }))
 )
 const ScenarioCreationFlow = lazy(() => import("@/ui/shell/scenario-creation-flow").then(module => ({ default: module.ScenarioCreationFlow })))
 
@@ -43,6 +45,8 @@ const DEFAULT_SCENARIO_DRAFT: ScenarioDraft = {
 }
 
 interface HomeViewProps {
+  viewMode: ViewMode
+  onNavigate: (view: ViewMode) => void
   documentAnalysis: boolean
   onDocumentAnalysisChange: (active: boolean) => void
   t: UiTexts
@@ -59,6 +63,7 @@ interface HomeViewProps {
 }
 
 export function HomeView({
+  viewMode, onNavigate,
   documentAnalysis,
   onDocumentAnalysisChange,
   t,
@@ -74,11 +79,24 @@ export function HomeView({
   onStartWorld,
 }: HomeViewProps) {
   const uploadInputRef = useRef<HTMLInputElement>(null)
-  const [scenarioBuilder, setScenarioBuilder] = useState<"unused" | "open" | "closed">("unused")
+  const [builderUsed, setBuilderUsed] = useState(viewMode === "scenario-new" || documentAnalysis)
+  const scenarioBuilder = viewMode === "scenario-new"
+  const [settingsReturn, setSettingsReturn] = useState<ViewMode>(() => {
+    const saved = readRunSession().settingsReturnView
+    return saved && saved !== "settings" && isWorkspaceView(saved) ? saved : "home"
+  })
+  const openSettings = () => {
+    setSettingsReturn(viewMode)
+    updateRunSession({ settingsReturnView: viewMode })
+    onNavigate("settings")
+  }
+  const [previewRevision, setPreviewRevision] = useState(0)
+  const [previewLoaded, setPreviewLoaded] = useState(false)
   const [samplePickerOpen, setSamplePickerOpen] = useState(false)
   const [runHistoryOpen, setRunHistoryOpen] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [scenarioPreviewOpen, setScenarioPreviewOpen] = useState(false)
+  const settingsOpen = viewMode === "settings"
+  const scenarioPreviewOpen = viewMode === "scenario-preview"
+  const setScenarioPreviewOpen = (open: boolean) => { if (open) { setPreviewLoaded(true); setPreviewRevision(value => value + 1) }; onNavigate(open ? "scenario-preview" : "home") }
   const [scenarioDraft, setScenarioDraft] = useState<ScenarioDraft>(DEFAULT_SCENARIO_DRAFT)
   const [launchSeed, setLaunchSeed] = useState<string>()
   const [preparingBatch, setPreparingBatch] = useState(false)
@@ -86,9 +104,17 @@ export function HomeView({
   const [hasSavedPreview, setHasSavedPreview] = useState(false)
   const samplePickerPresent = useExitPresence(samplePickerOpen)
   const runHistoryPresent = useExitPresence(runHistoryOpen)
-  const previewPresent = useExitPresence(scenarioPreviewOpen)
-  const settingsPresent = useExitPresence(settingsOpen)
 
+
+
+  useEffect(() => { if (scenarioBuilder) setBuilderUsed(true) }, [scenarioBuilder])
+  useEffect(() => { if (viewMode !== "scenario-preview" || previewLoaded) return
+    void readDraft<{ draft: ScenarioDraft; autoContinue: boolean }>("finished-scenario").then(value => {
+      const restored = value?.working ?? value?.saved
+      if (restored) { setScenarioDraft(restored.draft); onAutoContinueChange(restored.autoContinue) }
+      setPreviewLoaded(true)
+    })
+  }, [viewMode, previewLoaded, onAutoContinueChange])
   useEffect(() => { void readDraft<{ draft: ScenarioDraft; autoContinue: boolean }>("finished-scenario")
     .then(value => setHasSavedPreview(Boolean(value?.saved))) }, [])
 
@@ -107,7 +133,7 @@ export function HomeView({
         await prepareScenarioDraft(scenarioDraft)
         setLaunchSeed(crypto.randomUUID())
         setScenarioPreviewOpen(false)
-        setScenarioBuilder("closed")
+
         onDocumentAnalysisChange(true)
       } catch { setStartError(true) }
       finally { setPreparingBatch(false) }
@@ -136,33 +162,34 @@ export function HomeView({
           if (file) loadScenarioFile(file)
         }}
       />
-      {!documentAnalysis ? <StartScreen
+      {viewMode === "home" ? <StartScreen
+        runs={runs} onOpenRun={onOpenRun}
         t={t}
         languagePreference={languagePreference}
         promptLanguage={promptLanguage}
-        onNewScenario={() => setScenarioBuilder("open")}
+        onNewScenario={() => onNavigate("scenario-new")}
         onImportScenario={() => uploadInputRef.current?.click()}
         hasSavedPreview={hasSavedPreview}
         onResumeScenario={() => { void readDraft<{ draft: ScenarioDraft; autoContinue: boolean }>("finished-scenario")
           .then(value => { if (!value?.saved) return; setScenarioDraft(value.saved.draft); onAutoContinueChange(value.saved.autoContinue); setScenarioPreviewOpen(true) }) }}
         onExampleScenario={() => setSamplePickerOpen(true)}
         onRunHistory={() => setRunHistoryOpen(true)}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={openSettings}
         onLanguagePreferenceChange={onLanguagePreferenceChange}
       /> : null}
       <Suspense fallback={null}>
-        {scenarioBuilder !== "unused" || documentAnalysis ? (
+        {builderUsed || scenarioBuilder || documentAnalysis ? (
           <ScenarioCreationFlow key={launchSeed ?? "new-scenario"}
             autoExecute={Boolean(launchSeed)}
-            active={scenarioBuilder === "open"}
+            active={scenarioBuilder}
             analysis={documentAnalysis}
-            onAnalyze={() => { setScenarioBuilder("closed"); onDocumentAnalysisChange(true) }}
-            onHome={() => { setScenarioBuilder("closed"); onDocumentAnalysisChange(false) }}
-            onEdit={() => { setScenarioBuilder("open"); onDocumentAnalysisChange(false) }}
+            onAnalyze={() => onDocumentAnalysisChange(true)}
+            onHome={() => onDocumentAnalysisChange(false)}
+            onEdit={() => onNavigate("scenario-new")}
             language={promptLanguage}
             t={t}
-            onClose={() => setScenarioBuilder("closed")}
-            onOpenSettings={() => setSettingsOpen(true)}
+            onClose={() => onNavigate("home")}
+            onOpenSettings={openSettings}
             starting={isStarting}
             autoContinue={autoContinue}
             onAutoContinueChange={onAutoContinueChange}
@@ -184,8 +211,8 @@ export function HomeView({
         {runHistoryPresent ? (
           <RunHistoryDialog open={runHistoryOpen} runs={runs} t={t} onOpenChange={setRunHistoryOpen} onOpenRun={onOpenRun} />
         ) : null}
-        {previewPresent ? (
-          <ScenarioPreviewDialog
+        {previewLoaded ? (
+          <ScenarioPreviewPage key={previewRevision}
             open={scenarioPreviewOpen}
             draft={scenarioDraft}
             startError={startError}
@@ -195,12 +222,12 @@ export function HomeView({
             onOpenChange={setScenarioPreviewOpen}
             onDraftChange={setScenarioDraft}
             onAutoContinueChange={onAutoContinueChange}
-            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenSettings={openSettings}
             onStart={startScenario}
             onDraftSaved={() => setHasSavedPreview(true)}
           />
         ) : null}
-        {settingsPresent ? <SettingsDialog open={settingsOpen} t={t} onOpenChange={setSettingsOpen} /> : null}
+        {settingsOpen ? <SettingsPage open t={t} onOpenChange={() => onNavigate(settingsReturn)} /> : null}
       </Suspense>
     </>
   )

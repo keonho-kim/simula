@@ -15,6 +15,7 @@ import { useRunStore } from "@/ui/stores/run-store"
 import { useDocumentVisible } from "@/ui/animation/use-document-visible"
 import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
 import { activeRowMotion, progressDotMotion } from "@/ui/animation/activity"
+import { PresenceSurface } from "@/ui/animation/presence-surface"
 import { fadePresence, slidePresence } from "@/ui/animation/presence"
 import { boardProgress, type ScenarioBoardState } from "@/ui/models/simulation/scenario-board"
 import { scenarioBoardColumns } from "@/ui/models/simulation/scenario-board-items"
@@ -58,7 +59,7 @@ export const ScenarioBoardPage = memo(function ScenarioBoardPage({ t, onPrepared
   return <LazyMotion features={domAnimation} strict>
     <MotionConfig reducedMotion={still ? "always" : "never"}>
       <main className="min-h-svh overflow-x-clip bg-background text-foreground">
-        <header className="sticky top-0 z-10 flex min-w-0 items-center justify-between gap-3 border-b bg-background px-5 py-4">
+        <header className="mx-auto flex w-4/5 min-w-0 items-center justify-between gap-3 border-b bg-background py-6">
           <div className="flex min-w-0 items-center gap-2">
             <span className="flex size-8 shrink-0 items-center justify-center">
               <AnimatePresence initial={false}>{selected ? <m.span key="back"
@@ -82,9 +83,9 @@ export const ScenarioBoardPage = memo(function ScenarioBoardPage({ t, onPrepared
             </span>
           </div>
         </header>
-        <div className="mx-auto w-full max-w-[1600px] px-4 py-5 md:px-6">
+        <div className="workspace-frame">
           <AnimatePresence initial={false}>
-            {selected && selectedColumn ? <div key={`detail:${selectedColumn.title}`}
+            {selected && selectedColumn ? <PresenceSurface key={`detail:${selectedColumn.title}`}
               className="flex min-h-[55svh] min-w-0 flex-col bg-background md:flex-row">
               <m.div className="min-w-0 p-1 md:w-2/5 md:shrink-0" {...slidePresence(still, "x", -28, 0, "reveal")}>
                 <BoardColumn column={selectedColumn} board={board} activeIds={activeIds} selectedId={selectedId}
@@ -100,12 +101,12 @@ export const ScenarioBoardPage = memo(function ScenarioBoardPage({ t, onPrepared
                   </m.div>
                 </AnimatePresence>
               </m.aside>
-            </div> : <div key="overview" className="min-w-0 bg-background">
+            </PresenceSurface> : <PresenceSurface key="overview" className="min-w-0 bg-background">
               <m.div className="flex min-w-0 flex-wrap gap-5" {...slidePresence(still, "x", -12, 0, "reveal")}>
                 {columns.map(column => <BoardColumn key={column.title} column={column} board={board}
                   activeIds={activeIds} selectedId={selectedId} moving={moving} onSelect={setSelectedId} t={t} />)}
               </m.div>
-            </div>}
+            </PresenceSurface>}
           </AnimatePresence>
         </div>
       </main>

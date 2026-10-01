@@ -6,7 +6,8 @@
  */
 export interface RunSession {
   runId?: string
-  viewMode?: "home" | "document-analysis" | "board" | "simulation" | "report" | "report-preparation"
+  viewMode?: "home" | "scenario-new" | "scenario-preview" | "settings" | "document-analysis" | "board" | "simulation" | "report" | "report-preparation"
+  settingsReturnView?: RunSession["viewMode"]
   autoContinue?: boolean
   handledRounds?: number[]
   automaticStreak?: number

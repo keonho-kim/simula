@@ -367,7 +367,6 @@ Local skills live in `.agents/skills`:
 
 - Use `shadcn` for shadcn/ui work. Prefer `bunx --bun shadcn@latest` when invoking its CLI.
 - Use `design-md` when deriving or maintaining `DESIGN.md`.
-- Use `minimalist-ui` for restrained UI direction, with `DESIGN.md` taking precedence for this project's visual choices.
 - Use `vercel-react-best-practices` for React or Next.js performance-sensitive work.
 - Use `caveman` only when the user explicitly requests compressed communication.
 

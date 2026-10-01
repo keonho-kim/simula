@@ -8,6 +8,7 @@ import { AnimatePresence } from "motion/react"
 import * as m from "motion/react-m"
 import type { ReactNode } from "react"
 import { useReducedMotionPreference } from "./use-reduced-motion-preference"
+import { PresenceSurface } from "./presence-surface"
 import { motionTransition } from "./timing"
 
 type PageDirection = "forward" | "back" | "replace"
@@ -33,7 +34,7 @@ export function PageTransition({ viewKey, children }: { viewKey: string; childre
   return <div className="relative min-h-svh overflow-x-clip"><AnimatePresence mode="popLayout" custom={direction} initial={false}>
     <m.div key={viewKey} custom={direction} variants={variants} initial="enter" animate="center" exit="exit"
       className="relative min-h-svh w-full bg-background">
-      {children}
+      <PresenceSurface>{children}</PresenceSurface>
     </m.div>
   </AnimatePresence></div>
 }

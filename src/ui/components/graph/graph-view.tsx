@@ -4,7 +4,9 @@
  * Usage: Rendered by simulation and report relationship views.
  * Related: src/ui/components/graph/overlays/edge-preview.tsx, src/ui/components/markdown/markdown-content.tsx
  */
-import { memo } from "react"
+import { GRAPH_PALETTES } from "./palette"
+import "@/ui/styles/graph.css"
+import { memo, type CSSProperties } from "react"
 import { CrosshairIcon, Maximize2Icon } from "lucide-react"
 import { Button } from "@/ui/components/ui/button"
 import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
@@ -13,20 +15,28 @@ import { useGraphRenderer } from "@/ui/components/graph/renderer/use-graph-rende
 import type { GraphViewProps } from "@/ui/components/graph/renderer/types"
 
 export const GraphView = memo(function GraphView(props: GraphViewProps) {
-  const { t, frame, showActorPopover, onActorExpand } = props
+  const { t, frame, showActorPopover, onActorExpand, appearance = "standard" } = props
+  const palette = GRAPH_PALETTES[appearance]
+  const surface: CSSProperties & Record<`--${string}`, string> = {
+    background: palette.background, color: palette.ink, border: `1px solid ${palette.border}`,
+    "--foreground": palette.ink, "--muted-foreground": palette.secondary, "--card": palette.surface,
+    "--background": palette.background, "--border": palette.border, "--muted": palette.surface,
+    ...(appearance === "tactical" ? { "--accent": palette.border, "--primary": palette.nodes[0], "--primary-foreground": palette.background, "--ring": palette.nodes[1] } : {}),
+  }
   const { containerRef, selectedActor, selectedPopoverStyle, selectedActorIntent,
     previewEdge, edgePreviewStyle, actorNames, actors, resetCamera } = useGraphRenderer(props)
   return (
-    <div className="relative h-full min-h-0 overflow-hidden rounded-lg bg-white ring-1 ring-border/60">
+    <div className="graph-surface relative h-full min-h-0 overflow-hidden rounded-lg" data-appearance={appearance}
+      style={surface}>
       <div className="absolute right-3 top-3 z-10">
         <Button variant="outline" size="icon" aria-label={t.graphResetView} onClick={resetCamera}><CrosshairIcon /></Button>
       </div>
 
-      <div ref={containerRef} className="absolute inset-0 bg-[radial-gradient(circle_at_center,#f8fafc_1px,transparent_1px)] [background-size:24px_24px]" />
+      <div ref={containerRef} className="absolute inset-0" style={{ backgroundImage: `radial-gradient(${palette.grid} 1px, transparent 1px)`, backgroundSize: "24px 24px" }} />
 
       {showActorPopover && selectedActor && selectedPopoverStyle ? (
         <div
-          className="absolute z-20 rounded-md border border-border/80 bg-white/95 p-3 text-left shadow-[0_12px_32px_rgba(23,32,51,0.14)] "
+          className="absolute z-20 rounded-md border border-border/80 graph-overlay p-3 text-left shadow-[0_12px_32px_rgba(23,32,51,0.14)] "
           style={selectedPopoverStyle}
         >
           <div className="flex items-start justify-between gap-3">
@@ -55,13 +65,13 @@ export const GraphView = memo(function GraphView(props: GraphViewProps) {
               ) : null}
             </div>
           </div>
-          <MarkdownContent generated compact className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground" content={selectedActorIntent} fallback={t.graphNoIntent} />
+          <MarkdownContent generated density="compact" className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground" content={selectedActorIntent} fallback={t.graphNoIntent} />
         </div>
       ) : null}
 
       {previewEdge ? (
         <div
-          className="pointer-events-none absolute z-20 w-[min(340px,calc(100%-24px))] rounded-md border border-border/80 bg-white/95 p-3 text-left shadow-[0_12px_32px_rgba(23,32,51,0.12)] "
+          className="pointer-events-none absolute z-20 w-[min(340px,calc(100%-24px))] rounded-md border border-border/80 graph-overlay p-3 text-left shadow-[0_12px_32px_rgba(23,32,51,0.12)] "
           style={edgePreviewStyle ?? { right: 12, top: 12 }}
         >
           <EdgePreview edge={previewEdge} t={t} actorNames={actorNames} actors={actors} />

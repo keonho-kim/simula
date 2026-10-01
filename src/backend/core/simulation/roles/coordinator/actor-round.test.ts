@@ -78,3 +78,33 @@ for (const fastMode of [false, true]) test(`later actors receive prior accepted 
     expect(cast[1]?.context.visible).toEqual([])
   } finally { text.mockRestore(); choice.mockRestore() }
 })
+
+test("fast mode publishes a validated later message before a blocked first actor without committing out of order", async () => {
+  const scenario = { text: "Discuss", controls: { numCast: 2, maxRound: 1, actionsPerType: 1, fastMode: true, allowAdditionalCast: false } }
+  const simulation = initialSimulationState("arrival-round", scenario)
+  const cast = [actor("actor-1"), actor("actor-2")].map(value => ({ ...value,
+    actions: [{ id: "speak", visibility: "public" as const, label: "Speak", intentHint: "Ask", expectedOutcome: "Clarity" }] }))
+  const blocked = Promise.withResolvers<void>(), ready = Promise.withResolvers<void>()
+  let messageCalls = 0
+  const events: RunEvent[] = []
+  const text = spyOn(invocation, "invokeRoleTextWithMetrics").mockImplementation(async (_settings, _role, step) => {
+    if (step === "message" && ++messageCalls === 1) await blocked.promise
+    return response(step === "message" ? "Completed speech" : step === "intent" ? "Ask a question" : "Consider the options")
+  })
+  const choice = spyOn(invocation, "invokeExactChoiceWithMetrics").mockImplementation(async (_settings, _role, _step, _attempt, _prompt, allowed) => response(allowed[0]!))
+  const running = runActorRound({ runId: simulation.runId, scenario, settings: defaultSettings(), simulation }, cast,
+    { id: "e", title: "Review", summary: "Decide", status: "active", participantIds: [] },
+    { roundIndex: 1, preRound: { elapsedTime: "0", content: "Start" } }, 1, emptyCoordinatorTrace(), async event => {
+      events.push(event)
+      if (event.type === "actor.progress" && event.update.kind === "ready") ready.resolve()
+    })
+  try {
+    await ready.promise
+    expect(events.filter(event => event.type === "interaction.recorded")).toHaveLength(0)
+    const preview = events.find(event => event.type === "actor.progress" && event.update.kind === "ready")
+    expect(preview?.type === "actor.progress" && preview.update.kind === "ready" && preview.update.message.actorId).toBe("actor-2")
+    blocked.resolve()
+    const result = await running
+    expect(result.interactions.map(value => value.sourceActorId)).toEqual(["actor-1", "actor-2"])
+  } finally { blocked.resolve(); await running; text.mockRestore(); choice.mockRestore() }
+})

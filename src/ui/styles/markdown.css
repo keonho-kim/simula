@@ -133,3 +133,12 @@
   .simula-markdown-compact table,
   .simula-markdown-compact .katex-display { margin-block: 0.35rem; }
 }
+
+/* Explicit density prevents the compact base renderer from overriding report prose. */
+.simula-markdown-report { font-size: 17px; line-height: 1.8; color: var(--foreground); }
+.simula-markdown-report p, .simula-markdown-report ul, .simula-markdown-report ol { margin-block: 1rem; }
+.simula-markdown-report h1 { font-size: 28px; }
+.simula-markdown-report h2 { font-size: 24px; }
+.simula-markdown-report h3, .simula-markdown-report h4 { font-size: 20px; }
+.simula-markdown-report h1, .simula-markdown-report h2, .simula-markdown-report h3, .simula-markdown-report h4 { margin-block: 2rem 1rem; line-height: 1.4; }
+@media (max-width: 1023px) { .simula-markdown-report { font-size: 16px; } }

@@ -4,16 +4,18 @@
  * Usage: Rendered by ReportFlow while analysis is absent, running, or awaiting recovery.
  * Related: src/ui/hooks/use-analytical-report.ts, src/ui/components/report/analysis/activity.tsx
  */
+import { lazy, Suspense, useState } from "react"
 import { RunNavigation } from "@/ui/components/navigation/run-navigation"
 import type { RunEvent } from "@/shared/run"
 import type { UiTexts } from "@/ui/types/i18n"
 import type { useAnalyticalReport } from "@/ui/hooks/use-analytical-report"
 import { Button } from "@/ui/components/ui/button"
 import { Alert, AlertDescription } from "@/ui/components/ui/alert"
-import { ReportMetricOverview } from "@/ui/components/report/metric-overview"
 import { AnalysisActivity } from "@/ui/components/report/analysis/activity"
 
-export function ReportPreparationPage({ selectedRunId, onBackToWorlds, title, analysis, events, t, onHome, batch, runError }: {
+const ExecutionDetails = lazy(() => import("@/ui/components/report/analysis/execution-details").then(module => ({ default: module.ReportExecutionDetails })))
+
+export function ReportPreparationPage({ selectedRunId, onBackToWorlds, title, analysis, events, t, onHome, runError }: {
   selectedRunId?: string
   onBackToWorlds?: () => void
   runError?: string
@@ -22,19 +24,18 @@ export function ReportPreparationPage({ selectedRunId, onBackToWorlds, title, an
   events: RunEvent[]
   t: UiTexts
   onHome: () => void
-  batch: boolean
 }) {
+  const [usageOpen, setUsageOpen] = useState(false)
   const { query, command, record, running } = analysis
   const unavailable = query.data?.freshness === "unavailable"
   const stopped = Boolean(record && !running)
   return <main className="min-h-svh bg-background text-foreground">
-    <div className="mx-auto flex w-[94vw] max-w-[1600px] flex-col gap-5 py-5">
+    <div className="workspace-frame">
       <header className="flex items-center gap-3 border-b pb-4">
         <RunNavigation runId={selectedRunId} onHome={onHome} onBackToWorlds={onBackToWorlds} t={t} />
-        <div><h1 className="text-lg font-semibold">{t.analysisPreparing}</h1><p className="text-xs text-muted-foreground">{title}</p></div>
+        <div><h1 className="text-3xl font-semibold">{t.analysisPreparing}</h1><p className="text-xs text-muted-foreground">{title}</p></div>
       </header>
-      <p className="text-xs text-muted-foreground">{batch ? t.analysisBatchMetricScope : t.analysisScope}</p>
-      <ReportMetricOverview events={events} additionalMetrics={analysis.metrics.data} scopeId={record?.id} t={t} />
+
       <p className="text-sm text-muted-foreground">{t.analysisPreparationDescription}</p>
       {query.isError || command.isError ? <Alert variant="destructive"><AlertDescription>{t.analysisUnavailable}</AlertDescription></Alert> : null}
       {runError ? <Alert variant="destructive"><AlertDescription>{runError}</AlertDescription></Alert> : null}
@@ -42,6 +43,9 @@ export function ReportPreparationPage({ selectedRunId, onBackToWorlds, title, an
       {stopped ? <Alert><AlertDescription>{t.analysisPartial}</AlertDescription></Alert> : null}
       <AnalysisActivity key={record?.id ?? "pending"} id={record?.id} running={running} t={t} />
       {!record && !unavailable && !query.isError && !command.isError ? <p role="status" className="text-sm">{t.reportLoading}</p> : null}
+      <details className="workspace-disclosure" onToggle={event => setUsageOpen(event.currentTarget.open)}><summary>{t.workspaceExecution}</summary>
+        {usageOpen ? <Suspense fallback={<p>{t.reportLoading}</p>}><ExecutionDetails record={record ?? undefined} events={events} language={record?.language ?? "en"} t={t} /></Suspense> : null}
+      </details>
       <div className="flex flex-wrap gap-2">
         {running ? <Button variant="outline" disabled={command.isPending} onClick={() => command.mutate("cancel")}>{t.analysisCancel}</Button> : null}
         {query.isError ? <Button disabled={query.isFetching} onClick={() => void query.refetch()}>{t.reportRetryLoad}</Button>

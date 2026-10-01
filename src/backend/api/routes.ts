@@ -27,6 +27,7 @@ import type {
   SettingsModelsRequest,
 } from "@/shared"
 import { SAMPLE_ROOT } from "@/backend/config"
+import { streamActorProgress } from "./runs/actor-progress-stream"
 import { streamEvents, streamBoardPreview } from "@/backend/api/runs/event-stream"
 import type { Subscriptions } from "@/backend/runtime/events"
 import { listProviderModels } from "@/backend/api/settings/model-controller"
@@ -210,6 +211,11 @@ async function routeRunDetail(
     }
     const pruned = await context.store.pruneConfirmedEvents(runId, count)
     return pruned ? json({ status: "pruned" }) : json({ error: "Browser event count does not match server history." }, { status: 409 })
+  }
+  if (parts[3] === "actor-progress" && request.method === "GET") {
+    const manifest = await context.store.readManifest(runId)
+    if (["completed", "failed", "canceled", "interrupted"].includes(manifest.status)) return new Response(null, { status: 204 })
+    return streamActorProgress(context.subscriptions.actors, runId, request.signal)
   }
   if (parts[3] === "board-preview" && request.method === "GET") {
     const itemId = url.searchParams.get("item")

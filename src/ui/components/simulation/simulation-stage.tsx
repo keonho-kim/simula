@@ -6,7 +6,6 @@
  */
 import { memo, useMemo, useState, type ReactNode } from "react"
 import { Badge } from "@/ui/components/ui/badge"
-import { Progress } from "@/ui/components/ui/progress"
 import { useRunStore } from "@/ui/stores/run-store"
 import { GraphView } from "@/ui/components/graph/graph-view"
 import { buildSimulationEventNotice } from "@/ui/models/simulation/simulation-event-notice"
@@ -50,8 +49,6 @@ export const SimulationStage = memo(function SimulationStage({
   const runState = useRunStore((state) => state.runState)
   const frame = timeline[replayIndex] ?? timeline.at(-1)
   const status = useMemo(() => buildSimulationStageStatus(liveEvents, runState, timeline), [liveEvents, runState, timeline])
-  const completedNodes = liveEvents.filter((event) => event.type === "node.completed").length
-  const progress = Math.min(100, completedNodes * 25)
   const eventNotice = useMemo(() => buildSimulationEventNotice(liveEvents), [liveEvents])
   const visibleEventNotice = eventNotice && !dismissedEventNoticeKeys.has(eventNotice.dismissalKey) ? eventNotice : undefined
   const dismissEventNotice = (dismissalKey: string) => {
@@ -88,10 +85,10 @@ export const SimulationStage = memo(function SimulationStage({
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
-        <Progress value={progress} className="h-1.5" />
         <div className={cn("relative min-h-0 flex-1", graphClassName)}>
           <div className="absolute inset-0">
             <GraphView
+              appearance="tactical"
               frame={frame}
               t={t}
               selectedActorId={selectedActorId}

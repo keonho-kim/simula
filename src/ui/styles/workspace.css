@@ -1,0 +1,57 @@
+/**
+ * Purpose: Define the shared page grid, dashboard, and semantic working surfaces.
+ * Pattern: Shared presentation contract.
+ * Usage: Imported by ui/index.css; used by workspace pages.
+ * Related: src/ui/components/layout/workspace-frame.tsx, src/ui/pages/start-screen.tsx
+ */
+.workspace-page { min-height: 100svh; background: var(--background); color: var(--foreground); }
+.workspace-frame { width: 80%; min-width: 0; margin-inline: auto; padding-block: 28px 48px; display: flex; flex-direction: column; gap: 28px; }
+.workspace-header { display: flex; align-items: flex-start; gap: 16px; padding-block: 8px 24px; border-bottom: 1px solid var(--border); }
+.workspace-header h1 { font-size: clamp(1.65rem, 2.6vw, 2.25rem); font-weight: 650; line-height: 1.25; overflow-wrap: anywhere; }
+.workspace-description { margin-top: 10px; color: var(--muted-foreground); font-size: 15px; line-height: 1.7; }
+.workspace-eyebrow { margin-bottom: 10px; color: var(--primary); font-size: 12px; font-weight: 650; }
+.workspace-actions { display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
+.workspace-panel { min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 24px; }
+.workspace-panel-title { font-size: 18px; font-weight: 650; }
+.workspace-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; padding-top: 20px; border-top: 1px solid var(--border); }
+.workspace-split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start; }
+.workspace-preview { grid-template-columns: minmax(0, 13fr) minmax(0, 7fr); }
+.workspace-settings { display: grid; grid-template-columns: minmax(160px, 20%) minmax(0, 1fr); gap: 28px; align-items: start; }
+.workspace-disclosure { border-top: 1px solid var(--border); padding-top: 16px; }
+.workspace-disclosure > summary { cursor: pointer; font-size: 14px; font-weight: 600; padding-block: 8px; }
+.workspace-disclosure[open] > summary { margin-bottom: 16px; }
+.dashboard-heading { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 18px; }
+.dashboard-brand { font-size: 20px; font-weight: 700; color: var(--primary); }
+.dashboard-intro { padding-block: 12px 4px; }
+.dashboard-intro h1 { max-width: 22ch; font-size: clamp(2rem, 3.7vw, 3.2rem); font-weight: 650; line-height: 1.2; }
+.dashboard-intro p { max-width: 70ch; margin-top: 16px; font-size: 16px; line-height: 1.8; color: var(--muted-foreground); }
+.dashboard-start { display: flex; flex-direction: column; gap: 16px; }
+.dashboard-tile { display: flex; width: 100%; min-width: 0; align-items: center; gap: 18px; padding: 22px; border: 1px solid var(--border); border-radius: 10px; text-align: left; background: var(--card); transition: border-color 120ms, background-color 120ms; }
+.dashboard-tile:hover { border-color: var(--primary); background: var(--source-surface); }
+.dashboard-tile:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.dashboard-tile[data-primary="true"] { min-height: 150px; border-color: var(--primary); background: var(--primary); color: var(--primary-foreground); }
+.dashboard-tile[data-primary="true"] .dashboard-tile-description { color: var(--primary-foreground); opacity: .88; }
+.dashboard-tile-icon { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 8px; background: var(--source-surface); color: var(--source-ink); }
+.dashboard-tile[data-primary="true"] .dashboard-tile-icon { background: #ffffff20; color: white; }
+.dashboard-tile-description { display: block; margin-top: 7px; color: var(--muted-foreground); font-size: 14px; line-height: 1.7; }
+.dashboard-recent { display: flex; min-width: 0; flex-direction: column; gap: 16px; }
+.dashboard-recent-row { display: flex; min-width: 0; align-items: center; gap: 12px; padding-block: 18px; border-bottom: 1px solid var(--border); }
+.dashboard-recent-row:last-child { border-bottom: 0; }
+.dashboard-empty { padding-block: 36px; font-size: 14px; line-height: 1.8; color: var(--muted-foreground); }
+.semantic-source { color: var(--source-ink); background: var(--source-surface); }
+.semantic-scenario { color: var(--scenario-ink); background: var(--scenario-surface); }
+.semantic-observation { color: var(--observation-ink); background: var(--observation-surface); }
+.semantic-attention { color: var(--attention-ink); background: var(--attention-surface); }
+@media (max-width: 1023px) {
+  .workspace-split, .workspace-settings { grid-template-columns: minmax(0, 1fr); }
+  .workspace-header { flex-wrap: wrap; }
+  .workspace-actions { width: 100%; }
+  .workspace-frame { gap: 24px; padding-top: 20px; }
+}
+@media (max-width: 479px) {
+  .workspace-panel, .dashboard-tile { padding: 16px; }
+  .dashboard-tile { gap: 12px; align-items: flex-start; }
+  .dashboard-tile-icon { width: 32px; height: 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) { .dashboard-tile { transition: none; } }

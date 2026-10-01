@@ -1,3 +1,9 @@
+/**
+ * Purpose: Edit provider connections with optional advanced headers.
+ * Pattern: Controlled settings composition.
+ * Usage: Rendered by SettingsPage.
+ * Related: src/ui/pages/settings-page.tsx
+ */
 import type { Dispatch, SetStateAction } from "react"
 import type { LLMSettings, ModelProvider } from "@/shared"
 import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@/ui/components/ui/field"
@@ -89,8 +95,9 @@ function ProviderSection({ provider, settings, jsonDraft, t, setDraft, setJsonDr
         </div>
       </FieldSet>
 
-      <FieldSet className="rounded-lg bg-background/70 p-4 ring-1 ring-border/60">
-        <FieldLegend>{t.settingsConnectionExtras}</FieldLegend>
+      <details className="workspace-disclosure"><summary>{t.settingsConnectionExtras}</summary>
+      <FieldSet>
+        <FieldLegend className="sr-only">{t.settingsConnectionExtras}</FieldLegend>
         <div className="grid gap-3 pt-3">
           <JsonTextarea
             label={t.settingsExtraHeaders}
@@ -99,7 +106,7 @@ function ProviderSection({ provider, settings, jsonDraft, t, setDraft, setJsonDr
             onChange={(value) => updateProviderJsonDraft(provider, "extraHeaders", value, setJsonDraft)}
           />
         </div>
-      </FieldSet>
+      </FieldSet></details>
     </FieldGroup>
   )
 }

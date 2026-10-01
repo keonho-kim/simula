@@ -1,0 +1,8 @@
+/**
+ * Purpose: Style graph overlays with the palette selected by GraphView.
+ * Pattern: Renderer-scoped presentation.
+ * Usage: Imported with the lazy graph component.
+ * Related: src/ui/components/graph/palette.ts, src/ui/components/graph/graph-view.tsx
+ */
+.graph-overlay { background: var(--card); }
+.graph-surface [data-slot="button"] { border-color: var(--border); }

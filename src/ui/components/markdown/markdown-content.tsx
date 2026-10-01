@@ -13,7 +13,7 @@ interface MarkdownContentProps {
   content?: string
   fallback?: string
   className?: string
-  compact?: boolean
+  density?: "normal" | "compact" | "report"
   generated?: boolean
   inline?: boolean
   ariaLabel?: string
@@ -25,12 +25,12 @@ const MarkdownMathRenderer = lazy(() =>
   }))
 )
 
-export function MarkdownContent({ content, fallback = "-", className, compact = false, generated = false, inline = false, ariaLabel }: MarkdownContentProps) {
+export function MarkdownContent({ content, fallback = "-", className, density = "normal", generated = false, inline = false, ariaLabel }: MarkdownContentProps) {
   const source = normalizeMarkdownSource(content?.trim() || fallback)
   const Element = inline ? "span" : "div"
   const selectable = generated && Boolean(content?.trim())
   return (
-    <Element aria-label={ariaLabel} data-llm-generated={selectable ? "true" : undefined} className={cn("simula-markdown", compact && "simula-markdown-compact", inline && "simula-markdown-inline", className)}>
+    <Element aria-label={ariaLabel} data-llm-generated={selectable ? "true" : undefined} className={cn("simula-markdown", density === "compact" && "simula-markdown-compact", density === "report" && "simula-markdown-report", inline && "simula-markdown-inline", className)}>
       {hasMathSyntax(source) ? (
         <Suspense fallback={<MarkdownRenderer source={source} inline={inline} />}>
           <MarkdownMathRenderer source={source} inline={inline} />

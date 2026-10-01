@@ -43,6 +43,10 @@ test("scenario board opens as a page and hands off when preparation ends", async
   const columns = board.locator('section[aria-label]')
   await expect(columns).toHaveCount(4)
   const title = board.getByRole("heading", { name: "시나리오 보드", exact: true })
+  await expect.poll(() => title.evaluate(element => {
+    const surface = element.closest(".relative.min-h-svh.w-full.bg-background")
+    return surface ? getComputedStyle(surface).transform : "none"
+  })).toBe("none")
   const titleX = (await title.boundingBox())!.x
   expect(await columns.evaluateAll(elements => elements.map(element => element.getAttribute("aria-label"))))
     .toEqual(["배경·갈등", "예상 이벤트", "행동", "인물 카드"])

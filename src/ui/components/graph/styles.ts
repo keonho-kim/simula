@@ -1,3 +1,10 @@
+/**
+ * Purpose: Derive graph emphasis, geometry, and appearance from interaction state.
+ * Pattern: Pure rendering transformations.
+ * Usage: Used by the frame writer and Sigma reducers.
+ * Related: src/ui/components/graph/palette.ts, src/ui/components/graph/renderer/use-graph-renderer.ts
+ */
+import { GRAPH_PALETTES, type GraphPalette } from "./palette"
 import { DEFAULT_EDGE_CURVATURE, indexParallelEdgesIndex } from "@sigma/edge-curve"
 import type { GraphEdgeView } from "@/shared"
 import { LARGE_GRAPH_LABEL_THRESHOLD, MUTED_EDGE_COLOR, MUTED_NODE_COLOR } from "@/ui/components/graph/constants"
@@ -9,6 +16,7 @@ export function reduceNode(
   data: GraphNodeAttributes,
   state: {
     activeNodeIds: Set<string>
+    palette?: GraphPalette
     highlightedNodeDepths: Map<string, number>
     hoveredNodeId?: string
     selectedNodeId?: string
@@ -31,7 +39,7 @@ export function reduceNode(
   const renderLabel = shouldRenderLabel(graph, related, active || selectedDepth !== undefined, data)
   return {
     ...data,
-    color: active || node === focusNodeId ? graphIntensityColor(Math.max(data.interactionCount, data.degree)) : related ? data.color : MUTED_NODE_COLOR,
+    color: active || node === focusNodeId ? graphIntensityColor(Math.max(data.interactionCount, data.degree), state.palette) : related ? (state.palette ? graphIntensityColor(data.interactionCount, state.palette) : data.color) : (state.palette?.mutedNode ?? MUTED_NODE_COLOR),
     label: renderLabel ? data.label : "",
     forceLabel: renderLabel,
     size: active || node === focusNodeId ? data.size + 4 : selectedDepth === 1 ? data.size + 2 : data.size,
@@ -44,6 +52,7 @@ export function reduceEdge(
   edge: string,
   data: GraphEdgeAttributes,
   state: {
+    palette?: GraphPalette
     highlightedNodeDepths: Map<string, number>
     hoveredNodeId?: string
     selectedNodeId?: string
@@ -56,14 +65,14 @@ export function reduceEdge(
     const selected = edge === focusEdgeId
     return {
       ...data,
-      color: selected ? edgeColor(data.weight, 0.96) : MUTED_EDGE_COLOR,
+      color: selected ? edgeColor(data.weight, 0.96, state.palette) : (state.palette?.mutedEdge ?? MUTED_EDGE_COLOR),
       size: selected ? data.size + 2.5 : Math.max(0.7, data.size * 0.28),
       zIndex: selected ? 2 : 0,
     }
   }
   const focusNodeId = state.selectedNodeId ?? state.hoveredNodeId
   if (!focusNodeId || !graph.hasNode(focusNodeId)) {
-    return data
+    return state.palette ? { ...data, color: edgeColor(data.weight, undefined, state.palette) } : data
   }
   const source = graph.source(edge)
   const target = graph.target(edge)
@@ -72,7 +81,7 @@ export function reduceEdge(
     : source === focusNodeId || target === focusNodeId
   return {
     ...data,
-    color: related ? edgeColor(data.weight, 0.9) : MUTED_EDGE_COLOR,
+    color: related ? edgeColor(data.weight, 0.9, state.palette) : (state.palette?.mutedEdge ?? MUTED_EDGE_COLOR),
     size: related ? data.size + 1.8 : Math.max(0.7, data.size * 0.32),
     zIndex: related ? 1 : 0,
   }
@@ -128,22 +137,16 @@ export function edgeAlpha(weight: number): number {
   return 0.9
 }
 
-export function graphIntensityColor(value: number): string {
+export function graphIntensityColor(value: number, palette: GraphPalette = GRAPH_PALETTES.standard): string {
   const level = intensityLevel(value)
-  if (level === "none") return MUTED_NODE_COLOR
-  if (level === "low") return "#93c5fd"
-  if (level === "medium") return "#4c8df6"
-  if (level === "high") return "#6d5bd0"
-  return "#be3455"
+  if (level === "none") return palette.mutedNode
+  return palette.nodes[level === "low" ? 0 : level === "medium" ? 1 : level === "high" ? 2 : 3]
 }
 
-export function edgeColor(weight: number, alpha = edgeAlpha(weight)): string {
+export function edgeColor(weight: number, alpha = edgeAlpha(weight), palette: GraphPalette = GRAPH_PALETTES.standard): string {
   const level = intensityLevel(weight)
-  if (level === "none") return `rgba(100, 116, 139, ${alpha})`
-  if (level === "low") return `rgba(47, 111, 143, ${alpha})`
-  if (level === "medium") return `rgba(75, 156, 143, ${alpha})`
-  if (level === "high") return `rgba(138, 122, 184, ${alpha})`
-  return `rgba(183, 121, 102, ${alpha})`
+  const index = level === "none" ? 0 : level === "low" ? 1 : level === "medium" ? 2 : level === "high" ? 3 : 4
+  return `rgba(${palette.edges[index]}, ${alpha})`
 }
 
 export function applyEdgeCurves(graph: ActorGraph): void {

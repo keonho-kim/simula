@@ -1,3 +1,10 @@
+/**
+ * Purpose: Own Sigma, worker layout, camera selection, and graph overlay lifecycles.
+ * Pattern: Renderer lifecycle hook.
+ * Usage: Called by GraphView; appearance changes update colors without rebuilding the graph.
+ * Related: src/ui/components/graph/palette.ts, src/ui/components/graph/layout/worker-client.ts
+ */
+import { GRAPH_PALETTES } from "../palette"
 import { createLayoutWorker } from "../layout/worker-client"
 import type { GraphViewProps } from "@/ui/components/graph/renderer/types"
 import { edgePreviewStyleFromEvent } from "@/ui/components/graph/overlays/pointer-position"
@@ -27,6 +34,7 @@ const EMPTY_ACTORS: ActorState[] = []
 
 export function useGraphRenderer({
   frame,
+  appearance = "standard",
   selectedActorId,
   onActorSelect,
   selectedEdgeId,
@@ -34,6 +42,7 @@ export function useGraphRenderer({
   actors = EMPTY_ACTORS,
   showActorPopover,
 }: GraphViewProps) {
+  const paletteRef = useRef(GRAPH_PALETTES[appearance])
   const layoutWorkerRef = useRef<ReturnType<typeof createLayoutWorker> | null>(null)
   const [layoutError, setLayoutError] = useState<Error>()
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -152,7 +161,7 @@ export function useGraphRenderer({
         [EDGE_TYPE]: EdgeCurvedArrowProgram as unknown as EdgeProgramType<GraphNodeAttributes, GraphEdgeAttributes>,
       },
       enableEdgeEvents: Boolean(onEdgeSelect),
-      labelColor: { color: "#172033" },
+      labelColor: { color: paletteRef.current.ink },
       labelDensity: 0.12,
       labelFont: "Geist Variable, sans-serif",
       labelGridCellSize: 64,
@@ -160,6 +169,7 @@ export function useGraphRenderer({
       renderEdgeLabels: false,
       zIndex: true,
       nodeReducer: (node, data) => reduceNode(graph, node, data, {
+        palette: paletteRef.current,
         activeNodeIds: activeNodeIdsRef.current,
         highlightedNodeDepths: highlightedNodeDepthsRef.current,
         hoveredNodeId: hoveredNodeRef.current,
@@ -167,6 +177,7 @@ export function useGraphRenderer({
         selectedEdgeId: selectedEdgeRef.current,
       }),
       edgeReducer: (edge, data) => reduceEdge(graph, edge, data, {
+        palette: paletteRef.current,
         highlightedNodeDepths: highlightedNodeDepthsRef.current,
         hoveredNodeId: hoveredNodeRef.current,
         selectedNodeId: selectedNodeRef.current,
@@ -257,6 +268,14 @@ export function useGraphRenderer({
       rendererRef.current?.scheduleRefresh()
     }
   }, [frame, requestOverlayRefresh, updateSelectedDepths])
+
+  useEffect(() => {
+    paletteRef.current = GRAPH_PALETTES[appearance]
+    const renderer = rendererRef.current
+    if (!renderer) return
+    renderer.setSetting("labelColor", { color: paletteRef.current.ink })
+    renderer.scheduleRefresh()
+  }, [appearance])
 
   const resetCamera = () => {
     rendererRef.current?.getCamera().animate({ x: 0, y: 0, angle: 0, ratio: 1 }, { duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 120 })

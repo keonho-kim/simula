@@ -29,7 +29,7 @@ interface ReportPageProps {
   state?: SimulationState
   events: RunEvent[]
   subject: AnalysisSubject
-  analysis: Pick<ReturnType<typeof useAnalyticalReport>, "query" | "record" | "metrics" | "accounting">
+  analysis: Pick<ReturnType<typeof useAnalyticalReport>, "query" | "record">
   loadError: boolean
   runError?: string
   onRetryLoad: () => void
@@ -51,10 +51,10 @@ export function ReportPage({ selectedRunId, title, status, state, events, subjec
     window.scrollTo({ top: 0, behavior: "instant" })
     resultHeading.current?.focus({ preventScroll: true })
   }, [subject.id, subject.kind])
-  return <main className="min-h-svh bg-card text-foreground"><div className="mx-auto flex w-[94vw] max-w-[1600px] flex-col gap-5 py-5">
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+  return <main className="workspace-page report-page"><div className="workspace-frame">
+    <header className="report-masthead">
       <div className="flex min-w-0 items-center gap-3"><RunNavigation runId={selectedRunId} onHome={onHome} onBackToWorlds={onBackToWorlds} t={t} />
-        <div className="min-w-0"><h1 ref={resultHeading} tabIndex={-1} className="truncate text-lg font-semibold outline-none">{title}</h1><p className="text-xs text-muted-foreground">{t.report}</p></div>
+        <div className="min-w-0"><h1 ref={resultHeading} tabIndex={-1} className="report-title outline-none">{title}</h1><p className="text-xs text-muted-foreground">{t.report}</p></div>
         {status ? <Badge variant={status === "failed" ? "destructive" : "secondary"}>{reportStatusLabel(status, t)}</Badge> : null}
       </div>
       <div className="flex flex-wrap gap-2">

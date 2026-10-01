@@ -4,24 +4,8 @@
  * Usage: Imported only by the lazy scenario-builder dialog.
  * Related: src/ui/components/scenario-builder/scenario-builder-dialog.tsx
  */
-.scenario-builder-dialog[data-slot="dialog-content"] {
-  top: 50%;
-  left: 50%;
-  display: flex;
-  width: min(920px, calc(100vw - 3rem));
-  max-width: none;
-  max-height: min(800px, calc(100svh - 3rem));
-  min-height: 0;
-  flex-direction: column;
-  gap: 24px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding: clamp(16px, 2.5vw, 32px);
-  translate: -50% -50%;
-  transform: none;
-}
 .document-scenario-body { display: flex; min-width: 0; flex-direction: column; gap: 20px; }
-.document-builder-form { display: flex; flex-direction: column; gap: 24px; width: 100%; min-width: 0; padding: 4px; }
+.document-builder-form { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; width: 100%; min-width: 0; }
 .document-builder-form > * { width: 100%; min-width: 0; }
 .document-builder-files { display: flex; flex-direction: column; gap: 10px; }
 .document-builder-files > li { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding-block: 8px; font-size: 13px; }
@@ -45,3 +29,7 @@
 @media (max-width: 760px) {
   .document-builder-task-detail { border-left: 0; border-top: 1px solid var(--border); }
 }
+
+.document-input-source { display: flex; flex-direction: column; gap: 28px; }
+.document-input-source textarea { min-height: 180px; }
+@media (max-width: 1023px) { .document-builder-form { grid-template-columns: minmax(0, 1fr); } }

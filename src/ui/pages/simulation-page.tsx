@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, type ReactNode } from "react"
 import { ActorRail } from "@/ui/components/actors/actor-rail"
-import { LlmMetricsPanel } from "@/ui/components/metrics/llm-metrics-panel"
+import { LiveMetricSummary } from "@/ui/components/metrics/live-metric-summary"
 import { SimulationStage } from "@/ui/components/simulation/simulation-stage"
 import type { UiTexts } from "@/ui/types/i18n"
 import "@/ui/styles/simulation.css"
@@ -29,11 +29,11 @@ export function SimulationPage({ toolbar, notice, children, t, selectedActorId, 
     window.scrollTo({ top: 0, behavior: "instant" })
     page.current?.focus({ preventScroll: true })
   }, [])
-  return <main ref={page} tabIndex={-1} className="simulation-page h-dvh overflow-hidden bg-background text-foreground outline-none">
-    <div className="mx-auto flex h-full min-h-0 w-full flex-col gap-3 px-4 py-3 lg:w-4/5 lg:px-0">
+  return <main ref={page} tabIndex={-1} className="simulation-page bg-background text-foreground outline-none">
+    <div className="simulation-workspace">
       <div className="shrink-0">{toolbar}{notice}</div>
-      <div className="shrink-0"><LlmMetricsPanel t={t} /></div>
-      <section className="flex min-h-0 flex-1 flex-col items-stretch gap-3 md:flex-row">
+      <div className="shrink-0"><LiveMetricSummary t={t} /></div>
+      <section className="simulation-panels">
         <SimulationStage className="min-h-0 flex-[3] overflow-hidden" t={t}
           selectedActorId={selectedActorId} onActorSelect={onActorSelect} onActorExpand={onActorExpand}
           selectedEdgeId={selectedEdgeId} onEdgeSelect={onEdgeSelect} showActorPopover />

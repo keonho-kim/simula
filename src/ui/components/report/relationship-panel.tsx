@@ -81,7 +81,7 @@ export function ReportRelationshipPanel({ state, t }: { state?: SimulationState;
                 ].map(([label, content]) => (
                   <section key={label}>
                     <h3 className="mb-2 text-xs font-medium text-muted-foreground">{label}</h3>
-                    <MarkdownContent generated compact content={content ?? ""} fallback="—" />
+                    <MarkdownContent generated density="compact" content={content ?? ""} fallback="—" />
                   </section>
                 ))}
               </div>

@@ -43,7 +43,7 @@ export function EdgePreview({
         </span>
       </div>
       {edge.latestContent ? (
-        <MarkdownContent generated compact className="line-clamp-2 text-xs leading-5 text-muted-foreground" content={edge.latestContent} />
+        <MarkdownContent generated density="compact" className="line-clamp-2 text-xs leading-5 text-muted-foreground" content={edge.latestContent} />
       ) : null}
     </div>
   )

@@ -2,7 +2,7 @@
  * Purpose: Verify settings loading recovery and the labeled concurrency control.
  * Pattern: Browser workflow test.
  * Usage: bun run test:e2e -- apps/web/e2e/settings-loading.e2e.ts
- * Related: src/ui/components/settings/settings-dialog.tsx, src/ui/components/settings/role-settings-panel.tsx
+ * Related: src/ui/pages/settings-page.tsx, src/ui/components/settings/role-settings-panel.tsx
  */
 import { expect, test } from "./fixtures"
 
@@ -15,7 +15,7 @@ test("settings failures replace loading with an error and can be retried", async
   })
   await page.goto("/")
   await page.getByRole("button", { name: "Settings", exact: true }).click()
-  const dialog = page.getByRole("dialog", { name: "LLM settings" })
+  const dialog = page.getByRole("main", { name: "LLM settings" })
   await expect(dialog.getByRole("alert")).toBeVisible()
   await expect(dialog.getByText("Loading settings...", { exact: true })).toHaveCount(0)
   await expect(dialog.getByRole("button", { name: "Save settings", exact: true })).toBeDisabled()
@@ -31,7 +31,7 @@ test("a stalled settings request times out instead of loading forever", async ({
   await page.route("**/api/settings/defaults", () => {})
   await page.goto("/")
   await page.getByRole("button", { name: "설정", exact: true }).click()
-  const dialog = page.getByRole("dialog")
+  const dialog = page.getByRole("main", { name: "LLM 설정" })
   await expect(dialog.getByRole("alert")).toBeVisible({ timeout: 15000 })
   await expect(dialog.getByText("설정을 불러오는 중...", { exact: true })).toHaveCount(0)
   await expect(dialog.getByRole("button", { name: "다시 시도", exact: true })).toBeEnabled()
@@ -48,11 +48,11 @@ test("the concurrency setting is labeled and included in the saved payload", asy
   })
   await page.goto("/")
   await page.getByRole("button", { name: "Settings", exact: true }).click()
-  const dialog = page.getByRole("dialog", { name: "LLM settings" })
+  const dialog = page.getByRole("main", { name: "LLM settings" })
   await dialog.getByRole("button", { name: /Roles/ }).click()
-  expect((await dialog.boundingBox())!.height).toBeLessThan(await page.evaluate(() => innerHeight))
+  expect((await dialog.locator(".workspace-frame").boundingBox())!.width).toBeCloseTo(await page.evaluate(() => innerWidth * .8), 0)
   await expect(dialog.locator('[data-slot="scroll-area-viewport"]')).toHaveCount(0)
-  expect(await dialog.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true)
+  await expect(dialog.locator(".workspace-settings")).toBeVisible()
   await dialog.getByRole("spinbutton", { name: "Concurrent model calls" }).fill("3")
   await dialog.getByRole("textbox", { name: "Credentials passphrase" }).fill("unit-test-passphrase")
   await dialog.getByRole("button", { name: "Save settings" }).click()
@@ -64,17 +64,17 @@ test("edited settings ask before closing and remain over the scenario popup", as
   await page.addInitScript(() => localStorage.setItem("simula.language", "en"))
   await page.goto("/")
   await page.getByRole("button", { name: /New Scenario/ }).click()
-  const scenario = page.getByRole("dialog", { name: "New Scenario" })
+  const scenario = page.getByRole("main", { name: "New Scenario" })
   await scenario.getByRole("button", { name: "Settings" }).click()
-  const settings = page.getByRole("dialog", { name: "LLM settings" })
+  const settings = page.getByRole("main", { name: "LLM settings" })
   await settings.getByRole("button", { name: /Roles/ }).click()
   await settings.getByRole("spinbutton", { name: "Concurrent model calls" }).fill("3")
-  await settings.getByRole("button", { name: "Close" }).click()
+  await settings.getByRole("button", { name: "Back" }).click()
   const confirm = page.getByRole("dialog", { name: "Save changes before closing?" })
   await expect(confirm).toBeVisible()
   await confirm.getByRole("button", { name: "Continue editing" }).click()
   await expect(settings.getByRole("spinbutton", { name: "Concurrent model calls" })).toHaveValue("3")
-  await settings.getByRole("button", { name: "Close" }).click()
+  await settings.getByRole("button", { name: "Back" }).click()
   await confirm.getByRole("button", { name: "Discard and close" }).click()
   await expect(settings).toBeHidden()
   await expect(scenario).toBeVisible()

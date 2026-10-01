@@ -4,6 +4,7 @@
  * Usage: Mounted by App for report and report-preparation URLs; batch worlds always resolve to their parent batch.
  * Related: src/ui/models/report/preparation.ts, src/ui/pages/report-page.tsx
  */
+import { WorkspaceFrame } from "@/ui/components/layout/workspace-frame"
 import { RunNavigation } from "@/ui/components/navigation/run-navigation"
 import { useEffect, useRef } from "react"
 import { useQuery } from "@tanstack/react-query"
@@ -61,18 +62,18 @@ export function ReportFlow({ mode, onNavigate, selectedRunId, selectedRunStatus,
   }, [canGenerate, mode, subjectKey, analysis.commandPending, analysis.query.isFetching, analysis.query.isError, analysis.query.data, prepare])
   if (!subject.id || batchActive || isBatch && !batchQuery.data && !resultReady) {
     const failed = query.isError || isBatch && batchQuery.isError
-    return <main className="min-h-svh bg-background p-6"><div className="mx-auto flex max-w-4xl flex-col gap-4">
+    return <WorkspaceFrame>
       <RunNavigation runId={selectedRunId} onHome={onHome} onBackToWorlds={onBackToWorlds} t={t} />
       <h1 className="text-lg font-semibold">{title}</h1>
       <p role={failed ? "alert" : "status"}>{failed ? t.reportLoadError : batchActive ? t.analysisBatchWaiting : t.reportLoading}</p>
       {failed ? <Button variant="outline" onClick={() => { if (query.isError) void query.refetch(); else void batchQuery.refetch() }}>{t.reportRetryLoad}</Button> : null}
-    </div></main>
+    </WorkspaceFrame>
   }
-  if (mode !== destination || analysis.query.isPending) return <main className="min-h-svh bg-background p-6">
+  if (mode !== destination || analysis.query.isPending) return <WorkspaceFrame>
     <RunNavigation runId={selectedRunId} onHome={onHome} onBackToWorlds={onBackToWorlds} t={t} /><p role="status">{t.reportLoading}</p>
-  </main>
+  </WorkspaceFrame>
   if (mode === "report-preparation") return <ReportPreparationPage selectedRunId={selectedRunId} onBackToWorlds={onBackToWorlds}
-    key={subjectKey} title={title} analysis={analysis} events={events} t={t} onHome={onHome} batch={isBatch} runError={isBatch ? undefined : query.data?.run.error} />
+    key={subjectKey} title={title} analysis={analysis} events={events} t={t} onHome={onHome} runError={isBatch ? undefined : query.data?.run.error} />
   return <ReportPage onBackToWorlds={onBackToWorlds} selectedRunId={selectedRunId} title={title}
     status={isBatch ? batchQuery.data?.status : query.data?.run.status ?? selectedRunStatus}
     state={isBatch ? undefined : state} events={events} subject={subject} analysis={analysis}

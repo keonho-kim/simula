@@ -131,3 +131,17 @@ test("corrupt persisted history sends an explicit stream failure without canceli
     expect(f.subscriptions.size).toBe(0)
   } finally { await f.close() }
 })
+
+test("actor previews never enter the durable event log or graph timeline", async () => {
+  const f = await fixture()
+  try {
+    await appendAndPublish(f.store, f.subscriptions, { type: "actor.progress", runId: f.run.id, timestamp: "now",
+      update: { kind: "round", roundIndex: 1, parallel: true, actors: [{ id: "a", name: "A" }] } }, f.lease)
+    await appendAndPublish(f.store, f.subscriptions, { type: "actor.progress", runId: f.run.id, timestamp: "now",
+      update: { kind: "ready", roundIndex: 1, message: { id: "round-1-a", actorId: "a", actorName: "A", role: "Role",
+        content: "UNCOMMITTED", action: "Speak", targets: [], visibility: "public", decisionType: "action" } } }, f.lease)
+    expect(f.subscriptions.actors.snapshot(f.run.id)?.turns[0].status).toBe("ready")
+    const log = await f.store.openEventLog(f.run.id)
+    try { expect(await log.next()).toBeUndefined() } finally { await log.close() }
+  } finally { await f.close() }
+})

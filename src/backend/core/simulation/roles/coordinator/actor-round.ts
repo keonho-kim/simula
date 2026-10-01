@@ -42,18 +42,24 @@ export async function runActorRound(
   const interactions: Interaction[] = []
   for (const batch of actorExecutionBatches(actors, state.scenario.controls.fastMode)) {
     const snapshot = nextActors
+    let publishing = true
     const results = await Promise.all(
-      batch.map((actor) => runActorGraph(
-        state,
-        snapshot,
-        actor.id,
-        event,
-        roundDigest,
-        roundIndex,
-        coordinatorTrace,
-        emit
-      ))
-    )
+      batch.map(async (actor) => {
+        await emit({ type: "actor.progress", runId: state.runId, timestamp: timestamp(), update: { kind: "started", roundIndex, actorId: actor.id } })
+        const result = await runActorGraph(
+          state, snapshot, actor.id, event, roundDigest, roundIndex, coordinatorTrace, emit
+        )
+        if (publishing) {
+          const interaction = buildInteraction(roundIndex, event, actor, snapshot, result.decision, state.scenario.language)
+          await emit({ type: "actor.progress", runId: state.runId, timestamp: timestamp(), update: { kind: "ready", roundIndex, message: {
+            id: interaction.id, actorId: actor.id, actorName: actor.name, role: actor.role,
+            targets: interaction.targetActorIds.map(id => snapshot.find(actor => actor.id === id)?.name ?? id),
+            action: interaction.actionType, content: interaction.content, visibility: interaction.visibility, decisionType: interaction.decisionType,
+          } } })
+        }
+        return result
+      })
+    ).finally(() => { publishing = false })
     for (const result of results) {
       const currentActor = nextActors.find((actor) => actor.id === result.actorId)
       if (!currentActor) continue
