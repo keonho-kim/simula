@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, type ReactNode } from "react"
 import { ActorRail } from "@/ui/components/actors/actor-rail"
-import { LiveMetricSummary } from "@/ui/components/metrics/live-metric-summary"
+import { LlmMetricsPanel } from "@/ui/components/metrics/llm-metrics-panel"
 import { SimulationStage } from "@/ui/components/simulation/simulation-stage"
 import type { UiTexts } from "@/ui/types/i18n"
 import "@/ui/styles/simulation.css"
@@ -32,7 +32,7 @@ export function SimulationPage({ toolbar, notice, children, t, selectedActorId, 
   return <main ref={page} tabIndex={-1} className="simulation-page bg-background text-foreground outline-none">
     <div className="simulation-workspace">
       <div className="shrink-0">{toolbar}{notice}</div>
-      <div className="shrink-0"><LiveMetricSummary t={t} /></div>
+      <div className="shrink-0"><LlmMetricsPanel t={t} /></div>
       <section className="simulation-panels">
         <SimulationStage className="min-h-0 flex-[3] overflow-hidden" t={t}
           selectedActorId={selectedActorId} onActorSelect={onActorSelect} onActorExpand={onActorExpand}

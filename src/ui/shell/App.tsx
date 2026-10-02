@@ -194,8 +194,8 @@ function App() {
     setReportConfirmRunId(undefined)
     setActorDetailOpen(false)
     setSelectedEdgeId(undefined)
-    viewModeRef.current = "document-analysis"
-    setViewMode("document-analysis")
+    viewModeRef.current = "simulations"
+    setViewMode("simulations")
   }
 
   let content: ReactNode

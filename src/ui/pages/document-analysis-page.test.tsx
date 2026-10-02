@@ -20,9 +20,8 @@ function workflow(overrides: Partial<Workflow> = {}): Workflow {
     ] }, build: undefined, hasSession: true, refreshing: false, refresh: () => {}, ...overrides }
 }
 function render(w: Workflow) {
-  return renderToStaticMarkup(<DocumentAnalysisPage workflow={w} language="ko" t={dictionary.ko} onHome={() => {}}
-    onEdit={() => {}} onOpenSettings={() => {}} starting={false} autoContinue={false} onAutoContinueChange={() => {}}
-    onStartWorld={() => {}} onOpenRun={() => {}} />)
+  return renderToStaticMarkup(<DocumentAnalysisPage workflow={w} t={dictionary.ko} onHome={() => {}}
+    onEdit={() => {}} onOpenSettings={() => {}} onSimulations={() => {}} />)
 }
 test("document analysis uses a main page and exposes file reading state without setup fields", () => {
   const html = render(workflow())

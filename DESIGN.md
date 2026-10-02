@@ -4,9 +4,9 @@
 
 Simula helps people explore what could happen using materials they already have. Users bring documents and context, review the resulting scenario, observe simulated interactions, and read an explanation of possible developments and the conditions behind them.
 
-The "Minority Report" reference expresses the ambition to make possible futures inspectable. Translate that ambition into clear evidence, connected events, and readable interpretation. The visual language is a bright analytical workspace with editorial reports. Keep speculative outcomes visibly connected to their inputs and assumptions; the interface must not imply certainty or real-world predictive accuracy that the system has not established.
+The "Minority Report" reference expresses the ambition to make possible futures inspectable. Translate that ambition into clear evidence, connected events, and readable interpretation. The visual language is a complete analytical service: a recognizable application workspace, actionable dashboards, an operational simulation view, and editorial reports. Keep speculative outcomes visibly connected to their inputs and assumptions; the interface must not imply certainty or real-world predictive accuracy that the system has not established.
 
-The experience should feel thoughtful, legible, and purposeful. Use white reading surfaces, cool background planes, strong ink, and distinct semantic accents. Give important content room and give different kinds of information recognizable identities.
+Use an explicit SaaS interface with visible navigation, useful summaries, strong action hierarchy, and distinct control surfaces. Prioritize task visibility and discoverability over sparse presentation. White content panels, cool background planes, saturated brand actions, semantic status colors, and bounded elevation should make the service easy to operate. Editorial reports retain their reading rhythm.
 
 This document is the design authority for new and revised UI. It describes the target design; it does not claim every existing screen already follows it. Implement changes through existing components and semantic tokens, within the responsibility being changed.
 
@@ -69,14 +69,14 @@ These light-theme values are the reference palette. `src/ui/index.css` owns impl
 
 | Role | Reference value | Use |
 | --- | --- | --- |
-| Workspace | `#F3F6FA` | Page canvas around content and tools |
+| Workspace | `#F1F5FB` | Page canvas around content and tools |
 | Reading surface | `#FFFFFF` | Documents, reports, forms, primary panels |
-| Secondary surface | `#EAF0F6` | Navigation, grouped controls, supporting regions |
+| Secondary surface | `#E8EFFF` | Navigation, grouped controls, supporting regions |
 | Structural divider | `#CBD5E1` | Section and panel boundaries |
 | Control boundary | `#74859B` | Input and interactive boundaries where needed for recognition |
 | Primary ink | `#172033` | Titles, body, important values |
 | Secondary ink | `#526176` | Descriptions, metadata, captions |
-| Primary action | `#254E70` | Main actions with white text |
+| Primary action | `#2563EB` | Main actions with white text |
 | Active and focus | `#1D4ED8` | Selection indicators, keyboard focus, active navigation |
 
 ### Semantic accents
@@ -100,7 +100,7 @@ Color communicates a specific meaning. Successful execution does not imply a fav
 - Give normal text adequate ink contrast; do not make entire paragraphs pale to create hierarchy.
 - Pair state and provenance colors with text, icons, line styles, or shapes. Include legends where meanings are not already explicit.
 - Keep actor and series colors stable across a graph, timeline, and legend. Identity colors must not silently acquire status meaning.
-- Reserve shadows for elevation and overlays. Do not compensate for weak hierarchy by adding shadows or borders everywhere.
+- Use light, static elevation to separate interactive controls and working panels from the canvas. Give primary, secondary, and destructive actions distinct fills; avoid a uniform collection of outlined rectangles.
 - Warm amber is appropriate for a bounded attention state. Keep the overall canvas white or cool neutral.
 - Use existing semantic Tailwind tokens first. Add a named semantic token only when implementing its actual consumer; avoid page-specific raw color palettes.
 
@@ -154,11 +154,34 @@ These ranges are starting points, not a requirement to use every size. Use a sma
 - Keep the final review summary and launch action easy to locate. Sticky controls must not cover content or keyboard focus.
 - Use a full page for extended review and multi-step preparation. Reserve dialogs for bounded edits and confirmations; avoid stacking settings over a long preview dialog.
 
+### Generation hierarchy
+
+- Always separate the stage, its semantic generation targets, and each target's steps. A participant's personality, decision scope, and goal belong inside that person, rather than appearing as three unrelated participant cards.
+- Present stage navigation first, target cards second, and a selected target's step list beside its content third. Keep a breadcrumb and a return control for both inner levels; restore focus to the originating control on return.
+- Name targets using the actual person, document, or subject. Name steps by what they produce. Numbers are useful for repeated evidence blocks or roster positions, but must not replace a meaningful target name.
+
+| Stage | Generation target | Steps |
+| --- | --- | --- |
+| Read materials | Each source document; combined materials | Check facts, summarize, identify gaps, synthesize evidence |
+| Design situation | Decision context; goals, constraints, tensions | Title, purpose, decision, starting situation; relevant facet |
+| Build participants | Participant selection; each named person | Choose count and names; personality, decision scope, immediate goal |
+| Check scenario | Rules; source access; consistency | Information, actions, stopping conditions, variations; fact access |
+| Prepare simulation | Initial situation; each named person | Opening, assumptions; starting position, immediate concern |
+
+- Keep the stage/target overview stable while reading a step. New progress must update the existing target, not reset navigation or duplicate it during retries.
+- Count received steps explicitly. Generation can introduce further work, so completion of the currently received steps is not a fabricated overall percentage.
+- Fetch accepted content and subscribe to drafts only for the selected step. Inactive content must not remain mounted. On compact screens, stack the step list and reading pane without flattening the hierarchy.
+
 ### Simulation and world comparison
+
+- Keep source analysis and scenario review at `/document-analysis`. After confirmation, move preparation and active-run management to `/simulations` with its own title and actions. The document-analysis header must not frame running simulations.
+- Use "simulation" for user-facing execution controls. "View simulations" returns to management; "View simulation" opens one run; "Stop simulation" affects the selected run. Domain and storage identifiers may retain "world".
+- Keep new-scenario entry on the home page. Simulation management and observation focus on the current scenario and its executions; do not add a competing new-scenario action to their headers.
+- Organize management into actual batch totals, a visible simulation list, the selected run's controls, and a separate area for batch-wide actions and the aggregate report. Mount detailed preparation for the selected simulation only.
 
 - Prioritize the current stage, actor interactions, meaningful changes, and pause/continue controls.
 - Keep command and conversation surfaces bright. Use the tactical navy palette only inside the simulation graph, including labels and overlays. A static grid and meaningful selection provide the operational character. The graph palette module owns its canvas and overlay colors.
-- Keep technical metrics compact by default and mount detailed charts only when opened.
+- Show the existing compact performance charts directly above the live simulation, without a separate summary or disclosure. Stack metric cards on compact screens. Report metrics remain in execution details.
 - Show validated actor messages as soon as each finishes. Pending previews must be labeled and replaced in place by accepted interactions; only accepted interactions affect saved history, graph state, or reports.
 - Use a viewport-bound layout only when the primary content remains usable. On compact screens, provide focused views or a readable vertical flow instead of shrinking everything into one viewport.
 - Compare worlds with aligned labels and consistent scales. Show incomplete and unclassified worlds alongside the denominator for any distribution.
@@ -175,7 +198,7 @@ The report is the main explanation of the user's experiment. Its reading order i
 6. **Execution details:** model usage, resource accounting, and technical exports.
 
 - The first viewport should expose the main conclusion and enough scope to interpret it. Do not put a large model-metrics dashboard ahead of the report.
-- Use a restrained title block, readable lead, chapter rhythm, rules, and captions. Keep analytical paragraphs outside decorative cards.
+- Use a strong title block, readable lead, chapter rhythm, rules, and captions. Keep analytical paragraphs outside decorative cards.
 - Keep analysis reading, recorded interactions, and execution details visibly distinct. Within analysis, use chapter navigation and mount only the selected full chapter.
 - Allow figures and comparison tables to extend beyond the prose column when useful. Provide captions and explain what their values represent.
 - Open evidence inline or in an adjacent panel with a clear return to the claim. On compact screens, preserve a straightforward reading and focus order.
@@ -189,7 +212,25 @@ The report is the main explanation of the user's experiment. Its reading order i
 - Show ordinary fields first and disclose advanced headers or JSON configuration when requested.
 - Keep save state and validation near the relevant controls. Preserve drafts and warn before discarding changed settings through the existing workflow.
 
-## 7. Components, States, and Accessibility
+## 7. Actions and Button Placement
+
+| Role | Existing variant | Appearance and placement |
+| --- | --- | --- |
+| Principal next step | `default` | Filled brand blue, white text, light elevation; near the task result or in its action footer |
+| Related alternative | `secondary` | Tinted blue surface with dark ink; grouped next to the principal action |
+| Navigation or inspection | `outline` | White control surface, visible boundary, dark ink; in the context header or adjacent to inspected content |
+| Low-priority action | `ghost` or `link` | Text emphasis with local hover/focus feedback; outside the principal decision group |
+| Stop or destructive action | `destructive` | Red-tinted surface, red ink, visible red boundary; separated from forward actions |
+
+- Use 40px common controls and 44px large actions, semibold labels, approximately 8px corners, and consistent icon spacing. Preserve compact controls for bounded table or list actions.
+- Give each decision area one principal action. Navigation belongs in the page header; selected-run actions belong in the selected-run panel; batch-wide actions belong in a separate footer.
+- Place progression switches close to the run they affect. Place stop controls apart from continue/view controls, with explicit target wording.
+- Keep controls visually distinct from surrounding panels through fill, boundary, elevation, and ink. Hover, pressed, disabled, and focus states must remain recognizable.
+- Align actions in stable groups with 12–16px spacing. On compact screens, wrap labels and groups, and use full-width actions where needed; do not hide or clip essential actions.
+- Keep default element rules inside the base CSS layer. Global unlayered border or font resets must not override component variants.
+- Use icons to reinforce action meaning, alongside visible labels. Avoid undifferentiated rows of equally styled buttons.
+
+## 8. Components, States, and Accessibility
 
 - Reuse existing shadcn primitives and their keyboard behavior. Express reusable component emphasis through variants; keep page layout with its owner.
 - Use approximately 8px control radii and 8–12px panel radii consistently. Larger containers do not need progressively larger rounding.
@@ -204,7 +245,7 @@ The report is the main explanation of the user's experiment. Its reading order i
 - Verify compact layouts, 200% text resizing, and reflow at 320 CSS pixels. Put genuinely two-dimensional tables or graphs in their own usable regions.
 - Respect reduced motion. Keep feedback local, preserve scroll position, and stop background animation when hidden or idle. Shared timing and presence behavior belong to `src/ui/animation`.
 
-## 8. Review and Implementation Checks
+## 9. Review and Implementation Checks
 
 For each changed screen, verify:
 
@@ -228,5 +269,4 @@ Use fixed fixtures to inspect layouts without LLM calls. Review representative l
 - Analysis scope and behavior: [`docs/analysis.md`](docs/analysis.md)
 - [Visual hierarchy — Nielsen Norman Group](https://www.nngroup.com/articles/visual-hierarchy-ux-definition/)
 - [Proximity and grouping — Nielsen Norman Group](https://www.nngroup.com/articles/gestalt-proximity/)
-- [Aesthetic and minimalist design — Nielsen Norman Group](https://www.nngroup.com/articles/aesthetic-minimalist-design/)
 - [WCAG 2.2 — W3C](https://www.w3.org/TR/WCAG22/)

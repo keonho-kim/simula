@@ -1,8 +1,8 @@
 /**
  * Purpose: Render settings section navigation.
  * Pattern: Navigation component.
- * Usage: Used by the settings dialog.
- * Related: src/ui/components/settings/settings-dialog.tsx, src/ui/animation/styles.css
+ * Usage: Used by the settings page.
+ * Related: src/ui/pages/settings-page.tsx, src/ui/animation/styles.css
  */
 import type { UiTexts } from "@/ui/types/i18n"
 import { cn } from "@/ui/lib/class-names"
@@ -40,11 +40,12 @@ function SidebarButton({ active, title, subtitle, onClick }: {
   return (
     <button
       type="button"
+      aria-pressed={active}
       className={cn(
         "rounded-md px-2.5 py-2 text-left text-sm transition-colors duration-[var(--animation-feedback-duration)]",
         active
-          ? "bg-background text-foreground shadow-sm ring-1 ring-border/70"
-          : "text-muted-foreground hover:bg-background/70 hover:text-foreground"
+          ? "bg-secondary text-secondary-foreground ring-1 ring-primary/30"
+          : "text-muted-foreground hover:bg-card hover:text-foreground"
       )}
       onClick={onClick}
     >

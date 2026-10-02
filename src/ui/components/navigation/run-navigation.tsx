@@ -1,5 +1,5 @@
 /**
- * Purpose: Return an opened world to its source list or offer the normal home navigation.
+ * Purpose: Return an opened world to its source list or offer home navigation.
  * Pattern: Shared navigation composition.
  * Usage: Rendered in simulation, report preparation, and report result headers.
  * Related: src/ui/browser-storage/world-navigation.ts, src/ui/shell/App.tsx
@@ -14,7 +14,7 @@ export function RunNavigation({ runId, onHome, onBackToWorlds, t }: {
 }) {
   const canReturn = runId && onBackToWorlds && readWorldVisit()?.runId === runId
   if (!canReturn) return <Button aria-label={t.home} variant="ghost" size="icon" onClick={onHome}><HomeIcon /></Button>
-  return <Button aria-label={t.batchBackToWorlds} title={t.batchBackToWorlds} variant="ghost" size="sm" onClick={() => {
+  return <Button aria-label={t.batchBackToWorlds} title={t.batchBackToWorlds} variant="outline" onClick={() => {
     if (restoreWorldList(runId)) onBackToWorlds()
-  }}><ArrowLeftIcon data-icon="inline-start" /><span className="hidden sm:inline">{t.batchBackToWorlds}</span></Button>
+  }}><ArrowLeftIcon data-icon="inline-start" /><span>{t.batchBackToWorlds}</span></Button>
 }

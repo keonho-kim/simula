@@ -105,7 +105,8 @@ WebSocket allows a 30-second reconnection grace period. Expired sessions cancel 
 and remove temporary artifacts after active writers stop. Browser history records lost active
 work as interrupted. There is no supported multi-server execution contract.
 
-The unified ScenarioBuilder modal is lazy-loaded from the home view. Its centered, wide dialog uses one scroll surface and keeps its workflow state mounted while closed. It accepts uploaded
+Scenario creation uses dedicated input, analysis, and review pages. Its workflow state
+stays above page content so navigation preserves the draft. It accepts uploaded
 files, a situation description, or both. With no file, the browser creates an explicitly
 named user-situation text source so the same extraction and scenario graph can run; the
 presentation labels that source as user input instead of exposing the internal filename.
@@ -118,6 +119,16 @@ fetches a cited evidence block only when selected. The document API requires the
 scenario's source-set revision for that exact-ID read and serves the retained extraction,
 even after the current set changes. An uncaptured revision returns 409; it never falls
 back to current evidence.
+`ui/models/scenario-builder/preparation-groups.ts` projects existing bounded progress
+into stages, named targets, and steps for shared scenario and world preparation.
+`BuilderActivity` owns selection, breadcrumbs, focus restoration, and one persistent
+overview subscription. `BuilderTaskOutput` mounts only for the selected step: a running
+step adds one scoped draft subscription; a completed step queries its accepted artifact.
+Accepted results use execution/task/attempt-scoped query keys and remain fresh during
+that query's lifetime, avoiding repeated requests when the same step is reopened.
+Changing selection never resets the overview. At most two builder streams coexist,
+and leaving the view disposes both. Retries replace one step by its existing task identity;
+the grouping does not change generation contracts, domain ordering, or persistence.
 Extracted text and VLM page interpretation carry distinct method labels; a visual
 interpretation is not represented as a full OCR transcript.
 
@@ -743,7 +754,7 @@ accepted prose. This preservation does not constitute durable mid-task graph rec
 
 ### Simulation and report presentation stages
 
-`ui/pages/simulation-page.tsx` owns a viewport-sized workspace. Metrics use a compact row;
+`ui/pages/simulation-page.tsx` owns a viewport-sized workspace. Performance charts remain visible above the graph and conversation;
 its graph and live actor history share the remaining height. Live history uses its own
 virtualized scroll surface, preserving manual reading until the reader returns to the bottom.
 Report navigation first loads retained analysis. Missing or outdated analysis starts in
@@ -820,3 +831,26 @@ incoming workspace remains a navigation target while the short visual exit finis
 
 The tab session also retains the workspace to return to from settings, so reloading settings does
 not discard navigation context. Form drafts and provider secrets keep their existing storage owners.
+
+### Service workspace and simulation management
+
+`/simulations` is a browser workspace alongside `/document-analysis`, `/scenario/new`, and
+`/settings`. `ScenarioCreationFlow` retains the existing document/scenario workflow across these
+routes. Confirming a reviewed scenario moves to simulation management; opening an already confirmed
+scenario also restores management. Returning to source review is explicit and does not restart
+preparation or generation. HomeView wires navigation and settings return context; App only switches
+views. Browser session and SQLite draft owners are unchanged.
+
+`SimulationsPage` owns the management header and confirmed-source context. `WorldLaunch` coordinates
+single or multiple execution. `MultiversePanel` uses the same compact status response and controls;
+`BatchOverview` derives actual totals and `BatchWorldList` presents only summaries. Only the selected
+simulation mounts its preparation detail. Desktop uses a visible list beside selected controls;
+compact screens use a selector. The selected simulation's continue/view and stop actions have
+separate placement, while batch-wide stop/recovery and aggregate report actions live in a footer.
+Opening the aggregate report retains the current selection for the return trip. User-visible
+controls use "simulation"; shared contracts and durable identifiers continue to use "world".
+
+Button emphasis belongs to the existing primitive. Filled brand actions, tinted alternatives,
+white inspection controls, and red-tinted stop actions share the same sizing and focus behavior.
+Page and feature styles own action-group placement; no new runtime dependency or event framework
+is introduced. Reports retain their editorial composition, and live metrics remain immediately visible.

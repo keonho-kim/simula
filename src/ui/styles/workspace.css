@@ -11,7 +11,7 @@
 .workspace-description { margin-top: 10px; color: var(--muted-foreground); font-size: 15px; line-height: 1.7; }
 .workspace-eyebrow { margin-bottom: 10px; color: var(--primary); font-size: 12px; font-weight: 650; }
 .workspace-actions { display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
-.workspace-panel { min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 24px; }
+.workspace-panel { min-width: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 24px; box-shadow: 0 2px 6px #17203306; }
 .workspace-panel-title { font-size: 18px; font-weight: 650; }
 .workspace-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; padding-top: 20px; border-top: 1px solid var(--border); }
 .workspace-split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; align-items: start; }

@@ -1,8 +1,8 @@
 /**
- * Purpose: Bound the scenario modal and lay out its live task and review surfaces.
+ * Purpose: Lay out source input and completed scenario review surfaces.
  * Pattern: Feature stylesheet.
- * Usage: Imported only by the lazy scenario-builder dialog.
- * Related: src/ui/components/scenario-builder/scenario-builder-dialog.tsx
+ * Usage: Imported by the scenario input and document analysis pages.
+ * Related: src/ui/pages/scenario-input-page.tsx, src/ui/pages/document-analysis-page.tsx
  */
 .document-scenario-body { display: flex; min-width: 0; flex-direction: column; gap: 20px; }
 .document-builder-form { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 24px; width: 100%; min-width: 0; }
@@ -10,26 +10,12 @@
 .document-builder-files { display: flex; flex-direction: column; gap: 10px; }
 .document-builder-files > li { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding-block: 8px; font-size: 13px; }
 .document-builder-participant { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius); }
-.document-builder-activity { display: flex; min-width: 0; flex-direction: column; gap: 16px; }
-.document-builder-timeline { display: flex; flex-wrap: wrap; gap: 8px; }
-.document-builder-task-grid { display: flex; flex-wrap: wrap; gap: 20px; min-width: 0; }
-.document-builder-task-list { display: flex; flex: 1 1 320px; min-width: 0; flex-direction: column; gap: 6px; }
-.document-builder-task { justify-content: flex-start; height: auto; min-height: 42px; white-space: normal; text-align: left; }
-.document-builder-task-detail { display: flex; flex: 2 1 420px; min-width: 0; flex-direction: column; align-items: flex-start; gap: 16px; padding: 16px; border-left: 1px solid var(--border); }
-.document-builder-indicator { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%; background: var(--muted); color: var(--muted-foreground); font-size: 10px; }
-[data-status="running"] .document-builder-indicator, [data-status="retrying"] .document-builder-indicator { background: var(--chart-2); }
-[data-status="completed"] .document-builder-indicator { background: var(--primary); color: var(--primary-foreground); }
-[data-status="failed"] .document-builder-indicator { background: var(--destructive); }
 .document-builder-review-grid { display: flex; flex-wrap: wrap; gap: 16px; padding: 2px; }
 .document-builder-review-grid > * { flex: 1 1 280px; min-width: 0; }
 .document-builder-review-grid p { overflow-wrap: anywhere; }
 .document-builder-source-grid { display: flex; flex-wrap: wrap; gap: 16px; min-width: 0; }
 .document-builder-source-list { display: flex; flex: 2 1 300px; min-width: 0; flex-direction: column; gap: 4px; }
 .document-builder-source-detail { flex: 3 1 380px; min-width: 0; }
-@media (max-width: 760px) {
-  .document-builder-task-detail { border-left: 0; border-top: 1px solid var(--border); }
-}
-
 .document-input-source { display: flex; flex-direction: column; gap: 28px; }
 .document-input-source textarea { min-height: 180px; }
 @media (max-width: 1023px) { .document-builder-form { grid-template-columns: minmax(0, 1fr); } }

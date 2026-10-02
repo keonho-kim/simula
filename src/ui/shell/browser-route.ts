@@ -12,6 +12,7 @@ export function viewFromPath(pathname: string, session: RunSession): { viewMode:
   if (pathname === "/scenario/new") return { viewMode: "scenario-new" }
   if (pathname === "/scenario/preview") return { viewMode: "scenario-preview" }
   if (pathname === "/settings") return { viewMode: "settings" }
+  if (pathname === "/simulations") return { viewMode: "simulations" }
   if (pathname === "/document-analysis") return { viewMode: "document-analysis" }
   if (pathname === "/scenario-board") return session.runId ? { viewMode: "board", runId: session.runId } : { viewMode: "home" }
   if (pathname === "/simulation") return { viewMode: "simulation", runId: session.runId }
@@ -24,6 +25,7 @@ export function pathForView(viewMode: ViewMode, runId: string | undefined): stri
   if (viewMode === "scenario-new") return "/scenario/new"
   if (viewMode === "scenario-preview") return "/scenario/preview"
   if (viewMode === "settings") return "/settings"
+  if (viewMode === "simulations") return "/simulations"
   if (viewMode === "document-analysis") return "/document-analysis"
   if (viewMode === "home") return "/"
   if (viewMode === "board") return runId ? "/scenario-board" : undefined
@@ -32,5 +34,5 @@ export function pathForView(viewMode: ViewMode, runId: string | undefined): stri
 }
 
 export function isWorkspaceView(view: ViewMode): boolean {
-  return ["home", "document-analysis", "scenario-new", "scenario-preview", "settings"].includes(view)
+  return ["home", "document-analysis", "simulations", "scenario-new", "scenario-preview", "settings"].includes(view)
 }

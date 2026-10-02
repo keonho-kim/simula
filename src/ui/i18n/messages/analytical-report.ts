@@ -5,7 +5,7 @@
  * Related: src/ui/pages/report-preparation-page.tsx, src/ui/components/report/analysis/results.tsx
  */
 const en = {
-  analysisMultiverseReport: "Multiverse report", analysisBatchWaiting: "Other worlds are still running or awaiting approval. The combined report starts when all worlds have finished. You can return to the world list to manage them.",
+  analysisMultiverseReport: "Multiverse report", analysisBatchWaiting: "Other worlds are still running or awaiting approval. The combined report starts when all worlds have finished. You can return to the simulations page to manage them.",
   analysisBatchMetricScope: "These charts cover report generation. The Usage tab includes shared preparation and all worlds.",
   analysisUsageTab: "Usage", analysisReportTabs: "Report sections",
   analysisOutcomes: "Key outcomes", analysisTurningPoints: "Turning points", analysisConditions: "Influential conditions",
@@ -57,7 +57,7 @@ const en = {
   analysisPrevious: "Previous tasks", analysisNext: "Next tasks", analysisTask: "Task {index}", analysisLive: "Live analysis", analysisPending: "Not started", analysisFailed: "Unavailable",
 } as const
 const ko = {
-  analysisMultiverseReport: "멀티버스 종합 리포트", analysisBatchWaiting: "다른 세계가 진행 중이거나 승인을 기다리고 있습니다. 모든 세계가 종료되면 종합 리포트를 작성합니다. 세계 목록에서 진행 상태를 확인할 수 있습니다.",
+  analysisMultiverseReport: "멀티버스 종합 리포트", analysisBatchWaiting: "다른 세계가 진행 중이거나 승인을 기다리고 있습니다. 모든 세계가 종료되면 종합 리포트를 작성합니다. 시뮬레이션 페이지에서 진행 상태를 확인할 수 있습니다.",
   analysisBatchMetricScope: "상단 차트는 종합 리포트 생성 호출 기준입니다. 사용량 탭에서 공통 준비와 전체 세계의 사용량을 확인할 수 있습니다.",
   analysisUsageTab: "사용량", analysisReportTabs: "리포트 항목",
   analysisOutcomes: "핵심 결과", analysisTurningPoints: "주요 전개와 전환점", analysisConditions: "결과를 좌우한 조건",

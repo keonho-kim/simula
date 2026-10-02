@@ -368,3 +368,79 @@ from saved events. Raw benchmark output and final screenshots are retained with 
   host launch error. Firefox rendering and behavior therefore remain unverified in this environment.
 - Real model generation, remote network jitter, field INP, and GPU memory usage were not measured.
   All execution used fixed fixtures, intercepted APIs, or the deterministic test model.
+
+## Service workspace and action hierarchy (2026-10-01)
+
+Simulation preparation and batch management now live at `/simulations`; source extraction and
+scenario review stay at `/document-analysis`. The creation controller remains above these pages.
+The management page is lazy-loaded, uses the same compact batch status response, and mounts only
+the selected simulation's preparation details. No runtime dependency, graph renderer, message
+projection, or model contract was added or changed for this pass.
+
+The existing Button primitive now owns filled primary, tinted secondary, white outlined, and
+red-tinted stop actions. Unlayered global border and font resets were overriding its variants;
+the border default remains in the base layer, and the font reset now inherits only the family.
+Browser checks compare actual computed fills and weights, including a transparent text-action
+boundary, rather than just checking CSS class names.
+
+Baseline was commit `ce73dbe`, built in an isolated checkout with the same installed packages.
+Both hosts used a production build with the E2E entry enabled, deterministic model support,
+Chromium at 1440 × 1000, and reduced motion. The workspace benchmark warms up once and alternates
+five measured fresh contexts; each opens and closes settings five times. Both revisions now use
+the Back page action. Fixed simulations and interrupted APIs exercised the workflows; real LLM
+servers were not contacted.
+
+| Five-run median | Baseline | Service UI |
+| --- | ---: | ---: |
+| Dashboard ready | 881.47 ms | 881.06 ms |
+| First contentful paint | 335.63 ms | 336.41 ms |
+| Initial encoded JavaScript | 346,243 bytes | 345,778 bytes |
+| Settings click to visible controls | 36.09 ms | 36.71 ms |
+| Task CPU, five round trips | 155.35 ms | 152.91 ms |
+| Script time | 58.80 ms | 57.05 ms |
+| Layout time | 7.56 ms | 7.47 ms |
+| Style recalculation | 10.89 ms | 11.04 ms |
+
+Differences are below the 5% remeasurement threshold. These are local workflow measurements,
+including Playwright dispatch and control visibility, rather than field INP. Final navigation
+labels and accessibility attributes do not add subscriptions or model work.
+
+Validation covered confirmed-scenario handoff, direct URL/reload, selected-run restoration,
+source-review return, per-run versus batch cancellation, automatic/manual progression, reports,
+settings, and actor-history following. All 571 Bun tests passed, with one existing skipped test;
+type checking, lint, and production builds passed. The final affected Chromium suite passed 14
+cases, the WebKit workspace/management suite passed seven, and document workflows passed eight
+in their focused run. Layout checks covered 320 through 1920 CSS pixels and enlarged text.
+
+Live arrival measured 6.59 ms p95 in Chromium and 14.66 ms in WebKit for twelve fixed messages,
+within the 100 ms target. The 4,120-message history mounted twelve cards at its measured position.
+Metric-only batches still caused zero round-control, conversation, and stage projection updates.
+The 20,000-sample chart fixture retained 158 display points within its 258-point bound. No claim
+is made about real model latency, remote network jitter, or GPU memory use. Screenshots and raw
+measurement logs are retained with the task's local validation artifacts.
+
+## Generation hierarchy and scoped content (2026-10-02)
+
+Shared scenario and individual world preparation now separate stages, semantic targets, and
+target-specific steps. The presentation groups the existing 64-task progress window; it does
+not expand retained generation history, change model concurrency, or add runtime dependencies.
+One overview stream remains stable while selection changes. Only a selected running step adds
+a draft stream; accepted artifacts are requested only when their completed step is selected.
+Returning to targets, hiding the page, and leaving the view dispose scoped subscriptions.
+
+A focused browser assertion first reproduced two artifact requests after reopening the same
+completed step. Execution/task/attempt-scoped fresh queries reduced this to one request. A new
+execution with the same task and attempt fetched its new result, confirming cache isolation.
+Measured live stream instances were one for the overview, two with a selected live step, and
+zero after leaving the view or hiding it. These are request and lifecycle measurements, not
+an overall rendering-speed or real-provider latency claim.
+
+Six pure projection tests cover person/document/rule grouping, world-specific step names,
+retry replacement, and incomplete terminal work. Parallel phase progression cannot imply that
+a target has finished expanding; the UI labels completion of received steps explicitly.
+All 577 Bun tests passed, with one existing skipped test. Type checking, lint, and a normal
+production build passed. Across the focused runs, eleven affected Chromium workflows and four
+WebKit workflows passed. Browser checks covered target/step navigation, draft replacement,
+focus restoration, deferred artifact queries, execution isolation, 320–1920 CSS pixel widths,
+200% zoom, and reduced motion. Screenshots and check logs are retained locally under
+`output/ui-generation-hierarchy/`. All generation used fixed responses or the test model.

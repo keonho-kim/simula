@@ -1,7 +1,7 @@
 /**
- * Purpose: Present document interpretation, scenario generation, cast review, and launch outside a modal.
+ * Purpose: Present document interpretation, scenario generation, cast review, and source-grounded scenario review.
  * Pattern: Page composition.
- * Usage: Mounted by ScenarioCreationFlow at /document-analysis before the scenario board.
+ * Usage: Mounted by ScenarioCreationFlow at /document-analysis before simulation management.
  * Related: src/ui/shell/scenario-creation-flow.tsx, src/ui/hooks/use-document-scenario.ts
  */
 import { useEffect, useRef } from "react"
@@ -16,18 +16,14 @@ import { Badge } from "@/ui/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/ui/components/ui/alert"
 import { BuilderActivity } from "@/ui/components/scenario-builder/builder-activity"
 import { ScenarioReview } from "@/ui/components/scenario-builder/scenario-review"
-import { WorldLaunch } from "@/ui/components/scenario-builder/world-launch"
 import { ScenarioWorkflowStatus } from "@/ui/components/scenario-builder/scenario-workflow-status"
 import { builderLabel } from "@/ui/models/scenario-builder/labels"
 import { scenarioSourceName } from "@/ui/models/scenario-builder/source-name"
 import "@/ui/styles/document-builder.css"
 
-export function DocumentAnalysisPage({ workflow: w, t, language, onHome, onOpenSettings, onEdit, starting,
-  autoContinue, onAutoContinueChange, onStartWorld, onOpenRun }: {
-  workflow: ReturnType<typeof useDocumentScenario>; t: UiTexts; language: "ko" | "en";
-  onHome: () => void; onOpenSettings: () => void; onEdit: () => void; starting: boolean;
-  autoContinue: boolean; onAutoContinueChange: (enabled: boolean) => void;
-  onStartWorld: (worldId: string) => void; onOpenRun: (runId: string, view?: "simulation" | "report") => void
+export function DocumentAnalysisPage({ workflow: w, t, onHome, onOpenSettings, onEdit, onSimulations }: {
+  workflow: ReturnType<typeof useDocumentScenario>; t: UiTexts;
+  onHome: () => void; onOpenSettings: () => void; onEdit: () => void; onSimulations: () => void
 }) {
   const heading = useRef<HTMLHeadingElement>(null)
   const reduced = useReducedMotionPreference()
@@ -36,7 +32,7 @@ export function DocumentAnalysisPage({ workflow: w, t, language, onHome, onOpenS
   const sourcesReady = w.documents?.documents.length && w.documents.documents.every(document => document.status === "ready" || document.status === "partial")
   const canResume = !w.build && (w.files.length > 0 || (!w.documents?.documents.length && !!w.form.context.trim())
     || (w.hasSession && !w.pendingGeneration && sourcesReady))
-  const stage = w.build?.status === "confirmed" ? "launch" : running ? "building" : w.build?.specification ? "review" : "documents"
+  const stage = running ? "building" : w.build?.specification ? "review" : "documents"
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); heading.current?.focus({ preventScroll: true }) }, [])
   return <main className="min-h-svh bg-background text-foreground">
     <div className="workspace-frame">
@@ -64,14 +60,13 @@ export function DocumentAnalysisPage({ workflow: w, t, language, onHome, onOpenS
         </section> : null}
         {running && w.build ? <BuilderActivity key={w.build.id} buildId={w.build.id} open documents={w.documents} t={t} /> : null}
         {stage === "review" && w.build?.specification ? <ScenarioReview specification={w.build.specification} documents={w.documents} t={t} /> : null}
-        {w.hydrated && w.build?.status === "confirmed" ? <WorldLaunch key={w.build.id} scenarioId={w.build.id} fastMode={w.build.request.fastMode}
-          initialOptions={w.form} open starting={starting} autoContinue={autoContinue} onAutoContinueChange={onAutoContinueChange}
-          onStart={onStartWorld} onOpenRun={onOpenRun} language={language} t={t} /> : null}
+
       </m.div>
       {w.build && ["failed", "canceled", "blocked"].includes(w.build.status) ? <Alert><AlertDescription>{w.build.status === "blocked" ? t.builderBlockedHelp : w.build.status === "canceled" ? t.builderStatusCanceled : t.builderRequestError}</AlertDescription></Alert> : null}
       {w.build?.status === "confirmed" ? <Alert><AlertTitle>{t.builderConfirmed}</AlertTitle><AlertDescription>{t.builderConfirmedHelp}</AlertDescription></Alert> : null}
-      <footer className="flex flex-wrap gap-2 border-t pt-4">
-        {running ? <Button variant="outline" disabled={w.busy} onClick={() => void w.controlBuild("cancel")}>{t.builderCancel}</Button> : null}
+      <footer className="workspace-footer">
+        {w.build?.status === "confirmed" ? <Button onClick={onSimulations}>{t.batchBackToWorlds}</Button> : null}
+        {running ? <Button variant="destructive" disabled={w.busy} onClick={() => void w.controlBuild("cancel")}>{t.builderCancel}</Button> : null}
         {w.build && ["failed", "canceled", "blocked"].includes(w.build.status) ? <Button disabled={w.busy} onClick={() => void w.controlBuild("retry")}>{t.builderRetry}</Button> : null}
         {w.build?.status === "review" ? <Button disabled={w.busy} onClick={() => void w.controlBuild("confirm")}>{t.builderConfirm}</Button> : null}
         {w.hasSession && !running ? <Button variant="ghost" disabled={w.busy || w.pendingGeneration || extracting} onClick={() => { w.reset(); onEdit() }}>{t.builderNew}</Button> : null}

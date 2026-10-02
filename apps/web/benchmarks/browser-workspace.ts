@@ -32,7 +32,7 @@ try {
       await page.getByRole("heading", { name: "LLM settings" }).waitFor()
       await page.getByRole("button", { name: "Save settings", exact: true }).waitFor()
       settingsOpenMs.push(performance.now() - openedAt)
-      await page.getByRole("button", { name: name === "baseline" ? "Close" : "Back", exact: true }).click()
+      await page.getByRole("button", { name: "Back", exact: true }).click()
       await page.getByRole("button", { name: /New Scenario/ }).waitFor()
     }
     const after = await cdp.send("Performance.getMetrics")

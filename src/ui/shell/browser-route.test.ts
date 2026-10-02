@@ -50,3 +50,8 @@ test("workspace editors have reloadable paths without requiring a run", () => {
     expect(pathForView(viewMode, undefined)).toBe(path)
   }
 })
+
+test("simulation management has a reloadable workspace URL", () => {
+  expect(viewFromPath("/simulations", {})).toEqual({ viewMode: "simulations" })
+  expect(pathForView("simulations", undefined)).toBe("/simulations")
+})

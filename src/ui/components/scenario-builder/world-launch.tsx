@@ -35,14 +35,14 @@ export function WorldLaunch({ initialOptions, scenarioId, fastMode, open, starti
   useEffect(() => { heading.current?.focus() }, [])
   const preparing = w.world?.status === "preparing"
   const phase = !w.world ? "setup" : preparing ? "preparing" : w.world.status === "ready" ? "ready" : "other"
-  return <section className="flex flex-col gap-4 rounded-lg border p-4" aria-label={t.worldPrepareTitle}>
-    <header><h2 ref={heading} tabIndex={-1} className="text-base font-semibold">{t.worldPrepareTitle}</h2><p className="mt-1 text-sm text-muted-foreground">{t.worldPrepareDescription}</p></header>
-    <Field orientation="horizontal"><FieldLabel htmlFor="multiverse-enabled">{t.batchTitle}</FieldLabel><input type="checkbox" className="size-4 accent-primary" id="multiverse-enabled" checked={multiple} disabled={preparing} onChange={event => setMultiple(event.target.checked)} /></Field>
+  return <section className="simulation-launch" aria-label={multiple ? undefined : t.worldPrepareTitle}>
+    {!multiple ? <header><h2 ref={heading} tabIndex={-1} className="text-base font-semibold">{t.worldPrepareTitle}</h2><p className="mt-1 text-sm text-muted-foreground">{t.worldPrepareDescription}</p></header> : null}
+    <Field className="simulation-mode-picker" orientation="horizontal"><input type="checkbox" className="size-4 accent-primary" id="multiverse-enabled" checked={multiple} disabled={preparing} onChange={event => setMultiple(event.target.checked)} /><FieldLabel htmlFor="multiverse-enabled">{t.batchTitle}</FieldLabel></Field>
     <AnimatePresence mode="wait" initial={false}>{multiple ? <m.div key="multiverse" {...quietPresence(reducedMotion)}><MultiversePanel initialOptions={initialOptions} autoContinue={autoContinue} scenarioId={scenarioId} fastMode={fastMode} open={open} language={language} t={t} onOpenRun={onOpenRun} /></m.div> :
     <m.div key="single" className="flex flex-col gap-4" {...quietPresence(reducedMotion)}>
     <AnimatePresence mode="wait" initial={false}><m.div key={phase} {...sequencePresence(reducedMotion, direction)}>
     {!w.world ? <form onSubmit={event => { event.preventDefault(); setDirection(1); void w.prepare() }}>
-      <FieldGroup>
+      <FieldGroup className="simulation-setup-grid">
         <WorldControlsFields prefix="world" controls={w.controls} onChange={patch => w.setControls(current => ({ ...current, ...patch }))} disabled={w.busy} t={t} />
         <Button type="submit" disabled={w.busy}>{t.worldPrepareAction}</Button>
       </FieldGroup>
@@ -57,7 +57,7 @@ export function WorldLaunch({ initialOptions, scenarioId, fastMode, open, starti
     </div> : null}
     </m.div></AnimatePresence>
     <div className="flex flex-wrap gap-2">
-      {preparing ? <Button variant="outline" disabled={w.busy} onClick={() => void w.control("cancel")}>{t.builderCancel}</Button> : null}
+      {preparing ? <Button variant="destructive" disabled={w.busy} onClick={() => void w.control("cancel")}>{t.builderCancel}</Button> : null}
       {w.world && ["failed", "canceled"].includes(w.world.status) ? <Button disabled={w.busy} onClick={() => void w.control("retry")}>{t.builderRetry}</Button> : null}
       {w.world && !preparing ? <Button variant="ghost" disabled={w.busy || starting} onClick={() => { setDirection(-1); w.reset() }}>{t.worldAnother}</Button> : null}
     </div>

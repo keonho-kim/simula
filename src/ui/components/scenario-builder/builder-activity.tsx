@@ -1,74 +1,126 @@
 /**
- * Purpose: Present generation stages and a selected task's bounded live content.
- * Pattern: Scoped rendering composition.
- * Usage: Displayed while a shared scenario is generating or being retried.
- * Related: src/ui/hooks/use-generation-stream.ts, src/ui/models/scenario-builder/progress.ts
+ * Purpose: Navigate generation stages, their semantic targets, and each target's individual steps.
+ * Pattern: Master-detail composition with an independent progress subscription.
+ * Usage: Mounted during shared scenario and individual world preparation.
+ * Related: src/ui/models/scenario-builder/preparation-groups.ts, src/ui/components/scenario-builder/builder-task-output.tsx, src/ui/styles/builder-generation.css
  */
-import { useMemo, useState } from "react"
-import { AnimatePresence } from "motion/react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import * as m from "motion/react-m"
-import { useQuery } from "@tanstack/react-query"
+import { ArrowLeftIcon, ChevronRightIcon } from "lucide-react"
 import { useGenerationStream } from "@/ui/hooks/use-generation-stream"
-import { fetchGenerationTask } from "@/ui/api-client/generation"
 import { BUILDER_STAGES, builderTaskStage } from "@/ui/models/scenario-builder/progress"
-import { projectGenerationFields } from "@/shared/generation-preview"
+import { groupBuilderTasks, type BuilderChannel, type BuilderGroup } from "@/ui/models/scenario-builder/preparation-groups"
 import { builderLabel } from "@/ui/models/scenario-builder/labels"
 import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
-import { quietPresence, sequencePresence } from "@/ui/animation/presence"
+import { quietPresence } from "@/ui/animation/presence"
 import { scenarioSourceName } from "@/ui/models/scenario-builder/source-name"
 import { Button } from "@/ui/components/ui/button"
 import { Badge } from "@/ui/components/ui/badge"
-import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/ui/components/ui/tabs"
 import type { UiTexts } from "@/ui/types/i18n"
 import type { DocumentSet } from "@/shared/documents"
+import { BuilderTaskOutput } from "./builder-task-output"
+import "@/ui/styles/builder-generation.css"
 
-export function BuilderActivity({ buildId, open, documents, t, channel = "scenario-builder" }: { buildId: string; open: boolean; documents?: DocumentSet; t: UiTexts; channel?: "scenario-builder" | "worlds" }) {
+export function BuilderActivity({ buildId, open, documents, t, channel = "scenario-builder" }: {
+  buildId: string; open: boolean; documents?: DocumentSet; t: UiTexts; channel?: BuilderChannel
+}) {
   const reducedMotion = useReducedMotionPreference()
-  const [selected, setSelected] = useState<string>()
   const [stage, setStage] = useState<typeof BUILDER_STAGES[number]>()
-  const [direction, setDirection] = useState<-1 | 1>(1)
-  const progress = useGenerationStream(buildId, selected, open, channel)
+  const [targetId, setTargetId] = useState<string>()
+  const [stepId, setStepId] = useState<string>()
+  const progress = useGenerationStream(buildId, undefined, open, channel)
   const documentNames = useMemo(() => new Map(documents?.documents.map(document => [document.id, scenarioSourceName(document.name, t)])), [documents, t])
+  const groups = useMemo(() => groupBuilderTasks(progress.tasks, { t, channel, documentNames, terminal: progress.terminal }),
+    [progress.tasks, progress.terminal, t, channel, documentNames])
   const latest = progress.tasks.at(-1)
   const currentStage = stage ?? (latest ? builderTaskStage(latest.kind) : channel === "worlds" ? "situation" : "sources")
-  const tasks = progress.tasks.filter(task => builderTaskStage(task.kind) === currentStage)
-  const selectedTask = progress.tasks.find(task => task.taskId === selected)
-  const accepted = useQuery({ queryKey: ["builder-task", channel, buildId, selected, selectedTask?.attempt],
-    queryFn: ({ signal }) => fetchGenerationTask(buildId, selected ?? "", signal, channel), enabled: open && !!selected && selectedTask?.status === "completed", retry: false,
-  })
-  const activeDraft = progress.draft
-  const acceptedFields = useMemo(() => projectGenerationFields(accepted.data), [accepted.data])
-  const fields = activeDraft && activeDraft.taskId === selected ? activeDraft.fields : acceptedFields
-  return <section className="document-builder-activity" aria-label={t.builderStatusRunning}>
-    <nav className="document-builder-timeline" aria-label={t.builderReviewStage}>
-      {BUILDER_STAGES.filter(value => channel !== "worlds" || value !== "sources").map(value => <Button key={value} variant={value === currentStage ? "secondary" : "ghost"} aria-pressed={value === currentStage} onClick={() => {
-        setDirection(BUILDER_STAGES.indexOf(value) >= BUILDER_STAGES.indexOf(currentStage) ? 1 : -1)
-        setStage(value)
-      }}>{builderLabel(value, t)}</Button>)}
-    </nav>
-    <p className="text-sm text-muted-foreground" role="status">{progress.disconnected ? t.builderReconnecting : t.builderSelectTask}</p>
-    <AnimatePresence mode="wait" initial={false}><m.div key={currentStage} className="document-builder-task-grid"
-      {...sequencePresence(reducedMotion, direction)}>
-      <div className="document-builder-task-list">
-        {tasks.map(task => <Button key={task.taskId} variant={selected === task.taskId ? "secondary" : "ghost"} className="document-builder-task" data-status={task.status} aria-pressed={selected === task.taskId}
-          onClick={() => setSelected(task.taskId)}>
-          <span className="document-builder-indicator" aria-hidden="true">{task.status === "completed" ? "✓" : ""}</span>
-          <span className="flex min-w-0 flex-col gap-1"><span>{builderLabel(task.kind, t)}</span>
-            {task.scope ? <span className="break-all text-xs text-muted-foreground">{task.scope.kind === "document" ? documentNames.get(task.scope.id)
-              : task.scope.kind === "participant" ? task.scope.name : builderLabel(task.scope.key, t)}</span> : null}
-          </span><span className="ml-auto text-xs">{builderLabel(task.status, t)}</span>
-        </Button>)}
-      </div>
-      <div className="document-builder-task-detail" aria-label={t.builderSummary}>
-        <AnimatePresence mode="wait" initial={false}><m.div key={selected ?? "none"} className="flex min-w-0 flex-col items-start gap-4"
-          {...quietPresence(reducedMotion)}>
-          {selectedTask ? <Badge variant="outline">{builderLabel(selectedTask.status, t)}</Badge> : null}
-          {activeDraft && activeDraft.taskId === selected ? <p className="text-xs text-muted-foreground">{t.builderDraftNotice}</p> : null}
-          {fields.length ? fields.map((field, index) => <div key={`${field.key}-${index}`} className="flex flex-col gap-1">
-            <h3 className="text-xs font-medium text-muted-foreground">{builderLabel(field.key, t)}</h3><MarkdownContent generated content={field.text} />
-          </div>) : <p className="text-sm text-muted-foreground">{t.builderNoPreview}</p>}
-        </m.div></AnimatePresence>
-      </div>
-    </m.div></AnimatePresence>
+  const targets = groups.filter(group => group.stage === currentStage)
+  const group = targets.find(target => target.id === targetId)
+  const selected = group?.steps.find(step => step.task.taskId === stepId)
+  const root = useRef<HTMLElement>(null)
+  const back = useRef<HTMLButtonElement>(null)
+  const outputHeading = useRef<HTMLHeadingElement>(null)
+  const returnFocus = useRef<{ kind: "target" | "step"; id: string } | undefined>(undefined)
+  const labelId = useId()
+  useEffect(() => {
+    const origin = returnFocus.current
+    if (origin) {
+      const buttons = root.current?.querySelectorAll<HTMLButtonElement>(`button[data-builder-${origin.kind}]`)
+      const target = buttons && [...buttons].find(button => button.getAttribute(`data-builder-${origin.kind}`) === origin.id)
+      target?.focus({ preventScroll: true })
+      returnFocus.current = undefined
+    } else if (stepId) outputHeading.current?.focus({ preventScroll: true })
+    else if (targetId) back.current?.focus({ preventScroll: true })
+  }, [targetId, stepId])
+  const goBack = () => {
+    if (stepId) { returnFocus.current = { kind: "step", id: stepId }; setStepId(undefined) }
+    else if (targetId) { returnFocus.current = { kind: "target", id: targetId }; setTargetId(undefined) }
+  }
+  const changeStage = (value: string) => {
+    const next = BUILDER_STAGES.find(candidate => candidate === value)
+    if (!next) return
+    setStage(next); setTargetId(undefined); setStepId(undefined); returnFocus.current = undefined
+  }
+  return <section ref={root} className="builder-generation" aria-label={t.builderStatusRunning} onKeyDown={event => {
+    if (event.key === "Escape" && group) { event.stopPropagation(); goBack() }
+  }}>
+    <Tabs value={currentStage} onValueChange={changeStage}>
+      <TabsList variant="line" className="builder-generation-stages" aria-label={t.builderGenerationStages}>
+        {BUILDER_STAGES.filter(value => channel !== "worlds" || value !== "sources").map(value =>
+          <TabsTrigger key={value} value={value}>{builderLabel(value, t)}</TabsTrigger>)}
+      </TabsList>
+      <TabsContent value={currentStage}>
+        <header className="builder-generation-header">
+          {group ? <Button ref={back} variant="outline" onClick={goBack}><ArrowLeftIcon data-icon="inline-start" />
+            {stepId ? t.builderBackToSteps : t.builderBackToTargets}</Button> : null}
+          <nav aria-label={t.builderGenerationPath}><ol>
+            <li>{group ? <Button variant="link" size="sm" onClick={() => { returnFocus.current = { kind: "target", id: group.id }; setTargetId(undefined); setStepId(undefined) }}>
+              {builderLabel(currentStage, t)}</Button> : <span aria-current="step">{builderLabel(currentStage, t)}</span>}</li>
+            {group ? <li><ChevronRightIcon aria-hidden="true" />{selected ? <Button variant="link" size="sm" onClick={() => { returnFocus.current = { kind: "step", id: selected.task.taskId }; setStepId(undefined) }}>{group.title}</Button>
+              : <span aria-current="step">{group.title}</span>}</li> : null}
+            {selected ? <li><ChevronRightIcon aria-hidden="true" /><span aria-current="step">{selected.title}</span></li> : null}
+          </ol></nav>
+        </header>
+        {progress.disconnected && !progress.terminal ? <p className="text-sm text-muted-foreground" role="status">{t.builderReconnecting}</p> : null}
+        <m.div key={group?.id ?? currentStage} {...quietPresence(reducedMotion)}>
+          <div className="builder-generation-context"><h2>{group?.title ?? t.builderTargets}</h2>
+            <p>{group ? stepProgress(group, t) : t.builderSelectTarget}</p>
+            {group ? <p>{t.builderStepCoverage}</p> : null}
+          </div>
+          {group ? <div className="builder-generation-detail-layout">
+            <section className="builder-generation-step-list" aria-label={t.builderSteps}><h3>{t.builderSteps}</h3>
+              {group.steps.map((step, index) => <Button key={step.task.taskId} variant={stepId === step.task.taskId ? "secondary" : "outline"}
+                className="builder-generation-step" data-builder-step={step.task.taskId} aria-label={step.title}
+                aria-describedby={`${labelId}-step-${index}`} aria-pressed={stepId === step.task.taskId}
+                onClick={() => setStepId(step.task.taskId)}>
+                <span>{step.title}</span><span id={`${labelId}-step-${index}`} className="builder-generation-meta">{builderLabel(step.task.status, t)}</span>
+              </Button>)}
+            </section>
+            <aside className="builder-generation-output" aria-label={selected?.title ?? t.builderSummary}>
+              {selected ? <><header><p>{group.title}</p><h3 ref={outputHeading} tabIndex={-1}>{selected.title}</h3>
+                <Badge variant="secondary" data-status={selected.task.status}>{builderLabel(selected.task.status, t)}</Badge></header>
+                <BuilderTaskOutput key={selected.task.taskId} buildId={buildId} executionId={progress.executionId} task={selected.task} channel={channel}
+                  open={open} live={!progress.terminal} t={t} />
+              </> : <p>{t.builderSelectStep}</p>}
+            </aside>
+          </div> : targets.length ? <div className="builder-generation-targets" aria-label={t.builderTargets}>
+            {targets.map((target, index) => <Button key={target.id} variant="outline" className="builder-generation-target"
+              data-builder-target={target.id} aria-label={target.title} aria-describedby={`${labelId}-target-${index}`}
+              onClick={() => { setStage(currentStage); setTargetId(target.id); setStepId(undefined) }}>
+              <span className="builder-generation-target-heading"><span>{target.title}</span><ChevronRightIcon aria-hidden="true" /></span>
+              <span id={`${labelId}-target-${index}`} className="builder-generation-meta">
+                <span>{target.status === "running" && target.completed === target.steps.length
+                  ? t.builderReceivedComplete : builderLabel(target.status, t)}</span><span>{stepProgress(target, t)}</span>
+              </span>
+            </Button>)}
+          </div> : <p className="text-sm text-muted-foreground">{t.builderTargetsPending}</p>}
+        </m.div>
+      </TabsContent>
+    </Tabs>
   </section>
+}
+
+function stepProgress(group: BuilderGroup, t: UiTexts): string {
+  return t.builderStepProgress.replace("{completed}", String(group.completed)).replace("{total}", String(group.steps.length))
 }

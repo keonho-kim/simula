@@ -1,7 +1,7 @@
 /**
  * Purpose: Coordinate unified scenario creation, completed imports, settings, samples, and history.
  * Pattern: Page-flow component.
- * Usage: Rendered by App while the active view is home.
+ * Usage: Rendered by App across source, settings, and simulation management workspace views.
  * Related: src/ui/pages/start-screen.tsx, src/ui/shell/App.tsx
  */
 import { isWorkspaceView, type ViewMode } from "./browser-route"
@@ -79,7 +79,7 @@ export function HomeView({
   onStartWorld,
 }: HomeViewProps) {
   const uploadInputRef = useRef<HTMLInputElement>(null)
-  const [builderUsed, setBuilderUsed] = useState(viewMode === "scenario-new" || documentAnalysis)
+  const [builderUsed, setBuilderUsed] = useState(viewMode === "scenario-new" || documentAnalysis || viewMode === "simulations")
   const scenarioBuilder = viewMode === "scenario-new"
   const [settingsReturn, setSettingsReturn] = useState<ViewMode>(() => {
     const saved = readRunSession().settingsReturnView
@@ -178,11 +178,14 @@ export function HomeView({
         onLanguagePreferenceChange={onLanguagePreferenceChange}
       /> : null}
       <Suspense fallback={null}>
-        {builderUsed || scenarioBuilder || documentAnalysis ? (
+        {builderUsed || scenarioBuilder || documentAnalysis || viewMode === "simulations" ? (
           <ScenarioCreationFlow key={launchSeed ?? "new-scenario"}
             autoExecute={Boolean(launchSeed)}
             active={scenarioBuilder}
             analysis={documentAnalysis}
+            simulations={viewMode === "simulations"}
+            onSimulations={() => onNavigate("simulations")}
+            onDocuments={() => onNavigate("document-analysis")}
             onAnalyze={() => onDocumentAnalysisChange(true)}
             onHome={() => onDocumentAnalysisChange(false)}
             onEdit={() => onNavigate("scenario-new")}
