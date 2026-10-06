@@ -7,7 +7,7 @@
 import { expect, test } from "./fixtures"
 import type { WebSocketRoute } from "@playwright/test"
 
-test("saved model settings require an unlock after refresh without plaintext SQLite secrets", async ({ page }) => {
+test("saved model settings require an unlock after refresh without plaintext SQLite secrets", async ({ page }, testInfo) => {
   await page.addInitScript(() => localStorage.setItem("simula.language", "en"))
   await page.goto("/")
   await page.waitForFunction(() => Boolean(window.__simulaE2E))
@@ -26,6 +26,19 @@ test("saved model settings require an unlock after refresh without plaintext SQL
   await page.reload()
   await page.waitForFunction(() => Boolean(window.__simulaE2E))
   await expect(page.getByRole("heading", { name: "Unlock credentials" })).toBeVisible()
+  for (const width of [1920, 1440, 768, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 })
+    const form = page.locator(".credential-card")
+    const bounds = (await form.boundingBox())!
+    expect(bounds.width).toBeLessThanOrEqual(440)
+    expect(Math.abs(bounds.x + bounds.width / 2 - width / 2)).toBeLessThan(1)
+    const input = page.getByLabel("Credentials passphrase", { exact: true })
+    await expect(input).toHaveAttribute("autocomplete", "current-password")
+    expect((await input.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    if (width === 1920 || width === 390) await page.screenshot({ path: testInfo.outputPath(`credential-${width}.png`), fullPage: true })
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 })
   await page.getByRole("textbox", { name: "Credentials passphrase" }).fill("wrong passphrase")
   await page.getByRole("button", { name: "Unlock credentials" }).click()
   await expect(page.getByRole("alert").filter({ hasText: "Check the passphrase" })).toBeVisible()

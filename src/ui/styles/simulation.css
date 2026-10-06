@@ -2,12 +2,12 @@
  * Purpose: Arrange the tactical graph and live conversation without continuous decorative work.
  * Pattern: Scoped responsive presentation.
  * Usage: Imported by SimulationPage.
- * Related: src/ui/components/graph/palette.ts, src/ui/components/actors/actor-rail.tsx
+ * Related: src/ui/components/graph/palette.ts, src/ui/components/actors/actor-rail.tsx, src/ui/styles/llm-metrics.css
  */
 .simulation-page { height: 100dvh; overflow: hidden; }
 .simulation-workspace { width: 80%; margin-inline: auto; display: flex; height: 100%; min-height: 0; flex-direction: column; gap: 16px; padding-block: 20px; }
+.simulation-command-bar { padding: 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
 .simulation-panels { display: flex; min-height: 0; flex: 1; align-items: stretch; gap: 20px; }
-.simulation-workspace [data-slot="live-metrics"] { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .actor-progress-status { display: flex; flex-direction: column; gap: 5px; padding: 12px 20px; color: var(--observation-ink); background: var(--observation-surface); font-size: 12px; }
 .actor-message-card[data-delivery="pending"] { border-left: 3px solid var(--observation-ink); }
 .actor-message-card[data-delivery="unapplied"] { border-left: 3px solid var(--attention-ink); }
@@ -15,10 +15,6 @@
   .simulation-page { height: auto; min-height: 100dvh; overflow: visible; }
   .simulation-workspace { height: auto; }
   .simulation-panels { flex-direction: column; }
-  .simulation-workspace [data-slot="live-metrics"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .simulation-panels > section { flex: none; height: clamp(320px, 50svh, 420px); }
   .simulation-panels > aside { flex: none; height: 65svh; min-height: 320px; }
-}
-@media (max-width: 479px) {
-  .simulation-workspace [data-slot="live-metrics"] { grid-template-columns: minmax(0, 1fr); }
 }

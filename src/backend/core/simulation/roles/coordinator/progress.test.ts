@@ -10,6 +10,7 @@ import { defaultSettings } from "@/backend/core/settings/defaults"
 import { normalizeScenarioControls, parseScenarioDocument } from "@/backend/core/scenario"
 import { initialSimulationState, type WorkflowState } from "@/backend/core/simulation/workflow/state"
 import { progressSnapshot } from "./progress"
+import { progressPrompt } from "./prompts/progress-decision"
 import { coordinatorNode } from "./nodes"
 
 function state(autonomousProgress = false): WorkflowState {
@@ -50,6 +51,23 @@ test("fixed mode respects max round without progress or extension calls", async 
   expect(steps).not.toContain("progressDecision")
   expect(steps).not.toContain("extensionDecision")
   expect(pauses).toEqual([])
+})
+
+test("progress instructions distinguish a fresh proposal, execution, and closure in both languages", () => {
+  const en = progressPrompt("before", "after", "Release decision", "en")
+  const ko = progressPrompt("before", "after", "출시 결정", "ko")
+  expect(en).toContain("1 only when BOTH")
+  expect(en).toContain("first actionable proposal")
+  expect(en).toContain("Terminal example")
+  expect(ko).toContain("두 조건을 모두")
+  expect(ko).toContain("처음 나온 실행 가능한 제안")
+  expect(ko).toContain("종료 예시")
+  for (const prompt of [en, ko]) {
+    expect(prompt).toContain("before")
+    expect(prompt).toContain("after")
+    expect(prompt).toContain("PREVIOUS_STATE")
+    expect(prompt).toContain("CURRENT_STATE")
+  }
 })
 
 test("autonomous mode exceeds max only on 1 and stops on 0 despite reinjection", async () => {

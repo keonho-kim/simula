@@ -19,10 +19,10 @@ for (const locale of ["ko", "en"] as const) test(`world headers show return; oth
   try {
     const t = dictionary[locale]
     const world = renderToStaticMarkup(<RunNavigation runId={runId} onHome={() => {}} onBackToWorlds={() => {}} t={t} />)
-    expect(world).toContain(`aria-label="${t.batchBackToWorlds}"`)
-    expect(world).not.toContain(`aria-label="${t.home}"`)
+    expect(world).toContain(`${t.batchBackToWorlds}</button>`)
+    expect(world).not.toContain(`${t.home}</button>`)
     const other = renderToStaticMarkup(<RunNavigation runId="standalone" onHome={() => {}} onBackToWorlds={() => {}} t={t} />)
-    expect(other).toContain(`aria-label="${t.home}"`)
+    expect(other).toContain(`${t.home}</button>`)
     expect(other).not.toContain(t.batchBackToWorlds)
   } finally {
     if (original) Object.defineProperty(globalThis, "sessionStorage", original)

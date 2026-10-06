@@ -32,9 +32,6 @@
 }
 
 /* Editorial reading keeps the full shell width while constraining prose. */
-.report-masthead { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 20px; border-bottom: 2px solid var(--foreground); padding-block: 12px 28px; }
-.report-masthead > div:first-child { flex: 1; align-items: flex-start; flex-wrap: wrap; }
-.report-title { font-size: clamp(1.75rem, 3.2vw, 3rem); font-weight: 650; line-height: 1.2; overflow-wrap: anywhere; }
 .report-view-tabs > [data-slot="tabs-list"] { width: 100%; height: auto; justify-content: flex-start; border-bottom: 1px solid var(--border); padding-block: 8px; gap: 12px; flex-wrap: wrap; }
 .report-view-tabs > [data-slot="tabs-list"] > [data-slot="tabs-trigger"] { flex: 0 1 auto; min-height: 44px; padding-inline: 12px; }
 .report-reading-layout { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: 28px; padding-top: 28px; align-items: start; }
@@ -75,3 +72,9 @@
 
 .report-page { background: var(--card); }
 .report-scope { background: var(--background); }
+
+.report-page .workspace-header[data-appearance="editorial"] { border-inline: 0; border-top: 0; border-radius: 0; }
+.report-page .workspace-header .workspace-heading { padding: 28px 0; }
+.report-page .workspace-toolbar { border: 1px solid var(--border); border-radius: var(--radius); }
+.report-contents { padding-right: 16px; border-right: 1px solid var(--border); }
+.report-scope { border: 1px solid var(--border); border-top: 3px solid var(--source-ink); border-radius: var(--radius); }

@@ -5,7 +5,8 @@
  * Related: src/ui/components/scenario-builder/world-launch.tsx, src/ui/styles/simulations.css
  */
 import { useEffect, useRef } from "react"
-import { HomeIcon, FileTextIcon, SettingsIcon } from "lucide-react"
+import { FileTextIcon, SettingsIcon } from "lucide-react"
+import { PageNavigation } from "@/ui/components/navigation/page-navigation"
 import type { UiTexts } from "@/ui/types/i18n"
 import type { useDocumentScenario } from "@/ui/hooks/use-document-scenario"
 import { WorkspaceFrame, WorkspaceHeader } from "@/ui/components/layout/workspace-frame"
@@ -29,8 +30,8 @@ export function SimulationsPage({ workflow: w, t, language, onHome, onOpenSettin
   }, [])
   return <WorkspaceFrame ariaLabel={t.simulationsTitle}>
     <div ref={page} tabIndex={-1} className="outline-none">
-      <WorkspaceHeader title={t.simulationsTitle} description={t.simulationsDescription}
-        navigation={<Button variant="outline" size="icon" aria-label={t.home} onClick={onHome}><HomeIcon /></Button>}
+      <WorkspaceHeader title={t.simulationsTitle}
+        navigation={<PageNavigation kind="home" label={t.home} onClick={onHome} />}
         actions={<Button variant="outline" onClick={onOpenSettings}><SettingsIcon data-icon="inline-start" />{t.settings}</Button>} />
     </div>
     <ScenarioWorkflowStatus workflow={w} t={t} />

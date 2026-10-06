@@ -9,7 +9,8 @@ import { useEffect, useState } from "react"
 import { AnimatePresence } from "motion/react"
 import * as m from "motion/react-m"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { SaveIcon, ArrowLeftIcon } from "lucide-react"
+import { SaveIcon } from "lucide-react"
+import { PageNavigation } from "@/ui/components/navigation/page-navigation"
 import { toast } from "sonner"
 import type { LLMSettings } from "@/shared"
 import { Button } from "@/ui/components/ui/button"
@@ -138,10 +139,10 @@ export function SettingsPage({ open, t, onOpenChange }: SettingsPageProps) {
   return (
     <>
     <WorkspaceFrame ariaLabel={t.settingsTitle}>
-        <WorkspaceHeader title={t.settingsTitle} description={t.settingsDescription}
-          navigation={<Button variant="ghost" size="icon" aria-label={t.workspaceBack} onClick={requestClose}><ArrowLeftIcon /></Button>} />
+        <WorkspaceHeader title={t.settingsTitle}
+          navigation={<PageNavigation kind="back" label={t.workspaceBack} onClick={requestClose} />} />
 
-        {vaultExists && !vaultUnlocked ? <div className="flex flex-col gap-3 rounded-lg border p-4">
+        {vaultExists && !vaultUnlocked ? <div className="settings-credential-form workspace-panel">
           <p className="text-sm">{t.vaultUnlockHelp}</p>
           <Input type="password" aria-label={t.vaultPassphrase} value={passphrase} onChange={event => setPassphrase(event.target.value)} />
           {vaultError ? <p role="alert" className="text-sm text-destructive">{vaultError}</p> : null}
@@ -184,7 +185,7 @@ export function SettingsPage({ open, t, onOpenChange }: SettingsPageProps) {
           <div role="status" className="rounded-lg bg-muted/40 p-4 text-sm text-muted-foreground">{t.settingsLoading}</div>
         )}
 
-        {vaultExists === false ? <div className="flex flex-col gap-2 border-t pt-3">
+        {vaultExists === false ? <div className="settings-credential-form workspace-panel">
           <p className="text-xs text-muted-foreground">{t.vaultCreateHelp}</p>
           <Input type="password" aria-label={t.vaultPassphrase} value={passphrase} onChange={event => setPassphrase(event.target.value)} />
         </div> : null}

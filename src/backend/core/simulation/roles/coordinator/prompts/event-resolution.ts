@@ -17,7 +17,7 @@ export const eventResolution: CoordinatorPromptBuilder = (current) => {
       .slice(-10)
     return `Coordinator eventResolution.
 Return exactly one allowed output: completed or partial.
-Use completed only when the event's core pressure, decision, responsibility, or next state was substantially addressed this round.
+Use completed only when recorded actions establish the event's required decision or result. Talking about a task, assigning it, promising it, or expecting success does not prove it was performed. If the event only requires a decision, an explicit decision can complete it; do not demand unrelated follow-up. Judge the event's own scope, not whether the whole scenario ended.
 Use partial when actors only reacted, deferred responsibility, left conditions unresolved, or the event should continue into another round.
 No explanation or markdown.
 

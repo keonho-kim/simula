@@ -5,7 +5,8 @@
  * Related: src/ui/hooks/use-document-scenario.ts, src/ui/styles/document-builder.css
  */
 import { useState } from "react"
-import { SettingsIcon, ArrowLeftIcon } from "lucide-react"
+import { SettingsIcon } from "lucide-react"
+import { PageNavigation } from "@/ui/components/navigation/page-navigation"
 import type { UiTexts } from "@/ui/types/i18n"
 import type { useDocumentScenario } from "@/ui/hooks/use-document-scenario"
 import { Button } from "@/ui/components/ui/button"
@@ -48,8 +49,8 @@ export function ScenarioInputPage({ active, workflow: w, t, onBack, onOpenSettin
 
   if (!active) return null
   return <><WorkspaceFrame ariaLabel={t.newScenario}>
-      <WorkspaceHeader title={t.newScenario} description={t.documentScenarioDescription}
-        navigation={<Button variant="ghost" size="icon" aria-label={t.workspaceBack} onClick={requestClose}><ArrowLeftIcon /></Button>}
+      <WorkspaceHeader title={t.newScenario}
+        navigation={<PageNavigation kind="back" label={t.workspaceBack} onClick={requestClose} />}
         actions={<Button variant="outline" onClick={onOpenSettings}><SettingsIcon data-icon="inline-start" />{t.settings}</Button>} />
       <div className="document-scenario-body">
         <ScenarioWorkflowStatus workflow={w} t={t} />

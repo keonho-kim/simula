@@ -39,9 +39,9 @@ export function SourceEvidence({ setId, revision, ids, documents, t }: {
           </Button></li>
         })}
       </ul>
-      <Card size="sm" className="min-w-0">
+      <Card size="sm" className="document-builder-source-detail">
         <CardHeader><CardTitle><h4>{selectedDocument ? scenarioSourceName(selectedDocument.name, t) : t.builderSourceDetail}</h4></CardTitle></CardHeader>
-        <CardContent className="document-builder-source-detail">
+        <CardContent>
           {!selectedId ? <p className="text-muted-foreground">{t.builderSelectEvidence}</p>
             : !selectedDocument ? <p role="alert">{t.builderEvidenceUnavailable}</p>
               : evidence.isPending ? <p role="status">{t.builderLoadingEvidence}</p>

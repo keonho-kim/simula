@@ -27,6 +27,7 @@ export const eventInjection: CoordinatorPromptBuilder = (current) => {
     })
     return `Coordinator eventInjection.
 Choose one pending or partial event id, or None.
+Select the event whose conditions fit the current situation and whose pressure has not already been addressed. Prefer continuing a still-relevant partial event over introducing unrelated pressure. Do not reinject an event just because it appears first or a round remains. Return None when existing interactions should proceed without a new event; None does not itself end the simulation.
 Return exactly one allowed output: an event id from the list, or None.
 No explanation, titles, markdown, or punctuation.
 

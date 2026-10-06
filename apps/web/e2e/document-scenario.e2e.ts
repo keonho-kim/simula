@@ -242,6 +242,11 @@ test("reviewed source excerpts remain readable after newer materials are added",
   const { documentSetId } = request
   await expect(dialog.getByRole("heading", { name: "Technical lead", exact: true })).toBeVisible({ timeout: 15_000 })
   await expect(dialog.getByRole("heading", { name: "Finance representative", exact: true })).toBeVisible()
+  const participants = dialog.getByRole("region", { name: "Participants", exact: true })
+  await expect(participants.getByRole("heading", { name: "Technical lead", exact: true })).toBeVisible()
+  await expect(participants.getByRole("heading", { name: "Finance representative", exact: true })).toBeVisible()
+  await expect(dialog.getByRole("region", { name: "Scenario rules", exact: true })).toBeVisible()
+  expect((await dialog.locator(".document-builder-source-detail").boundingBox())!.height).toBeLessThan(240)
   await expect(dialog.getByRole("button", { name: /Evidence 1/ }).first()).toBeVisible({ timeout: 15_000 })
   expect((await page.request.post(`/api/documents/${documentSetId}/files`, { multipart: { file: { name: "later.txt", mimeType: "text/plain", buffer: Buffer.from("Later source") } } })).status()).toBe(201)
   await dialog.getByRole("button", { name: /Evidence 1/ }).first().click()

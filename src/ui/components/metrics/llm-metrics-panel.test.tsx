@@ -1,5 +1,5 @@
 /**
- * Purpose: Verify live and report-context LLM metric card rendering.
+ * Purpose: Verify simulation, preparation, and accepted-report metric card rendering.
  * Pattern: Server-rendered component contract test.
  * Usage: Run with `bun test src/ui/components/metrics/llm-metrics-panel.test.tsx`.
  * Related: src/ui/components/metrics/llm-metrics-panel.tsx
@@ -54,6 +54,16 @@ describe("LlmMetricsPanel", () => {
 
     expect(html).toContain("2 samples")
     expect(html).toContain("<svg")
+    expect(html).not.toContain("Live")
+  })
+
+  test("preparation uses compact simulation typography while preserving report sample counts", () => {
+    const data = appendMetricData(emptyMetricData(), [modelMetrics("actor", "message", 100, 10, 50)])
+    const series = buildMetricSeries(data, dictionary.en)[0]!
+    const html = renderToStaticMarkup(<MetricPanel context="preparation" series={series} t={dictionary.en} />)
+    expect(html).toContain("1 samples")
+    expect(html).toContain("text-lg")
+    expect(html).not.toContain("text-2xl")
     expect(html).not.toContain("Live")
   })
 })

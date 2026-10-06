@@ -74,3 +74,21 @@ test("initial private concern survives actual compression in the owner's later t
     expect(actor.contextSummary).not.toContain(actor.privateGoal)
   } finally { model.mockRestore() }
 })
+
+
+test("spoken response receives the latest visible request without peer-private context", () => {
+  const simulation = buildDigestSimulation()
+  const actor = simulation.actors[0]!
+  const peer = { ...structuredClone(actor), id: "peer", name: "Peer", privateGoal: "PRIVATE-PEER-STRATEGY" }
+  actor.contextSummary = "Older context. ".repeat(100)
+  actor.context.visible = [{ id: "latest-question", kind: "in", roundIndex: 3, eventId: "e",
+    content: "Can you confirm Monday after the safety check?", sourceActorId: "peer", targetActorIds: [actor.id] }]
+  const context = createActorContext({ runId: "run", scenario: simulation.scenario, plannerDigest: "Release decision",
+    actor, actors: [actor, peer], event: { id: "e", title: "Release", summary: "Decide a date", status: "active", participantIds: [] },
+    roundIndex: 3, roundDigest: { roundIndex: 3, preRound: { elapsedTime: "3", content: "A proposal is awaiting a response" } },
+    coordinatorTrace: emptyCoordinatorTrace() })
+  const prompt = actorPrompts.message({ ...context, ...createActorGraphState() }, {})
+  expect(prompt).toContain("Can you confirm Monday after the safety check?")
+  expect(prompt).not.toContain("PRIVATE-PEER-STRATEGY")
+  expect(prompt.length).toBeLessThan(20_000)
+})

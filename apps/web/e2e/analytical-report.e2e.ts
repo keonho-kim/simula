@@ -200,10 +200,15 @@ test("batch accounting shows fifty per-world rows in the full page scroll on mob
 
 test("visible live sections replace retried drafts without duplicates and cancel independently of viewing", async ({ page }, testInfo) => {
   const record = analysisFixture(); record.report = undefined; record.status = "running"
+  let metricReads = 0
   const executionId = "44444444-4444-4444-8444-444444444444"
   await page.route(url => url.pathname.startsWith("/api/analysis"), route => {
     const url = new URL(route.request().url())
-    if (url.pathname.endsWith("/metrics")) return route.fulfill({ json: { calls: [] } })
+    if (url.pathname.endsWith("/metrics")) {
+      metricReads++
+      return route.fulfill({ json: { calls: [{ timestamp, metrics: { role: "observer", step: "reportCommentary",
+        attempt: 1, ttftMs: 20, durationMs: 100, inputTokens: 40, reasoningTokens: 0, outputTokens: 10, totalTokens: 50, tokenSource: "provider" } }] } })
+    }
     if (url.pathname.endsWith("/cancel")) { record.status = "canceled"; return route.fulfill({ json: { status: "canceling" } }) }
     if (url.pathname.endsWith("/events")) {
       const tasks = ["conclusion-source", "conclusion-observations", "conclusion-implications"].map(taskId => ({ type: "task", taskId, kind: "conclusion", attempt: 1, status: "running" }))
@@ -224,6 +229,9 @@ data: ${JSON.stringify(event)}
   })
   await openRun(page)
   await expect(page.getByRole("heading", { name: "리포트 작성", exact: true })).toBeVisible()
+  const metrics = page.getByRole("region", { name: "모델 지표" })
+  await expect(metrics).toContainText("20 ms")
+  await expect(metrics).toContainText("1 샘플")
   await expect(page).toHaveURL(`/reports/${run.id}/prepare`)
   await expect(page.locator(".report-task-output")).toHaveCount(0)
   await expect(page.locator(".report-preparation-column")).toHaveCount(3)
@@ -234,10 +242,22 @@ data: ${JSON.stringify(event)}
   await expect(page.getByText("수정된 분석을 실시간으로 작성합니다.", { exact: true })).toHaveCount(1)
   await expect(page.getByText("폐기된 초안", { exact: true })).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath("analysis-live.png"), fullPage: true })
+  await page.getByRole("button", { name: "홈", exact: true }).click()
+  await expect(metrics).toHaveCount(0)
+  const readsAfterExit = metricReads
+  await page.waitForTimeout(1200)
+  expect(metricReads).toBe(readsAfterExit)
+  await page.goto(`/reports/${run.id}/prepare`)
+  await expect(metrics).toContainText("20 ms")
+  await page.getByRole("button", { name: /자료 평가/ }).click()
+  await page.locator('[data-task-id="conclusion-source"]').click()
+  await expect(page.getByText("수정된 분석을 실시간으로 작성합니다.", { exact: true })).toHaveCount(1)
   await page.getByRole("button", { name: "생성 중지", exact: true }).click()
   await expect(page.getByRole("button", { name: "미완료 분석 재시도", exact: true })).toBeEnabled()
   await expect(page).toHaveURL(`/reports/${run.id}/prepare`)
   await page.getByRole("button", { name: "하위 작업 목록으로" }).click()
   await page.getByRole("button", { name: "전체 보드" }).click()
   await expect(page.locator(".report-task-output")).toHaveCount(0)
+  await page.getByRole("button", { name: "홈", exact: true }).click()
+  await expect(metrics).toHaveCount(0)
 })

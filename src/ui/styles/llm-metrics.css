@@ -1,0 +1,14 @@
+/**
+ * Purpose: Share simulation and report-preparation metric card spacing and responsive columns.
+ * Pattern: Component stylesheet.
+ * Usage: Imported by LlmMetricsPanel and reused by ReportMetricOverview.
+ * Related: src/ui/components/metrics/llm-metrics-panel.tsx, src/ui/components/report/metric-overview.tsx
+ */
+.llm-metrics-grid { display: grid; min-width: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.llm-metrics-grid > * { min-width: 0; }
+@media (max-width: 1023px) {
+  .llm-metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 479px) {
+  .llm-metrics-grid { grid-template-columns: minmax(0, 1fr); }
+}

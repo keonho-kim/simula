@@ -6,7 +6,9 @@
  */
 import { useEffect, useRef } from "react"
 import * as m from "motion/react-m"
-import { HomeIcon, SettingsIcon } from "lucide-react"
+import { SettingsIcon } from "lucide-react"
+import { WorkspaceHeader } from "@/ui/components/layout/workspace-frame"
+import { PageNavigation } from "@/ui/components/navigation/page-navigation"
 import type { UiTexts } from "@/ui/types/i18n"
 import type { useDocumentScenario } from "@/ui/hooks/use-document-scenario"
 import { useReducedMotionPreference } from "@/ui/animation/use-reduced-motion-preference"
@@ -36,12 +38,9 @@ export function DocumentAnalysisPage({ workflow: w, t, onHome, onOpenSettings, o
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); heading.current?.focus({ preventScroll: true }) }, [])
   return <main className="min-h-svh bg-background text-foreground">
     <div className="workspace-frame">
-      <header className="flex items-center gap-3 border-b pb-4">
-        <Button variant="ghost" size="icon" aria-label={t.home} onClick={onHome}><HomeIcon /></Button>
-        <div className="min-w-0 flex-1"><h1 ref={heading} tabIndex={-1} className="text-3xl font-semibold outline-none">{t.documentAnalysisTitle}</h1>
-          <p className="text-sm text-muted-foreground">{t.documentAnalysisDescription}</p></div>
-        <Button variant="ghost" size="icon" aria-label={t.settings} onClick={onOpenSettings}><SettingsIcon /></Button>
-      </header>
+      <WorkspaceHeader title={t.documentAnalysisTitle} headingRef={heading}
+        navigation={<PageNavigation kind="home" label={t.home} onClick={onHome} />}
+        actions={<Button variant="outline" onClick={onOpenSettings}><SettingsIcon data-icon="inline-start" />{t.settings}</Button>} />
       <ScenarioWorkflowStatus workflow={w} t={t} />
       <m.div key={stage} className="flex min-w-0 flex-col gap-4" {...fadePresence(reduced, "content")}>
         {stage === "documents" ? <section className="flex flex-col gap-3" aria-label={t.builderSourcesStage}>

@@ -1,7 +1,7 @@
 /**
- * Purpose: Render run-level LLM metrics above the analytical report and its detail views.
+ * Purpose: Render scoped run and analysis metrics in preparation or accepted-report execution views.
  * Pattern: Presentation Component.
- * Usage: Rendered by ReportPage with persisted or live run events.
+ * Usage: Rendered by ReportExecutionDetails with persisted events and polled analysis calls.
  * Related: src/ui/models/report/metric-overview.ts, src/ui/components/metrics/llm-metrics-panel.tsx
  */
 import { useEffect, useMemo, useState } from "react"
@@ -9,13 +9,14 @@ import type { RunEvent } from "@/shared"
 import type { AnalyticalExport } from "@/shared/analytical-report"
 import type { UiTexts } from "@/ui/types/i18n"
 import { MetricPanel } from "@/ui/components/metrics/llm-metrics-panel"
+import { cn } from "@/ui/lib/class-names"
 import { appendReportMetricSummary, emptyReportMetricSummary, reportMetricSeries, type ReportMetricSummary } from "@/ui/models/report/metric-overview"
 
 const EMPTY_CALLS: AnalyticalExport["metrics"] = []
 interface Projection { events: RunEvent[]; scopeId?: string; processed: number; tail?: string; summary: ReportMetricSummary }
 
-export function ReportMetricOverview({ events, t, additionalMetrics = EMPTY_CALLS, scopeId }: {
-  events: RunEvent[]; t: UiTexts; additionalMetrics?: AnalyticalExport["metrics"]; scopeId?: string
+export function ReportMetricOverview({ events, t, additionalMetrics = EMPTY_CALLS, scopeId, context = "report" }: {
+  events: RunEvent[]; t: UiTexts; additionalMetrics?: AnalyticalExport["metrics"]; scopeId?: string; context?: "report" | "preparation"
 }) {
   const base = useMemo(() => appendReportMetricSummary(emptyReportMetricSummary(), events), [events])
   const [projection, setProjection] = useState<Projection>(() => ({ events, scopeId, processed: 0, summary: base }))
@@ -40,10 +41,10 @@ export function ReportMetricOverview({ events, t, additionalMetrics = EMPTY_CALL
   return (
     <section
       aria-label={t.llmMetrics}
-      className="flex min-w-0 flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_240px]"
+      className={cn(context === "preparation" ? "llm-metrics-grid" : "flex min-w-0 flex-wrap gap-3 [&>*]:min-w-0 [&>*]:flex-[1_1_240px]")}
     >
       {series.map((item) => (
-        <MetricPanel key={item.title} context="report" series={item} t={t} />
+        <MetricPanel key={item.title} context={context} series={item} t={t} />
       ))}
     </section>
   )

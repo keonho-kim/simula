@@ -20,11 +20,14 @@ ${textGuide(state.scenario.language)}
 ${renderOutputLengthGuide(state.scenario.controls, "actor message")}
 If Action is no_action, return None.
 If mentioning another actor or an action, use names and labels rather than internal ids. Do not prefix the line with the speaker’s name.
+Respond to the latest relevant visible request or proposal when there is one. Make the selected action concrete: answer, ask for missing information, propose terms, accept, or refuse with a relevant condition. Do not claim another actor agreed or a future task was completed without recorded support. Do not repeat earlier wording unless repetition is the chosen action.
 No explanation or JSON.
 
 ${renderPromptBlock("ACTOR", { name: state.actor.name })}
 
 ${renderPromptBlock("SIMULATION", `Round: ${state.event.title}. ${compactText(state.event.summary, scalePromptLimit(300, state.scenario.controls))}`)}
+
+${renderPromptBlock("HISTORY", state.history)}
 
 ${renderPromptBlock("PREVIOUS_RESULT", `Thought: ${compactText(partial.thought, scalePromptLimit(300, state.scenario.controls))}
 Target: ${targetSelectionSummary(state, partial.target)}

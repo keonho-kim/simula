@@ -754,11 +754,26 @@ accepted prose. This preservation does not constitute durable mid-task graph rec
 
 ### Simulation and report presentation stages
 
+`components/layout/workspace-frame.tsx` owns the common toolbar/title hierarchy for working
+pages and editorial results. `components/navigation/page-navigation.tsx` owns visible home
+and return button presentation; callers retain navigation and unsaved-draft policy.
+RunNavigation still resolves the source simulation list through browser session state.
+BatchOverview accepts its parent's batch actions in the top overview header, while the
+selected simulation panel retains per-run controls. Scenario review groups existing fields
+by situation, participants, and rules without introducing another data projection or fetch.
+
 `ui/pages/simulation-page.tsx` owns a viewport-sized workspace. Performance charts remain visible above the graph and conversation;
 its graph and live actor history share the remaining height. Live history uses its own
 virtualized scroll surface, preserving manual reading until the reader returns to the bottom.
 Report navigation first loads retained analysis. Missing or outdated analysis starts in
-`ui/pages/report-preparation-page.tsx`, which shows three kanban columns with click-to-open task details.
+`ui/pages/report-preparation-page.tsx`, which displays scoped metric cards immediately below
+its context header, followed by three kanban columns with click-to-open task details.
+`ui/styles/llm-metrics.css` owns the shared simulation/preparation card grid. Preparation
+uses compact simulation typography while preserving report averages, sample counts, and
+run-versus-batch scope. The existing analysis metric query polls only running records
+while mounted; accepted reports mount execution details only when their tab is selected.
+Motion presence disables metric/accounting queries as soon as the view starts exiting,
+including the interval before an outgoing page is finally unmounted.
 A completed analysis switches to the read-only result; saved accepted reports cause no model
 calls. Failed work without an accepted report stays in preparation with an explicit retry.
 The result composition owns neither generation controls nor live task subscriptions.
@@ -846,7 +861,7 @@ single or multiple execution. `MultiversePanel` uses the same compact status res
 `BatchOverview` derives actual totals and `BatchWorldList` presents only summaries. Only the selected
 simulation mounts its preparation detail. Desktop uses a visible list beside selected controls;
 compact screens use a selector. The selected simulation's continue/view and stop actions have
-separate placement, while batch-wide stop/recovery and aggregate report actions live in a footer.
+separate placement, while batch-wide stop/recovery and aggregate report actions live in the top overview header.
 Opening the aggregate report retains the current selection for the return trip. User-visible
 controls use "simulation"; shared contracts and durable identifiers continue to use "world".
 
@@ -854,3 +869,10 @@ Button emphasis belongs to the existing primitive. Filled brand actions, tinted 
 white inspection controls, and red-tinted stop actions share the same sizing and focus behavior.
 Page and feature styles own action-group placement; no new runtime dependency or event framework
 is introduced. Reports retain their editorial composition, and live metrics remain immediately visible.
+
+
+### Evidence used by dialogue and continuation
+
+The actor message prompt consumes the same bounded actor-visible history projection as thought generation. It does not read global interactions or another actor's private context. The coordinator continuation prompt remains one exact-choice call per autonomous round, with a localized rubric separating changed evidence, feasible follow-up, and terminal resolution. Finite-choice parsing, retry ownership, fixed-round execution, and persisted event contracts remain unchanged. See [the prompt quality review](prompt-review.md) for intended judgments and validation limits.
+
+The dashboard now separates navigation from lightweight manifest summaries and recent records. Credential entry owns a bounded 440px form and does not change browser-vault encryption or server synchronization. Workspace headers, buttons, cards, and feature styles share the enterprise workspace palette defined in `DESIGN.md`.

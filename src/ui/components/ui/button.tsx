@@ -11,13 +11,13 @@ import { Slot } from "radix-ui"
 import { cn } from "@/ui/lib/class-names"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-lg border border-transparent bg-clip-padding max-w-full text-sm font-semibold whitespace-normal text-center transition-colors duration-[var(--animation-feedback-duration)] outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50  disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-md border border-transparent bg-clip-padding max-w-full text-sm font-semibold whitespace-normal text-center transition-colors duration-[var(--animation-feedback-duration)] outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50  disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/95 active:bg-primary/95",
+        default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:bg-primary/90",
         outline:
-          "border-input bg-card text-foreground shadow-sm hover:border-primary hover:bg-accent aria-expanded:border-primary aria-expanded:bg-accent",
+          "border-input bg-card text-foreground hover:border-ring hover:bg-accent aria-expanded:border-ring aria-expanded:bg-accent",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/75 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:

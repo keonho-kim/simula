@@ -71,7 +71,12 @@ export function MultiversePanel({ initialOptions, autoContinue, scenarioId, fast
         <Button type="submit" disabled={w.busy}>{t.batchStart}</Button>
       </FieldGroup>
     </form> : <>
-      <BatchOverview batch={w.batch} language={language} t={t} />
+      <BatchOverview batch={w.batch} language={language} t={t} actions={<>
+        {reportWorld ? <Button variant={w.batch.status === "completed" ? "default" : "outline"} onClick={() => openWorld(reportWorld, "report")}><FileTextIcon data-icon="inline-start" />{t.batchOpenResult}</Button> : null}
+        {active ? <Button variant="destructive" disabled={w.busy} onClick={() => void w.control("cancel")}><SquareIcon data-icon="inline-start" />{t.batchCancel}</Button> : null}
+        {w.batch.status === "partial" || w.batch.status === "interrupted" ? <Button disabled={w.busy} onClick={() => void w.control("resume")}><RotateCcwIcon data-icon="inline-start" />{t.batchResume}</Button> : null}
+        {!active ? <Button variant="outline" disabled={w.busy} onClick={w.reset}>{t.batchNew}</Button> : null}
+      </>} />
       {w.batch.stopReason === "deadline" ? <Alert><AlertDescription>{t.batchDeadline}</AlertDescription></Alert> : null}
       {w.batch.status === "interrupted" || w.batch.worlds.some(world => world.status === "interrupted") ? <Alert><AlertDescription>{t.batchInterruptedHelp}</AlertDescription></Alert> : null}
       <div className="simulation-management-layout">
@@ -92,12 +97,6 @@ export function MultiversePanel({ initialOptions, autoContinue, scenarioId, fast
         </div>
       </section> : null}
       </div>
-      <footer className="simulation-batch-actions"><p>{t.simulationsAllControls}</p><div className="flex flex-wrap gap-3">
-        {reportWorld ? <Button variant="outline" onClick={() => openWorld(reportWorld, "report")}><FileTextIcon data-icon="inline-start" />{t.batchOpenResult}</Button> : null}
-        {active ? <Button variant="destructive" disabled={w.busy} onClick={() => void w.control("cancel")}><SquareIcon data-icon="inline-start" />{t.batchCancel}</Button> : null}
-        {w.batch.status === "partial" || w.batch.status === "interrupted" ? <Button variant="outline" disabled={w.busy} onClick={() => void w.control("resume")}><RotateCcwIcon data-icon="inline-start" />{t.batchResume}</Button> : null}
-        {!active ? <Button variant="ghost" disabled={w.busy} onClick={w.reset}>{t.batchNew}</Button> : null}
-      </div></footer>
     </>}
   </div>
 }

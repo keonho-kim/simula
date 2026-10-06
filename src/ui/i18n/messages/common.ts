@@ -5,16 +5,12 @@
  * Related: src/ui/types/i18n.ts
  */
 const en = {
-  appSubtitle: "Agent-based simulation command surface",
   home: "Home",
   homeTitle: "Start a simulation",
   homeSubtitle: "Create a scenario, try an example, or review a past run.",
   newScenario: "New Scenario",
-  newScenarioBody: "Use files, describe a situation, or combine both to build a scenario.",
-  importScenarioBody: "Open a finished Markdown or text scenario and review it before running.",
   resumeScenarioDraft: "Resume saved draft",
   exampleScenario: "Simulate Example Scenario",
-  exampleScenarioBody: "Choose a project sample and prepare it for execution.",
   runHistory: "Review Run History",
   runHistoryBody: "Replay a previous graph, log, and report.",
   chooseSample: "Choose sample",
@@ -86,16 +82,12 @@ const en = {
 } as const
 
 const ko = {
-  appSubtitle: "인물이 만들어 가는 시뮬레이션",
   home: "홈",
   homeTitle: "시뮬레이션 시작하기",
   homeSubtitle: "시나리오를 만들고 실행하거나 지난 결과를 살펴보세요.",
   newScenario: "새 시나리오",
-  newScenarioBody: "파일이나 상황 설명을 사용하거나 둘을 함께 입력해 시나리오를 만듭니다.",
-  importScenarioBody: "완성된 Markdown·텍스트 시나리오를 열어 실행 전에 확인합니다.",
   resumeScenarioDraft: "저장한 초안 이어쓰기",
   exampleScenario: "예시 시나리오 실행",
-  exampleScenarioBody: "예시 시나리오를 골라 바로 시작해 보세요.",
   runHistory: "실행 내역 보기",
   runHistoryBody: "지난 실행의 관계 변화와 대화, 분석 결과를 다시 살펴보세요.",
   chooseSample: "예시 선택",

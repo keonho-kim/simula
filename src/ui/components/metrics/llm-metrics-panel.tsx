@@ -1,8 +1,8 @@
 /**
- * Purpose: Render live and report-context LLM metric cards from prepared series.
+ * Purpose: Render consistent simulation, preparation, and report metric cards from prepared series.
  * Pattern: Presentation Component.
  * Usage: Imported by the simulation dashboard and Report metric overview.
- * Related: src/ui/models/metrics/metric-series.ts, src/ui/components/metrics/line-chart.tsx
+ * Related: src/ui/models/metrics/metric-series.ts, src/ui/components/metrics/line-chart.tsx, src/ui/styles/llm-metrics.css
  */
 import { memo, useMemo } from "react"
 import type { MetricData } from "@/ui/models/metrics/metric-data"
@@ -10,6 +10,7 @@ import type { UiTexts } from "@/ui/types/i18n"
 import { useRunStore } from "@/ui/stores/run-store"
 import { buildMetricSeries, type MetricSeries } from "@/ui/models/metrics/metric-series"
 import { LineChart } from "@/ui/components/metrics/line-chart"
+import "@/ui/styles/llm-metrics.css"
 
 export const LlmMetricsPanel = memo(function LlmMetricsPanel({ t }: { t: UiTexts }) {
   const data = useRunStore((state) => state.metricData)
@@ -21,7 +22,7 @@ export function LlmMetricsPanelView({ data, t }: { data: MetricData; t: UiTexts 
   const series = useMemo(() => buildMetricSeries(data, t), [data, t])
 
   return (
-    <section data-slot="live-metrics" className="flex gap-2 [&>*]:min-w-0 [&>*]:flex-1" aria-label={t.llmMetrics}>
+    <section data-slot="live-metrics" className="llm-metrics-grid" aria-label={t.llmMetrics}>
       {series.map((item) => (
         <MetricPanel key={item.title} series={item} t={t} />
       ))}
@@ -36,11 +37,11 @@ export function MetricPanel({
 }: {
   series: MetricSeries
   t: UiTexts
-  context?: "live" | "report"
+  context?: "live" | "preparation" | "report"
 }) {
   const hasSamples = series.sampleCount > 0
   const isTotal = series.display === "total"
-  const status = context === "report"
+  const status = context !== "live"
     ? `${series.sampleCount.toLocaleString()} ${t.samples}`
     : hasSamples ? t.metricLive : t.metricIdle
   return (

@@ -10,6 +10,7 @@ import type { ActorCardPromptBuilder } from "./contracts"
 export const preference: ActorCardPromptBuilder = (state) =>
     `Generator actor card preference.
 Return one compact sentence describing what this actor wants and what tradeoff they prefer.
+Make the preferred outcome and what the actor is willing to give up specific to this role. Keep conflicting incentives plausible; do not make every actor simply want harmony or force a secret agenda.
 Do not rename this actor.
 
 ${renderPromptBlock("ACTOR", `Role: ${state.card.role}

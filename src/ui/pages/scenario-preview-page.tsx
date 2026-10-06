@@ -5,7 +5,7 @@
  * Related: src/ui/shell/home-view.tsx, src/ui/browser-storage/database/drafts/save.ts
  */
 import { useEffect, useState } from "react"
-import { ArrowLeftIcon } from "lucide-react"
+import { PageNavigation } from "@/ui/components/navigation/page-navigation"
 import type { ScenarioDraft } from "@/ui/types/scenario"
 import type { UiTexts } from "@/ui/types/i18n"
 import { Button } from "@/ui/components/ui/button"
@@ -88,7 +88,7 @@ export function ScenarioPreviewPage({
   return <>
     <WorkspaceFrame ariaLabel={t.scenarioPreview}>
       <WorkspaceHeader title={t.scenarioPreview} description={t.scenarioPreviewDescription}
-        navigation={<Button variant="ghost" size="icon" aria-label={t.workspaceBack} onClick={requestClose}><ArrowLeftIcon /></Button>} />
+        navigation={<PageNavigation kind="back" label={t.workspaceBack} onClick={requestClose} />} />
       {draft.text ? <div className="workspace-split workspace-preview">
         <section className="workspace-panel"><h2 className="workspace-panel-title">{t.scenarioText}</h2>
           <p className="my-3 break-all text-xs text-muted-foreground">{draft.sourceName}</p><MarkdownContent content={draft.text} />

@@ -15,6 +15,7 @@ const PRIVATE_CONCERN_CHARS = 500
 export const thought: ActorPromptBuilder = (state) =>
     `Actor thought. As the actor below, return one short paragraph using only visible context and private profile.
 ${textGuide(state.scenario.language)}
+Attend to the latest visible request or changed constraint. Separate what you know from what you suspect, then identify an immediate choice within your actual authority. If nothing changed, do not invent news or repeat a generic concern as if it were new.
 ${renderOutputLengthGuide(state.scenario.controls, "actor thought")}
 
 ${renderPromptBlock("SCENARIO", `Digest: ${compactText(state.plannerDigest, scalePromptLimit(650, state.scenario.controls))}`)}

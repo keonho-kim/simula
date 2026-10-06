@@ -42,7 +42,7 @@ export function TopCommandBar({
   onReport,
 }: TopCommandBarProps) {
   return (
-    <header className="border-b border-border bg-background py-3">
+    <header className="simulation-command-bar">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-start gap-3">
           <RunNavigation runId={selectedRunId} onHome={onHome} onBackToWorlds={onBackToWorlds} t={t} />
@@ -56,12 +56,9 @@ export function TopCommandBar({
                 </Badge>
               ) : null}
             </div>
-            <p className="hidden text-xs text-muted-foreground sm:block">
-              {t.appSubtitle}
-            </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
         {onAutoContinueChange && !showReportShortcut ? (
           <label className="flex flex-wrap items-center gap-2 text-xs">
             <Switch checked={autoContinue} disabled={autoContinueDisabled} onCheckedChange={onAutoContinueChange} />

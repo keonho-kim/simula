@@ -7,7 +7,6 @@
 export const simulationSettingsTexts = {
   en: {
     settingsTitle: "LLM settings",
-    settingsDescription: "Provider connections are shared across roles. API keys are sent to the server and are not displayed after save.",
     settingsProviders: "Providers",
     settingsProviderConnections: "Connection settings",
     settingsRoles: "Roles",
@@ -28,7 +27,7 @@ export const simulationSettingsTexts = {
     settingsSave: "Save settings",
     vaultPassphrase: "Credentials passphrase",
     vaultCreateHelp: "Create a passphrase to encrypt provider API keys and authentication headers in this browser. Enter it again after a browser restart.",
-    vaultUnlockHelp: "Unlock provider credentials to edit or use model settings in this browser.",
+    vaultUnlockHelp: "Enter the passphrase you created to use saved model connections.",
     vaultUnlock: "Unlock credentials",
     vaultPassphraseRequired: "Enter a credentials passphrase before saving.",
     vaultUnlockRequired: "Unlock provider credentials before saving.",
@@ -79,7 +78,6 @@ export const simulationSettingsTexts = {
   },
   ko: {
     settingsTitle: "LLM 설정",
-    settingsDescription: "공급자 연결 설정은 모든 역할이 공유합니다. API 키는 서버로 전송되며 저장 후에는 다시 표시되지 않습니다.",
     settingsProviders: "공급자",
     settingsProviderConnections: "연결 설정",
     settingsRoles: "역할",
@@ -100,7 +98,7 @@ export const simulationSettingsTexts = {
     settingsSave: "설정 저장",
     vaultPassphrase: "인증 정보 암호",
     vaultCreateHelp: "이 브라우저의 API 키와 인증 헤더를 암호화할 암호를 만드세요. 브라우저를 다시 열면 잠금 해제가 필요합니다.",
-    vaultUnlockHelp: "모델 설정을 편집하거나 사용하려면 인증 정보를 잠금 해제하세요.",
+    vaultUnlockHelp: "저장된 모델 연결을 사용하려면 설정한 암호를 입력하세요.",
     vaultUnlock: "인증 정보 잠금 해제",
     vaultPassphraseRequired: "저장하기 전에 인증 정보 암호를 입력하세요.",
     vaultUnlockRequired: "저장하기 전에 인증 정보를 잠금 해제하세요.",

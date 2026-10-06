@@ -444,3 +444,91 @@ WebKit workflows passed. Browser checks covered target/step navigation, draft re
 focus restoration, deferred artifact queries, execution isolation, 320–1920 CSS pixel widths,
 200% zoom, and reduced motion. Screenshots and check logs are retained locally under
 `output/ui-generation-hierarchy/`. All generation used fixed responses or the test model.
+
+## Report preparation metrics (2026-10-02)
+
+Report preparation now mounts its four metric cards below the context header and above
+the generation board. `ui/styles/llm-metrics.css` shares simulation card spacing and
+four/two/one-column breakpoints. Preparation retains report averages, sample counts,
+unavailable usage, and run/batch accounting boundaries. The existing incremental metric
+projection and bounded chart histories are reused; no runtime dependency was added.
+
+Chromium and WebKit checks compared computed card width, background, padding, numeric
+font size, grid columns, and gap against simulation at 1920, 1440, 1024, 768, 390, and
+320 CSS pixels. All comparisons matched, with no horizontal overflow. Accepted-report
+execution details remain deferred until their tab opens.
+
+A live-view exit test first observed one additional metric request during the outgoing
+page's Motion lifetime. Query enablement and polling now follow presence; the same test
+observed zero further requests over 1.2 seconds after leaving an active preparation view.
+Reopening, draft replacement, and cancellation passed in both engines. These checks
+measure visible layout and subscription lifetime, not overall rendering throughput.
+The six affected Chromium workflows and two focused WebKit workflows passed. The Bun
+suite passed 578 tests with one existing skip; focused post-fix tests, type checking,
+lint, and production builds passed. All model responses were fixed or simulated.
+Captures are retained locally under `output/report-preparation-final/`.
+
+## Navigation and control consistency (2026-10-02)
+
+Workspace pages share a toolbar above their title and one labeled navigation component.
+Editorial typography is limited to report headings; navigation keeps 14px labels and
+40px controls. Batch actions use the existing summary card's header, and scenario review
+groups existing fields without adding another query or projection. Inline Markdown inherits
+heading typography; evidence reading no longer assigns a 380px flex basis to card content.
+
+The Bun suite passed 578 tests with one existing skip. Across focused runs, 21 Chromium
+workflows and four WebKit workflows passed, including 320–1920px layouts, long bilingual
+report titles, settings/draft return, enlarged text, report export, and separate individual
+and batch controls. Fixed-model captures in the in-app browser document six before/after
+states under `output/ui-consistency-audit/`. The comparisons validate layout and behavior;
+they do not claim a new rendering-speed improvement or a full accessibility certification.
+
+## Enterprise workspace and prompt review — 2026-10-02
+
+The workspace redesign changes page composition, shared surfaces, controls, and bounded credential entry. It adds no runtime dependency, polling, timer, or subscription. Dashboard counts use the loaded run manifests. Model prompt changes add no model calls; real-provider latency and semantic accuracy were not measured.
+
+### Production comparison
+
+Compared committed `b6bd366` with the complete current working tree, including earlier uncommitted report/navigation changes. Both use the installed dependencies, normal production builds without E2E entry points, local Node servers, Chromium at 1440 × 1000, and reduced motion. `browser-workspace.ts` alternates the two builds, warms up once, then reports five-run medians. Each run opens and closes settings five times. No simulation or live provider is invoked.
+
+A first pass showed a greater-than-5% style-calculation difference, so the comparison was repeated. Final repeat:
+
+| Metric | Baseline | Revised workspace |
+| --- | ---: | ---: |
+| App ready | 879.90 ms | 879.52 ms |
+| First contentful paint | 329.61 ms | 329.72 ms |
+| Initial encoded script bytes | 347,427 | 346,230 |
+| Settings open | 36.20 ms | 35.57 ms |
+| Task duration across five settings round trips | 157.29 ms | 155.91 ms |
+| Script duration | 58.61 ms | 58.14 ms |
+| Layout duration | 7.70 ms | 5.59 ms |
+| Style recalculation | 11.26 ms | 12.11 ms |
+| Layout plus style recalculation | 18.96 ms | 17.70 ms |
+
+The style subcomponent consistently increases by about 0.85 ms over five round trips. Aggregate rendering work, task time, and input response do not regress in this workload. Keep this subcomponent visible rather than claiming every metric improved. These measurements do not establish performance for every screen, device, or workload.
+
+### Bounded rendering and projection checks
+
+The three existing CPU benchmarks retain their warmup and five-sample medians. A second sequential pass gives:
+
+| Workload | Baseline | Revised workspace |
+| --- | ---: | ---: |
+| Incremental metrics, 4,000 events | 0.73 ms | 0.66 ms |
+| Incremental conversation, 4,000 events | 1.84 ms | 2.01 ms |
+| Chart render, 4,000 events | 1.37 ms | 1.32 ms |
+| Batched ingestion, 4,000 events | 11.85 ms | 12.03 ms |
+| Bounded chart geometry, 20,000 samples | 0.12 ms | 0.12 ms |
+| Chunked append, 20,000 samples | 1.57 ms | 1.56 ms |
+
+The conversation projection source, stores, and benchmark are unchanged; small absolute timing variation here cannot be attributed to the new page styles. Output equivalence remains true. The chart fixture renders 158 points within the 258-point cap. Timeline sharing retains 2,148 graph records from 150,000 original records. Metric batches cause zero conversation, stage, or round-control subscription updates.
+
+The production browser history test injects 4,120 messages, mounts 12 cards at 4,000 messages, preserves reading position, and follows new messages only from the bottom. It passes at desktop and compact widths.
+
+### Validation and artifacts
+
+- Bun: 580 passed, 1 skipped, 0 failed.
+- Typecheck, lint, and normal production build pass.
+- Chromium and WebKit credential flows cover wrong passwords, server synchronization failure/retry, and reset failure/retry.
+- Responsive checks cover English/Korean, 320–1920px, 80% page width, bounded password forms, navigation, settings return, and overflow. Existing enlarged-text and reduced-motion workflows pass.
+- Primary white-on-brand contrast is 5.75:1; primary body ink on white is 14.02:1; secondary ink on the workspace is 5.81:1. This is a token check, not a complete accessibility certification.
+- Screenshots and raw measurements are in `output/workspace-redesign/`: `final-screens`, `e2e`, `responsive`, `performance`, and the benchmark JSON files. These local artifacts are not committed.

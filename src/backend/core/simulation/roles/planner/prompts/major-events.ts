@@ -10,6 +10,7 @@ import type { PlannerPromptBuilder } from "./contracts"
 export const majorEvents: PlannerPromptBuilder = (current, partial) =>
     `Planner majorEvents.
 List concrete major events that could occur during this scenario and create new pressure for actors.
+Each event should have a plausible trigger, a distinct constraint or decision pressure, and an observable way to address it. Keep events conditional; a planned event is not evidence that it has happened. Avoid repeating the same disagreement with a new title or escalating every event into a crisis.
 For each event summary, explicitly name who first observes or receives the event and whether it is public. A participant mentioned in the event is not automatically a recipient.
 Return one event per line in exactly this format: Title - Summary
 Do not include headings, markdown tables, code fences, or commentary.

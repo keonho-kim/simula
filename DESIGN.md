@@ -6,7 +6,9 @@ Simula helps people explore what could happen using materials they already have.
 
 The "Minority Report" reference expresses the ambition to make possible futures inspectable. Translate that ambition into clear evidence, connected events, and readable interpretation. The visual language is a complete analytical service: a recognizable application workspace, actionable dashboards, an operational simulation view, and editorial reports. Keep speculative outcomes visibly connected to their inputs and assumptions; the interface must not imply certainty or real-world predictive accuracy that the system has not established.
 
-Use an explicit SaaS interface with visible navigation, useful summaries, strong action hierarchy, and distinct control surfaces. Prioritize task visibility and discoverability over sparse presentation. White content panels, cool background planes, saturated brand actions, semantic status colors, and bounded elevation should make the service easy to operate. Editorial reports retain their reading rhythm.
+Use a Databricks-inspired analytical workspace: stable navigation groups, compact toolbars, clear list/detail boundaries, white work surfaces, and data-first content. This is an enterprise web application, not a sparse landing page. Treat the [Databricks workspace navigation](https://docs.databricks.com/aws/en/workspace/navigate-workspace) as a structural reference; retain Simula's identity and workflows. Do not copy unrelated product menus or add nonfunctional search, catalog, or account controls.
+
+Separate navigation, commands, state, and content through position and surface contrast. Use a warm primary action color, blue source/focus accents, and independently meaningful status colors. Reserve large display type for editorial reports. Prefer compact working layouts with visible boundaries over oversized promotional cards, repeated instructions, or blank space.
 
 This document is the design authority for new and revised UI. It describes the target design; it does not claim every existing screen already follows it. Implement changes through existing components and semantic tokens, within the responsibility being changed.
 
@@ -69,15 +71,15 @@ These light-theme values are the reference palette. `src/ui/index.css` owns impl
 
 | Role | Reference value | Use |
 | --- | --- | --- |
-| Workspace | `#F1F5FB` | Page canvas around content and tools |
+| Workspace | `#F4F5F7` | Page canvas around content and tools |
 | Reading surface | `#FFFFFF` | Documents, reports, forms, primary panels |
-| Secondary surface | `#E8EFFF` | Navigation, grouped controls, supporting regions |
+| Secondary surface | `#E9EDF2` | Navigation, grouped controls, supporting regions |
 | Structural divider | `#CBD5E1` | Section and panel boundaries |
 | Control boundary | `#74859B` | Input and interactive boundaries where needed for recognition |
-| Primary ink | `#172033` | Titles, body, important values |
-| Secondary ink | `#526176` | Descriptions, metadata, captions |
-| Primary action | `#2563EB` | Main actions with white text |
-| Active and focus | `#1D4ED8` | Selection indicators, keyboard focus, active navigation |
+| Primary ink | `#202D3A` | Titles, body, important values |
+| Secondary ink | `#536170` | Descriptions, metadata, captions |
+| Primary action | `#B93820` | Main actions with white text |
+| Active and focus | `#2272B5` | Selection indicators, keyboard focus, active navigation |
 
 ### Semantic accents
 
@@ -100,7 +102,7 @@ Color communicates a specific meaning. Successful execution does not imply a fav
 - Give normal text adequate ink contrast; do not make entire paragraphs pale to create hierarchy.
 - Pair state and provenance colors with text, icons, line styles, or shapes. Include legends where meanings are not already explicit.
 - Keep actor and series colors stable across a graph, timeline, and legend. Identity colors must not silently acquire status meaning.
-- Use light, static elevation to separate interactive controls and working panels from the canvas. Give primary, secondary, and destructive actions distinct fills; avoid a uniform collection of outlined rectangles.
+- Prefer 6px panel corners, 1px structural borders, and neutral header bands. Use light, static elevation only where it separates a dialog or bounded entry form from the canvas. Give primary, secondary, and destructive actions distinct fills; avoid a uniform collection of outlined rectangles.
 - Warm amber is appropriate for a bounded attention state. Keep the overall canvas white or cool neutral.
 - Use existing semantic Tailwind tokens first. Add a named semantic token only when implementing its actual consumer; avoid page-specific raw color palettes.
 
@@ -110,7 +112,7 @@ Use `Geist Variable` for the shared interface with system fallbacks that render 
 
 | Role | Working screens | Editorial reports |
 | --- | --- | --- |
-| Page title | 28–36px | 36–48px desktop; 28–34px compact |
+| Page title | 24–28px | 36–48px desktop; 28–34px compact |
 | Section title | 20–24px | 24–28px |
 | Subsection title | 16–18px | 18–20px |
 | Lead or summary | 16–18px | 18–22px |
@@ -131,28 +133,40 @@ These ranges are starting points, not a requirement to use every size. Use a sma
 
 ### Shared layout rhythm
 
-- Every page uses a centered shell at 80% of the available width, with 10% outer space on each side, including compact screens. Do not apply another page-wide maximum that increases those margins. Allocate the inner width to actual working columns.
+- Working pages use a centered shell at 80% of the available width, with 10% outer space on each side, including compact screens. Credential entry is a bounded task: center a form no wider than 440px inside this frame. Short settings credential forms may use a 480px maximum. Do not apply another page-wide maximum that increases those margins. Allocate the inner width to actual working columns.
 - Within that shell, separate navigation, primary content, and supporting detail. Reports may use a narrow contents rail beside the constrained prose column.
-- Use a 4px spacing base: 4–8px within a control, 12–16px between related items, 24–32px between working sections, and 48–64px between major report sections.
+- Use a 4px spacing base: 4–8px within a control, 12–16px between related items, 24–28px between working sections, and 48–64px between major report sections.
 - Keep titles, sections, and actions aligned to the shared 80% frame. Use padding within panels rather than adding a second layer of page padding. Collapse internal columns below 1024px.
 - Provide a stable context header with the current scenario or report and a clear return path. Place global settings and locale controls consistently.
+- Use the shared workspace header for input, settings, document analysis, simulation management, and report pages. Give its toolbar a neutral surface and its title area a white surface. Editorial mastheads keep an open reading layout below the same toolbar. Place navigation and page actions in one toolbar above the title. Home and return controls use the same 40px outlined button, 14px visible label, and leading icon; do not place an icon-only home control beside an editorial title.
+- Standard workspace titles use a 24–28px scale. Editorial titles retain their larger reading scale, with report status below the title. Neither title styling nor Markdown rendering may change the size of navigation controls or shrink an inline heading to body size.
 - Use tabs for alternative views of the same scope. Use a contents navigation for chapters within a document. Avoid wrapping long lists of unrelated destinations into several tab rows.
 
 ### Start and source entry
 
+- Keep the home navigation in a distinct, compact left region on desktop, above content on smaller screens. Show real run counts and a recent-records list in the main region; use existing manifest data only.
 - Make adding materials and describing the question the primary entry. Group prepared-scenario import and examples as alternative ways to begin; present history and resume actions separately.
-- Explain what the user will obtain: possible developments, influential conditions, and supporting evidence.
+- Explain the product in one short sentence. Use action labels for import, examples, history, and settings; do not repeat a description beneath every navigation action.
 - Show upload and interpretation state per document, including partial or failed extraction and the next recovery action.
 - Prefer meaningful document titles in lists. Keep filenames and technical details secondary and available when needed.
 
 ### Scenario review and launch
 
 - Clearly separate source review, scenario assumptions, participants, and execution settings.
+- In generated scenario review, group situation/assumption cards, named participants, and scenario rules under separate section headings. Keep evidence selection in a compact list/detail layout; an unselected evidence panel must not reserve a tall blank column.
 - Use a source list and reading pane when inspecting documents. Keep context visible when switching evidence.
 - Make basic execution settings immediately available; group advanced behavior under a labeled disclosure.
 - Explain automatic continuation and autonomous stopping as distinct decisions. Long switch descriptions should not become a grid of equally weighted cards.
 - Keep the final review summary and launch action easy to locate. Sticky controls must not cover content or keyboard focus.
 - Use a full page for extended review and multi-step preparation. Reserve dialogs for bounded edits and confirmations; avoid stacking settings over a long preview dialog.
+
+### Copy and credential entry
+
+- Put instructions beside the input or decision they explain. Remove page subtitles that repeat the title, field labels, or an obvious button action. Preserve errors, source limitations, and distinctions between automatic continuation and autonomous stopping.
+- Keep credential entry a single-column grid: brand, title, one short explanation, visible password label, input, inline error, primary action, then a separated reset link.
+- Associate errors with the input, announce failures, show processing state, and disable competing actions during synchronization. Keep the reset confirmation and encrypted storage boundary intact.
+- Input width must follow the task's expected content, not the viewport. Never stretch a password form across a desktop workspace. Test 320px, 390px, 1440px, and 1920px at a minimum.
+- Keep provider configuration, scenario input, generation targets, and selected details in identifiable regions. A border around every small text fragment is not information hierarchy.
 
 ### Generation hierarchy
 
@@ -181,7 +195,7 @@ These ranges are starting points, not a requirement to use every size. Use a sma
 
 - Prioritize the current stage, actor interactions, meaningful changes, and pause/continue controls.
 - Keep command and conversation surfaces bright. Use the tactical navy palette only inside the simulation graph, including labels and overlays. A static grid and meaningful selection provide the operational character. The graph palette module owns its canvas and overlay colors.
-- Show the existing compact performance charts directly above the live simulation, without a separate summary or disclosure. Stack metric cards on compact screens. Report metrics remain in execution details.
+- Show the existing compact performance charts directly above the live simulation, without a separate summary or disclosure. Report preparation uses the same card dimensions, spacing, and responsive columns directly below its context header and above the generation board. Stack metric cards on compact screens. Accepted-report metrics remain in execution details.
 - Show validated actor messages as soon as each finishes. Pending previews must be labeled and replaced in place by accepted interactions; only accepted interactions affect saved history, graph state, or reports.
 - Use a viewport-bound layout only when the primary content remains usable. On compact screens, provide focused views or a readable vertical flow instead of shrinking everything into one viewport.
 - Compare worlds with aligned labels and consistent scales. Show incomplete and unclassified worlds alongside the denominator for any distribution.
@@ -223,7 +237,7 @@ The report is the main explanation of the user's experiment. Its reading order i
 | Stop or destructive action | `destructive` | Red-tinted surface, red ink, visible red boundary; separated from forward actions |
 
 - Use 40px common controls and 44px large actions, semibold labels, approximately 8px corners, and consistent icon spacing. Preserve compact controls for bounded table or list actions.
-- Give each decision area one principal action. Navigation belongs in the page header; selected-run actions belong in the selected-run panel; batch-wide actions belong in a separate footer.
+- Give each decision area one principal action. Navigation belongs in the page toolbar; selected-run actions belong in the selected-run panel; batch-wide actions belong in the top-level execution overview header, before the simulation list. Keep the target scope visible next to its controls.
 - Place progression switches close to the run they affect. Place stop controls apart from continue/view controls, with explicit target wording.
 - Keep controls visually distinct from surrounding panels through fill, boundary, elevation, and ink. Hover, pressed, disabled, and focus states must remain recognizable.
 - Align actions in stable groups with 12–16px spacing. On compact screens, wrap labels and groups, and use full-width actions where needed; do not hide or clip essential actions.

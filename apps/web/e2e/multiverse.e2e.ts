@@ -42,6 +42,11 @@ test("two worlds retain independent approvals and finish in the background after
   const readBatch = async () => (await (await page.request.get(`/api/multiverse/${batch.id}`)).json()).batch
   await expect.poll(async () => (await readBatch()).worlds.map((world: { status: string }) => world.status)).toEqual(["waiting", "waiting"])
   await expect(panel.getByRole("button", { name: "Continue simulation", exact: true })).toBeVisible()
+  const batchActions = panel.getByRole("group", { name: "All simulations", exact: true })
+  await expect(batchActions.getByRole("button", { name: "Stop unfinished simulations", exact: true })).toBeVisible()
+  await expect(batchActions.getByRole("button", { name: "Stop simulation", exact: true })).toHaveCount(0)
+  const selectedPanel = panel.getByRole("region", { name: "Simulation 1", exact: true })
+  expect((await batchActions.boundingBox())!.y).toBeLessThan((await selectedPanel.boundingBox())!.y)
   await panel.getByRole("button", { name: "Continue simulation", exact: true }).click()
   await expect.poll(async () => (await readBatch()).worlds.map((world: { status: string }) => world.status)).toEqual(["completed", "waiting"])
   await panel.getByRole("button", { name: "Open Multiverse report", exact: true }).click()

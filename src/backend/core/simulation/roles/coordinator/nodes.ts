@@ -182,7 +182,7 @@ export async function coordinatorNode(
       const progressResult = await runCoordinatorChoice(
         current,
         "progressDecision",
-        () => progressPrompt(previousProgress, currentProgress, state.scenario.text),
+        () => progressPrompt(previousProgress, currentProgress, state.scenario.text, state.scenario.language),
         emit,
         selectProgressDecision,
         ["1", "0"]

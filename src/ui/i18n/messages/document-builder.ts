@@ -6,7 +6,6 @@
  */
 const en = {
   documentAnalysisTitle: "Document analysis",
-  documentAnalysisDescription: "Read the materials, build the scenario and participants, then prepare the simulation.",
   documentUploadPending: "Waiting for upload", documentAnalysisResume: "Continue analysis",
   worldPrepareTitle: "Develop the story",
   worldPrepareDescription: "Build the simulation’s starting situation with the confirmed participants and constraints.",
@@ -15,7 +14,6 @@ const en = {
   worldStart: "Start simulation",
   worldOpenRun: "View simulation",
   worldAnother: "Prepare another simulation",
-  documentScenarioDescription: "Add files, describe a situation, or use both. Set the options, then Run.",
   builderImportScenario: "Import finished scenario",
   builderFiles: "Reference files · optional",
   builderFileHint: "PDF, DOCX, DOC, PPTX, XLSX, CSV, TXT, MD · up to 20 files, 20 MiB each",
@@ -124,7 +122,6 @@ const en = {
 
 const ko = {
   documentAnalysisTitle: "문서 분석",
-  documentAnalysisDescription: "자료를 분석하고 시나리오와 등장인물을 구성한 뒤 시뮬레이션을 준비합니다.",
   documentUploadPending: "업로드 대기", documentAnalysisResume: "분석 계속",
   worldPrepareTitle: "스토리 구체화",
   worldPrepareDescription: "확정한 인물과 조건을 유지하며 시뮬레이션의 시작 상황을 구성합니다.",
@@ -133,7 +130,6 @@ const ko = {
   worldStart: "시뮬레이션 시작",
   worldOpenRun: "시뮬레이션 보기",
   worldAnother: "다른 시뮬레이션 준비",
-  documentScenarioDescription: "파일, 상황 설명, 또는 둘 다 입력하고 옵션을 정한 뒤 실행하세요.",
   builderImportScenario: "완성된 시나리오 불러오기",
   builderFiles: "참고 파일 · 선택",
   builderFileHint: "PDF, DOCX, DOC, PPTX, XLSX, CSV, TXT, MD · 최대 20개, 파일당 20 MiB",

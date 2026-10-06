@@ -12,7 +12,7 @@ const CONTEXT_COMPRESSION_INPUT_CHARS = 700
 
 export function compressMemory(actor: ActorState, context: string, controls: ScenarioControls, lengthGuide: string): string {
   return `Compress memory for the actor below. ${lengthGuide}
-Keep only actionable facts, pressure, commitment, and important promises.
+Keep actionable facts, pressure, commitments, and unresolved questions. Preserve who said what, conditions, negation, and whether an action was proposed, promised, or performed. Retain a consequential disagreement rather than smoothing it into consensus. Use only this actor's visible records; do not infer another actor's private knowledge.
 
 ${renderPromptBlocks({
   SOURCE: { initiallyKnownFacts: actor.knownSourceFacts ?? [] },

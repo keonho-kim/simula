@@ -2,7 +2,7 @@
  * Purpose: Present a generated scenario's assumptions, participants, rules, and issues.
  * Pattern: Read-only review composition.
  * Usage: Displayed after shared scenario generation reaches a terminal draft.
- * Related: src/shared/scenario-builder.ts, src/ui/components/scenario-builder/scenario-builder-dialog.tsx
+ * Related: src/shared/scenario-builder.ts, src/ui/pages/document-analysis-page.tsx, src/ui/styles/document-builder.css
  */
 import type { ScenarioSpecification } from "@/shared/scenario-builder"
 import type { DocumentSet } from "@/shared/documents"
@@ -15,8 +15,8 @@ import { SourceEvidence } from "./source-evidence"
 import { MarkdownContent } from "@/ui/components/markdown/markdown-content"
 
 export function ScenarioReview({ specification: value, documents, t }: { specification: ScenarioSpecification; documents?: DocumentSet; t: UiTexts }) {
-  return <section className="flex flex-col gap-5" aria-label={t.builderReviewTitle}>
-    <header className="flex flex-col gap-2">
+  return <section className="scenario-review" aria-label={t.builderReviewTitle}>
+    <header className="scenario-review-intro">
       <h2 className="text-lg font-semibold"><MarkdownContent generated inline content={value.situation.title} /></h2>
       <MarkdownContent generated content={value.situation.purpose} />
       <MarkdownContent generated content={value.situation.setting} />
@@ -26,11 +26,16 @@ export function ScenarioReview({ specification: value, documents, t }: { specifi
         {value.issues.map((issue, index) => <li key={index}>{documents?.documents.some(document => document.id === issue.scope) ? t.builderPartialHelp : issue.description}</li>)}
       </ul></AlertDescription>
     </Alert> : null}
+    <section className="scenario-review-group" aria-label={t.builderSituationTarget}><h3>{t.builderSituationTarget}</h3>
     <div className="document-builder-review-grid">
       <ReviewCard title={t.builderDecision} paragraphs={[value.situation.decision]} />
       {Object.entries(value.facets).map(([key, facet]) => <ReviewCard key={key} title={builderLabel(key, t)} paragraphs={[facet.summary]} assumptions={facet.assumptions} t={t} />)}
+      {value.situation.assumptions.length ? <ReviewCard title={t.builderAssumptions} paragraphs={value.situation.assumptions} /> : null}
+    </div></section>
+    <section className="scenario-review-group" aria-label={t.builderNames}><h3>{t.builderNames}</h3>
+    <div className="document-builder-review-grid">
       {value.participants.map(participant => <Card key={participant.id} size="sm">
-        <CardHeader><CardTitle><h3><MarkdownContent generated={!participant.nameLocked} inline content={participant.name} /></h3></CardTitle></CardHeader>
+        <CardHeader><CardTitle><h4><MarkdownContent generated={!participant.nameLocked} inline content={participant.name} /></h4></CardTitle></CardHeader>
         <CardContent className="flex flex-col gap-3">
           {participant.nameLocked ? <Badge variant="outline">{t.builderLocked}</Badge> : null}
           {[{ label: t.builderPersonality, text: participant.personality }, { label: t.builderAuthority, text: participant.authority }, { label: t.builderGoal, text: participant.goal }].map(field => <div key={field.label}>
@@ -38,9 +43,12 @@ export function ScenarioReview({ specification: value, documents, t }: { specifi
           </div>)}
         </CardContent>
       </Card>)}
+    </div></section>
+    <section className="scenario-review-group" aria-label={t.builderRules}><h3>{t.builderRules}</h3>
+    <div className="document-builder-review-grid">
       {Object.entries(value.rules).map(([key, rule]) => <ReviewCard key={key} title={builderLabel(key, t)} paragraphs={rule.entries} assumptions={rule.assumptions} t={t} />)}
       <Card size="sm">
-        <CardHeader><CardTitle><h3>{t.builderSourceAccess}</h3></CardTitle></CardHeader>
+        <CardHeader><CardTitle><h4>{t.builderSourceAccess}</h4></CardTitle></CardHeader>
         <CardContent>
           {value.sourceFacts.length ? <ul className="flex flex-col gap-3">
             {value.sourceFacts.map(fact => <li key={fact.id} className="flex flex-col gap-1">
@@ -52,18 +60,17 @@ export function ScenarioReview({ specification: value, documents, t }: { specifi
           </ul> : <p className="text-sm text-muted-foreground">{t.builderNoSourceFacts}</p>}
         </CardContent>
       </Card>
-      {value.situation.assumptions.length ? <ReviewCard title={t.builderAssumptions} paragraphs={value.situation.assumptions} /> : null}
-    </div>
+    </div></section>
     <SourceEvidence key={value.id} setId={value.documentSetId} revision={value.documentRevision}
       ids={value.sourceEvidenceIds} documents={documents} t={t} />
   </section>
 }
 
 function ReviewCard({ title, paragraphs, assumptions, t }: { title: string; paragraphs: string[]; assumptions?: string[]; t?: UiTexts }) {
-  return <Card size="sm"><CardHeader><CardTitle><h3>{title}</h3></CardTitle></CardHeader>
+  return <Card size="sm"><CardHeader><CardTitle><h4>{title}</h4></CardTitle></CardHeader>
     <CardContent className="flex flex-col gap-2">
       {paragraphs.map((paragraph, index) => <MarkdownContent generated key={index} content={paragraph} />)}
-      {assumptions?.length && t ? <div className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground"><h4>{t.builderAssumptions}</h4>{assumptions.map((assumption, index) => <MarkdownContent generated key={index} content={assumption} />)}</div> : null}
+      {assumptions?.length && t ? <div className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground"><h5>{t.builderAssumptions}</h5>{assumptions.map((assumption, index) => <MarkdownContent generated key={index} content={assumption} />)}</div> : null}
     </CardContent>
   </Card>
 }

@@ -1,8 +1,8 @@
 /**
- * Purpose: Verify Report metrics, analysis board, analysis layouts, and compact-screen behavior.
+ * Purpose: Verify report reading and simulation-aligned preparation metrics across screen sizes.
  * Pattern: Browser Workflow Test.
  * Usage: Run through `bun run test:e2e`.
- * Related: src/ui/pages/report-page.tsx, src/ui/styles/report.css
+ * Related: src/ui/pages/report-page.tsx, src/ui/pages/report-preparation-page.tsx, src/ui/styles/llm-metrics.css
  */
 import { expect, test, type Page } from "./fixtures"
 import { ANALYSIS_SECTIONS } from "@/shared/analytical-report"
@@ -128,8 +128,10 @@ test("report round carousel selects messages independently from browsing and sup
 
 })
 
-test("empty failed report remains in preparation with metrics and recovery", async ({ page }) => {
+test("preparation metrics stay at the top and match simulation layout at every width", async ({ page }, testInfo) => {
   await page.addInitScript(() => localStorage.setItem("simula.language", "ko"))
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  await page.route("**/api/analysis/*/metrics", route => route.fulfill({ json: { calls: [] } }))
   const detail = reportFixture()
   detail.state.interactions = []
   detail.state.roundReports = []
@@ -143,9 +145,80 @@ test("empty failed report remains in preparation with metrics and recovery", asy
   await expect(page).toHaveURL(`/reports/${detail.run.id}/prepare`)
   await expect(page.getByRole("button", { name: "미완료 분석 재시도", exact: true })).toBeVisible()
   await expect(page.locator(".report-preparation-column")).toHaveCount(3)
-  await page.getByText("실행 정보", { exact: true }).click()
   const metrics = page.getByRole("region", { name: "모델 지표" })
   await expect(metrics.getByRole("article")).toHaveCount(4)
   await expect(metrics).toContainText("—")
   await expect(metrics).toContainText("0 샘플")
+  await expect(page.locator("details")).toHaveCount(0)
+  const widths = [1920, 1440, 1024, 768, 390, 320]
+  const measureLayout = () => metrics.evaluate(element => {
+    const card = element.querySelector("article")!
+    const value = card.querySelector(".font-mono")!
+    return { columns: getComputedStyle(element).gridTemplateColumns.split(" ").length,
+      gap: getComputedStyle(element).gap, fontSize: getComputedStyle(value).fontSize,
+      padding: getComputedStyle(card.firstElementChild!).padding, background: getComputedStyle(card).backgroundColor,
+      width: card.getBoundingClientRect().width }
+  })
+  const layouts = new Map<number, { columns: number; gap: string; fontSize: string; padding: string; background: string; width: number }>()
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 1000 })
+    const layout = await measureLayout()
+    expect(layout.columns).toBe(width < 480 ? 1 : width < 1024 ? 2 : 4)
+    layouts.set(width, layout)
+    const bounds = await metrics.boundingBox()
+    const header = await page.getByRole("heading", { name: "리포트 작성", exact: true }).boundingBox()
+    const board = await page.locator(".report-preparation-columns").boundingBox()
+    expect(bounds!.y).toBeGreaterThan(header!.y + header!.height)
+    expect(bounds!.y + bounds!.height).toBeLessThan(board!.y)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    if (width === 1440 || width === 390) await page.screenshot({ path: testInfo.outputPath(`preparation-metrics-${width}.png`), fullPage: true })
+  }
+  await page.goto("/simulation")
+  const live = page.getByRole("region", { name: "모델 지표" })
+  await expect(live.getByRole("article")).toHaveCount(4)
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 1000 })
+    const layout = await measureLayout()
+    expect(layout).toEqual(layouts.get(width))
+  }
+})
+
+
+test("report, input, and settings use visible navigation with consistent sizing", async ({ page }, testInfo) => {
+  await page.addInitScript(() => localStorage.setItem("simula.language", "ko"))
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  const detail = reportFixture()
+  detail.run.scenarioName = "장기 제품 전략과 예산 변경에 따른 의사결정 검토 · Long scenario title for responsive report reading"
+  await seedRun(page, detail as unknown as BrowserRunDetail)
+  await page.getByRole("button", { name: /실행 내역 보기/ }).click()
+  await page.getByRole("dialog").getByRole("button", { name: /열기/ }).click()
+  const home = page.getByRole("button", { name: "홈", exact: true })
+  await expect(page.getByRole("region", { name: "분석 리포트", exact: true })).toBeVisible()
+  await expect(page.getByRole("button", { name: "내보내기", exact: true })).toBeVisible()
+  await expect(home).toHaveText("홈")
+  const controlStyle = await home.evaluate(element => ({ fontSize: getComputedStyle(element).fontSize, height: element.getBoundingClientRect().height }))
+  expect(controlStyle).toEqual({ fontSize: "14px", height: 40 })
+  for (const width of [1920, 1440, 1024, 768, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 })
+    const navigation = (await home.boundingBox())!
+    const exporting = (await page.getByRole("button", { name: "내보내기", exact: true }).boundingBox())!
+    const heading = (await page.getByRole("heading", { name: detail.run.scenarioName, exact: true }).boundingBox())!
+    expect(Math.abs(navigation.y - exporting.y)).toBeLessThan(1)
+    expect(heading.y).toBeGreaterThan(navigation.y + navigation.height)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await expect(home).toHaveAttribute("data-variant", "outline")
+    if (width === 1440 || width === 390) await page.screenshot({ path: testInfo.outputPath(`report-navigation-${width}.png`), fullPage: false })
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await home.click()
+  await expect(page).toHaveURL("/")
+  await page.getByRole("button", { name: "설정", exact: true }).click()
+  const back = page.getByRole("button", { name: "돌아가기", exact: true })
+  await expect(back).toHaveText("돌아가기")
+  expect(await back.evaluate(element => ({ fontSize: getComputedStyle(element).fontSize, height: element.getBoundingClientRect().height }))).toEqual(controlStyle)
+  await back.click()
+  await page.getByRole("button", { name: /새 시나리오/ }).click()
+  expect(await back.evaluate(element => ({ fontSize: getComputedStyle(element).fontSize, height: element.getBoundingClientRect().height }))).toEqual(controlStyle)
+  await back.click()
+  await expect(page).toHaveURL("/")
 })
